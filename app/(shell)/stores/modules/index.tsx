@@ -1,174 +1,582 @@
-"use client";
-import { useState } from "react";
+'use client';
 
-type Store = { id: number; name: string; domain: string; status: string; synced: string };
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { toast } from 'react-toastify';
+import useRequest from '@/hooks/useRequest';
+import { StoreRow, NoteType } from '@/models/store.model.server';
+import StoresTable from './StoresTable';
+import AddStoreModal from './AddStoreModal';
+import NotesModal from './NotesModal';
 
-const INITIAL_STORES: Store[] = [
-  { id: 1, name: "AU Flagship", domain: "auflagship.myshopify.com", status: "connected", synced: "3 min ago" },
-  { id: 2, name: "NZ Store", domain: "nzstore.myshopify.com", status: "connected", synced: "3 min ago" },
-  { id: 3, name: "UK Store", domain: "ukstore.myshopify.com", status: "disconnected", synced: "2 hrs ago" },
-];
+type NotesAction = { storeId: string; type: 'create' | 'update' | 'delete'; noteId?: number };
+type ConnectStep = 1 | 2 | 3 | 4;
 
-const SYNC_MAP: Record<string, { chip: string; label: string }> = {
-  connected: { chip: "bg-green-100 text-green-700", label: "Live" },
-  disconnected: { chip: "bg-gray-100 text-gray-500", label: "Disconnected" },
-  error: { chip: "bg-red-100 text-red-600", label: "Error" },
-};
+const EMPTY_FORM = { storeDomain: '' };
+
+type ApiResponse<T> = { success: boolean; message: string; data: T };
+
+async function getJson<T>(url: string) {
+  const res = await fetch(url);
+  const json = (await res.json()) as ApiResponse<T>;
+  if (!res.ok || !json.success) {
+    throw new Error(json.message || 'Request failed');
+  }
+  return json.data;
+}
 
 export default function StoresPage() {
-  const [stores, setStores] = useState<Store[]>(INITIAL_STORES);
-  const [view, setView] = useState<"table" | "cards">("table");
-  const [sName, setSName] = useState("");
-  const [sUrl, setSUrl] = useState("");
-  const [sKey, setSKey] = useState("");
-  const [sSecret, setSSecret] = useState("");
-  const [connectMsg, setConnectMsg] = useState("");
-  const [connectMsgClass, setConnectMsgClass] = useState("");
+  const [stores, setStores] = useState<StoreRow[]>([]);
+  const [savedMargins, setSavedMargins] = useState<Record<string, number>>({});
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkMargin, setBulkMargin] = useState('');
+  const [savingMarginIds, setSavingMarginIds] = useState<string[]>([]);
+  const [disconnectingIds, setDisconnectingIds] = useState<string[]>([]);
+  const [deletingIds, setDeletingIds] = useState<string[]>([]);
+  const [addModalOpen, setAddModalOpen] = useState(false);
+  const [addForm, setAddForm] = useState(EMPTY_FORM);
+  const [notesModal, setNotesModal] = useState<{ isOpen: boolean; storeId: string; storeName: string }>({
+    isOpen: false,
+    storeId: '',
+    storeName: '',
+  });
+  const [notesAction, setNotesAction] = useState<NotesAction | null>(null);
 
-  function connectStore() {
-    if (!sName || !sUrl || !sKey || !sSecret) {
-      setConnectMsg("Please fill in all fields.");
-      setConnectMsgClass("text-sm text-red-600");
+  const [connectStep, setConnectStep] = useState<ConnectStep>(1);
+  const [normalizedDomain, setNormalizedDomain] = useState('');
+  const [domainError, setDomainError] = useState('');
+  const [authorizationError, setAuthorizationError] = useState('');
+  const [deviceCode, setDeviceCode] = useState('');
+  const [userCode, setUserCode] = useState('');
+  const [authorizationUrl, setAuthorizationUrl] = useState('');
+  const [installUrl, setInstallUrl] = useState('');
+  const [copyCodeText, setCopyCodeText] = useState('Copy Code');
+  const [timeLeft, setTimeLeft] = useState(600);
+  const [isCheckingDomain, setIsCheckingDomain] = useState(false);
+  const [isAuthorizing, setIsAuthorizing] = useState(false);
+  const [isListingOrgs, setIsListingOrgs] = useState(false);
+  const [isCreatingApp, setIsCreatingApp] = useState(false);
+  const [isInstalling, setIsInstalling] = useState(false);
+
+  const authPollLock = useRef(false);
+
+  const listReq = useRequest<StoreRow[]>();
+  const { request: listStoresRequest, loading: listLoading } = listReq;
+  const marginReq = useRequest();
+  const statusReq = useRequest();
+  const deleteReq = useRequest();
+  const notesReq = useRequest();
+  const searchParams = useSearchParams();
+
+  const loadStores = useCallback(() => {
+    void listStoresRequest({
+      url: '/api/stores',
+      method: 'GET',
+      showToast: false,
+      onSuccess: ({ data }) => {
+        setStores(data ?? []);
+        const margins: Record<string, number> = {};
+        (data ?? []).forEach((store) => {
+          margins[store.id] = store.profitMargin ?? 0;
+        });
+        setSavedMargins(margins);
+      },
+    });
+  }, [listStoresRequest]);
+
+  useEffect(() => {
+    loadStores();
+  }, [loadStores]);
+
+  useEffect(() => {
+    if (searchParams.get('connected')) {
+      loadStores();
+    }
+  }, [searchParams, loadStores]);
+
+  useEffect(() => {
+    if (connectStep !== 2) return;
+
+    const timer = window.setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          window.clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [connectStep]);
+
+  const resetConnectFlow = () => {
+    setConnectStep(1);
+    setAddForm(EMPTY_FORM);
+    setNormalizedDomain('');
+    setDomainError('');
+    setAuthorizationError('');
+    setDeviceCode('');
+    setUserCode('');
+    setAuthorizationUrl('');
+    setInstallUrl('');
+    setCopyCodeText('Copy Code');
+    setTimeLeft(600);
+    setIsCheckingDomain(false);
+    setIsAuthorizing(false);
+    setIsListingOrgs(false);
+    setIsCreatingApp(false);
+    setIsInstalling(false);
+    authPollLock.current = false;
+  };
+
+  const isMarginDirty = (store: StoreRow) =>
+    (store.profitMargin ?? 0) !== (savedMargins[store.id] ?? 0);
+
+  const handleSelectAll = (checked: boolean) =>
+    setSelectedIds(checked ? stores.map((store) => store.id) : []);
+
+  const handleSelectOne = (id: string, checked: boolean) =>
+    setSelectedIds((prev) => checked ? [...new Set([...prev, id])] : prev.filter((storeId) => storeId !== id));
+
+  const handleMarginChange = (id: string, margin: number) =>
+    setStores((prev) => prev.map((store) => store.id === id ? { ...store, profitMargin: margin } : store));
+
+  const handleSaveMargin = async (id: string) => {
+    const store = stores.find((item) => item.id === id);
+    if (!store) return;
+
+    setSavingMarginIds((prev) => [...prev, id]);
+    await marginReq.request({
+      url: `/api/stores/${id}`,
+      method: 'PATCH',
+      data: { profitMargin: store.profitMargin ?? 0 },
+      successMessage: 'Margin saved.',
+      onSuccess: () => setSavedMargins((prev) => ({ ...prev, [id]: store.profitMargin ?? 0 })),
+    });
+    setSavingMarginIds((prev) => prev.filter((item) => item !== id));
+  };
+
+  const handleBulkMargin = async () => {
+    if (!selectedIds.length) return;
+    const margin = parseFloat(bulkMargin);
+    if (isNaN(margin)) {
+      alert('Enter a valid margin first.');
       return;
     }
-    setStores((prev) => [...prev, { id: Date.now(), name: sName, domain: sUrl, status: "connected", synced: "Just now" }]);
-    setConnectMsg(`✓ ${sName} connected!`);
-    setConnectMsgClass("text-sm text-green-600");
-    setSName(""); setSUrl(""); setSKey(""); setSSecret("");
-    setTimeout(() => setConnectMsg(""), 4000);
-  }
 
-  function disconn(id: number) {
-    setStores((prev) => prev.map((s) => s.id === id ? { ...s, status: "disconnected" } : s));
-  }
-
-  function reconn(id: number) {
-    setStores((prev) => prev.map((s) => s.id === id ? { ...s, status: "connected", synced: "Just now" } : s));
-  }
-
-  function delStore(id: number) {
-    if (!confirm("Delete this store?")) return;
-    setStores((prev) => prev.filter((s) => s.id !== id));
-  }
-
-  function StoreActions({ s }: { s: Store }) {
-    if (s.status === "connected") {
-      return (
-        <button onClick={() => disconn(s.id)} className="px-2.5 py-1 text-xs border border-amber-300 text-amber-600 rounded-lg hover:bg-amber-50 transition-colors duration-150 cursor-pointer">Disconnect</button>
-      );
-    }
-    return (
-      <>
-        <button onClick={() => reconn(s.id)} className="px-2.5 py-1 text-xs border border-blue-200 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors duration-150 cursor-pointer mr-1">Reconnect</button>
-        <button onClick={() => delStore(s.id)} className="px-2.5 py-1 text-xs border border-red-200 text-red-500 rounded-lg hover:bg-red-50 transition-colors duration-150 cursor-pointer">Delete</button>
-      </>
+    await Promise.all(
+      selectedIds.map(async (id) => {
+        setSavingMarginIds((prev) => [...prev, id]);
+        await marginReq.request({
+          url: `/api/stores/${id}`,
+          method: 'PATCH',
+          data: { profitMargin: margin },
+          showToast: false,
+          onSuccess: () => {
+            setStores((prev) => prev.map((store) => store.id === id ? { ...store, profitMargin: margin } : store));
+            setSavedMargins((prev) => ({ ...prev, [id]: margin }));
+          },
+        });
+        setSavingMarginIds((prev) => prev.filter((item) => item !== id));
+      })
     );
-  }
+    setBulkMargin('');
+  };
+
+  const handleDisconnect = async (id: string) => {
+    const store = stores.find((item) => item.id === id);
+    if (!store || !confirm(`Disconnect ${store.name ?? store.storeDomain}?`)) return;
+
+    setDisconnectingIds((prev) => [...prev, id]);
+    await statusReq.request({
+      url: `/api/stores/${id}`,
+      method: 'PATCH',
+      data: { status: 'disconnected' },
+      successMessage: 'Store disconnected.',
+      onSuccess: () => setStores((prev) => prev.map((item) => item.id === id ? { ...item, status: 'disconnected' } : item)),
+    });
+    setDisconnectingIds((prev) => prev.filter((item) => item !== id));
+  };
+
+  const handleReconnect = async (id: string) => {
+    const store = stores.find((item) => item.id === id);
+    if (!store) return;
+
+    resetConnectFlow();
+    setAddModalOpen(true);
+    setAddForm({ storeDomain: store.storeDomain });
+    setTimeout(() => {
+      void handleStartConnect(store.storeDomain);
+    }, 0);
+  };
+
+  const handleDelete = async (id: string) => {
+    const store = stores.find((item) => item.id === id);
+    if (!store || !confirm(`Delete ${store.name ?? store.storeDomain}? This cannot be undone.`)) return;
+
+    setDeletingIds((prev) => [...prev, id]);
+    await deleteReq.request({
+      url: `/api/stores/${id}`,
+      method: 'DELETE',
+      successMessage: 'Store deleted.',
+      onSuccess: () => {
+        setStores((prev) => prev.filter((item) => item.id !== id));
+        setSelectedIds((prev) => prev.filter((item) => item !== id));
+      },
+    });
+    setDeletingIds((prev) => prev.filter((item) => item !== id));
+  };
+
+  const handleOpenConnectModal = () => {
+    resetConnectFlow();
+    setAddModalOpen(true);
+  };
+
+  const handleGetOrganizationsAndCreateApp = useCallback(async (tokens: {
+    appManagementToken: string;
+    businessPlatformToken: string;
+  }) => {
+    try {
+      setIsListingOrgs(true);
+      const organizations = await getJson<{
+        realShopUrl: string | null;
+        storeOrganizationId: string | null;
+      }>(
+        `/api/list-organizations?businessPlatformToken=${encodeURIComponent(tokens.businessPlatformToken)}&store=${encodeURIComponent(normalizedDomain)}`
+      );
+      setIsListingOrgs(false);
+
+      if (!organizations.storeOrganizationId) {
+        setAuthorizationError(
+          `${normalizedDomain} is not available under your authorized organizations. Check account access and try again.`
+        );
+        setIsAuthorizing(false);
+        return;
+      }
+
+      setIsCreatingApp(true);
+      const created = await getJson<{ installUrl: string }>(
+        `/api/create-app?appManagementToken=${encodeURIComponent(tokens.appManagementToken)}&organizationId=${encodeURIComponent(organizations.storeOrganizationId)}&store=${encodeURIComponent(normalizedDomain)}`
+      );
+      setIsCreatingApp(false);
+      setInstallUrl(created.installUrl);
+      setConnectStep(3);
+      setIsAuthorizing(false);
+    } catch (error) {
+      setIsListingOrgs(false);
+      setIsCreatingApp(false);
+      setIsAuthorizing(false);
+      setAuthorizationError(error instanceof Error ? error.message : 'Failed to create Shopify app');
+    }
+  }, [normalizedDomain]);
+
+  const pollAuthorization = useCallback(async () => {
+    if (!deviceCode || authPollLock.current) return;
+    authPollLock.current = true;
+    try {
+      const polled = await getJson<{
+        error?: string;
+        appManagementToken?: string;
+        businessPlatformToken?: string;
+      }>(`/api/poll-token?device_code=${encodeURIComponent(deviceCode)}`);
+
+      if (polled.error === 'authorization_pending' || polled.error === 'slow_down') return;
+
+      if (polled.error) {
+        setAuthorizationError('Authorization failed or expired. Please try again.');
+        setIsAuthorizing(false);
+        return;
+      }
+
+      if (!polled.appManagementToken || !polled.businessPlatformToken) {
+        setAuthorizationError('Missing tokens from Shopify authorization. Please retry.');
+        setIsAuthorizing(false);
+        return;
+      }
+
+      await handleGetOrganizationsAndCreateApp({
+        appManagementToken: polled.appManagementToken,
+        businessPlatformToken: polled.businessPlatformToken,
+      });
+    } catch (error) {
+      setAuthorizationError(error instanceof Error ? error.message : 'Authorization polling failed');
+      setIsAuthorizing(false);
+    } finally {
+      authPollLock.current = false;
+    }
+  }, [deviceCode, handleGetOrganizationsAndCreateApp]);
+
+  useEffect(() => {
+    if (!isAuthorizing || !deviceCode || connectStep !== 2) return;
+    const intervalId = window.setInterval(() => {
+      void pollAuthorization();
+    }, 4000);
+    return () => window.clearInterval(intervalId);
+  }, [isAuthorizing, deviceCode, connectStep, pollAuthorization]);
+
+  useEffect(() => {
+    if (!isInstalling || !normalizedDomain || connectStep !== 3) return;
+    const intervalId = window.setInterval(async () => {
+      try {
+        const status = await getJson<{ connected: boolean; storeDomain: string }>(
+          `/api/store-connected-status?store=${encodeURIComponent(normalizedDomain)}`
+        );
+        if (status.connected) {
+          setConnectStep(4);
+          setIsInstalling(false);
+          loadStores();
+        }
+      } catch {
+        // ignore polling errors during install wait
+      }
+    }, 4000);
+    return () => window.clearInterval(intervalId);
+  }, [isInstalling, normalizedDomain, connectStep, loadStores]);
+
+  const handleStartConnect = async (forcedDomain?: string) => {
+    const inputDomain = (forcedDomain ?? addForm.storeDomain).trim();
+    setDomainError('');
+    setAuthorizationError('');
+
+    if (!inputDomain) {
+      setDomainError('Please enter your store domain.');
+      return;
+    }
+
+    try {
+      setIsCheckingDomain(true);
+      const status = await getJson<{
+        connected: boolean;
+        storeDomain: string;
+      }>(`/api/store-connected-status?store=${encodeURIComponent(inputDomain)}`);
+
+      if (status.connected) {
+        setDomainError('This store is already connected.');
+        setIsCheckingDomain(false);
+        return;
+      }
+
+      const codeData = await getJson<{
+        device_code?: string;
+        user_code?: string;
+        verification_uri_complete?: string;
+      }>('/api/device-code');
+
+      if (!codeData.device_code || !codeData.user_code || !codeData.verification_uri_complete) {
+        throw new Error('Invalid device authorization response from Shopify.');
+      }
+
+      setNormalizedDomain(status.storeDomain);
+      setAddForm({ storeDomain: status.storeDomain });
+      setDeviceCode(codeData.device_code);
+      setUserCode(codeData.user_code);
+      setAuthorizationUrl(codeData.verification_uri_complete);
+      setTimeLeft(600);
+      setConnectStep(2);
+    } catch (error) {
+      setDomainError(error instanceof Error ? error.message : 'Failed to start store connection.');
+    } finally {
+      setIsCheckingDomain(false);
+    }
+  };
+
+  const handleCopyCode = () => {
+    if (!userCode) return;
+    navigator.clipboard.writeText(userCode);
+    setCopyCodeText('Copied');
+    toast.info('Code copied.');
+    setTimeout(() => setCopyCodeText('Copy Code'), 1500);
+  };
+
+  const handleAuthorize = () => {
+    if (!authorizationUrl) return;
+    setAuthorizationError('');
+    setIsAuthorizing(true);
+    window.open(authorizationUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleCopyAuthorizationUrl = () => {
+    if (!authorizationUrl) return;
+    navigator.clipboard.writeText(authorizationUrl);
+    toast.info('Authorization URL copied.');
+  };
+
+  const handleInstall = () => {
+    if (!installUrl) return;
+    setIsInstalling(true);
+    window.open(installUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleCopyInstallUrl = () => {
+    if (!installUrl) return;
+    navigator.clipboard.writeText(installUrl);
+    toast.info('Install URL copied.');
+  };
+
+  const getStoreNotes = (storeId: string) =>
+    stores.find((store) => store.id === storeId)?.notes ?? [];
+
+  const persistNotes = async (
+    storeId: string,
+    nextNotes: NoteType[],
+    previousNotes: NoteType[],
+    type: NotesAction['type'],
+    noteId?: number
+  ) => {
+    setNotesAction({ storeId, type, noteId });
+    setStores((prev) =>
+      prev.map((store) => store.id === storeId ? { ...store, notes: nextNotes } : store)
+    );
+
+    await notesReq.request({
+      url: `/api/stores/${storeId}`,
+      method: 'PATCH',
+      data: { notes: nextNotes },
+      successMessage:
+        type === 'create' ? 'Note added.' : type === 'update' ? 'Note updated.' : 'Note deleted.',
+      onError: () =>
+        setStores((prev) => prev.map((store) => store.id === storeId ? { ...store, notes: previousNotes } : store)),
+    });
+
+    setNotesAction(null);
+  };
+
+  const handleAddNote = async (storeId: string, text: string) => {
+    const previous = getStoreNotes(storeId);
+    const newId = previous.length > 0 ? Math.max(...previous.map((note) => note.id)) + 1 : 1;
+    const note: NoteType = { id: newId, text, createdAt: new Date().toISOString(), editedAt: null };
+    await persistNotes(storeId, [note, ...previous], previous, 'create', newId);
+  };
+
+  const handleEditNote = async (storeId: string, noteId: number, text: string) => {
+    const previous = getStoreNotes(storeId);
+    const next = previous.map((note) =>
+      note.id === noteId ? { ...note, text, editedAt: new Date().toISOString() } : note
+    );
+    await persistNotes(storeId, next, previous, 'update', noteId);
+  };
+
+  const handleDeleteNote = async (storeId: string, noteId: number) => {
+    const previous = getStoreNotes(storeId);
+    await persistNotes(storeId, previous.filter((note) => note.id !== noteId), previous, 'delete', noteId);
+  };
 
   return (
-    <main className="flex-1 p-6 space-y-6">
-
-      {/* Connect New Store */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <h2 className="text-base font-semibold text-gray-900 mb-4">Connect New Store</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Store Name</label>
-            <input type="text" placeholder="My Shopify Store" value={sName} onChange={(e) => setSName(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Shopify Store URL</label>
-            <input type="text" placeholder="yourstore.myshopify.com" value={sUrl} onChange={(e) => setSUrl(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">API Key</label>
-            <input type="password" placeholder="••••••••••••••••" value={sKey} onChange={(e) => setSKey(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">API Secret</label>
-            <input type="password" placeholder="••••••••••••••••" value={sSecret} onChange={(e) => setSSecret(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
-          </div>
-        </div>
-        <div className="mt-4 flex items-center gap-3">
-          <button onClick={connectStore} className="bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors duration-150 cursor-pointer">Connect Store</button>
-          {connectMsg && <span className={connectMsgClass}>{connectMsg}</span>}
+    <main className="flex-1 p-6 space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-gray-500">Manage connected Shopify stores and profit margins.</p>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={loadStores}
+            disabled={listLoading}
+            className="flex items-center gap-1.5 bg-white border border-gray-300 text-gray-600 text-sm px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors shadow-sm cursor-pointer disabled:opacity-50"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            {listLoading ? 'Refreshing…' : 'Refresh'}
+          </button>
+          <button
+            onClick={handleOpenConnectModal}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors cursor-pointer"
+          >
+            + Connect Store
+          </button>
         </div>
       </div>
 
-      {/* Connected Stores */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-gray-900">Connected Stores</h2>
-          <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5">
-            <button
-              onClick={() => setView("table")}
-              className={`view-btn px-3 py-1.5 rounded-md text-xs font-medium transition-colors duration-150 cursor-pointer ${view === "table" ? "bg-white text-gray-700 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
-            >
-              ≡ Table
-            </button>
-            <button
-              onClick={() => setView("cards")}
-              className={`view-btn px-3 py-1.5 rounded-md text-xs font-medium transition-colors duration-150 cursor-pointer ${view === "cards" ? "bg-white text-gray-700 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
-            >
-              ⊞ Cards
-            </button>
-          </div>
+        <div className="px-5 py-3 border-b border-gray-100 flex flex-wrap items-center gap-3 text-sm">
+          <span className="text-gray-500">{selectedIds.length} selected</span>
+          <input
+            type="number"
+            min="0"
+            max="100"
+            step="0.1"
+            placeholder="Bulk margin e.g. 15"
+            value={bulkMargin}
+            onChange={(e) => setBulkMargin(e.target.value)}
+            className="w-40 border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <button
+            onClick={() => void handleBulkMargin()}
+            disabled={!selectedIds.length || !bulkMargin || marginReq.loading}
+            className="px-3 py-1.5 bg-gray-800 text-white rounded-lg text-xs font-medium hover:bg-gray-700 disabled:opacity-40 cursor-pointer transition-colors"
+          >
+            Apply to selected
+          </button>
         </div>
 
-        {/* Table view */}
-        {view === "table" && (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-100">
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Store Name</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Shopify Domain</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Sync Status</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Last Synced</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {stores.map((s) => {
-                const sc = SYNC_MAP[s.status] || SYNC_MAP.disconnected;
-                return (
-                  <tr key={s.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors duration-100">
-                    <td className="px-4 py-3 text-sm font-medium text-gray-900">{s.name}</td>
-                    <td className="px-4 py-3 text-sm text-gray-500 font-mono" data-protected style={{ userSelect: "none" }}>{s.domain}</td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${sc.chip}`}>{sc.label}</span>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-500">{s.synced}</td>
-                    <td className="px-4 py-3"><StoreActions s={s} /></td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-
-        {/* Cards view */}
-        {view === "cards" && (
-          <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {stores.map((s) => {
-              const sc = SYNC_MAP[s.status] || SYNC_MAP.disconnected;
-              return (
-                <div key={s.id} className="store-card bg-white border border-gray-200 rounded-xl p-4">
-                  <div className="flex items-start justify-between mb-2">
-                    <div>
-                      <h3 className="text-sm font-semibold text-gray-900">{s.name}</h3>
-                      <p className="text-xs text-gray-400 font-mono mt-0.5" data-protected style={{ userSelect: "none" }}>{s.domain}</p>
-                    </div>
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${sc.chip}`}>{sc.label}</span>
-                  </div>
-                  <p className="text-xs text-gray-400 mb-3">Last synced: {s.synced}</p>
-                  <div className="flex gap-2"><StoreActions s={s} /></div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+        <StoresTable
+          stores={stores}
+          isLoading={listLoading}
+          selectedIds={selectedIds}
+          onSelectAll={handleSelectAll}
+          onSelectOne={handleSelectOne}
+          onMarginChange={handleMarginChange}
+          onSaveMargin={(id) => void handleSaveMargin(id)}
+          onDisconnect={(id) => void handleDisconnect(id)}
+          onReconnect={(id) => void handleReconnect(id)}
+          onDelete={(id) => void handleDelete(id)}
+          onOpenNotes={(id, name) => setNotesModal({ isOpen: true, storeId: id, storeName: name })}
+          isMarginDirty={isMarginDirty}
+          savingMarginIds={savingMarginIds}
+          disconnectingIds={disconnectingIds}
+          deletingIds={deletingIds}
+        />
       </div>
 
+      <AddStoreModal
+        isOpen={addModalOpen}
+        onClose={() => {
+          setAddModalOpen(false);
+          resetConnectFlow();
+        }}
+        currentStep={connectStep}
+        storeDomain={addForm.storeDomain}
+        onStoreDomainChange={(value) => setAddForm({ storeDomain: value })}
+        onStartConnect={() => void handleStartConnect()}
+        domainError={domainError}
+        isCheckingDomain={isCheckingDomain}
+        authorizationCode={userCode}
+        authorizationUrl={authorizationUrl}
+        copyCodeText={copyCodeText}
+        timeLeft={timeLeft}
+        isAuthorizing={isAuthorizing}
+        isCreatingApp={isCreatingApp}
+        isListingOrgs={isListingOrgs}
+        authorizationError={authorizationError}
+        onCopyCode={handleCopyCode}
+        onCopyAuthorizationUrl={handleCopyAuthorizationUrl}
+        onAuthorize={handleAuthorize}
+        onBackToStepOne={() => {
+          setConnectStep(1);
+          setAuthorizationError('');
+          setIsAuthorizing(false);
+          setIsListingOrgs(false);
+          setIsCreatingApp(false);
+        }}
+        isInstalling={isInstalling}
+        installUrl={installUrl}
+        onInstall={handleInstall}
+        onCopyInstallUrl={handleCopyInstallUrl}
+        onStartOver={resetConnectFlow}
+      />
+
+      <NotesModal
+        isOpen={notesModal.isOpen}
+        onClose={() => setNotesModal((prev) => ({ ...prev, isOpen: false }))}
+        storeName={notesModal.storeName}
+        storeId={notesModal.storeId}
+        notes={getStoreNotes(notesModal.storeId)}
+        onAddNote={handleAddNote}
+        onEditNote={handleEditNote}
+        onDeleteNote={handleDeleteNote}
+        isLoading={notesReq.loading}
+        activeAction={notesAction?.storeId === notesModal.storeId ? notesAction.type : null}
+        activeNoteId={notesAction?.storeId === notesModal.storeId ? (notesAction.noteId ?? null) : null}
+      />
     </main>
   );
 }
