@@ -1,20 +1,11 @@
 import prisma from '@/lib/prisma.server';
 
-export type NoteType = {
-  id: number;
-  text: string;
-  createdAt: string;
-  editedAt: string | null;
-};
-
 export type StoreRow = {
   id: string;
   storeDomain: string;
   name: string | null;
   url: string | null;
   email: string | null;
-  profitMargin: number | null;
-  notes: NoteType[];
   status: string;
   createdAt: string;
   updatedAt: string;
@@ -30,8 +21,6 @@ export type CreateStoreData = {
 export type UpdateStoreData = {
   status?: string;
   accessToken?: string | null;
-  profitMargin?: number;
-  notes?: string;
   name?: string;
   url?: string | null;
   email?: string | null;
@@ -48,8 +37,6 @@ export class StoreModel {
       name: s.name,
       url: s.url,
       email: s.email,
-      profitMargin: s.profitMargin,
-      notes: s.notes ? (JSON.parse(s.notes as string) as NoteType[]) : [],
       status: s.status,
       createdAt: s.createdAt.toISOString(),
       updatedAt: s.updatedAt.toISOString(),
@@ -77,7 +64,6 @@ export class StoreModel {
         clientId: data.clientId,
         clientSecret: data.clientSecret,
         status: 'pending',
-        profitMargin: 10,
       },
     });
   }
@@ -98,7 +84,6 @@ export class StoreModel {
         storeDomain: data.storeDomain,
         clientId: data.clientId,
         clientSecret: data.clientSecret,
-        profitMargin: 10,
         status: 'pending',
       },
     });

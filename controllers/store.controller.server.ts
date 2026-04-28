@@ -1,4 +1,4 @@
-import { StoreModel, NoteType } from '@/models/store.model.server';
+import { StoreModel } from '@/models/store.model.server';
 import {
   generateInstallLink,
   normalizeShopDomain,
@@ -79,18 +79,6 @@ export class StoreController {
       if (status === 'disconnected') {
         updateData.accessToken = null;
       }
-    }
-
-    if ('profitMargin' in data) {
-      const margin = Number(data.profitMargin);
-      if (isNaN(margin) || margin < 0 || margin > 100) {
-        return { error: { message: 'Profit margin must be between 0 and 100', status: 400 } };
-      }
-      updateData.profitMargin = margin;
-    }
-
-    if ('notes' in data) {
-      updateData.notes = JSON.stringify(data.notes as NoteType[]);
     }
 
     const updated = await model.update(id, updateData);

@@ -30,9 +30,7 @@ model Store {
   name         String?
   accessToken  String?
   url          String?
-  profitMargin Float?   @default(10) // Default margin for this store
   email        String?
-  notes        String?  @db.Text
   status       String   @default("pending")
   clientId     String
   clientSecret String

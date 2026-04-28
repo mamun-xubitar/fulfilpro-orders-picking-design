@@ -4,12 +4,10 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { toast } from 'react-toastify';
 import useRequest from '@/hooks/useRequest';
-import { StoreRow, NoteType } from '@/models/store.model.server';
+import { StoreRow } from '@/models/store.model.server';
 import StoresTable from './StoresTable';
 import AddStoreModal from './AddStoreModal';
-import NotesModal from './NotesModal';
 
-type NotesAction = { storeId: string; type: 'create' | 'update' | 'delete'; noteId?: number };
 type ConnectStep = 1 | 2 | 3 | 4;
 
 const EMPTY_FORM = { storeDomain: '' };
@@ -27,20 +25,11 @@ async function getJson<T>(url: string) {
 
 export default function StoresPage() {
   const [stores, setStores] = useState<StoreRow[]>([]);
-  const [savedMargins, setSavedMargins] = useState<Record<string, number>>({});
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [bulkMargin, setBulkMargin] = useState('');
-  const [savingMarginIds, setSavingMarginIds] = useState<string[]>([]);
   const [disconnectingIds, setDisconnectingIds] = useState<string[]>([]);
   const [deletingIds, setDeletingIds] = useState<string[]>([]);
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [addForm, setAddForm] = useState(EMPTY_FORM);
-  const [notesModal, setNotesModal] = useState<{ isOpen: boolean; storeId: string; storeName: string }>({
-    isOpen: false,
-    storeId: '',
-    storeName: '',
-  });
-  const [notesAction, setNotesAction] = useState<NotesAction | null>(null);
 
   const [connectStep, setConnectStep] = useState<ConnectStep>(1);
   const [normalizedDomain, setNormalizedDomain] = useState('');
@@ -62,10 +51,8 @@ export default function StoresPage() {
 
   const listReq = useRequest<StoreRow[]>();
   const { request: listStoresRequest, loading: listLoading } = listReq;
-  const marginReq = useRequest();
   const statusReq = useRequest();
   const deleteReq = useRequest();
-  const notesReq = useRequest();
   const searchParams = useSearchParams();
 
   const loadStores = useCallback(() => {
@@ -75,11 +62,6 @@ export default function StoresPage() {
       showToast: false,
       onSuccess: ({ data }) => {
         setStores(data ?? []);
-        const margins: Record<string, number> = {};
-        (data ?? []).forEach((store) => {
-          margins[store.id] = store.profitMargin ?? 0;
-        });
-        setSavedMargins(margins);
       },
     });
   }, [listStoresRequest]);
@@ -130,59 +112,11 @@ export default function StoresPage() {
     authPollLock.current = false;
   };
 
-  const isMarginDirty = (store: StoreRow) =>
-    (store.profitMargin ?? 0) !== (savedMargins[store.id] ?? 0);
-
   const handleSelectAll = (checked: boolean) =>
     setSelectedIds(checked ? stores.map((store) => store.id) : []);
 
   const handleSelectOne = (id: string, checked: boolean) =>
     setSelectedIds((prev) => checked ? [...new Set([...prev, id])] : prev.filter((storeId) => storeId !== id));
-
-  const handleMarginChange = (id: string, margin: number) =>
-    setStores((prev) => prev.map((store) => store.id === id ? { ...store, profitMargin: margin } : store));
-
-  const handleSaveMargin = async (id: string) => {
-    const store = stores.find((item) => item.id === id);
-    if (!store) return;
-
-    setSavingMarginIds((prev) => [...prev, id]);
-    await marginReq.request({
-      url: `/api/stores/${id}`,
-      method: 'PATCH',
-      data: { profitMargin: store.profitMargin ?? 0 },
-      successMessage: 'Margin saved.',
-      onSuccess: () => setSavedMargins((prev) => ({ ...prev, [id]: store.profitMargin ?? 0 })),
-    });
-    setSavingMarginIds((prev) => prev.filter((item) => item !== id));
-  };
-
-  const handleBulkMargin = async () => {
-    if (!selectedIds.length) return;
-    const margin = parseFloat(bulkMargin);
-    if (isNaN(margin)) {
-      alert('Enter a valid margin first.');
-      return;
-    }
-
-    await Promise.all(
-      selectedIds.map(async (id) => {
-        setSavingMarginIds((prev) => [...prev, id]);
-        await marginReq.request({
-          url: `/api/stores/${id}`,
-          method: 'PATCH',
-          data: { profitMargin: margin },
-          showToast: false,
-          onSuccess: () => {
-            setStores((prev) => prev.map((store) => store.id === id ? { ...store, profitMargin: margin } : store));
-            setSavedMargins((prev) => ({ ...prev, [id]: margin }));
-          },
-        });
-        setSavingMarginIds((prev) => prev.filter((item) => item !== id));
-      })
-    );
-    setBulkMargin('');
-  };
 
   const handleDisconnect = async (id: string) => {
     const store = stores.find((item) => item.id === id);
@@ -414,58 +348,10 @@ export default function StoresPage() {
     toast.info('Install URL copied.');
   };
 
-  const getStoreNotes = (storeId: string) =>
-    stores.find((store) => store.id === storeId)?.notes ?? [];
-
-  const persistNotes = async (
-    storeId: string,
-    nextNotes: NoteType[],
-    previousNotes: NoteType[],
-    type: NotesAction['type'],
-    noteId?: number
-  ) => {
-    setNotesAction({ storeId, type, noteId });
-    setStores((prev) =>
-      prev.map((store) => store.id === storeId ? { ...store, notes: nextNotes } : store)
-    );
-
-    await notesReq.request({
-      url: `/api/stores/${storeId}`,
-      method: 'PATCH',
-      data: { notes: nextNotes },
-      successMessage:
-        type === 'create' ? 'Note added.' : type === 'update' ? 'Note updated.' : 'Note deleted.',
-      onError: () =>
-        setStores((prev) => prev.map((store) => store.id === storeId ? { ...store, notes: previousNotes } : store)),
-    });
-
-    setNotesAction(null);
-  };
-
-  const handleAddNote = async (storeId: string, text: string) => {
-    const previous = getStoreNotes(storeId);
-    const newId = previous.length > 0 ? Math.max(...previous.map((note) => note.id)) + 1 : 1;
-    const note: NoteType = { id: newId, text, createdAt: new Date().toISOString(), editedAt: null };
-    await persistNotes(storeId, [note, ...previous], previous, 'create', newId);
-  };
-
-  const handleEditNote = async (storeId: string, noteId: number, text: string) => {
-    const previous = getStoreNotes(storeId);
-    const next = previous.map((note) =>
-      note.id === noteId ? { ...note, text, editedAt: new Date().toISOString() } : note
-    );
-    await persistNotes(storeId, next, previous, 'update', noteId);
-  };
-
-  const handleDeleteNote = async (storeId: string, noteId: number) => {
-    const previous = getStoreNotes(storeId);
-    await persistNotes(storeId, previous.filter((note) => note.id !== noteId), previous, 'delete', noteId);
-  };
-
   return (
     <main className="flex-1 p-6 space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-gray-500">Manage connected Shopify stores and profit margins.</p>
+        <p className="text-sm text-gray-500">Manage connected Shopify stores.</p>
         <div className="flex items-center gap-2">
           <button
             onClick={loadStores}
@@ -489,23 +375,6 @@ export default function StoresPage() {
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="px-5 py-3 border-b border-gray-100 flex flex-wrap items-center gap-3 text-sm">
           <span className="text-gray-500">{selectedIds.length} selected</span>
-          <input
-            type="number"
-            min="0"
-            max="100"
-            step="0.1"
-            placeholder="Bulk margin e.g. 15"
-            value={bulkMargin}
-            onChange={(e) => setBulkMargin(e.target.value)}
-            className="w-40 border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <button
-            onClick={() => void handleBulkMargin()}
-            disabled={!selectedIds.length || !bulkMargin || marginReq.loading}
-            className="px-3 py-1.5 bg-gray-800 text-white rounded-lg text-xs font-medium hover:bg-gray-700 disabled:opacity-40 cursor-pointer transition-colors"
-          >
-            Apply to selected
-          </button>
         </div>
 
         <StoresTable
@@ -514,14 +383,9 @@ export default function StoresPage() {
           selectedIds={selectedIds}
           onSelectAll={handleSelectAll}
           onSelectOne={handleSelectOne}
-          onMarginChange={handleMarginChange}
-          onSaveMargin={(id) => void handleSaveMargin(id)}
           onDisconnect={(id) => void handleDisconnect(id)}
           onReconnect={(id) => void handleReconnect(id)}
           onDelete={(id) => void handleDelete(id)}
-          onOpenNotes={(id, name) => setNotesModal({ isOpen: true, storeId: id, storeName: name })}
-          isMarginDirty={isMarginDirty}
-          savingMarginIds={savingMarginIds}
           disconnectingIds={disconnectingIds}
           deletingIds={deletingIds}
         />
@@ -562,20 +426,6 @@ export default function StoresPage() {
         onInstall={handleInstall}
         onCopyInstallUrl={handleCopyInstallUrl}
         onStartOver={resetConnectFlow}
-      />
-
-      <NotesModal
-        isOpen={notesModal.isOpen}
-        onClose={() => setNotesModal((prev) => ({ ...prev, isOpen: false }))}
-        storeName={notesModal.storeName}
-        storeId={notesModal.storeId}
-        notes={getStoreNotes(notesModal.storeId)}
-        onAddNote={handleAddNote}
-        onEditNote={handleEditNote}
-        onDeleteNote={handleDeleteNote}
-        isLoading={notesReq.loading}
-        activeAction={notesAction?.storeId === notesModal.storeId ? notesAction.type : null}
-        activeNoteId={notesAction?.storeId === notesModal.storeId ? (notesAction.noteId ?? null) : null}
       />
     </main>
   );
