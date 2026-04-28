@@ -296,7 +296,7 @@ export async function createApp(
               redirect_url_allowlist: [`${appUrl.replace(/\/$/, '')}/api/shopify-auth-callback`],
               scopes:
                 process.env.SHOPIFY_SCOPES ||
-                'read_products,write_products,read_orders,write_orders,read_inventory,write_inventory,read_locations,write_locations',
+                'read_products,write_products,read_orders,write_orders,read_fulfillments,write_fulfillments,read_inventory,write_inventory,read_locations,write_locations',
             },
           },
         ],
@@ -319,7 +319,7 @@ export async function createApp(
   if (userErrors.length) {
     throw new Error(userErrors[0]?.message || 'Failed to create Shopify app');
   }
-
+  // console.log("api/app_management response", JSON.stringify(result, null, 2));
   const app = result?.data?.appCreate?.app;
   if (!app?.key || !app?.activeRoot?.clientCredentials?.secrets?.[0]?.key) {
     throw new Error('Shopify app creation response is missing credentials');
@@ -328,11 +328,24 @@ export async function createApp(
   const clientId = app.key as string;
   const secretKey = app.activeRoot.clientCredentials.secrets[0].key as string;
   const normalizedShop = normalizeShopDomain(shopDomain);
+  const appId = app.id as string;
+  const organizationNumericId = extractNumericId(organizationId);
+  const appNumericId = extractNumericId(appId);
+  const partnerUrl =
+    organizationNumericId && appNumericId
+      ? `https://partners.shopify.com/org/${organizationNumericId}/org_apps/${appNumericId}/customer_data`
+      : null;
 
   return {
-    appId: app.id as string,
+    appId,
     clientId,
     secretKey,
     installUrl: generateInstallLink(normalizedShop, clientId),
+    partnerUrl,
   };
+}
+
+function extractNumericId(gidOrId: string) {
+  const match = gidOrId.match(/(\d+)(?!.*\d)/);
+  return match ? match[1] : null;
 }

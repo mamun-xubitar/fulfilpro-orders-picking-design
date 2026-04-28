@@ -28,7 +28,7 @@ export async function GET(req: Request) {
 
     return apiSuccess({
       message: 'Shopify app created successfully.',
-      data: { installUrl: data.installUrl },
+      data: { installUrl: data.installUrl, partnerUrl: data.partnerUrl },
     });
   } catch (error) {
     return apiError({

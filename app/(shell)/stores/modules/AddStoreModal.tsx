@@ -25,6 +25,8 @@ interface AddStoreModalProps {
   onBackToStepOne: () => void;
   isInstalling: boolean;
   installUrl: string;
+  partnerUrl: string;
+  onOpenPartnerUrl: () => void;
   onInstall: () => void;
   onCopyInstallUrl: () => void;
   onStartOver: () => void;
@@ -72,6 +74,8 @@ export default function AddStoreModal({
   onBackToStepOne,
   isInstalling,
   installUrl,
+  partnerUrl,
+  onOpenPartnerUrl,
   onInstall,
   onCopyInstallUrl,
   onStartOver,
@@ -161,9 +165,22 @@ export default function AddStoreModal({
           {currentStep === 3 && (
             <>
               <p className="text-sm text-gray-600">
-                Shopify app is ready. Install it on <span className="font-medium">{storeDomain}</span>.
+                Shopify app is ready for <span className="font-medium">{storeDomain}</span>.
               </p>
-              <div className="rounded-lg bg-blue-50 border border-blue-100 px-3 py-2 text-xs text-blue-700 break-all">
+              <div className="space-y-2">
+                <div className="rounded-lg bg-blue-50 border border-blue-100 px-3 py-2 text-xs text-blue-700">
+                  1. Allow Customer Data
+                </div>
+                <div className="rounded-lg bg-blue-50 border border-blue-100 px-3 py-2 text-xs text-blue-700">
+                  2. Install App
+                </div>
+              </div>
+              <div className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs text-slate-700 break-all">
+                <p className="font-medium text-slate-800 mb-1">Customer Data URL</p>
+                {partnerUrl || 'Partner URL unavailable for this app.'}
+              </div>
+              <div className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs text-slate-700 break-all">
+                <p className="font-medium text-slate-800 mb-1">Install URL</p>
                 {installUrl}
               </div>
             </>
@@ -225,6 +242,13 @@ export default function AddStoreModal({
 
           {currentStep === 3 && (
             <>
+              <button
+                onClick={onOpenPartnerUrl}
+                disabled={!partnerUrl}
+                className="px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                Allow Customer Data
+              </button>
               <button
                 onClick={onCopyInstallUrl}
                 disabled={!installUrl}

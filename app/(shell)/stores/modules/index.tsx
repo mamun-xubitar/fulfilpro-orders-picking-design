@@ -38,6 +38,7 @@ export default function StoresPage() {
   const [userCode, setUserCode] = useState('');
   const [authorizationUrl, setAuthorizationUrl] = useState('');
   const [installUrl, setInstallUrl] = useState('');
+  const [partnerUrl, setPartnerUrl] = useState('');
   const [copyCodeText, setCopyCodeText] = useState('Copy Code');
   const [timeLeft, setTimeLeft] = useState(600);
   const [isCheckingDomain, setIsCheckingDomain] = useState(false);
@@ -101,6 +102,7 @@ export default function StoresPage() {
     setUserCode('');
     setAuthorizationUrl('');
     setInstallUrl('');
+    setPartnerUrl('');
     setCopyCodeText('Copy Code');
     setTimeLeft(600);
     setIsCheckingDomain(false);
@@ -182,11 +184,12 @@ export default function StoresPage() {
       }
 
       setIsCreatingApp(true);
-      const created = await getJson<{ installUrl: string }>(
+      const created = await getJson<{ installUrl: string; partnerUrl?: string | null }>(
         `/api/create-app?appManagementToken=${encodeURIComponent(tokens.appManagementToken)}&organizationId=${encodeURIComponent(organizations.storeOrganizationId)}&store=${encodeURIComponent(normalizedDomain)}`
       );
       setIsCreatingApp(false);
       setInstallUrl(created.installUrl);
+      setPartnerUrl(created.partnerUrl ?? '');
       setConnectStep(3);
       setIsAuthorizing(false);
     } catch (error) {
@@ -340,6 +343,11 @@ export default function StoresPage() {
     toast.info('Install URL copied.');
   };
 
+  const handleOpenPartnerUrl = () => {
+    if (!partnerUrl) return;
+    window.open(partnerUrl, '_blank', 'noopener,noreferrer');
+  };
+
   return (
     <main className="flex-1 p-6 space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -408,6 +416,8 @@ export default function StoresPage() {
         }}
         isInstalling={isInstalling}
         installUrl={installUrl}
+        partnerUrl={partnerUrl}
+        onOpenPartnerUrl={handleOpenPartnerUrl}
         onInstall={handleInstall}
         onCopyInstallUrl={handleCopyInstallUrl}
         onStartOver={resetConnectFlow}

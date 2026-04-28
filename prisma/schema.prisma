@@ -42,8 +42,8 @@ model Store {
 }
 
 model Order {
-  id                String   @id @default(cuid())
-  number            String   @unique
+  id                String    @id @default(uuid())
+  number            Int       @unique
   cusName           String
   cusEmail          String?
   address           String?
@@ -54,10 +54,12 @@ model Order {
   fulfillmentStatus String?
   boarcode          String?
   lineItems         Json
+  fulfillmentItems  Json?
   price             Float
   country           String?
   storeId           String
-  store             Store    @relation(fields: [storeId], references: [id])
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  orderedAt         DateTime?
+  store             Store     @relation(fields: [storeId], references: [id])
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 }

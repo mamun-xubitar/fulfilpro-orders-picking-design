@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 
-const DEFAULT_SCOPES = 'read_products,write_products';
+const DEFAULT_SCOPES = process.env.SHOPIFY_SCOPES || 'read_products,write_products,read_orders,write_orders,read_fulfillments,write_fulfillments';
 
 export type ShopifyCallbackQuery = {
   code: string | null;
@@ -71,6 +71,19 @@ export function verifyHmac(query: ShopifyCallbackQuery, clientSecret: string) {
   return generatedHmac === hmac;
 }
 
+export function verifyWebhookHmac(rawBody: string, hmacHeader: string, clientSecret: string) {
+  const digest = crypto
+    .createHmac('sha256', clientSecret)
+    .update(rawBody, 'utf8')
+    .digest('base64');
+
+  try {
+    return crypto.timingSafeEqual(Buffer.from(digest), Buffer.from(hmacHeader));
+  } catch {
+    return false;
+  }
+}
+
 export async function getAccessToken(
   shop: string,
   code: string,
@@ -93,7 +106,7 @@ export async function getAccessToken(
     }),
     signal: AbortSignal.timeout(15000),
   });
-  console.log("my res", JSON.stringify(res, null, 2), endpoint, normalizedShop)
+  // console.log("my res", JSON.stringify(res, null, 2), endpoint, normalizedShop)
   if (!res.ok) {
     const errorText = await res.text();
     throw new Error(
@@ -134,6 +147,90 @@ export async function getStoreInfo(shop: string, accessToken: string) {
     url: data.shop?.domain ? `https://${data.shop.domain}` : null,
     myshopifyDomain: data.shop?.myshopify_domain ?? normalizedShop,
   };
+}
+
+const ORDER_WEBHOOK_TOPICS = [
+  'orders/create',
+  'orders/updated',
+  'orders/fulfilled',
+  'orders/partially_fulfilled',
+] as const;
+
+export async function registerOrderWebhooks(shop: string, accessToken: string) {
+  const normalizedShop = normalizeShopDomain(shop);
+  const appUrl = process.env.APP_URL?.trim();
+  if (!appUrl) {
+    throw new Error('APP_URL is required to register order webhooks');
+  }
+
+  const callbackAddress = `${appUrl.replace(/\/$/, '')}/api/webhooks/orders`;
+  const existing = await fetchShopifyWebhooks(normalizedShop, accessToken);
+
+  for (const topic of ORDER_WEBHOOK_TOPICS) {
+    const alreadyExists = existing.some(
+      (webhook) => webhook.topic === topic && webhook.address === callbackAddress
+    );
+    if (alreadyExists) continue;
+
+    await createShopifyWebhook(normalizedShop, accessToken, topic, callbackAddress);
+  }
+}
+
+type ExistingWebhook = { topic: string; address: string };
+
+async function fetchShopifyWebhooks(shop: string, accessToken: string): Promise<ExistingWebhook[]> {
+  const res = await fetch(`https://${shop}/admin/api/2025-01/webhooks.json?limit=250`, {
+    headers: {
+      'X-Shopify-Access-Token': accessToken,
+      Accept: 'application/json',
+    },
+    signal: AbortSignal.timeout(15000),
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(`Failed to list webhooks (${res.status}): ${errorText}`);
+  }
+
+  const data = (await res.json()) as {
+    webhooks?: Array<{ topic?: string; address?: string }>;
+  };
+
+  return (data.webhooks ?? [])
+    .filter((webhook) => typeof webhook.topic === 'string' && typeof webhook.address === 'string')
+    .map((webhook) => ({
+      topic: webhook.topic as string,
+      address: webhook.address as string,
+    }));
+}
+
+async function createShopifyWebhook(
+  shop: string,
+  accessToken: string,
+  topic: (typeof ORDER_WEBHOOK_TOPICS)[number],
+  address: string
+) {
+  const res = await fetch(`https://${shop}/admin/api/2025-01/webhooks.json`, {
+    method: 'POST',
+    headers: {
+      'X-Shopify-Access-Token': accessToken,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({
+      webhook: {
+        topic,
+        address,
+        format: 'json',
+      },
+    }),
+    signal: AbortSignal.timeout(15000),
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(`Failed to create webhook ${topic} (${res.status}): ${errorText}`);
+  }
 }
 
 function getShopifyAuthCallbackUrl() {
