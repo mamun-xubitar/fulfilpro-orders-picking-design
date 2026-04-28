@@ -43,16 +43,18 @@ model Store {
 
 model Order {
   id                String    @id @default(uuid())
-  number            Int       @unique
+  number            String    @unique
   cusName           String
   cusEmail          String?
   address           String?
+  address2          String?
   phone             String?
   city              String?
   state             String?
   zip               String?
   fulfillmentStatus String?
   boarcode          String?
+  currencyCode      String?
   lineItems         Json
   fulfillmentItems  Json?
   price             Float
