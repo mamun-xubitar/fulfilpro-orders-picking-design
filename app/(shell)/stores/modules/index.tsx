@@ -25,7 +25,6 @@ async function getJson<T>(url: string) {
 
 export default function StoresPage() {
   const [stores, setStores] = useState<StoreRow[]>([]);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [disconnectingIds, setDisconnectingIds] = useState<string[]>([]);
   const [deletingIds, setDeletingIds] = useState<string[]>([]);
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -112,12 +111,6 @@ export default function StoresPage() {
     authPollLock.current = false;
   };
 
-  const handleSelectAll = (checked: boolean) =>
-    setSelectedIds(checked ? stores.map((store) => store.id) : []);
-
-  const handleSelectOne = (id: string, checked: boolean) =>
-    setSelectedIds((prev) => checked ? [...new Set([...prev, id])] : prev.filter((storeId) => storeId !== id));
-
   const handleDisconnect = async (id: string) => {
     const store = stores.find((item) => item.id === id);
     if (!store || !confirm(`Disconnect ${store.name ?? store.storeDomain}?`)) return;
@@ -156,7 +149,6 @@ export default function StoresPage() {
       successMessage: 'Store deleted.',
       onSuccess: () => {
         setStores((prev) => prev.filter((item) => item.id !== id));
-        setSelectedIds((prev) => prev.filter((item) => item !== id));
       },
     });
     setDeletingIds((prev) => prev.filter((item) => item !== id));
@@ -373,16 +365,9 @@ export default function StoresPage() {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="px-5 py-3 border-b border-gray-100 flex flex-wrap items-center gap-3 text-sm">
-          <span className="text-gray-500">{selectedIds.length} selected</span>
-        </div>
-
         <StoresTable
           stores={stores}
           isLoading={listLoading}
-          selectedIds={selectedIds}
-          onSelectAll={handleSelectAll}
-          onSelectOne={handleSelectOne}
           onDisconnect={(id) => void handleDisconnect(id)}
           onReconnect={(id) => void handleReconnect(id)}
           onDelete={(id) => void handleDelete(id)}

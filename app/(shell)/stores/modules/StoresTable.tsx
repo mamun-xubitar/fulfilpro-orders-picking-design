@@ -11,9 +11,6 @@ const STATUS_MAP: Record<string, { chip: string; label: string }> = {
 interface StoresTableProps {
   stores: StoreRow[];
   isLoading: boolean;
-  selectedIds: string[];
-  onSelectAll: (checked: boolean) => void;
-  onSelectOne: (id: string, checked: boolean) => void;
   onDisconnect: (id: string) => void;
   onReconnect: (id: string) => void;
   onDelete: (id: string) => void;
@@ -24,7 +21,7 @@ interface StoresTableProps {
 function SkeletonRow() {
   return (
     <tr className="border-b border-gray-100">
-      {Array.from({ length: 5 }).map((_, i) => (
+      {Array.from({ length: 4 }).map((_, i) => (
         <td key={i} className="px-4 py-3">
           <div className="h-4 bg-gray-200 rounded animate-pulse" />
         </td>
@@ -36,34 +33,17 @@ function SkeletonRow() {
 export default function StoresTable({
   stores,
   isLoading,
-  selectedIds,
-  onSelectAll,
-  onSelectOne,
   onDisconnect,
   onReconnect,
   onDelete,
   disconnectingIds,
   deletingIds,
 }: StoresTableProps) {
-  const allSelected = stores.length > 0 && selectedIds.length === stores.length;
-  const someSelected = selectedIds.length > 0 && selectedIds.length < stores.length;
-
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
           <tr className="bg-gray-50 border-b border-gray-200">
-            <th className="px-4 py-3 w-10">
-              <input
-                type="checkbox"
-                className="rounded border-gray-300 text-blue-600 cursor-pointer"
-                checked={allSelected}
-                ref={(el) => {
-                  if (el) el.indeterminate = someSelected;
-                }}
-                onChange={(e) => onSelectAll(e.target.checked)}
-              />
-            </th>
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Store Name</th>
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Domain</th>
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
@@ -75,7 +55,7 @@ export default function StoresTable({
 
           {!isLoading && stores.length === 0 && (
             <tr>
-              <td colSpan={5} className="text-center text-gray-400 py-16 text-sm">
+              <td colSpan={4} className="text-center text-gray-400 py-16 text-sm">
                 No stores connected yet.
               </td>
             </tr>
@@ -89,15 +69,6 @@ export default function StoresTable({
 
             return (
               <tr key={store.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors duration-100">
-                <td className="px-4 py-3">
-                  <input
-                    type="checkbox"
-                    className="rounded border-gray-300 text-blue-600 cursor-pointer"
-                    checked={selectedIds.includes(store.id)}
-                    disabled={isBusy}
-                    onChange={(e) => onSelectOne(store.id, e.target.checked)}
-                  />
-                </td>
                 <td className="px-4 py-3 font-medium text-gray-900">{store.name ?? '—'}</td>
                 <td className="px-4 py-3 text-gray-500 font-mono text-xs">{store.storeDomain}</td>
                 <td className="px-4 py-3">
