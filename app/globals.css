@@ -12,15 +12,35 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
-  background: var(--background);
-  color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Login */
+.digit-input { text-align: center; font-size: 1.25rem; font-weight: 700; }
+
+/* Shell */
+#sidebar { transition: width .2s ease; }
+#main-content { transition: margin-left .2s ease; }
+@media (max-width: 767px) { #main-content { margin-left: 0 !important; } }
+
+/* Tooltip */
+.tooltip { position: relative; }
+.tooltip .tt { visibility: hidden; opacity: 0; transition: opacity .15s; white-space: nowrap; position: absolute; bottom: 110%; left: 50%; transform: translateX(-50%); background: #1f2937; color: #fff; padding: 2px 8px; border-radius: 4px; font-size: 11px; pointer-events: none; z-index: 50; }
+.tooltip:hover .tt { visibility: visible; opacity: 1; }
+
+/* Protected fields */
+[data-protected] { user-select: none; -webkit-user-select: none; }
+
+/* Orders */
+.chip-list { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* Stores */
+.store-card { transition: box-shadow .15s; }
+.store-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.08); }
+
+/* Profile */
+.strength-bar { transition: width .3s ease, background-color .3s ease; }
+
+/* Settings */
+.day-chip { cursor: pointer; transition: background-color .15s, color .15s, border-color .15s; }

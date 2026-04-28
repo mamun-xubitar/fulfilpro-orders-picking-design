@@ -1,1 +1,3 @@
 @AGENTS.md
+@PATTERN.md
+@INSTRUCTIONS.md
