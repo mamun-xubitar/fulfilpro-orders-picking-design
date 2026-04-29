@@ -48,14 +48,20 @@ export class OrderController {
 
   async confirmFulfillment(orderId: string, body: unknown) {
     const lines = parseFulfillmentLines(body);
-    console.log("confirm lines", lines)
-    const result = await model.confirmFulfillment(orderId, lines);
+    const notifyCustomer = parseNotifyCustomer(body);
+    const result = await model.confirmFulfillment(orderId, lines, notifyCustomer);
 
     return {
       data: result,
       message: 'Fulfillment confirmed',
     };
   }
+}
+
+function parseNotifyCustomer(body: unknown) {
+  if (!body || typeof body !== 'object') return true;
+  const value = (body as { notifyCustomer?: unknown }).notifyCustomer;
+  return typeof value === 'boolean' ? value : true;
 }
 
 function parseFulfillmentLines(body: unknown): FulfillmentLineInput[] {

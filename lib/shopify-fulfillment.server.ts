@@ -64,6 +64,7 @@ export async function createShopifyFulfillment(params: {
   accessToken: string;
   orderNumber: string;
   shopifyOrderId?: string | null;
+  notifyCustomer: boolean;
   lines: FulfillmentRequestLine[];
 }) {
   const shop = normalizeShopDomain(params.shop);
@@ -98,7 +99,7 @@ export async function createShopifyFulfillment(params: {
     `,
     variables: {
       fulfillment: {
-        notifyCustomer: false,
+        notifyCustomer: params.notifyCustomer,
         lineItemsByFulfillmentOrder: fulfillmentGroups,
       },
       message: 'Fulfillment confirmed from order fulfillment app',

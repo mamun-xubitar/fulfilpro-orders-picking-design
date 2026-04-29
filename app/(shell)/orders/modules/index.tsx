@@ -48,6 +48,8 @@ type ApiResponse<T> = {
   data: T;
 };
 
+type FulfillmentLine = { lineItemId: string; quantity: number; full: boolean };
+
 const PERIODS = [
   { label: 'All', value: 'all' },
   { label: 'This Week', value: 'week' },
@@ -115,6 +117,11 @@ export default function OrdersPage() {
   const [partialValues, setPartialValues] = useState<Record<string, number>>({});
   const [fulMessages, setFulMessages] = useState<Record<string, string>>({});
   const [fulSaving, setFulSaving] = useState<Record<string, boolean>>({});
+  const [pendingFulfillment, setPendingFulfillment] = useState<{
+    order: OrderRow;
+    lines: FulfillmentLine[];
+    notifyCustomer: boolean;
+  } | null>(null);
   const messageTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   useEffect(() => {
@@ -272,7 +279,7 @@ export default function OrdersPage() {
           full: isFull,
         };
       })
-      .filter((line): line is { lineItemId: string; quantity: number; full: boolean } => Boolean(line));
+      .filter((line): line is FulfillmentLine => Boolean(line));
   };
 
   const addBC = (orderId: string) => {
@@ -303,7 +310,7 @@ export default function OrdersPage() {
     }, 3000);
   };
 
-  const confirmFul = async (order: OrderRow) => {
+  const openFulfillmentConfirmation = (order: OrderRow) => {
     const lines = getFulfillmentLines(order);
 
     if (lines.length === 0) {
@@ -311,17 +318,28 @@ export default function OrdersPage() {
       return;
     }
 
-    const confirmed = window.confirm(
-      'After confirming fulfillment, these items cannot be changed without admin permission. Continue?'
-    );
-    if (!confirmed) return;
+    setPendingFulfillment({
+      order,
+      lines,
+      notifyCustomer: true,
+    });
+  };
 
+  const closeFulfillmentConfirmation = () => {
+    if (!pendingFulfillment || fulSaving[pendingFulfillment.order.id]) return;
+    setPendingFulfillment(null);
+  };
+
+  const confirmFul = async () => {
+    if (!pendingFulfillment) return;
+
+    const { order, lines, notifyCustomer } = pendingFulfillment;
     setFulSaving((prev) => ({ ...prev, [order.id]: true }));
     try {
       const res = await fetch(`/api/orders/${order.id}/fulfill`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lines }),
+        body: JSON.stringify({ lines, notifyCustomer }),
       });
       const json = (await res.json()) as ApiResponse<{
         orderId: string;
@@ -339,6 +357,7 @@ export default function OrdersPage() {
           : item
       )));
       setFulfillmentMessage(order.id, 'Fulfilment confirmed!');
+      setPendingFulfillment(null);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to confirm fulfillment.');
     } finally {
@@ -665,7 +684,7 @@ export default function OrdersPage() {
                                   ))}
                                 </div>
                                 <button
-                                  onClick={() => confirmFul(order)}
+                                  onClick={() => openFulfillmentConfirmation(order)}
                                   disabled={isConfirmDisabled}
                                   className={`w-full py-2 rounded-lg text-xs font-semibold transition-colors duration-150 mb-2 ${
                                     isConfirmDisabled
@@ -743,6 +762,82 @@ export default function OrdersPage() {
           </div>
         </div>
       </div>
+
+      {pendingFulfillment && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 px-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="fulfillment-confirmation-title"
+          onClick={closeFulfillmentConfirmation}
+        >
+          <div
+            className="w-full max-w-md rounded-lg bg-white shadow-xl border border-gray-200"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="px-5 py-4 border-b border-gray-200">
+              <h3 id="fulfillment-confirmation-title" className="text-base font-semibold text-gray-900">
+                Confirm fulfilment
+              </h3>
+              <p className="mt-1 text-sm text-gray-500">
+                Order {pendingFulfillment.order.number} will be fulfilled in Shopify.
+              </p>
+            </div>
+
+            <div className="px-5 py-4 space-y-4">
+              <p className="text-sm text-gray-700">
+                After confirming fulfilment, these items cannot be changed without admin permission.
+              </p>
+
+              <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                <p className="text-xs font-semibold uppercase text-gray-500">Items to fulfill</p>
+                <ul className="mt-2 space-y-1 text-sm text-gray-700">
+                  {pendingFulfillment.lines.map((line) => {
+                    const item = pendingFulfillment.order.items.find((orderItem) => orderItem.id === line.lineItemId);
+                    return (
+                      <li key={line.lineItemId} className="flex justify-between gap-3">
+                        <span className="truncate">{item?.name ?? line.lineItemId}</span>
+                        <span className="font-medium">x{line.quantity}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+
+              <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={pendingFulfillment.notifyCustomer}
+                  onChange={(event) => {
+                    setPendingFulfillment((prev) => (
+                      prev ? { ...prev, notifyCustomer: event.target.checked } : prev
+                    ));
+                  }}
+                  className="rounded border-gray-300 text-blue-600 cursor-pointer"
+                />
+                Send notification to customer
+              </label>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-gray-200 bg-gray-50 rounded-b-lg">
+              <button
+                onClick={closeFulfillmentConfirmation}
+                disabled={fulSaving[pendingFulfillment.order.id]}
+                className="px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmFul}
+                disabled={fulSaving[pendingFulfillment.order.id]}
+                className="px-3 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {fulSaving[pendingFulfillment.order.id] ? 'Confirming...' : 'Confirm fulfilment'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

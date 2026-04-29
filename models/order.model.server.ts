@@ -205,7 +205,7 @@ export class OrderModel {
     }));
   }
 
-  async confirmFulfillment(orderId: string, lines: FulfillmentLineInput[]) {
+  async confirmFulfillment(orderId: string, lines: FulfillmentLineInput[], notifyCustomer: boolean) {
     const order = await prisma.order.findUnique({
       where: { id: orderId },
       include: {
@@ -234,6 +234,7 @@ export class OrderModel {
       accessToken: order.store.accessToken,
       orderNumber: order.number,
       shopifyOrderId: currentFulfillmentItems.shopifyOrderId,
+      notifyCustomer,
       lines: fulfillableLines.map((line) => ({
         lineItemId: line.lineItemId,
         quantity: line.quantity,
@@ -245,6 +246,7 @@ export class OrderModel {
       confirmedAt: new Date().toISOString(),
       shopifyFulfillmentId: shopifyResult.fulfillmentId,
       shopifyFulfillmentStatus: shopifyResult.fulfillmentStatus,
+      notifyCustomer,
       lines: fulfillableLines,
     };
 
@@ -330,7 +332,7 @@ function buildOrderWriteData(
     zip: shippingAddress?.zip ?? null,
     country: shippingAddress?.country ?? null,
     fulfillmentStatus,
-    // boarcode: extractBarcode(lineItems),
+    boarcode: extractBarcode(lineItems),
     lineItems,
     fulfillmentItems: {
       shopifyOrderId,
