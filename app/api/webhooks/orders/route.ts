@@ -7,7 +7,12 @@ import { WebhookController } from '@/controllers/webhook.controller.server';
 const storeModel = new StoreModel();
 const webhookController = new WebhookController();
 
-const ALLOWED_TOPICS = new Set(['orders/create']);
+const ALLOWED_TOPICS = new Set([
+  'orders/create',
+  'orders/cancelled',
+  'orders/fulfilled',
+  'orders/partially_fulfilled',
+]);
 
 export async function POST(request: NextRequest) {
   const topic = request.headers.get('x-shopify-topic')?.toLowerCase() ?? '';
@@ -51,6 +56,23 @@ export async function POST(request: NextRequest) {
     switch (topic) {
       case "orders/create":
         await webhookController.handleOrderCreate({
+          topic,
+          payload: payload as ShopifyOrderPayload,
+          storeId: store.id,
+          storeDomain: normalizedShop,
+        })
+        break;
+      case "orders/cancelled":
+        await webhookController.handleOrderCancelled({
+          topic,
+          payload: payload as ShopifyOrderPayload,
+          storeId: store.id,
+          storeDomain: normalizedShop,
+        })
+        break;
+      case "orders/fulfilled":
+      case "orders/partially_fulfilled":
+        await webhookController.handleOrderFulfillmentUpdate({
           topic,
           payload: payload as ShopifyOrderPayload,
           storeId: store.id,

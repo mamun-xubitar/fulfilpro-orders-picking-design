@@ -23,4 +23,44 @@ export class WebhookController {
 
     return { data: { created: false }, message: 'Order already exists' };
   }
+
+  async handleOrderCancelled(params: {
+    topic: string;
+    payload: ShopifyOrderPayload;
+    storeId: string;
+    storeDomain: string;
+  }) {
+    const { payload, storeId } = params;
+
+    const result = await orderModel.upsertFromShopifyOrder({
+      payload,
+      storeId,
+    });
+
+    if (result.created) {
+      return { data: { created: true, updated: false }, message: 'Canceled order created' };
+    }
+
+    return { data: { created: false, updated: true }, message: 'Order marked canceled' };
+  }
+
+  async handleOrderFulfillmentUpdate(params: {
+    topic: string;
+    payload: ShopifyOrderPayload;
+    storeId: string;
+    storeDomain: string;
+  }) {
+    const { payload, storeId } = params;
+
+    const result = await orderModel.upsertFromShopifyOrder({
+      payload,
+      storeId,
+    });
+
+    if (result.created) {
+      return { data: { created: true, updated: false }, message: 'Fulfilled order created' };
+    }
+
+    return { data: { created: false, updated: true }, message: 'Order fulfillment updated' };
+  }
 }
