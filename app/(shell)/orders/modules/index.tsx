@@ -8,7 +8,6 @@ type OrderRow = {
   id: string;
   number: string;
   customer: string;
-  customerEmail: string | null;
   address: string | null;
   address2: string | null;
   city: string | null;
@@ -307,6 +306,8 @@ export default function OrdersPage() {
   const [partialValues, setPartialValues] = useState<Record<string, number>>({});
   const [fulMessages, setFulMessages] = useState<Record<string, string>>({});
   const [fulSaving, setFulSaving] = useState<Record<string, boolean>>({});
+  const [carrierDropdownOpen, setCarrierDropdownOpen] = useState(false);
+  const [carrierSearch, setCarrierSearch] = useState('');
   const [pendingFulfillment, setPendingFulfillment] = useState<{
     order: OrderRow;
     lines: FulfillmentLine[];
@@ -334,6 +335,12 @@ export default function OrdersPage() {
     if (storeId) params.set('storeId', storeId);
     return params.toString();
   }, [pagination.page, pagination.pageSize, period, search, storeId]);
+
+  const filteredTrackingCarriers = useMemo(() => {
+    const query = carrierSearch.trim().toLowerCase();
+    if (!query) return SHOPIFY_TRACKING_CARRIERS;
+    return SHOPIFY_TRACKING_CARRIERS.filter((carrier) => carrier.toLowerCase().includes(query));
+  }, [carrierSearch]);
 
   useEffect(() => {
     let cancelled = false;
@@ -532,11 +539,15 @@ export default function OrdersPage() {
       trackingUrl: '',
       trackingCompany: '',
     });
+    setCarrierDropdownOpen(false);
+    setCarrierSearch('');
   };
 
   const closeFulfillmentConfirmation = () => {
     if (!pendingFulfillment || fulSaving[pendingFulfillment.order.id]) return;
     setPendingFulfillment(null);
+    setCarrierDropdownOpen(false);
+    setCarrierSearch('');
   };
 
   const confirmFul = async () => {
@@ -572,6 +583,8 @@ export default function OrdersPage() {
       )));
       setFulfillmentMessage(order.id, 'Fulfilment confirmed!');
       setPendingFulfillment(null);
+      setCarrierDropdownOpen(false);
+      setCarrierSearch('');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to confirm fulfillment.');
     } finally {
@@ -792,7 +805,6 @@ export default function OrdersPage() {
                               <div>
                                 <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">Customer &amp; Order</h4>
                                 <p className="text-sm font-semibold text-gray-800">{order.customer}</p>
-                                {order.customerEmail && <p className="text-xs text-gray-500 mt-1">{order.customerEmail}</p>}
                                 {orderAddressLines.length > 0 && (
                                   <div className="text-xs text-gray-500 mt-1">
                                     {orderAddressLines.map((line) => (
@@ -1020,26 +1032,70 @@ export default function OrdersPage() {
               </div>
 
               <div className="grid grid-cols-1 gap-3">
-                <label className="text-sm text-gray-700">
+                <div className="text-sm text-gray-700">
                   <span className="block text-xs font-semibold uppercase text-gray-500 mb-1">Shipping carrier</span>
-                  <input
-                    list="shopify-tracking-carriers"
-                    type="text"
-                    value={pendingFulfillment.trackingCompany}
-                    onChange={(event) => {
-                      setPendingFulfillment((prev) => (
-                        prev ? { ...prev, trackingCompany: event.target.value } : prev
-                      ));
-                    }}
-                    placeholder="Search carrier"
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                  />
-                  <datalist id="shopify-tracking-carriers">
-                    {SHOPIFY_TRACKING_CARRIERS.map((carrier, index) => (
-                      <option key={`${carrier}-${index}`} value={carrier} />
-                    ))}
-                  </datalist>
-                </label>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCarrierDropdownOpen((prev) => !prev);
+                        setCarrierSearch('');
+                      }}
+                      className="w-full min-h-10 border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-left flex items-center justify-between gap-2 focus:outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer"
+                    >
+                      <span className={pendingFulfillment.trackingCompany ? 'text-gray-800 truncate' : 'text-gray-400'}>
+                        {pendingFulfillment.trackingCompany || 'Select carrier'}
+                      </span>
+                      <svg
+                        className={`w-4 h-4 text-gray-400 shrink-0 transition-transform ${carrierDropdownOpen ? 'rotate-180' : ''}`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+
+                    {carrierDropdownOpen && (
+                      <div className="absolute z-20 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg">
+                        <div className="p-2 border-b border-gray-100">
+                          <input
+                            type="text"
+                            value={carrierSearch}
+                            onChange={(event) => setCarrierSearch(event.target.value)}
+                            placeholder="Search carrier"
+                            autoFocus
+                            className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                          />
+                        </div>
+                        <div className="max-h-48 overflow-y-auto py-1">
+                          {filteredTrackingCarriers.length > 0 ? (
+                            filteredTrackingCarriers.map((carrier, index) => (
+                              <button
+                                key={`${carrier}-${index}`}
+                                type="button"
+                                onClick={() => {
+                                  setPendingFulfillment((prev) => (
+                                    prev ? { ...prev, trackingCompany: carrier } : prev
+                                  ));
+                                  setCarrierDropdownOpen(false);
+                                  setCarrierSearch('');
+                                }}
+                                className={`w-full px-3 py-2 text-left text-sm hover:bg-blue-50 cursor-pointer ${
+                                  pendingFulfillment.trackingCompany === carrier ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'
+                                }`}
+                              >
+                                {carrier}
+                              </button>
+                            ))
+                          ) : (
+                            <div className="px-3 py-3 text-sm text-gray-400">No carriers found.</div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
 
                 <label className="text-sm text-gray-700">
                   <span className="block text-xs font-semibold uppercase text-gray-500 mb-1">Tracking number</span>

@@ -66,9 +66,9 @@ function parseTrackingInfo(body: unknown) {
 
   const obj = value as Record<string, unknown>;
   const trackingInfo = {
-    number: typeof obj.number === 'string' ? obj.number.trim() : '',
-    url: typeof obj.url === 'string' ? obj.url.trim() : '',
-    company: typeof obj.company === 'string' ? obj.company.trim() : '',
+    number: typeof obj.number === 'string' && obj.number.trim() !== "" ? obj.number.trim() : undefined,
+    url: typeof obj.url === 'string' && obj.url.trim() !== "" ? obj.url.trim() : undefined,
+    company: typeof obj.company === 'string' && obj.company.trim() !== "" ? obj.company.trim() : undefined,
   };
 
   if (!trackingInfo.number && !trackingInfo.url && !trackingInfo.company) return null;

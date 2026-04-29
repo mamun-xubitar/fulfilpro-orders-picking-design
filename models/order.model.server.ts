@@ -187,7 +187,7 @@ export class OrderModel {
         id: row.id,
         number: row.number,
         customer: row.cusName,
-        customerEmail: row.cusEmail,
+        // customerEmail: row.cusEmail,
         address: row.address,
         address2: row.address2,
         city: row.city,
@@ -361,7 +361,7 @@ function buildOrderWriteData(
   const currencyCode = payload.total_price_set?.shop_money?.currency_code ?? null;
   const currentFulfillmentItems = toFulfillmentItems(existingFulfillmentItems);
   const syncedFulfillmentConfirmations = toShopifyFulfillmentConfirmations(payload);
-  console.log("payload", JSON.stringify(payload, null, 2));
+  // console.log("payload", JSON.stringify(payload, null, 2));
   const shopifyOrderId = payload.id ? `gid://shopify/Order/${payload.id}` : currentFulfillmentItems.shopifyOrderId;
   const fulfillmentItems = {
     shopifyOrderId,
