@@ -219,6 +219,12 @@ export default function OrdersPage() {
 
   const rowItemKey = (orderId: string, itemIndex: number) => `${orderId}-${itemIndex}`;
 
+  const isLineFullyFulfilled = (order: OrderRow, item: OrderItem) => getFulfilledQty(order, item.id) >= item.qty;
+
+  const isLineFullChecked = (order: OrderRow, item: OrderItem, itemIndex: number) => {
+    return isLineFullyFulfilled(order, item) || (fullChecks[rowItemKey(order.id, itemIndex)] ?? false);
+  };
+
   const toggleFull = (orderId: string, itemIndex: number, maxQty: number, fulfilledQty: number) => {
     const key = rowItemKey(orderId, itemIndex);
     const nextChecked = !(fullChecks[key] ?? false);
@@ -227,13 +233,15 @@ export default function OrdersPage() {
   };
 
   const toggleAllFull = (order: OrderRow) => {
-    const allChecked = order.items.every((_, itemIndex) => fullChecks[rowItemKey(order.id, itemIndex)] ?? false);
+    const allChecked = order.items.every((item, itemIndex) => isLineFullChecked(order, item, itemIndex));
     const nextValue = !allChecked;
 
     setFullChecks((prev) => {
       const updated = { ...prev };
-      order.items.forEach((_, itemIndex) => {
-        updated[rowItemKey(order.id, itemIndex)] = nextValue;
+      order.items.forEach((item, itemIndex) => {
+        if (!isLineFullyFulfilled(order, item)) {
+          updated[rowItemKey(order.id, itemIndex)] = nextValue;
+        }
       });
       return updated;
     });
@@ -247,9 +255,9 @@ export default function OrdersPage() {
     });
   };
 
-  const validPartial = (orderId: string, itemIndex: number, maxQty: number, value: string) => {
+  const validPartial = (orderId: string, itemIndex: number, minQty: number, maxQty: number, value: string) => {
     const parsed = parseInt(value, 10);
-    const clamped = Number.isNaN(parsed) || parsed < 1 ? 0 : parsed > maxQty ? maxQty : parsed;
+    const clamped = Number.isNaN(parsed) || parsed < minQty ? minQty : parsed > maxQty ? maxQty : parsed;
     setPartialValues((prev) => ({ ...prev, [rowItemKey(orderId, itemIndex)]: clamped }));
   };
 
@@ -267,8 +275,8 @@ export default function OrdersPage() {
         const key = rowItemKey(order.id, itemIndex);
         const fulfilledQty = getFulfilledQty(order, item.id);
         const remainingQty = Math.max(0, item.qty - fulfilledQty);
-        const isFull = fullChecks[key] ?? false;
-        const requestedTotal = partialValues[key] ?? fulfilledQty;
+        const isFull = isLineFullChecked(order, item, itemIndex);
+        const requestedTotal = Math.min(item.qty, Math.max(fulfilledQty, partialValues[key] ?? fulfilledQty));
         const quantity = isFull ? remainingQty : Math.max(0, requestedTotal - fulfilledQty);
 
         if (quantity < 1) return null;
@@ -601,7 +609,7 @@ export default function OrdersPage() {
                                         <label className="inline-flex items-center gap-1 cursor-pointer justify-start">
                                           <input
                                             type="checkbox"
-                                            checked={order.items.length > 0 && order.items.every((_, itemIndex) => fullChecks[rowItemKey(order.id, itemIndex)] ?? false)}
+                                            checked={order.items.length > 0 && order.items.every((item, itemIndex) => isLineFullChecked(order, item, itemIndex))}
                                             onChange={() => toggleAllFull(order)}
                                             className="rounded border-gray-300 text-blue-600 cursor-pointer"
                                           />
@@ -616,7 +624,7 @@ export default function OrdersPage() {
                                       const key = rowItemKey(order.id, itemIndex);
                                       const fulfilledQty = getFulfilledQty(order, item.id);
                                       const remainingQty = Math.max(0, item.qty - fulfilledQty);
-                                      const isFull = fullChecks[key] ?? false;
+                                      const isFull = isLineFullChecked(order, item, itemIndex);
                                       const partialValue = partialValues[key] ?? fulfilledQty;
                                       return (
                                         <tr key={`${order.id}-${itemIndex}`} className="border-b border-blue-100">
@@ -637,11 +645,11 @@ export default function OrdersPage() {
                                           <td className="py-1.5 text-center">
                                             <input
                                               type="number"
-                                              min={0}
+                                              min={fulfilledQty}
                                               max={item.qty}
                                               value={partialValue}
                                               disabled={isFull || remainingQty === 0}
-                                              onChange={(e) => validPartial(order.id, itemIndex, item.qty, e.target.value)}
+                                              onChange={(e) => validPartial(order.id, itemIndex, fulfilledQty, item.qty, e.target.value)}
                                               className="w-14 border border-blue-200 rounded px-1 py-0.5 text-center text-xs bg-white cursor-pointer disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
                                             />
                                           </td>

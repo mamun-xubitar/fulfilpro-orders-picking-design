@@ -50,6 +50,10 @@ model Order {
   address2          String?
   phone             String?
   city              String?
+  canceledAt        DateTime?
+  closedAt          DateTime?
+  canceled          Boolean   @default(false)
+  closed            Boolean   @default(false)
   state             String?
   zip               String?
   fulfillmentStatus String?
