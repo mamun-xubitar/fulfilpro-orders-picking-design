@@ -25,11 +25,7 @@ type OrderRow = {
   items: OrderItem[];
   fulfillmentItems: {
     shopifyOrderId: string | null;
-    confirmations: Array<{
-      id?: string;
-      confirmedAt?: string;
-      lines: Array<{ lineItemId: string; quantity: number; full?: boolean }>;
-    }>;
+    confirmations: FulfillmentConfirmation[];
   };
   itemsCount: number;
 };
@@ -52,6 +48,18 @@ type ApiResponse<T> = {
 };
 
 type FulfillmentLine = { lineItemId: string; quantity: number; full: boolean };
+type FulfillmentConfirmation = {
+  id?: string;
+  confirmedAt?: string | null;
+  shopifyFulfillmentId?: string | null;
+  shopifyFulfillmentStatus?: string | null;
+  trackingInfo?: {
+    number?: string;
+    company?: string;
+    url?: string;
+  } | null;
+  lines: Array<{ lineItemId: string; quantity: number; full?: boolean }>;
+};
 
 const PERIODS = [
   { label: 'All', value: 'all' },
@@ -284,6 +292,15 @@ function isOrderFulfillmentLocked(order: Pick<OrderRow, 'closed' | 'canceled' | 
   return order.canceled || order.closed || status === 'canceled' || status === 'cancelled' || status === 'closed';
 }
 
+function escapeHtml(value: string | number | null | undefined) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
 export default function OrdersPage() {
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [stores, setStores] = useState<StoreOption[]>([]);
@@ -301,7 +318,6 @@ export default function OrdersPage() {
   const [refreshToken, setRefreshToken] = useState(0);
   const [barcodeLists, setBarcodeLists] = useState<Record<string, string[]>>({});
   const [bcInputs, setBcInputs] = useState<Record<string, string>>({});
-  const [copies, setCopies] = useState<Record<string, number>>({});
   const [fullChecks, setFullChecks] = useState<Record<string, boolean>>({});
   const [partialValues, setPartialValues] = useState<Record<string, number>>({});
   const [fulMessages, setFulMessages] = useState<Record<string, string>>({});
@@ -315,6 +331,10 @@ export default function OrdersPage() {
     trackingNumber: string;
     trackingUrl: string;
     trackingCompany: string;
+  } | null>(null);
+  const [pendingPrint, setPendingPrint] = useState<{
+    order: OrderRow;
+    selectedKeys: string[];
   } | null>(null);
   const messageTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
@@ -592,12 +612,159 @@ export default function OrdersPage() {
     }
   };
 
-  const stepCp = (orderId: string, delta: number) => {
-    setCopies((prev) => ({ ...prev, [orderId]: Math.max(1, (prev[orderId] ?? 1) + delta) }));
+  const getPrintableFulfillments = (order: OrderRow) => {
+    return order.fulfillmentItems.confirmations.filter((fulfillment) => fulfillment.lines.length > 0);
   };
 
-  const printLabel = (orderNumber: string) => {
-    alert(`Print label for ${orderNumber}`);
+  const getFulfillmentPrintKey = (fulfillment: FulfillmentConfirmation, index: number) => {
+    return fulfillment.id ?? fulfillment.shopifyFulfillmentId ?? `fulfillment-${index}`;
+  };
+
+  const openPrintSelection = (order: OrderRow) => {
+    const fulfillments = getPrintableFulfillments(order);
+    if (fulfillments.length === 0) {
+      toast.warning("This order doesn't have any fulfillment to print.");
+      return;
+    }
+
+    setPendingPrint({
+      order,
+      selectedKeys: fulfillments.map((fulfillment, index) => getFulfillmentPrintKey(fulfillment, index)),
+    });
+  };
+
+  const closePrintSelection = () => {
+    setPendingPrint(null);
+  };
+
+  const togglePrintFulfillment = (key: string) => {
+    setPendingPrint((prev) => {
+      if (!prev) return prev;
+      const selected = prev.selectedKeys.includes(key);
+      return {
+        ...prev,
+        selectedKeys: selected
+          ? prev.selectedKeys.filter((item) => item !== key)
+          : [...prev.selectedKeys, key],
+      };
+    });
+  };
+
+  const printSelectedFulfillments = () => {
+    if (!pendingPrint) return;
+
+    const selectedFulfillments = getPrintableFulfillments(pendingPrint.order).filter((fulfillment, index) => {
+      return pendingPrint.selectedKeys.includes(getFulfillmentPrintKey(fulfillment, index));
+    });
+
+    if (selectedFulfillments.length === 0) {
+      toast.error('Select at least one fulfillment to print.');
+      return;
+    }
+
+    const printWindow = window.open('', '_blank', 'width=900,height=700');
+    if (!printWindow) {
+      toast.error('Unable to open print window. Please allow popups for this site.');
+      return;
+    }
+
+    printWindow.document.open();
+    printWindow.document.write(buildPackingSlipDocument(pendingPrint.order, selectedFulfillments));
+    printWindow.document.close();
+    printWindow.focus();
+    window.setTimeout(() => {
+      printWindow.print();
+    }, 250);
+    setPendingPrint(null);
+  };
+
+  const buildPackingSlipDocument = (order: OrderRow, fulfillments: FulfillmentConfirmation[]) => {
+    const addressLines = getOrderAddressLines(order);
+    const pages = fulfillments.map((fulfillment, fulfillmentIndex) => {
+      const itemRows = fulfillment.lines.map((line) => {
+        const item = order.items.find((orderItem) => orderItem.id === line.lineItemId);
+        return `
+          <tr>
+            <td>${escapeHtml(item?.name ?? line.lineItemId)}</td>
+            <td>${escapeHtml(item?.sku || '-')}</td>
+            <td class="qty">${escapeHtml(line.quantity)}</td>
+          </tr>
+        `;
+      }).join('');
+
+      return `
+        <section class="page">
+          <header class="slip-header">
+            <div>
+              <div class="store">${escapeHtml(order.storeName)}</div>
+            </div>
+            <div class="muted">Fulfillment ${escapeHtml(fulfillmentIndex + 1)} of ${escapeHtml(fulfillments.length)}</div>
+          </header>
+
+          <div class="meta-grid">
+            <div>
+              <div class="label">Ship to</div>
+              <div class="strong">${escapeHtml(order.customer)}</div>
+              ${addressLines.map((line) => `<div>${escapeHtml(line)}</div>`).join('')}
+            </div>
+            <div>
+              <div class="label">Order</div>
+              <div><span class="strong">#${escapeHtml(order.number)}</span></div>
+              <div>Ordered: ${escapeHtml(new Date(order.orderedAt).toLocaleDateString())}</div>
+            </div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>SKU</th>
+                <th class="qty">Qty</th>
+              </tr>
+            </thead>
+            <tbody>${itemRows}</tbody>
+          </table>
+
+          <footer>
+            <div>Thank you.</div>
+            <div>${escapeHtml(order.storeName)} · ${escapeHtml(order.number)}</div>
+          </footer>
+        </section>
+      `;
+    }).join('');
+
+    return `
+      <!doctype html>
+      <html>
+        <head>
+          <title></title>
+          <style>
+            * { box-sizing: border-box; }
+            body { margin: 0; color: #111; background: #fff; font-family: Arial, Helvetica, sans-serif; }
+            .page { width: 4in; min-height: 6in; padding: .18in; break-after: page; page-break-after: always; }
+            .page:last-child { break-after: auto; page-break-after: auto; }
+            .slip-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #111; padding-bottom: 8px; margin-bottom: 10px; gap: 10px; }
+            .store { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
+            .muted { color: #555; font-size: 9px; text-align: right; white-space: nowrap; }
+            .strong { font-weight: 700; }
+            .label { color: #555; font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 3px; }
+            .meta-grid { display: grid; grid-template-columns: 1.2fr .8fr; gap: 10px; margin-bottom: 10px; font-size: 10px; line-height: 1.35; }
+            table { width: 100%; border-collapse: collapse; font-size: 10px; }
+            th { text-align: left; border-bottom: 2px solid #111; padding: 5px 4px; text-transform: uppercase; font-size: 8px; letter-spacing: .08em; }
+            td { border-bottom: 1px solid #bbb; padding: 5px 4px; vertical-align: top; }
+            .qty { text-align: right; width: .45in; }
+            footer { display: flex; justify-content: space-between; margin-top: 10px; padding-top: 6px; border-top: 1px solid #111; color: #555; font-size: 9px; }
+            @media print {
+              @page { size: 4in 6in; margin: 0; }
+              body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+              .page { width: 4in; min-height: 6in; padding: .18in; break-after: page; page-break-after: always; }
+              .page:last-child { break-after: auto; page-break-after: auto; }
+            }
+          </style>
+        </head>
+        <body>${pages}</body>
+      </html>
+    `;
   };
 
   const handleStoreChange = (value: string) => {
@@ -784,7 +951,7 @@ export default function OrdersPage() {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                printLabel(order.number);
+                                openPrintSelection(order);
                               }}
                               className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors duration-150 cursor-pointer"
                             >
@@ -926,16 +1093,11 @@ export default function OrdersPage() {
                                 })()}
                                 <div className="flex items-center gap-2">
                                   <button
-                                    onClick={() => printLabel(order.number)}
+                                    onClick={() => openPrintSelection(order)}
                                     className="flex-1 border border-gray-300 bg-white text-gray-600 py-1.5 rounded-lg text-xs font-medium hover:bg-gray-50 transition-colors duration-150 cursor-pointer"
                                   >
                                     Print Label
                                   </button>
-                                  <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden bg-white select-none">
-                                    <button onClick={() => stepCp(order.id, -1)} className="px-2 py-1.5 text-gray-500 hover:bg-gray-100 transition-colors cursor-pointer">−</button>
-                                    <span className="px-2 text-xs font-medium text-gray-700">{copies[order.id] || 1}</span>
-                                    <button onClick={() => stepCp(order.id, 1)} className="px-2 py-1.5 text-gray-500 hover:bg-gray-100 transition-colors cursor-pointer">+</button>
-                                  </div>
                                 </div>
                                 {fulMessages[order.id] && (
                                   <div className="mt-2 text-xs text-center text-green-600 font-medium">{fulMessages[order.id]}</div>
@@ -989,6 +1151,106 @@ export default function OrdersPage() {
           </div>
         </div>
       </div>
+
+      {pendingPrint && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 px-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="print-selection-title"
+          onClick={closePrintSelection}
+        >
+          <div
+            className="w-full max-w-lg rounded-lg bg-white shadow-xl border border-gray-200"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="px-5 py-4 border-b border-gray-200">
+              <h3 id="print-selection-title" className="text-base font-semibold text-gray-900">
+                Print packing slips
+              </h3>
+              <p className="mt-1 text-sm text-gray-500">
+                Choose fulfillments for order {pendingPrint.order.number}.
+              </p>
+            </div>
+
+            <div className="px-5 py-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-800">{pendingPrint.order.customer}</p>
+                  <p className="text-xs text-gray-500">{pendingPrint.order.storeName}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const fulfillments = getPrintableFulfillments(pendingPrint.order);
+                    const allKeys = fulfillments.map((fulfillment, index) => getFulfillmentPrintKey(fulfillment, index));
+                    const allSelected = allKeys.every((key) => pendingPrint.selectedKeys.includes(key));
+                    setPendingPrint((prev) => (prev ? { ...prev, selectedKeys: allSelected ? [] : allKeys } : prev));
+                  }}
+                  className="text-xs font-medium text-blue-600 hover:text-blue-700 cursor-pointer"
+                >
+                  {getPrintableFulfillments(pendingPrint.order).every((fulfillment, index) => (
+                    pendingPrint.selectedKeys.includes(getFulfillmentPrintKey(fulfillment, index))
+                  )) ? 'Clear all' : 'Select all'}
+                </button>
+              </div>
+
+              <div className="border border-gray-200 rounded-lg overflow-hidden">
+                {getPrintableFulfillments(pendingPrint.order).map((fulfillment, index) => {
+                  const key = getFulfillmentPrintKey(fulfillment, index);
+                  const selected = pendingPrint.selectedKeys.includes(key);
+                  const itemCount = fulfillment.lines.reduce((sum, line) => sum + line.quantity, 0);
+                  return (
+                    <label
+                      key={key}
+                      className={`flex items-start gap-3 px-4 py-3 border-b border-gray-100 last:border-b-0 cursor-pointer ${
+                        selected ? 'bg-blue-50' : 'bg-white hover:bg-gray-50'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        onChange={() => togglePrintFulfillment(key)}
+                        className="mt-1 rounded border-gray-300 text-blue-600 cursor-pointer"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-sm font-semibold text-gray-800">Fulfillment {index + 1}</p>
+                          <p className="text-xs text-gray-500">{itemCount} item{itemCount !== 1 ? 's' : ''}</p>
+                        </div>
+                        <p className="text-xs text-gray-500">
+                          {fulfillment.confirmedAt ? new Date(fulfillment.confirmedAt).toLocaleString() : 'Date unavailable'}
+                        </p>
+                        {fulfillment.trackingInfo?.number && (
+                          <p className="text-xs text-gray-500 truncate">
+                            {fulfillment.trackingInfo.company || 'Tracking'} · {fulfillment.trackingInfo.number}
+                          </p>
+                        )}
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-gray-200 bg-gray-50 rounded-b-lg">
+              <button
+                onClick={closePrintSelection}
+                className="px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={printSelectedFulfillments}
+                disabled={pendingPrint.selectedKeys.length === 0}
+                className="px-3 py-2 text-sm font-semibold text-white bg-gray-900 rounded-lg hover:bg-black cursor-pointer disabled:bg-gray-300 disabled:cursor-not-allowed"
+              >
+                Print selected
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {pendingFulfillment && (
         <div
