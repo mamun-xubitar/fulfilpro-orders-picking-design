@@ -14,6 +14,10 @@ type OrderRow = {
   city: string | null;
   state: string | null;
   country: string | null;
+  closed: boolean;
+  closedAt: string | null;
+  canceled: boolean;
+  canceledAt: string | null;
   status: string;
   orderedAt: string;
   storeId: string;
@@ -64,6 +68,9 @@ const STATUS_MAP: Record<string, { chip: string; label: string }> = {
   fulfilled: { chip: 'bg-blue-600 text-white', label: 'Fully Shipped' },
   shipped: { chip: 'bg-blue-600 text-white', label: 'Fully Shipped' },
   unfulfilled: { chip: 'bg-white border border-gray-300 text-gray-600', label: 'Pending' },
+  closed: { chip: 'bg-gray-200 text-gray-700 border border-gray-300', label: 'Closed' },
+  canceled: { chip: 'bg-red-100 text-red-700 border border-red-200', label: 'Canceled' },
+  cancelled: { chip: 'bg-red-100 text-red-700 border border-red-200', label: 'Canceled' },
 };
 
 const DEFAULT_PAGINATION: Pagination = {
@@ -93,6 +100,11 @@ function getOrderAddressLines(order: Pick<OrderRow, 'address' | 'address2' | 'ci
 function getApiErrorMessage(response: ApiResponse<unknown>, fallback: string) {
   if (response.errors?.length) return response.errors.join(', ');
   return response.message || fallback;
+}
+
+function isOrderFulfillmentLocked(order: Pick<OrderRow, 'closed' | 'canceled' | 'status'>) {
+  const status = order.status.toLowerCase();
+  return order.canceled || order.closed || status === 'canceled' || status === 'cancelled' || status === 'closed';
 }
 
 export default function OrdersPage() {
@@ -319,6 +331,11 @@ export default function OrdersPage() {
   };
 
   const openFulfillmentConfirmation = (order: OrderRow) => {
+    if (isOrderFulfillmentLocked(order)) {
+      toast.error(`${order.status === 'closed' ? 'Closed' : 'Canceled'} orders cannot be fulfilled.`);
+      return;
+    }
+
     const lines = getFulfillmentLines(order);
 
     if (lines.length === 0) {
@@ -662,7 +679,8 @@ export default function OrdersPage() {
 
                               <div>
                                 {(() => {
-                                  const canConfirmFulfillment = getFulfillmentLines(order).length > 0;
+                                  const lockedFulfillment = isOrderFulfillmentLocked(order);
+                                  const canConfirmFulfillment = !lockedFulfillment && getFulfillmentLines(order).length > 0;
                                   const isConfirmDisabled = fulSaving[order.id] || !canConfirmFulfillment;
                                   return (
                                     <>
@@ -700,7 +718,7 @@ export default function OrdersPage() {
                                       : 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer'
                                   }`}
                                 >
-                                  {fulSaving[order.id] ? 'Confirming...' : 'Confirm Fulfilment'}
+                                  {lockedFulfillment ? 'Fulfilment Locked' : fulSaving[order.id] ? 'Confirming...' : 'Confirm Fulfilment'}
                                 </button>
                                     </>
                                   );

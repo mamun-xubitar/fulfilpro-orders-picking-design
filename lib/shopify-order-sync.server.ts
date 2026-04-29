@@ -40,7 +40,6 @@ export async function syncConnectedStoreOrders() {
             payload: order,
             storeId: store.id,
           });
-          console.log("my update", order)
           if (result.created) created += 1;
           if (result.updated) updated += 1;
         }

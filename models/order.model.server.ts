@@ -12,6 +12,9 @@ export type ShopifyOrderPayload = {
   current_total_price?: string | number | null;
   fulfillment_status?: string | null;
   created_at: string;
+  closed_at?: string | null;
+  cancelled_at?: string | null;
+  canceled_at?: string | null;
   total_price_set?: {
     shop_money?: {
       amount?: string | number | null;
@@ -46,6 +49,16 @@ export type ShopifyOrderPayload = {
         currency_code?: string | null;
       };
     };
+  }> | null;
+  fulfillments?: Array<{
+    id?: string | number;
+    status?: string | null;
+    created_at?: string | null;
+    updated_at?: string | null;
+    line_items?: Array<{
+      id?: string | number | null;
+      quantity?: number | null;
+    }> | null;
   }> | null;
 };
 
@@ -173,7 +186,11 @@ export class OrderModel {
         city: row.city,
         state: row.state,
         country: row.country,
-        status: row.fulfillmentStatus ?? 'unfulfilled',
+        closed: row.closed,
+        closedAt: row.closedAt?.toISOString() ?? null,
+        canceled: row.canceled,
+        canceledAt: row.canceledAt?.toISOString() ?? null,
+        status: getDisplayStatus(row),
         orderedAt: row.orderedAt?.toISOString(),
         storeId: row.store.id,
         storeName: row.store.name ?? row.store.storeDomain,
@@ -224,6 +241,14 @@ export class OrderModel {
 
     if (!order.store.accessToken) {
       throw new Error('Store is missing a Shopify access token');
+    }
+
+    if (order.canceled) {
+      throw new Error('Canceled orders cannot be fulfilled');
+    }
+
+    if (order.closed) {
+      throw new Error('Closed orders cannot be fulfilled');
     }
 
     const lineItems = toLineItems(order.lineItems);
@@ -315,11 +340,22 @@ function buildOrderWriteData(
   const customerEmail = payload.customer?.email ?? payload.email ?? null;
   const customerPhone = payload.customer?.phone ?? payload.phone ?? shippingAddress?.phone ?? null;
   const fulfillmentStatus = resolveFulfillmentStatus(payload.fulfillment_status);
+  const canceledAt = parseOptionalDate(payload.cancelled_at ?? payload.canceled_at ?? null);
+  const closedAt = parseOptionalDate(payload.closed_at ?? null);
   const priceRaw = payload.total_price_set?.shop_money?.amount ?? payload.total_price ?? payload.current_total_price ?? 0;
   const price = Number(priceRaw);
   const currencyCode = payload.total_price_set?.shop_money?.currency_code ?? null;
   const currentFulfillmentItems = toFulfillmentItems(existingFulfillmentItems);
+  const syncedFulfillmentConfirmations = toShopifyFulfillmentConfirmations(payload);
+  console.log("payload", JSON.stringify(payload, null, 2));
   const shopifyOrderId = payload.id ? `gid://shopify/Order/${payload.id}` : currentFulfillmentItems.shopifyOrderId;
+  const fulfillmentItems = {
+    shopifyOrderId,
+    confirmations: mergeFulfillmentConfirmations(
+      currentFulfillmentItems.confirmations,
+      syncedFulfillmentConfirmations
+    ),
+  } as Prisma.InputJsonValue;
 
   return {
     cusName: customerName,
@@ -332,12 +368,13 @@ function buildOrderWriteData(
     zip: shippingAddress?.zip ?? null,
     country: shippingAddress?.country ?? null,
     fulfillmentStatus,
+    canceled: Boolean(canceledAt),
+    canceledAt,
+    closed: Boolean(closedAt),
+    closedAt,
     boarcode: extractBarcode(lineItems),
     lineItems,
-    fulfillmentItems: {
-      shopifyOrderId,
-      confirmations: currentFulfillmentItems.confirmations,
-    },
+    fulfillmentItems,
     price: Number.isFinite(price) ? price : 0,
     currencyCode,
     storeId,
@@ -350,6 +387,70 @@ function resolveFulfillmentStatus(payloadStatus?: string | null) {
   if (normalized.includes('partial')) return 'partial';
   if (normalized.includes('fulfill')) return 'fulfilled';
   return normalized || 'unfulfilled';
+}
+
+function getDisplayStatus(order: { canceled: boolean; closed: boolean; fulfillmentStatus: string | null }) {
+  if (order.canceled) return 'canceled';
+  if (order.closed && isFulfilledStatus(order.fulfillmentStatus)) return 'fulfilled';
+  if (order.closed) return 'closed';
+  return order.fulfillmentStatus ?? 'unfulfilled';
+}
+
+function isFulfilledStatus(status: string | null) {
+  const normalized = (status ?? '').toLowerCase();
+  return normalized === 'fulfilled' || normalized === 'shipped' || normalized.includes('fulfill');
+}
+
+function parseOptionalDate(value?: string | null) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function toShopifyFulfillmentConfirmations(payload: ShopifyOrderPayload) {
+  return (payload.fulfillments ?? [])
+    .filter((fulfillment) => {
+      const status = (fulfillment.status ?? '').toLowerCase();
+      return status !== 'cancelled' && status !== 'canceled';
+    })
+    .map((fulfillment) => {
+      const shopifyFulfillmentId = fulfillment.id ? `gid://shopify/Fulfillment/${fulfillment.id}` : null;
+      const lines = (fulfillment.line_items ?? [])
+        .map((lineItem) => ({
+          lineItemId: String(lineItem.id ?? ''),
+          quantity: Math.max(0, Number(lineItem.quantity ?? 0)),
+        }))
+        .filter((line) => line.lineItemId && line.quantity > 0);
+
+      return {
+        id: shopifyFulfillmentId ?? crypto.randomUUID(),
+        confirmedAt: fulfillment.created_at ?? fulfillment.updated_at ?? null,
+        shopifyFulfillmentId,
+        shopifyFulfillmentStatus: fulfillment.status ?? null,
+        source: 'shopify_sync',
+        lines,
+      };
+    })
+    .filter((fulfillment) => fulfillment.lines.length > 0);
+}
+
+function mergeFulfillmentConfirmations(
+  currentConfirmations: Array<{ lines: FulfillmentRequestLine[]; shopifyFulfillmentId?: unknown }>,
+  syncedConfirmations: Array<{ lines: FulfillmentRequestLine[]; shopifyFulfillmentId: string | null }>
+) {
+  if (syncedConfirmations.length === 0) return currentConfirmations;
+
+  const syncedIds = new Set(
+    syncedConfirmations
+      .map((confirmation) => confirmation.shopifyFulfillmentId)
+      .filter((id): id is string => typeof id === 'string')
+  );
+
+  const currentWithoutSyncedDuplicates = currentConfirmations.filter((confirmation) => {
+    return typeof confirmation.shopifyFulfillmentId !== 'string' || !syncedIds.has(confirmation.shopifyFulfillmentId);
+  });
+
+  return [...currentWithoutSyncedDuplicates, ...syncedConfirmations];
 }
 
 function extractBarcode(lineItems: Array<{ sku: string }>) {
