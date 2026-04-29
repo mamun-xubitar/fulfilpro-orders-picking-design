@@ -22,6 +22,7 @@ type OrderRow = {
   storeId: string;
   storeName: string;
   storeDomain: string;
+  barcodes: string[];
   items: OrderItem[];
   fulfillmentItems: {
     shopifyOrderId: string | null;
@@ -318,6 +319,7 @@ export default function OrdersPage() {
   const [refreshToken, setRefreshToken] = useState(0);
   const [barcodeLists, setBarcodeLists] = useState<Record<string, string[]>>({});
   const [bcInputs, setBcInputs] = useState<Record<string, string>>({});
+  const [barcodeSaving, setBarcodeSaving] = useState<Record<string, boolean>>({});
   const [fullChecks, setFullChecks] = useState<Record<string, boolean>>({});
   const [partialValues, setPartialValues] = useState<Record<string, number>>({});
   const [fulMessages, setFulMessages] = useState<Record<string, string>>({});
@@ -383,6 +385,13 @@ export default function OrdersPage() {
 
         setOrders(json.data.orders);
         setStores(json.data.stores);
+        setBarcodeLists((prev) => {
+          const next = { ...prev };
+          json.data.orders.forEach((order) => {
+            next[order.id] = prev[order.id] ?? order.barcodes;
+          });
+          return next;
+        });
         setPagination(json.data.pagination);
         setExpandedId(search ? json.data.orders[0]?.id ?? null : null);
         setLastSynced(`Last synced: ${new Date().toLocaleTimeString()}`);
@@ -510,15 +519,47 @@ export default function OrdersPage() {
       .filter((line): line is FulfillmentLine => Boolean(line));
   };
 
-  const addBC = (orderId: string) => {
-    const value = (bcInputs[orderId] ?? '').trim();
-    if (!value) return;
-    setBarcodeLists((prev) => {
-      const existing = prev[orderId] ?? [];
-      if (existing.includes(value)) return prev;
-      return { ...prev, [orderId]: [...existing, value] };
-    });
-    setBcInputs((prev) => ({ ...prev, [orderId]: '' }));
+  const parseBarcodes = (value: string) => {
+    return value.split(/\s+/).map((barcode) => barcode.trim()).filter(Boolean);
+  };
+
+  const mergeBarcodes = (existing: string[], incoming: string[]) => {
+    return Array.from(new Set([...existing, ...incoming]));
+  };
+
+  const saveBC = async (order: OrderRow) => {
+    const inputBarcodes = parseBarcodes(bcInputs[order.id] ?? '');
+    const nextBarcodes = mergeBarcodes(barcodeLists[order.id] ?? order.barcodes, inputBarcodes);
+
+    if (nextBarcodes.length === 0) {
+      toast.warning('Enter at least one barcode.');
+      return;
+    }
+
+    setBarcodeSaving((prev) => ({ ...prev, [order.id]: true }));
+    try {
+      const res = await fetch(`/api/orders/${order.id}/barcodes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ barcodes: nextBarcodes }),
+      });
+      const json = (await res.json()) as ApiResponse<{ orderId: string; barcodes: string[] }>;
+
+      if (!res.ok || !json.success) {
+        throw new Error(getApiErrorMessage(json, 'Failed to save barcodes'));
+      }
+
+      setBarcodeLists((prev) => ({ ...prev, [order.id]: json.data.barcodes }));
+      setOrders((prev) => prev.map((item) => (
+        item.id === order.id ? { ...item, barcodes: json.data.barcodes } : item
+      )));
+      setBcInputs((prev) => ({ ...prev, [order.id]: '' }));
+      toast.success('Barcodes saved.');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to save barcodes.');
+    } finally {
+      setBarcodeSaving((prev) => ({ ...prev, [order.id]: false }));
+    }
   };
 
   const removeBC = (orderId: string, value: string) => {
@@ -1056,21 +1097,27 @@ export default function OrdersPage() {
                                 <div className="flex gap-2 mb-2">
                                   <input
                                     type="text"
-                                    placeholder="Scan or enter barcode"
-                                    value={bcInputs[order.id] ?? order.items[0]?.sku ?? ''}
+                                    placeholder="Scan or type barcodes separated by spaces"
+                                    value={bcInputs[order.id] ?? ''}
                                     onChange={(e) => setBcInputs((prev) => ({ ...prev, [order.id]: e.target.value }))}
-                                    onKeyDown={(e) => e.key === 'Enter' && addBC(order.id)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        void saveBC(order);
+                                      }
+                                    }}
                                     className="flex-1 border border-blue-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-400"
                                   />
                                   <button
-                                    onClick={() => addBC(order.id)}
-                                    className="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-blue-700 transition-colors duration-150 cursor-pointer"
+                                    onClick={() => saveBC(order)}
+                                    disabled={barcodeSaving[order.id]}
+                                    className="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-blue-700 transition-colors duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                                   >
-                                    Add
+                                    {barcodeSaving[order.id] ? 'Saving...' : 'Save'}
                                   </button>
                                 </div>
                                 <div className="chip-list mb-3 min-h-[20px]">
-                                  {(barcodeLists[order.id] || []).map((barcode) => (
+                                  {(barcodeLists[order.id] ?? order.barcodes).map((barcode) => (
                                     <span key={barcode} className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs font-mono">
                                       {barcode}
                                       <button onClick={() => removeBC(order.id, barcode)} className="hover:text-red-500 transition-colors cursor-pointer text-blue-400">×</button>

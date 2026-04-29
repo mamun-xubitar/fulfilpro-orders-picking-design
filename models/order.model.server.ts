@@ -188,6 +188,7 @@ export class OrderModel {
         number: row.number,
         customer: row.cusName,
         // customerEmail: row.cusEmail,
+        barcodes: parseBarcodeList(row.boarcode),
         address: row.address,
         address2: row.address2,
         city: row.city,
@@ -312,6 +313,25 @@ export class OrderModel {
       orderId: order.id,
       status: fulfillmentStatus,
       fulfillmentItems: nextFulfillmentItems,
+    };
+  }
+
+  async saveBarcodes(orderId: string, barcodes: string[]) {
+    const uniqueBarcodes = normalizeBarcodes(barcodes);
+    const order = await prisma.order.update({
+      where: { id: orderId },
+      data: {
+        boarcode: uniqueBarcodes.join(' '),
+      },
+      select: {
+        id: true,
+        boarcode: true,
+      },
+    });
+
+    return {
+      orderId: order.id,
+      barcodes: parseBarcodeList(order.boarcode),
     };
   }
 }
@@ -475,6 +495,14 @@ function mergeFulfillmentConfirmations(
 function extractBarcode(lineItems: Array<{ sku: string }>) {
   const firstSku = lineItems.find((item) => item.sku.trim() !== '')?.sku ?? '';
   return firstSku || null;
+}
+
+function parseBarcodeList(value: string | null) {
+  return normalizeBarcodes(value?.split(/\s+/) ?? []);
+}
+
+function normalizeBarcodes(values: string[]) {
+  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
 }
 
 function getPeriodStartDate(period: 'all' | 'week' | 'month' | 'year') {

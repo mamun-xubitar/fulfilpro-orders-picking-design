@@ -57,6 +57,24 @@ export class OrderController {
       message: 'Fulfillment confirmed',
     };
   }
+
+  async saveBarcodes(orderId: string, body: unknown) {
+    const barcodes = parseBarcodes(body);
+    const result = await model.saveBarcodes(orderId, barcodes);
+
+    return {
+      data: result,
+      message: 'Barcodes saved',
+    };
+  }
+}
+
+function parseBarcodes(body: unknown) {
+  if (!body || typeof body !== 'object' || !Array.isArray((body as { barcodes?: unknown }).barcodes)) {
+    throw new Error('Barcodes are required');
+  }
+
+  return (body as { barcodes: unknown[] }).barcodes.map((barcode) => String(barcode ?? ''));
 }
 
 function parseTrackingInfo(body: unknown) {
