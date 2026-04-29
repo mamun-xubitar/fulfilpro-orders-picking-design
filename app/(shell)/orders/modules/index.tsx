@@ -61,6 +61,184 @@ const PERIODS = [
   { label: 'This Year', value: 'year' },
 ] as const;
 
+const SHOPIFY_TRACKING_CARRIERS = [
+  '4PX',
+  'AGS',
+  'Amazon',
+  'Amazon Logistics UK',
+  'Amazon Logistics US',
+  'An Post',
+  'Anjun Logistics',
+  'APC',
+  'Asendia USA',
+  'Australia Post',
+  'Bonshaw',
+  'BPost',
+  'BPost International',
+  'Canada Post',
+  'Canpar',
+  'CDL Last Mile',
+  'China Post',
+  'Chronopost',
+  'Chukou1',
+  'Colissimo',
+  'Comingle',
+  'Coordinadora',
+  'Correios',
+  'Correos',
+  'CTT',
+  'CTT Express',
+  'Cyprus Post',
+  'Delnext',
+  'Deutsche Post',
+  'DHL eCommerce',
+  'DHL eCommerce Asia',
+  'DHL Express',
+  'DPD',
+  'DPD Local',
+  'DPD UK',
+  'DTD Express',
+  'DX',
+  'Eagle',
+  'Estes',
+  'Evri',
+  'FedEx',
+  'First Global Logistics',
+  'First Line',
+  'FSC',
+  'Fulfilla',
+  'GLS',
+  'Guangdong Weisuyi Information Technology (WSE)',
+  'Heppner Internationale Spedition GmbH & Co.',
+  'Iceland Post',
+  'IDEX',
+  'Israel Post',
+  'Japan Post (EN)',
+  'Japan Post (JA)',
+  'La Poste Colissimo',
+  'La Poste Burkina Faso',
+  'La Poste',
+  'Lasership',
+  'Latvia Post',
+  'Lietuvos Paštas',
+  'Logisters',
+  'Lone Star Overnight',
+  'M3 Logistics',
+  'Meteor Space',
+  'Mondial Relay',
+  'New Zealand Post',
+  'NinjaVan',
+  'North Russia Supply Chain (Shenzhen) Co.',
+  'OnTrac',
+  'Packeta',
+  'Pago Logistics',
+  'Ping An Da Tengfei Express',
+  'Pitney Bowes',
+  'Portal PostNord',
+  'Poste Italiane',
+  'PostNL',
+  'PostNord DK',
+  'PostNord NO',
+  'PostNord SE',
+  'Purolator',
+  'Qxpress',
+  'Qyun Express',
+  'Royal Mail',
+  'Royal Shipments',
+  'Sagawa (EN)',
+  'Sagawa (JA)',
+  'Sendle',
+  'SF Express',
+  'SFC Fulfillment',
+  'SHREE NANDAN COURIER',
+  'Singapore Post',
+  'Southwest Air Cargo',
+  'StarTrack',
+  'Step Forward Freight',
+  'Swiss Post',
+  'TForce Final Mile',
+  'Tinghao',
+  'TNT',
+  'Toll IPEC',
+  'United Delivery Service',
+  'UPS',
+  'USPS',
+  'Venipak',
+  'We Post',
+  'Whistl',
+  'Wizmo',
+  'WMYC',
+  'Xpedigo',
+  'XPO Logistics',
+  'Yamato (EN)',
+  'Yamato (JA)',
+  'YiFan Express',
+  'YunExpress',
+  'Aramex Australia',
+  'TNT Australia',
+  'Hunter Express',
+  'Couriers Please',
+  'Bonds',
+  'Allied Express',
+  'Direct Couriers',
+  'Northline',
+  'GO Logistics',
+  'Österreichische Post',
+  'Speedy',
+  'Intelcom',
+  'BoxKnight',
+  'Loomis',
+  'WanbExpress',
+  'Zásilkovna',
+  'Deutsche Post (DE)',
+  'Deutsche Post (EN)',
+  'DHL',
+  'Swiship',
+  'Hermes',
+  'SEUR',
+  'Colis Privé',
+  'Parcelforce',
+  'Yodel',
+  'DHL Parcel',
+  'Tuffnells',
+  'ACS Courier',
+  'Fastway',
+  'DPD Ireland',
+  'DTDC',
+  'India Post',
+  'Delhivery',
+  'Gati KWE',
+  'Professional Couriers',
+  'XpressBees',
+  'Ecom Express',
+  'Ekart',
+  'Shadowfax',
+  'Bluedart',
+  'BRT',
+  'GLS Italy',
+  'エコ配',
+  '西濃運輸',
+  '西濃スーパーエキスプレス',
+  '福山通運',
+  '日本通運',
+  '名鉄運輸',
+  '第一貨物',
+  'DHL Parcel',
+  'Bring',
+  'Inpost',
+  'PTT',
+  'Yurtiçi Kargo',
+  'Aras Kargo',
+  'Sürat Kargo',
+  'Alliance Air Freight',
+  'Pilot Freight',
+  'LSO',
+  'Old Dominion',
+  'Pandion',
+  'R+L Carriers',
+  'Skynet',
+] as const;
+
 const STATUS_MAP: Record<string, { chip: string; label: string }> = {
   pending: { chip: 'bg-white border border-gray-300 text-gray-600', label: 'Pending' },
   partial: { chip: 'bg-amber-100 text-amber-700 border border-amber-200', label: 'Partially Shipped' },
@@ -133,6 +311,9 @@ export default function OrdersPage() {
     order: OrderRow;
     lines: FulfillmentLine[];
     notifyCustomer: boolean;
+    trackingNumber: string;
+    trackingUrl: string;
+    trackingCompany: string;
   } | null>(null);
   const messageTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
@@ -347,6 +528,9 @@ export default function OrdersPage() {
       order,
       lines,
       notifyCustomer: true,
+      trackingNumber: '',
+      trackingUrl: '',
+      trackingCompany: '',
     });
   };
 
@@ -358,13 +542,18 @@ export default function OrdersPage() {
   const confirmFul = async () => {
     if (!pendingFulfillment) return;
 
-    const { order, lines, notifyCustomer } = pendingFulfillment;
+    const { order, lines, notifyCustomer, trackingNumber, trackingUrl, trackingCompany } = pendingFulfillment;
+    const trackingInfo = {
+      number: trackingNumber.trim(),
+      url: trackingUrl.trim(),
+      company: trackingCompany.trim(),
+    };
     setFulSaving((prev) => ({ ...prev, [order.id]: true }));
     try {
       const res = await fetch(`/api/orders/${order.id}/fulfill`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lines, notifyCustomer }),
+        body: JSON.stringify({ lines, notifyCustomer, trackingInfo }),
       });
       const json = (await res.json()) as ApiResponse<{
         orderId: string;
@@ -828,6 +1017,59 @@ export default function OrdersPage() {
                     );
                   })}
                 </ul>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3">
+                <label className="text-sm text-gray-700">
+                  <span className="block text-xs font-semibold uppercase text-gray-500 mb-1">Shipping carrier</span>
+                  <input
+                    list="shopify-tracking-carriers"
+                    type="text"
+                    value={pendingFulfillment.trackingCompany}
+                    onChange={(event) => {
+                      setPendingFulfillment((prev) => (
+                        prev ? { ...prev, trackingCompany: event.target.value } : prev
+                      ));
+                    }}
+                    placeholder="Search carrier"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                  <datalist id="shopify-tracking-carriers">
+                    {SHOPIFY_TRACKING_CARRIERS.map((carrier, index) => (
+                      <option key={`${carrier}-${index}`} value={carrier} />
+                    ))}
+                  </datalist>
+                </label>
+
+                <label className="text-sm text-gray-700">
+                  <span className="block text-xs font-semibold uppercase text-gray-500 mb-1">Tracking number</span>
+                  <input
+                    type="text"
+                    value={pendingFulfillment.trackingNumber}
+                    onChange={(event) => {
+                      setPendingFulfillment((prev) => (
+                        prev ? { ...prev, trackingNumber: event.target.value } : prev
+                      ));
+                    }}
+                    placeholder="Enter tracking number"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                </label>
+
+                <label className="text-sm text-gray-700">
+                  <span className="block text-xs font-semibold uppercase text-gray-500 mb-1">Tracking URL</span>
+                  <input
+                    type="url"
+                    value={pendingFulfillment.trackingUrl}
+                    onChange={(event) => {
+                      setPendingFulfillment((prev) => (
+                        prev ? { ...prev, trackingUrl: event.target.value } : prev
+                      ));
+                    }}
+                    placeholder="https://carrier.example/track/..."
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                </label>
               </div>
 
               <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">

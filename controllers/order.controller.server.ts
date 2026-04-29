@@ -49,13 +49,33 @@ export class OrderController {
   async confirmFulfillment(orderId: string, body: unknown) {
     const lines = parseFulfillmentLines(body);
     const notifyCustomer = parseNotifyCustomer(body);
-    const result = await model.confirmFulfillment(orderId, lines, notifyCustomer);
+    const trackingInfo = parseTrackingInfo(body);
+    const result = await model.confirmFulfillment(orderId, lines, notifyCustomer, trackingInfo);
 
     return {
       data: result,
       message: 'Fulfillment confirmed',
     };
   }
+}
+
+function parseTrackingInfo(body: unknown) {
+  if (!body || typeof body !== 'object') return null;
+  const value = (body as { trackingInfo?: unknown }).trackingInfo;
+  if (!value || typeof value !== 'object') return null;
+
+  const obj = value as Record<string, unknown>;
+  const trackingInfo = {
+    number: typeof obj.number === 'string' ? obj.number.trim() : '',
+    url: typeof obj.url === 'string' ? obj.url.trim() : '',
+    company: typeof obj.company === 'string' ? obj.company.trim() : '',
+  };
+
+  if (!trackingInfo.number && !trackingInfo.url && !trackingInfo.company) return null;
+  if (trackingInfo.url && !trackingInfo.number) {
+    throw new Error('Tracking number is required when a tracking URL is provided');
+  }
+  return trackingInfo;
 }
 
 function parseNotifyCustomer(body: unknown) {

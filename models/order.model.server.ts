@@ -1,5 +1,9 @@
 import prisma from '@/lib/prisma.server';
-import { createShopifyFulfillment, type FulfillmentRequestLine } from '@/lib/shopify-fulfillment.server';
+import {
+  createShopifyFulfillment,
+  type FulfillmentRequestLine,
+  type FulfillmentTrackingInput,
+} from '@/lib/shopify-fulfillment.server';
 import { Prisma } from '@prisma/client';
 
 export type ShopifyOrderPayload = {
@@ -55,6 +59,9 @@ export type ShopifyOrderPayload = {
     status?: string | null;
     created_at?: string | null;
     updated_at?: string | null;
+    tracking_number?: string | null;
+    tracking_company?: string | null;
+    tracking_url?: string | null;
     line_items?: Array<{
       id?: string | number | null;
       quantity?: number | null;
@@ -222,7 +229,12 @@ export class OrderModel {
     }));
   }
 
-  async confirmFulfillment(orderId: string, lines: FulfillmentLineInput[], notifyCustomer: boolean) {
+  async confirmFulfillment(
+    orderId: string,
+    lines: FulfillmentLineInput[],
+    notifyCustomer: boolean,
+    trackingInfo: FulfillmentTrackingInput | null
+  ) {
     const order = await prisma.order.findUnique({
       where: { id: orderId },
       include: {
@@ -260,6 +272,7 @@ export class OrderModel {
       orderNumber: order.number,
       shopifyOrderId: currentFulfillmentItems.shopifyOrderId,
       notifyCustomer,
+      trackingInfo,
       lines: fulfillableLines.map((line) => ({
         lineItemId: line.lineItemId,
         quantity: line.quantity,
@@ -272,6 +285,7 @@ export class OrderModel {
       shopifyFulfillmentId: shopifyResult.fulfillmentId,
       shopifyFulfillmentStatus: shopifyResult.fulfillmentStatus,
       notifyCustomer,
+      trackingInfo,
       lines: fulfillableLines,
     };
 
@@ -427,6 +441,11 @@ function toShopifyFulfillmentConfirmations(payload: ShopifyOrderPayload) {
         confirmedAt: fulfillment.created_at ?? fulfillment.updated_at ?? null,
         shopifyFulfillmentId,
         shopifyFulfillmentStatus: fulfillment.status ?? null,
+        trackingInfo: {
+          number: fulfillment.tracking_number ?? '',
+          company: fulfillment.tracking_company ?? '',
+          url: fulfillment.tracking_url ?? '',
+        },
         source: 'shopify_sync',
         lines,
       };

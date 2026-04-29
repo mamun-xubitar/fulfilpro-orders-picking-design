@@ -64,12 +64,19 @@ export type FulfillmentRequestLine = {
   quantity: number;
 };
 
+export type FulfillmentTrackingInput = {
+  number?: string;
+  url?: string;
+  company?: string;
+};
+
 export async function createShopifyFulfillment(params: {
   shop: string;
   accessToken: string;
   orderNumber: string;
   shopifyOrderId?: string | null;
   notifyCustomer: boolean;
+  trackingInfo?: FulfillmentTrackingInput | null;
   lines: FulfillmentRequestLine[];
 }) {
   const shop = normalizeShopDomain(params.shop);
@@ -91,6 +98,7 @@ export async function createShopifyFulfillment(params: {
   for (const locationGroup of groupFulfillmentGroupsByLocation(fulfillmentGroups)) {
     const data = await createFulfillmentForLocation(shop, params.accessToken, {
       notifyCustomer: params.notifyCustomer,
+      trackingInfo: params.trackingInfo,
       lineItemsByFulfillmentOrder: locationGroup.lineItemsByFulfillmentOrder,
     });
     fulfillments.push(data);
@@ -110,6 +118,7 @@ async function createFulfillmentForLocation(
   accessToken: string,
   params: {
     notifyCustomer: boolean;
+    trackingInfo?: FulfillmentTrackingInput | null;
     lineItemsByFulfillmentOrder: Array<{
       fulfillmentOrderId: string;
       fulfillmentOrderLineItems: Array<{ id: string; quantity: number }>;
@@ -134,6 +143,7 @@ async function createFulfillmentForLocation(
     variables: {
       fulfillment: {
         notifyCustomer: params.notifyCustomer,
+        ...(params.trackingInfo && hasTrackingInfo(params.trackingInfo) ? { trackingInfo: params.trackingInfo } : {}),
         lineItemsByFulfillmentOrder: params.lineItemsByFulfillmentOrder,
       },
       message: 'Fulfillment confirmed from order fulfillment app',
@@ -146,6 +156,10 @@ async function createFulfillmentForLocation(
   }
 
   return data;
+}
+
+function hasTrackingInfo(trackingInfo: FulfillmentTrackingInput) {
+  return Boolean(trackingInfo.number || trackingInfo.url || trackingInfo.company);
 }
 
 async function getOrderFulfillmentOrdersById(shop: string, accessToken: string, orderId: string) {
