@@ -1,4 +1,5 @@
 import prisma from '@/lib/prisma.server';
+import { saltAndHashPassword } from '@/lib/password';
 
 export type UserRow = {
   id: string;
@@ -46,7 +47,7 @@ export class UserModel {
         name: data.name,
         email: data.email,
         role: data.role,
-        password: data.password,
+        password: saltAndHashPassword(data.password),
         active: true,
         isTempPassword: data.isTempPassword,
       },
@@ -56,9 +57,13 @@ export class UserModel {
   }
 
   async update(id: string, data: UpdateUserData): Promise<UserRow> {
+    const updateData = {
+      ...data,
+      ...(data.password ? { password: saltAndHashPassword(data.password) } : {}),
+    };
     const user = await prisma.user.update({
       where: { id },
-      data,
+      data: updateData,
     });
 
     return toUserRow(user);

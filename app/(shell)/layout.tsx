@@ -1,60 +1,21 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-
-type SessionUser = {
-  name: string;
-  username: string;
-  role: string;
-  initials: string;
-  tfa: boolean;
-  firstTime: boolean;
-};
-
-function isWithinStaffHours() {
-  const now = new Date(), day = now.getDay(), mins = now.getHours() * 60 + now.getMinutes();
-  return day >= 1 && day <= 5 && mins >= 480 && mins < 960;
-}
+import { signOut, useSession } from "next-auth/react";
 
 export default function ShellLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [user, setUser] = useState<SessionUser | null>(null);
+  const { data: session, status } = useSession();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [showAccessDenied, setShowAccessDenied] = useState(false);
-  const [sessionCountdown, setSessionCountdown] = useState(1800);
-  const [showSessionBanner, setShowSessionBanner] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    try {
-      const stored = sessionStorage.getItem("fp_user");
-      if (!stored) { router.push("/"); return; }
-      const u = JSON.parse(stored) as SessionUser;
-      setUser(u);
-      if (u.role === "staff" && !isWithinStaffHours()) {
-        setShowAccessDenied(true);
-      }
-    } catch {
+    if (status === "unauthenticated") {
       router.push("/");
     }
-  }, [router]);
-
-  useEffect(() => {
-    if (!user) return;
-    timerRef.current = setInterval(() => {
-      setSessionCountdown((prev) => {
-        const next = prev - 1;
-        if (next <= 120 && next > 0) setShowSessionBanner(true);
-        if (next <= 0) { logout(); }
-        return next;
-      });
-    }, 1000);
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [router, status]);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -69,20 +30,9 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
     return () => document.removeEventListener("click", handleClick);
   }, []);
 
-  function logout() {
-    sessionStorage.removeItem("fp_user");
-    if (timerRef.current) clearInterval(timerRef.current);
-    router.push("/");
+  async function logout() {
+    await signOut({ callbackUrl: "/" });
   }
-
-  function dismissSessionBanner() {
-    setShowSessionBanner(false);
-    setSessionCountdown(1800);
-  }
-
-  const m = Math.floor(sessionCountdown / 60);
-  const s = sessionCountdown % 60;
-  const countdownText = m > 0 ? `${m} minute${m > 1 ? "s" : ""}` : `${s} second${s !== 1 ? "s" : ""}`;
 
   const navItems = [
     {
@@ -116,43 +66,19 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
   const activeId = pathname.split("/")[1] || "";
 
   const sidebarWidth = sidebarCollapsed ? "64px" : "240px";
+  const user = session?.user;
+  const initials = getInitials(user?.name ?? user?.email ?? "");
+
+  if (status === "loading") {
+    return (
+      <main className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-sm text-gray-500">Loading...</div>
+      </main>
+    );
+  }
 
   return (
     <div onContextMenu={(e) => e.preventDefault()}>
-      {/* Session banner */}
-      {showSessionBanner && (
-        <div className="fixed top-0 left-0 right-0 z-50 bg-amber-400 text-amber-900 px-4 py-2 flex items-center justify-between shadow-md">
-          <span className="text-sm font-medium">⚠ Your session expires in <span>{countdownText}</span>. Please save your work.</span>
-          <button
-            onClick={dismissSessionBanner}
-            className="bg-amber-900 text-amber-50 text-xs font-semibold px-3 py-1 rounded hover:bg-amber-800 transition-colors duration-150 cursor-pointer"
-          >
-            Stay Logged In
-          </button>
-        </div>
-      )}
-
-      {/* Access denied overlay */}
-      {showAccessDenied && (
-        <div className="fixed inset-0 z-50 bg-gray-900 flex flex-col items-center justify-center text-center">
-          <div className="bg-white rounded-2xl shadow-2xl p-12 max-w-md mx-4">
-            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-              </svg>
-            </div>
-            <h2 className="text-xl font-bold text-gray-900 mb-2">Access Restricted</h2>
-            <p className="text-gray-500 text-sm mb-6">Staff access is only available Monday – Friday, 8:00 am – 4:00 pm.</p>
-            <button
-              onClick={logout}
-              className="w-full bg-red-500 text-white py-2 rounded-lg font-semibold hover:bg-red-600 transition-colors duration-150 cursor-pointer"
-            >
-              Logout
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Sidebar */}
       <aside
         id="sidebar"
@@ -225,7 +151,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
               onClick={() => setUserMenuOpen(!userMenuOpen)}
               className="w-9 h-9 rounded-full bg-blue-600 text-white text-sm font-bold flex items-center justify-center hover:bg-blue-700 transition-colors duration-150 cursor-pointer"
             >
-              {user?.initials}
+              {initials}
             </button>
             {userMenuOpen && (
               <div
@@ -235,7 +161,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
                 <Link href="/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer">My Profile</Link>
                 <hr className="my-1 border-gray-100"/>
                 <button
-                  onClick={logout}
+                  onClick={() => void logout()}
                   className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 cursor-pointer"
                 >
                   Logout
@@ -249,4 +175,13 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
       </div>
     </div>
   );
+}
+
+function getInitials(value: string) {
+  return value
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("") || "U";
 }

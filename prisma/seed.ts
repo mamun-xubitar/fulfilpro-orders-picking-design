@@ -2,19 +2,27 @@ import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
+import { saltAndHashPassword } from '../lib/password';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
+  const adminPassword = saltAndHashPassword('password');
+  const staffPassword = saltAndHashPassword('password');
+
   await prisma.user.upsert({
     where: { email: 'admin@example.com' },
-    update: {},
+    update: {
+      password: adminPassword,
+      active: true,
+      isTempPassword: false,
+    },
     create: {
       name: 'John Doe',
       email: 'admin@example.com',
-      password: 'password',
+      password: adminPassword,
       role: 'admin',
       active: true,
       isTempPassword: false,
@@ -23,11 +31,15 @@ async function main() {
 
   await prisma.user.upsert({
     where: { email: 'staff@example.com' },
-    update: {},
+    update: {
+      password: staffPassword,
+      active: true,
+      isTempPassword: true,
+    },
     create: {
       name: 'Alice Wong',
       email: 'staff@example.com',
-      password: 'password',
+      password: staffPassword,
       role: 'staff',
       active: true,
       isTempPassword: true,

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import "react-toastify/dist/ReactToastify.css";
 import { ToastContainer } from "react-toastify";
+import AuthProvider from "@/components/AuthProvider";
 
 export const metadata: Metadata = {
   title: "FulfilPro",
@@ -16,8 +17,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        {children}
-        <ToastContainer position="bottom-right" theme="light" />
+        <AuthProvider>
+          {children}
+          <ToastContainer position="bottom-right" theme="light" />
+        </AuthProvider>
       </body>
     </html>
   );
