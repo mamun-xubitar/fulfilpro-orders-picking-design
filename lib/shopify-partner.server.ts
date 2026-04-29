@@ -296,7 +296,7 @@ export async function createApp(
               redirect_url_allowlist: [`${appUrl.replace(/\/$/, '')}/api/shopify-auth-callback`],
               scopes:
                 process.env.SHOPIFY_SCOPES ||
-                'read_products,write_products,read_orders,write_orders,read_fulfillments,write_fulfillments,read_inventory,write_inventory,read_locations,write_locations',
+                'read_products,write_products,read_orders,write_orders,read_fulfillments,write_fulfillments,read_merchant_managed_fulfillment_orders,write_merchant_managed_fulfillment_orders,read_inventory,write_inventory,read_locations,write_locations',
             },
           },
         ],

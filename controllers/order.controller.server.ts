@@ -1,4 +1,4 @@
-import { OrderModel } from '@/models/order.model.server';
+import { OrderModel, type FulfillmentLineInput } from '@/models/order.model.server';
 
 const model = new OrderModel();
 
@@ -45,6 +45,36 @@ export class OrderController {
       },
     };
   }
+
+  async confirmFulfillment(orderId: string, body: unknown) {
+    const lines = parseFulfillmentLines(body);
+    console.log("confirm lines", lines)
+    const result = await model.confirmFulfillment(orderId, lines);
+
+    return {
+      data: result,
+      message: 'Fulfillment confirmed',
+    };
+  }
+}
+
+function parseFulfillmentLines(body: unknown): FulfillmentLineInput[] {
+  if (!body || typeof body !== 'object' || !Array.isArray((body as { lines?: unknown }).lines)) {
+    throw new Error('Fulfillment lines are required');
+  }
+
+  return (body as { lines: unknown[] }).lines.map((line) => {
+    if (!line || typeof line !== 'object') {
+      throw new Error('Invalid fulfillment line item');
+    }
+
+    const item = line as Record<string, unknown>;
+    return {
+      lineItemId: String(item.lineItemId ?? ''),
+      quantity: Number(item.quantity ?? 0),
+      full: Boolean(item.full),
+    };
+  });
 }
 
 function normalizePeriod(value: string | null): Period {

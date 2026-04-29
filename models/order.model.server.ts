@@ -1,4 +1,5 @@
 import prisma from '@/lib/prisma.server';
+import { createShopifyFulfillment, type FulfillmentRequestLine } from '@/lib/shopify-fulfillment.server';
 import { Prisma } from '@prisma/client';
 
 export type ShopifyOrderPayload = {
@@ -34,6 +35,7 @@ export type ShopifyOrderPayload = {
     name?: string | null;
   } | null;
   line_items?: Array<{
+    id: number;
     name?: string | null;
     sku?: string | null;
     quantity?: number | null;
@@ -45,6 +47,12 @@ export type ShopifyOrderPayload = {
       };
     };
   }> | null;
+};
+
+export type FulfillmentLineInput = {
+  lineItemId: string;
+  quantity: number;
+  full: boolean;
 };
 
 export class OrderModel {
@@ -64,50 +72,40 @@ export class OrderModel {
       return { created: false };
     }
 
-    const lineItems = (payload.line_items ?? []).map((item) => ({
-      name: item.name ?? '',
-      sku: item.sku ?? '',
-      qty: Number(item.quantity ?? 0),
-      price: Number(item.price_set?.shop_money?.amount ?? 0),
-      currencyCode: item.price_set?.shop_money?.currency_code ?? null,
-    }));
-
-    const shippingAddress = payload.shipping_address;
-    const customerName =
-      `${payload.customer?.first_name ?? ''} ${payload.customer?.last_name ?? ''}`.trim() ||
-      shippingAddress?.name?.trim() ||
-      'Unknown Customer';
-    const customerEmail = payload.customer?.email ?? payload.email ?? null;
-    const customerPhone = payload.customer?.phone ?? payload.phone ?? shippingAddress?.phone ?? null;
-
-    const fulfillmentStatus = resolveFulfillmentStatus(payload.fulfillment_status);
-    const priceRaw = payload.total_price_set?.shop_money?.amount ?? payload.total_price ?? 0;
-    const price = Number(priceRaw);
-    const currencyCode = payload.total_price_set?.shop_money?.currency_code ?? null;
-
     await prisma.order.create({
-      data: {
-        number: `${payload.order_number}`,
-        cusName: customerName,
-        cusEmail: customerEmail,
-        address: shippingAddress?.address1 ?? null,
-        address2: shippingAddress?.address2 ?? null,
-        phone: customerPhone,
-        city: shippingAddress?.city ?? null,
-        state: shippingAddress?.province ?? null,
-        zip: shippingAddress?.zip ?? null,
-        country: shippingAddress?.country ?? null,
-        fulfillmentStatus,
-        boarcode: extractBarcode(lineItems),
-        lineItems,
-        price: Number.isFinite(price) ? price : 0,
-        currencyCode,
-        storeId,
-        orderedAt: new Date(payload.created_at)
-      },
+      data: buildOrderCreateData(payload, storeId),
     });
 
     return { created: true };
+  }
+
+  async upsertFromShopifyOrder(params: {
+    payload: ShopifyOrderPayload;
+    storeId: string;
+  }) {
+    const { payload, storeId } = params;
+    const number = `${payload.order_number}`;
+    const existing = await prisma.order.findUnique({
+      where: { number },
+      select: {
+        id: true,
+        fulfillmentItems: true,
+      },
+    });
+
+    if (!existing) {
+      await prisma.order.create({
+        data: buildOrderCreateData(payload, storeId),
+      });
+      return { created: true, updated: false };
+    }
+
+    await prisma.order.update({
+      where: { id: existing.id },
+      data: buildOrderUpdateData(payload, storeId, existing.fulfillmentItems),
+    });
+
+    return { created: false, updated: true };
   }
 
   async listForConnectedStores(params: {
@@ -156,7 +154,7 @@ export class OrderModel {
             },
           },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { orderedAt: 'desc' },
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),
@@ -176,11 +174,12 @@ export class OrderModel {
         state: row.state,
         country: row.country,
         status: row.fulfillmentStatus ?? 'unfulfilled',
-        orderedAt: row.createdAt.toISOString(),
+        orderedAt: row.orderedAt?.toISOString(),
         storeId: row.store.id,
         storeName: row.store.name ?? row.store.storeDomain,
         storeDomain: row.store.storeDomain,
         items: lineItems,
+        fulfillmentItems: toFulfillmentItems(row.fulfillmentItems),
         itemsCount: itemCount,
       };
     });
@@ -205,6 +204,143 @@ export class OrderModel {
       storeDomain: store.storeDomain,
     }));
   }
+
+  async confirmFulfillment(orderId: string, lines: FulfillmentLineInput[]) {
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        store: {
+          select: {
+            storeDomain: true,
+            accessToken: true,
+          },
+        },
+      },
+    });
+
+    if (!order) {
+      throw new Error('Order not found');
+    }
+
+    if (!order.store.accessToken) {
+      throw new Error('Store is missing a Shopify access token');
+    }
+
+    const lineItems = toLineItems(order.lineItems);
+    const fulfillableLines = normalizeFulfillmentLines(lines, lineItems);
+    const currentFulfillmentItems = toFulfillmentItems(order.fulfillmentItems);
+    const shopifyResult = await createShopifyFulfillment({
+      shop: order.store.storeDomain,
+      accessToken: order.store.accessToken,
+      orderNumber: order.number,
+      shopifyOrderId: currentFulfillmentItems.shopifyOrderId,
+      lines: fulfillableLines.map((line) => ({
+        lineItemId: line.lineItemId,
+        quantity: line.quantity,
+      })),
+    });
+
+    const confirmation = {
+      id: crypto.randomUUID(),
+      confirmedAt: new Date().toISOString(),
+      shopifyFulfillmentId: shopifyResult.fulfillmentId,
+      shopifyFulfillmentStatus: shopifyResult.fulfillmentStatus,
+      lines: fulfillableLines,
+    };
+
+    const nextFulfillmentItems = {
+      shopifyOrderId: currentFulfillmentItems.shopifyOrderId ?? shopifyResult.orderId,
+      confirmations: [...currentFulfillmentItems.confirmations, confirmation],
+    };
+
+    const totalQuantity = lineItems.reduce((sum, item) => sum + Math.max(0, item.qty), 0);
+    const fulfilledQuantity = nextFulfillmentItems.confirmations.reduce((sum, item) => {
+      return sum + item.lines.reduce((lineSum, line) => lineSum + line.quantity, 0);
+    }, 0);
+    const fulfillmentStatus = fulfilledQuantity >= totalQuantity ? 'fulfilled' : fulfilledQuantity > 0 ? 'partial' : 'unfulfilled';
+
+    await prisma.order.update({
+      where: { id: order.id },
+      data: {
+        fulfillmentItems: nextFulfillmentItems,
+        fulfillmentStatus,
+      },
+    });
+
+    return {
+      orderId: order.id,
+      status: fulfillmentStatus,
+      fulfillmentItems: nextFulfillmentItems,
+    };
+  }
+}
+
+function buildOrderCreateData(payload: ShopifyOrderPayload, storeId: string): Prisma.OrderUncheckedCreateInput {
+  const data = buildOrderWriteData(payload, storeId, null);
+  return {
+    number: `${payload.order_number}`,
+    ...data,
+  };
+}
+
+function buildOrderUpdateData(
+  payload: ShopifyOrderPayload,
+  storeId: string,
+  existingFulfillmentItems: Prisma.JsonValue | null
+): Prisma.OrderUncheckedUpdateInput {
+  return buildOrderWriteData(payload, storeId, existingFulfillmentItems);
+}
+
+function buildOrderWriteData(
+  payload: ShopifyOrderPayload,
+  storeId: string,
+  existingFulfillmentItems: Prisma.JsonValue | null
+) {
+  const lineItems = (payload.line_items ?? []).map((item) => ({
+    id: item.id,
+    name: item.name ?? '',
+    sku: item.sku ?? '',
+    qty: Number(item.quantity ?? 0),
+    price: Number(item.price_set?.shop_money?.amount ?? item.price ?? 0),
+    currencyCode: item.price_set?.shop_money?.currency_code ?? null,
+  }));
+
+  const shippingAddress = payload.shipping_address;
+  const customerName =
+    `${payload.customer?.first_name ?? ''} ${payload.customer?.last_name ?? ''}`.trim() ||
+    shippingAddress?.name?.trim() ||
+    'Unknown Customer';
+  const customerEmail = payload.customer?.email ?? payload.email ?? null;
+  const customerPhone = payload.customer?.phone ?? payload.phone ?? shippingAddress?.phone ?? null;
+  const fulfillmentStatus = resolveFulfillmentStatus(payload.fulfillment_status);
+  const priceRaw = payload.total_price_set?.shop_money?.amount ?? payload.total_price ?? payload.current_total_price ?? 0;
+  const price = Number(priceRaw);
+  const currencyCode = payload.total_price_set?.shop_money?.currency_code ?? null;
+  const currentFulfillmentItems = toFulfillmentItems(existingFulfillmentItems);
+  const shopifyOrderId = payload.id ? `gid://shopify/Order/${payload.id}` : currentFulfillmentItems.shopifyOrderId;
+
+  return {
+    cusName: customerName,
+    cusEmail: customerEmail,
+    address: shippingAddress?.address1 ?? null,
+    address2: shippingAddress?.address2 ?? null,
+    phone: customerPhone,
+    city: shippingAddress?.city ?? null,
+    state: shippingAddress?.province ?? null,
+    zip: shippingAddress?.zip ?? null,
+    country: shippingAddress?.country ?? null,
+    fulfillmentStatus,
+    // boarcode: extractBarcode(lineItems),
+    lineItems,
+    fulfillmentItems: {
+      shopifyOrderId,
+      confirmations: currentFulfillmentItems.confirmations,
+    },
+    price: Number.isFinite(price) ? price : 0,
+    currencyCode,
+    storeId,
+    orderedAt: new Date(payload.created_at),
+  };
 }
 
 function resolveFulfillmentStatus(payloadStatus?: string | null) {
@@ -238,19 +374,74 @@ function getPeriodStartDate(period: 'all' | 'week' | 'month' | 'year') {
   return weekStart;
 }
 
-function toLineItems(value: Prisma.JsonValue): Array<{ name: string; sku: string; qty: number }> {
+function toLineItems(value: Prisma.JsonValue): Array<{ id: string; name: string; sku: string; qty: number }> {
   if (!Array.isArray(value)) return [];
 
   return value.map((item) => {
     if (!item || typeof item !== 'object') {
-      return { name: '', sku: '', qty: 0 };
+      return { id: '', name: '', sku: '', qty: 0 };
     }
 
     const obj = item as Record<string, unknown>;
     return {
+      id: typeof obj.id === 'string' ? obj.id : String(obj.id ?? ''),
       name: typeof obj.name === 'string' ? obj.name : '',
       sku: typeof obj.sku === 'string' ? obj.sku : '',
       qty: typeof obj.qty === 'number' ? obj.qty : Number(obj.qty ?? 0),
     };
   });
+}
+
+function normalizeFulfillmentLines(
+  lines: FulfillmentLineInput[],
+  orderLines: Array<{ id: string; qty: number }>
+): FulfillmentLineInput[] {
+  const orderLinesById = new Map(orderLines.map((line) => [line.id, line]));
+  const normalized: FulfillmentLineInput[] = [];
+
+  for (const line of lines) {
+    const orderLine = orderLinesById.get(line.lineItemId);
+    if (!orderLine) {
+      throw new Error('Selected line item was not found on this order');
+    }
+
+    const quantity = Math.floor(Number(line.quantity));
+    if (!Number.isFinite(quantity) || quantity < 1) {
+      throw new Error('Selected fulfillment quantities must be at least 1');
+    }
+
+    if (quantity > orderLine.qty) {
+      throw new Error('Selected fulfillment quantity exceeds the ordered quantity');
+    }
+
+    normalized.push({
+      lineItemId: line.lineItemId,
+      quantity,
+      full: Boolean(line.full),
+    });
+  }
+
+  if (normalized.length === 0) {
+    throw new Error('Select at least one line item to fulfill');
+  }
+
+  return normalized;
+}
+
+function toFulfillmentItems(value: Prisma.JsonValue | null) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return { shopifyOrderId: null as string | null, confirmations: [] as Array<{ lines: FulfillmentRequestLine[] }> };
+  }
+
+  const obj = value as Record<string, unknown>;
+  const confirmations = Array.isArray(obj.confirmations)
+    ? obj.confirmations.filter((item): item is { lines: FulfillmentRequestLine[] } => {
+        return Boolean(item) && typeof item === 'object' && Array.isArray((item as { lines?: unknown }).lines);
+      })
+    : [];
+
+  return {
+    shopifyOrderId: typeof obj.shopifyOrderId === 'string' ? obj.shopifyOrderId : null,
+    confirmations,
+  };
 }

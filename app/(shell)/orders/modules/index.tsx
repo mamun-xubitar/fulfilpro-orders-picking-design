@@ -1,8 +1,9 @@
 'use client';
 
 import { Fragment, useEffect, useMemo, useState, useRef } from 'react';
+import { toast } from 'react-toastify';
 
-type OrderItem = { name: string; sku: string; qty: number };
+type OrderItem = { id: string; name: string; sku: string; qty: number };
 type OrderRow = {
   id: string;
   number: string;
@@ -19,6 +20,14 @@ type OrderRow = {
   storeName: string;
   storeDomain: string;
   items: OrderItem[];
+  fulfillmentItems: {
+    shopifyOrderId: string | null;
+    confirmations: Array<{
+      id?: string;
+      confirmedAt?: string;
+      lines: Array<{ lineItemId: string; quantity: number; full?: boolean }>;
+    }>;
+  };
   itemsCount: number;
 };
 
@@ -35,6 +44,7 @@ type Pagination = {
 type ApiResponse<T> = {
   success: boolean;
   message: string;
+  errors?: string[];
   data: T;
 };
 
@@ -78,6 +88,11 @@ function getOrderAddressLines(order: Pick<OrderRow, 'address' | 'address2' | 'ci
   ].filter(Boolean);
 }
 
+function getApiErrorMessage(response: ApiResponse<unknown>, fallback: string) {
+  if (response.errors?.length) return response.errors.join(', ');
+  return response.message || fallback;
+}
+
 export default function OrdersPage() {
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [stores, setStores] = useState<StoreOption[]>([]);
@@ -88,6 +103,7 @@ export default function OrdersPage() {
   const [pagination, setPagination] = useState<Pagination>(DEFAULT_PAGINATION);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState('');
   const [lastSynced, setLastSynced] = useState('Not synced yet');
   const [refreshRotation, setRefreshRotation] = useState(0);
@@ -98,6 +114,7 @@ export default function OrdersPage() {
   const [fullChecks, setFullChecks] = useState<Record<string, boolean>>({});
   const [partialValues, setPartialValues] = useState<Record<string, number>>({});
   const [fulMessages, setFulMessages] = useState<Record<string, string>>({});
+  const [fulSaving, setFulSaving] = useState<Record<string, boolean>>({});
   const messageTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   useEffect(() => {
@@ -140,7 +157,7 @@ export default function OrdersPage() {
         setOrders(json.data.orders);
         setStores(json.data.stores);
         setPagination(json.data.pagination);
-        setExpandedId(null);
+        setExpandedId(search ? json.data.orders[0]?.id ?? null : null);
         setLastSynced(`Last synced: ${new Date().toLocaleTimeString()}`);
       } catch (err) {
         if (cancelled) return;
@@ -158,26 +175,52 @@ export default function OrdersPage() {
     return () => {
       cancelled = true;
     };
-  }, [queryString, refreshToken]);
+  }, [queryString, refreshToken, search]);
 
   const handleRefresh = () => {
     setRefreshRotation((prev) => prev + 360);
     setRefreshToken((prev) => prev + 1);
   };
 
-  const rowItemKey = (orderId: string, itemIndex: number) => `${orderId}-${itemIndex}`;
+  const handleSync = async () => {
+    setSyncing(true);
+    setError('');
+    try {
+      const res = await fetch('/api/orders/sync', { method: 'POST' });
+      const json = (await res.json()) as ApiResponse<{
+        totalStores: number;
+        totalFetched: number;
+        totalCreated: number;
+        totalUpdated: number;
+        failedStores: number;
+      }>;
 
-  const toggleFull = (orderId: string, itemIndex: number, maxQty: number) => {
-    const key = rowItemKey(orderId, itemIndex);
-    const nextChecked = !(fullChecks[key] ?? true);
-    setFullChecks((prev) => ({ ...prev, [key]: nextChecked }));
-    if (nextChecked) {
-      setPartialValues((prev) => ({ ...prev, [key]: maxQty }));
+      if (!res.ok || !json.success) {
+        throw new Error(json.message || 'Failed to sync Shopify orders');
+      }
+
+      setLastSynced(
+        `Synced ${json.data.totalFetched} orders (${json.data.totalCreated} new, ${json.data.totalUpdated} updated)`
+      );
+      setRefreshToken((prev) => prev + 1);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to sync Shopify orders');
+    } finally {
+      setSyncing(false);
     }
   };
 
+  const rowItemKey = (orderId: string, itemIndex: number) => `${orderId}-${itemIndex}`;
+
+  const toggleFull = (orderId: string, itemIndex: number, maxQty: number, fulfilledQty: number) => {
+    const key = rowItemKey(orderId, itemIndex);
+    const nextChecked = !(fullChecks[key] ?? false);
+    setFullChecks((prev) => ({ ...prev, [key]: nextChecked }));
+    setPartialValues((prev) => ({ ...prev, [key]: nextChecked ? maxQty : fulfilledQty }));
+  };
+
   const toggleAllFull = (order: OrderRow) => {
-    const allChecked = order.items.every((_, itemIndex) => fullChecks[rowItemKey(order.id, itemIndex)] ?? true);
+    const allChecked = order.items.every((_, itemIndex) => fullChecks[rowItemKey(order.id, itemIndex)] ?? false);
     const nextValue = !allChecked;
 
     setFullChecks((prev) => {
@@ -188,21 +231,48 @@ export default function OrdersPage() {
       return updated;
     });
 
-    if (nextValue) {
-      setPartialValues((prev) => {
-        const updated = { ...prev };
-        order.items.forEach((item, itemIndex) => {
-          updated[rowItemKey(order.id, itemIndex)] = item.qty;
-        });
-        return updated;
+    setPartialValues((prev) => {
+      const updated = { ...prev };
+      order.items.forEach((item, itemIndex) => {
+        updated[rowItemKey(order.id, itemIndex)] = nextValue ? item.qty : getFulfilledQty(order, item.id);
       });
-    }
+      return updated;
+    });
   };
 
   const validPartial = (orderId: string, itemIndex: number, maxQty: number, value: string) => {
     const parsed = parseInt(value, 10);
     const clamped = Number.isNaN(parsed) || parsed < 1 ? 0 : parsed > maxQty ? maxQty : parsed;
     setPartialValues((prev) => ({ ...prev, [rowItemKey(orderId, itemIndex)]: clamped }));
+  };
+
+  const getFulfilledQty = (order: OrderRow, lineItemId: string) => {
+    return order.fulfillmentItems.confirmations.reduce((sum, confirmation) => {
+      return sum + confirmation.lines.reduce((lineSum, line) => (
+        line.lineItemId === lineItemId ? lineSum + line.quantity : lineSum
+      ), 0);
+    }, 0);
+  };
+
+  const getFulfillmentLines = (order: OrderRow) => {
+    return order.items
+      .map((item, itemIndex) => {
+        const key = rowItemKey(order.id, itemIndex);
+        const fulfilledQty = getFulfilledQty(order, item.id);
+        const remainingQty = Math.max(0, item.qty - fulfilledQty);
+        const isFull = fullChecks[key] ?? false;
+        const requestedTotal = partialValues[key] ?? fulfilledQty;
+        const quantity = isFull ? remainingQty : Math.max(0, requestedTotal - fulfilledQty);
+
+        if (quantity < 1) return null;
+
+        return {
+          lineItemId: item.id,
+          quantity,
+          full: isFull,
+        };
+      })
+      .filter((line): line is { lineItemId: string; quantity: number; full: boolean } => Boolean(line));
   };
 
   const addBC = (orderId: string) => {
@@ -223,14 +293,57 @@ export default function OrdersPage() {
     }));
   };
 
-  const confirmFul = (orderId: string) => {
-    setFulMessages((prev) => ({ ...prev, [orderId]: '✓ Fulfilment confirmed!' }));
+  const setFulfillmentMessage = (orderId: string, message: string) => {
+    setFulMessages((prev) => ({ ...prev, [orderId]: message }));
     if (messageTimerRef.current[orderId]) {
       clearTimeout(messageTimerRef.current[orderId]);
     }
     messageTimerRef.current[orderId] = setTimeout(() => {
       setFulMessages((prev) => ({ ...prev, [orderId]: '' }));
     }, 3000);
+  };
+
+  const confirmFul = async (order: OrderRow) => {
+    const lines = getFulfillmentLines(order);
+
+    if (lines.length === 0) {
+      toast.error('Increase a quantity or check Full for an item with remaining stock.');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      'After confirming fulfillment, these items cannot be changed without admin permission. Continue?'
+    );
+    if (!confirmed) return;
+
+    setFulSaving((prev) => ({ ...prev, [order.id]: true }));
+    try {
+      const res = await fetch(`/api/orders/${order.id}/fulfill`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lines }),
+      });
+      const json = (await res.json()) as ApiResponse<{
+        orderId: string;
+        status: string;
+        fulfillmentItems: OrderRow['fulfillmentItems'];
+      }>;
+
+      if (!res.ok || !json.success) {
+        throw new Error(getApiErrorMessage(json, 'Failed to confirm fulfillment'));
+      }
+
+      setOrders((prev) => prev.map((item) => (
+        item.id === order.id
+          ? { ...item, status: json.data.status, fulfillmentItems: json.data.fulfillmentItems }
+          : item
+      )));
+      setFulfillmentMessage(order.id, 'Fulfilment confirmed!');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to confirm fulfillment.');
+    } finally {
+      setFulSaving((prev) => ({ ...prev, [order.id]: false }));
+    }
   };
 
   const stepCp = (orderId: string, delta: number) => {
@@ -312,8 +425,24 @@ export default function OrdersPage() {
 
         <div className="flex items-center gap-2 ml-auto">
           <button
+            onClick={handleSync}
+            disabled={syncing || loading}
+            className="flex items-center gap-1.5 bg-white border border-gray-300 text-gray-600 text-sm px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors duration-150 cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <svg
+              className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v6h6M20 20v-6h-6M5 19A9 9 0 0119 5m0 0h-5m5 0v5M19 5A9 9 0 005 19m0 0h5m-5 0v-5" />
+            </svg>
+            {syncing ? 'Syncing...' : 'Sync'}
+          </button>
+          <button
             onClick={handleRefresh}
-            className="flex items-center gap-1.5 bg-white border border-gray-300 text-gray-600 text-sm px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors duration-150 cursor-pointer shadow-sm"
+            disabled={syncing}
+            className="flex items-center gap-1.5 bg-white border border-gray-300 text-gray-600 text-sm px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors duration-150 cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <svg
               className="w-4 h-4"
@@ -453,7 +582,7 @@ export default function OrdersPage() {
                                         <label className="inline-flex items-center gap-1 cursor-pointer justify-start">
                                           <input
                                             type="checkbox"
-                                            checked={order.items.every((_, itemIndex) => fullChecks[rowItemKey(order.id, itemIndex)] ?? true)}
+                                            checked={order.items.length > 0 && order.items.every((_, itemIndex) => fullChecks[rowItemKey(order.id, itemIndex)] ?? false)}
                                             onChange={() => toggleAllFull(order)}
                                             className="rounded border-gray-300 text-blue-600 cursor-pointer"
                                           />
@@ -466,19 +595,24 @@ export default function OrdersPage() {
                                   <tbody>
                                     {order.items.map((item, itemIndex) => {
                                       const key = rowItemKey(order.id, itemIndex);
-                                      const isFull = fullChecks[key] ?? true;
-                                      const partialValue = partialValues[key] ?? 0;
+                                      const fulfilledQty = getFulfilledQty(order, item.id);
+                                      const remainingQty = Math.max(0, item.qty - fulfilledQty);
+                                      const isFull = fullChecks[key] ?? false;
+                                      const partialValue = partialValues[key] ?? fulfilledQty;
                                       return (
                                         <tr key={`${order.id}-${itemIndex}`} className="border-b border-blue-100">
                                           <td className="py-1.5 pr-2 text-gray-700">{item.name}</td>
                                           <td className="py-1.5 pr-2 font-mono text-gray-500">{item.sku || '-'}</td>
-                                          <td className="py-1.5 text-center text-gray-700">{item.qty}</td>
-                                          <td className="py-1.5 flex justify-start text-center items-center">
+                                          <td className="py-1.5 text-center text-gray-700">
+                                            {fulfilledQty}/{item.qty}
+                                          </td>
+                                          <td className="py-1.5 flex-inline justify-start items-center">
                                             <input
                                               type="checkbox"
                                               checked={isFull}
-                                              onChange={() => toggleFull(order.id, itemIndex, item.qty)}
-                                              className="rounded border-gray-300 text-blue-600 cursor-pointer"
+                                              disabled={remainingQty === 0}
+                                              onChange={() => toggleFull(order.id, itemIndex, item.qty, fulfilledQty)}
+                                              className="rounded border-gray-300 text-blue-600 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                                             />
                                           </td>
                                           <td className="py-1.5 text-center">
@@ -487,9 +621,9 @@ export default function OrdersPage() {
                                               min={0}
                                               max={item.qty}
                                               value={partialValue}
-                                              disabled={isFull}
+                                              disabled={isFull || remainingQty === 0}
                                               onChange={(e) => validPartial(order.id, itemIndex, item.qty, e.target.value)}
-                                              className="w-14 border border-blue-200 rounded px-1 py-0.5 text-center text-xs bg-white disabled:bg-gray-100 disabled:text-gray-400 cursor-pointer"
+                                              className="w-14 border border-blue-200 rounded px-1 py-0.5 text-center text-xs bg-white cursor-pointer disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
                                             />
                                           </td>
                                         </tr>
@@ -500,6 +634,11 @@ export default function OrdersPage() {
                               </div>
 
                               <div>
+                                {(() => {
+                                  const canConfirmFulfillment = getFulfillmentLines(order).length > 0;
+                                  const isConfirmDisabled = fulSaving[order.id] || !canConfirmFulfillment;
+                                  return (
+                                    <>
                                 <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">Barcode &amp; Actions</h4>
                                 <div className="flex gap-2 mb-2">
                                   <input
@@ -526,11 +665,19 @@ export default function OrdersPage() {
                                   ))}
                                 </div>
                                 <button
-                                  onClick={() => confirmFul(order.id)}
-                                  className="w-full bg-blue-600 text-white py-2 rounded-lg text-xs font-semibold hover:bg-blue-700 transition-colors duration-150 cursor-pointer mb-2"
+                                  onClick={() => confirmFul(order)}
+                                  disabled={isConfirmDisabled}
+                                  className={`w-full py-2 rounded-lg text-xs font-semibold transition-colors duration-150 mb-2 ${
+                                    isConfirmDisabled
+                                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                      : 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer'
+                                  }`}
                                 >
-                                  Confirm Fulfilment
+                                  {fulSaving[order.id] ? 'Confirming...' : 'Confirm Fulfilment'}
                                 </button>
+                                    </>
+                                  );
+                                })()}
                                 <div className="flex items-center gap-2">
                                   <button
                                     onClick={() => printLabel(order.number)}
