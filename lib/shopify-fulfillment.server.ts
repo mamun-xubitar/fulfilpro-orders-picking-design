@@ -14,6 +14,11 @@ type ShopifyGraphQLResponse<T> = {
 type FulfillmentOrderNode = {
   id: string;
   status: string;
+  assignedLocation: {
+    location: {
+      id: string;
+    } | null;
+  } | null;
   lineItems: {
     nodes: Array<{
       id: string;
@@ -82,7 +87,36 @@ export async function createShopifyFulfillment(params: {
     throw new Error('No fulfillable Shopify line items were found for the selected quantities');
   }
 
-  const data = await shopifyGraphQL<FulfillmentCreateResult>(shop, params.accessToken, {
+  const fulfillments = [];
+  for (const locationGroup of groupFulfillmentGroupsByLocation(fulfillmentGroups)) {
+    const data = await createFulfillmentForLocation(shop, params.accessToken, {
+      notifyCustomer: params.notifyCustomer,
+      lineItemsByFulfillmentOrder: locationGroup.lineItemsByFulfillmentOrder,
+    });
+    fulfillments.push(data);
+  }
+
+  return {
+    orderId: order.id,
+    fulfillmentId: fulfillments[0]?.fulfillmentCreate.fulfillment?.id ?? null,
+    fulfillmentStatus: fulfillments[0]?.fulfillmentCreate.fulfillment?.status ?? 'SUCCESS',
+    fulfillments: fulfillments.map((data) => data.fulfillmentCreate.fulfillment).filter(Boolean),
+    lineItemsByFulfillmentOrder: fulfillmentGroups,
+  };
+}
+
+async function createFulfillmentForLocation(
+  shop: string,
+  accessToken: string,
+  params: {
+    notifyCustomer: boolean;
+    lineItemsByFulfillmentOrder: Array<{
+      fulfillmentOrderId: string;
+      fulfillmentOrderLineItems: Array<{ id: string; quantity: number }>;
+    }>;
+  }
+) {
+  const data = await shopifyGraphQL<FulfillmentCreateResult>(shop, accessToken, {
     query: `
       mutation CreateFulfillment($fulfillment: FulfillmentInput!, $message: String) {
         fulfillmentCreate(fulfillment: $fulfillment, message: $message) {
@@ -100,7 +134,7 @@ export async function createShopifyFulfillment(params: {
     variables: {
       fulfillment: {
         notifyCustomer: params.notifyCustomer,
-        lineItemsByFulfillmentOrder: fulfillmentGroups,
+        lineItemsByFulfillmentOrder: params.lineItemsByFulfillmentOrder,
       },
       message: 'Fulfillment confirmed from order fulfillment app',
     },
@@ -111,12 +145,7 @@ export async function createShopifyFulfillment(params: {
     throw new Error(userErrors.map((error) => error.message).join(', '));
   }
 
-  return {
-    orderId: order.id,
-    fulfillmentId: data.fulfillmentCreate.fulfillment?.id ?? null,
-    fulfillmentStatus: data.fulfillmentCreate.fulfillment?.status ?? 'SUCCESS',
-    lineItemsByFulfillmentOrder: fulfillmentGroups,
-  };
+  return data;
 }
 
 async function getOrderFulfillmentOrdersById(shop: string, accessToken: string, orderId: string) {
@@ -130,6 +159,11 @@ async function getOrderFulfillmentOrdersById(shop: string, accessToken: string, 
             nodes {
               id
               status
+              assignedLocation {
+                location {
+                  id
+                }
+              }
               lineItems(first: 250) {
                 nodes {
                   id
@@ -162,6 +196,11 @@ async function findOrderFulfillmentOrdersByNumber(shop: string, accessToken: str
               nodes {
                 id
                 status
+                assignedLocation {
+                  location {
+                    id
+                  }
+                }
                 lineItems(first: 250) {
                   nodes {
                     id
@@ -184,10 +223,12 @@ async function findOrderFulfillmentOrdersByNumber(shop: string, accessToken: str
 }
 
 function buildRemainingLineItemMap(fulfillmentOrders: FulfillmentOrderNode[]) {
-  const map = new Map<string, Array<{ fulfillmentOrderId: string; fulfillmentOrderLineItemId: string; remainingQuantity: number }>>();
-  console.log("fulfillment orders", JSON.stringify(fulfillmentOrders, null, 2))
+  const map = new Map<string, Array<{ fulfillmentOrderId: string; fulfillmentOrderLineItemId: string; remainingQuantity: number; locationId: string }>>();
   for (const fulfillmentOrder of fulfillmentOrders) {
     if (fulfillmentOrder.status === 'CLOSED' || fulfillmentOrder.status === 'CANCELLED' || fulfillmentOrder.status === 'CANCELED') continue;
+
+    const locationId = fulfillmentOrder.assignedLocation?.location?.id;
+    if (!locationId) continue;
 
     for (const lineItem of fulfillmentOrder.lineItems.nodes) {
       if (lineItem.remainingQuantity <= 0) continue;
@@ -198,6 +239,7 @@ function buildRemainingLineItemMap(fulfillmentOrders: FulfillmentOrderNode[]) {
         fulfillmentOrderId: fulfillmentOrder.id,
         fulfillmentOrderLineItemId: lineItem.id,
         remainingQuantity: lineItem.remainingQuantity,
+        locationId,
       });
       map.set(key, existing);
     }
@@ -208,9 +250,9 @@ function buildRemainingLineItemMap(fulfillmentOrders: FulfillmentOrderNode[]) {
 
 function buildFulfillmentGroups(
   lines: FulfillmentRequestLine[],
-  remainingByLineItem: Map<string, Array<{ fulfillmentOrderId: string; fulfillmentOrderLineItemId: string; remainingQuantity: number }>>
+  remainingByLineItem: Map<string, Array<{ fulfillmentOrderId: string; fulfillmentOrderLineItemId: string; remainingQuantity: number; locationId: string }>>
 ) {
-  const groups = new Map<string, Array<{ id: string; quantity: number }>>();
+  const groups = new Map<string, { locationId: string; fulfillmentOrderLineItems: Array<{ id: string; quantity: number }> }>();
   for (const line of lines) {
     let quantityLeft = line.quantity;
     const candidates = remainingByLineItem.get(line.lineItemId) ?? [];
@@ -219,8 +261,11 @@ function buildFulfillmentGroups(
       if (quantityLeft <= 0) break;
 
       const quantity = Math.min(quantityLeft, candidate.remainingQuantity);
-      const existing = groups.get(candidate.fulfillmentOrderId) ?? [];
-      existing.push({ id: candidate.fulfillmentOrderLineItemId, quantity });
+      const existing = groups.get(candidate.fulfillmentOrderId) ?? {
+        locationId: candidate.locationId,
+        fulfillmentOrderLineItems: [],
+      };
+      existing.fulfillmentOrderLineItems.push({ id: candidate.fulfillmentOrderLineItemId, quantity });
       groups.set(candidate.fulfillmentOrderId, existing);
       quantityLeft -= quantity;
     }
@@ -230,9 +275,37 @@ function buildFulfillmentGroups(
     }
   }
 
-  return Array.from(groups.entries()).map(([fulfillmentOrderId, fulfillmentOrderLineItems]) => ({
+  return Array.from(groups.entries()).map(([fulfillmentOrderId, group]) => ({
     fulfillmentOrderId,
-    fulfillmentOrderLineItems,
+    locationId: group.locationId,
+    fulfillmentOrderLineItems: group.fulfillmentOrderLineItems,
+  }));
+}
+
+function groupFulfillmentGroupsByLocation(
+  fulfillmentGroups: Array<{
+    fulfillmentOrderId: string;
+    locationId: string;
+    fulfillmentOrderLineItems: Array<{ id: string; quantity: number }>;
+  }>
+) {
+  const groups = new Map<string, Array<{
+    fulfillmentOrderId: string;
+    fulfillmentOrderLineItems: Array<{ id: string; quantity: number }>;
+  }>>();
+
+  for (const fulfillmentGroup of fulfillmentGroups) {
+    const existing = groups.get(fulfillmentGroup.locationId) ?? [];
+    existing.push({
+      fulfillmentOrderId: fulfillmentGroup.fulfillmentOrderId,
+      fulfillmentOrderLineItems: fulfillmentGroup.fulfillmentOrderLineItems,
+    });
+    groups.set(fulfillmentGroup.locationId, existing);
+  }
+
+  return Array.from(groups.entries()).map(([locationId, lineItemsByFulfillmentOrder]) => ({
+    locationId,
+    lineItemsByFulfillmentOrder,
   }));
 }
 
