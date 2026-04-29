@@ -79,6 +79,10 @@ model AppSettings {
   staffAccessStart      String   @default("08:00")
   staffAccessEnd        String   @default("16:00")
   sessionTimeoutMinutes Int      @default(30)
+  googleEmail           String?
+  googleAccessToken     String?
+  googleRefreshToken    String?
+  googleTokenExpiresAt  DateTime?
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 }

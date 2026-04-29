@@ -44,6 +44,10 @@ async function main() {
       staffAccessStart: '08:00',
       staffAccessEnd: '16:00',
       sessionTimeoutMinutes: 30,
+      googleEmail: null,
+      googleAccessToken: null,
+      googleRefreshToken: null,
+      googleTokenExpiresAt: null,
     },
   });
 }
