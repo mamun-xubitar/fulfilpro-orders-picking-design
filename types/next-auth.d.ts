@@ -7,6 +7,7 @@ declare module 'next-auth' {
       role: string;
       active: boolean;
       isTempPassword: boolean;
+      loginAt: number;
     } & DefaultSession['user'];
   }
 
@@ -14,6 +15,7 @@ declare module 'next-auth' {
     role: string;
     active: boolean;
     isTempPassword: boolean;
+    loginAt: number;
   }
 }
 
@@ -23,5 +25,6 @@ declare module 'next-auth/jwt' {
     role: string;
     active: boolean;
     isTempPassword: boolean;
+    loginAt: number;
   }
 }

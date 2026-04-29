@@ -2,12 +2,7 @@ import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import { verifyPassword } from '@/lib/password';
 import prisma from '@/lib/prisma.server';
-
-type SettingsForAccess = {
-  staffAccessDays: string[];
-  staffAccessStart: string;
-  staffAccessEnd: string;
-};
+import { evaluateStaffAccess, getAuthPolicy } from '@/lib/auth-policy.server';
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   pages: {
@@ -23,15 +18,17 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       credentials: {
         email: {},
         password: {},
+        approvalRequestId: {},
       },
       authorize: async (credentials) => {
         const email = typeof credentials.email === 'string' ? credentials.email.trim().toLowerCase() : '';
         const password = typeof credentials.password === 'string' ? credentials.password : '';
+        const approvalRequestId = typeof credentials.approvalRequestId === 'string' ? credentials.approvalRequestId : '';
 
         if (!email || !password) {
           throw new Error('Invalid credentials.');
         }
-
+        console.log("being authorized")
         const user = await prisma.user.findUnique({ where: { email } });
 
         if (!user || !user.active || !verifyPassword(password, user.password)) {
@@ -39,10 +36,33 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         }
 
         if (user.role === 'staff') {
-          const settings = await getSettingsForAccess();
-          if (!isWithinStaffAccess(settings)) {
+          const policy = await getAuthPolicy();
+          const access = evaluateStaffAccess(policy);
+          if (!access.allowed) {
             throw new Error('Staff access is restricted at this time.');
           }
+          if (!approvalRequestId) {
+            throw new Error('Staff login requires admin approval.');
+          }
+
+          const approval = await prisma.staffLoginApproval.findUnique({
+            where: { id: approvalRequestId },
+          });
+
+          if (
+            !approval ||
+            approval.userId !== user.id ||
+            approval.status !== 'approved' ||
+            approval.consumedAt ||
+            approval.expiresAt.getTime() <= Date.now()
+          ) {
+            throw new Error('Staff login approval is missing or expired.');
+          }
+
+          await prisma.staffLoginApproval.update({
+            where: { id: approval.id },
+            data: { consumedAt: new Date() },
+          });
         }
 
         return {
@@ -52,6 +72,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           role: user.role,
           active: user.active,
           isTempPassword: user.isTempPassword,
+          loginAt: Date.now(),
         };
       },
     }),
@@ -63,6 +84,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.role = user.role;
         token.active = user.active;
         token.isTempPassword = user.isTempPassword;
+        token.loginAt = user.loginAt;
       }
       return token;
     },
@@ -72,38 +94,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         session.user.role = token.role as string;
         session.user.active = token.active as boolean;
         session.user.isTempPassword = token.isTempPassword as boolean;
+        session.user.loginAt = token.loginAt as number;
+        console.log("my session", session)
       }
       return session;
     },
   },
 });
-
-async function getSettingsForAccess(): Promise<SettingsForAccess> {
-  const settings = await prisma.appSettings.findUnique({ where: { id: 'default' } });
-
-  return {
-    staffAccessDays: normalizeDays(settings?.staffAccessDays),
-    staffAccessStart: settings?.staffAccessStart ?? '08:00',
-    staffAccessEnd: settings?.staffAccessEnd ?? '16:00',
-  };
-}
-
-function isWithinStaffAccess(settings: SettingsForAccess) {
-  const now = new Date();
-  const day = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][now.getDay()];
-  const minutes = now.getHours() * 60 + now.getMinutes();
-  const start = parseTime(settings.staffAccessStart);
-  const end = parseTime(settings.staffAccessEnd);
-
-  return settings.staffAccessDays.includes(day) && minutes >= start && minutes < end;
-}
-
-function parseTime(value: string) {
-  const [hours = '0', minutes = '0'] = value.split(':');
-  return Number(hours) * 60 + Number(minutes);
-}
-
-function normalizeDays(value: unknown) {
-  if (!Array.isArray(value)) return ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
-  return value.filter((day): day is string => typeof day === 'string');
-}

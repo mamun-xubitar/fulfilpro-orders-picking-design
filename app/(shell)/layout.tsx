@@ -4,18 +4,71 @@ import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
 
+type SessionPolicy = {
+  sessionTimeoutMinutes: number;
+  staffAccess: null | {
+    allowed: boolean;
+    timezone: string;
+    currentTime: string;
+    staffAccessDays: string[];
+    staffAccessStart: string;
+    staffAccessEnd: string;
+    allowedDay: boolean;
+    allowedTime: boolean;
+  };
+};
+
+type ApiResponse<T> = { success: boolean; message: string; data: T };
+
 export default function ShellLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const { data: session, status } = useSession();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [policy, setPolicy] = useState<SessionPolicy | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  const [sessionWarningDismissed, setSessionWarningDismissed] = useState(false);
 
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/");
     }
   }, [router, status]);
+
+  useEffect(() => {
+    if (status !== "authenticated") return;
+    let cancelled = false;
+
+    async function loadPolicy() {
+      try {
+        const nextPolicy = await getJson<SessionPolicy>("/api/auth/session-policy");
+        if (!cancelled) setPolicy(nextPolicy);
+      } catch {
+        // Keep the current session usable if policy refresh fails briefly.
+      }
+    }
+
+    void loadPolicy();
+    const policyInterval = window.setInterval(() => {
+      void loadPolicy();
+    }, 60_000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(policyInterval);
+    };
+  }, [status]);
+
+  useEffect(() => {
+    if (status !== "authenticated") return;
+
+    const intervalId = window.setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, [status]);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -30,8 +83,8 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
     return () => document.removeEventListener("click", handleClick);
   }, []);
 
-  async function logout() {
-    await signOut({ callbackUrl: "/" });
+  async function logout(timeout = false) {
+    await signOut({ callbackUrl: timeout ? "/?timeout=1" : "/" });
   }
 
   const navItems = [
@@ -68,6 +121,18 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
   const sidebarWidth = sidebarCollapsed ? "64px" : "240px";
   const user = session?.user;
   const initials = getInitials(user?.name ?? user?.email ?? "");
+  const loginAt = user?.loginAt ?? now;
+  const timeoutMinutes = policy?.sessionTimeoutMinutes ?? 30;
+  const expiresAt = loginAt + timeoutMinutes * 60 * 1000;
+  const remainingMs = expiresAt - now;
+  const remainingMinutes = Math.max(0, Math.ceil(remainingMs / 60_000));
+  const showSessionWarning = remainingMs > 0 && remainingMs <= 15 * 60 * 1000 && !sessionWarningDismissed;
+  const staffRestricted = policy?.staffAccess && !policy.staffAccess.allowed;
+
+  useEffect(() => {
+    if (status !== "authenticated" || !policy || remainingMs > 0) return;
+    void logout(true);
+  }, [policy, remainingMs, status]);
 
   if (status === "loading") {
     return (
@@ -79,6 +144,44 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
 
   return (
     <div onContextMenu={(e) => e.preventDefault()}>
+      {showSessionWarning && (
+        <div className="fixed top-0 left-0 right-0 z-50 bg-amber-400 text-amber-950 px-4 py-2 flex items-center justify-between shadow-md">
+          <span className="text-sm font-medium">Your session expires in {remainingMinutes} minute{remainingMinutes === 1 ? "" : "s"}. Please save your work.</span>
+          <button
+            onClick={() => setSessionWarningDismissed(true)}
+            className="bg-amber-900 text-amber-50 text-xs font-semibold px-3 py-1 rounded hover:bg-amber-800 transition-colors duration-150 cursor-pointer"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {staffRestricted && (
+        <div className="fixed inset-0 z-[60] bg-gray-900 flex flex-col items-center justify-center text-center">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md mx-4">
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/>
+              </svg>
+            </div>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">Access Restricted</h2>
+            <p className="text-gray-500 text-sm mb-5">Your staff account is outside the allowed access days or time window.</p>
+            <div className="text-left bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-600 space-y-1 mb-5">
+              <p><span className="font-medium text-gray-800">Timezone:</span> {policy.staffAccess?.timezone}</p>
+              <p><span className="font-medium text-gray-800">Current time:</span> {policy.staffAccess?.currentTime}</p>
+              <p><span className="font-medium text-gray-800">Allowed days:</span> {policy.staffAccess?.staffAccessDays.join(", ")}</p>
+              <p><span className="font-medium text-gray-800">Allowed time:</span> {policy.staffAccess?.staffAccessStart} - {policy.staffAccess?.staffAccessEnd}</p>
+            </div>
+            <button
+              onClick={() => void logout()}
+              className="w-full bg-red-500 text-white py-2 rounded-lg font-semibold hover:bg-red-600 transition-colors duration-150 cursor-pointer"
+            >
+              Logout
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Sidebar */}
       <aside
         id="sidebar"
@@ -175,6 +278,15 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
       </div>
     </div>
   );
+}
+
+async function getJson<T>(url: string) {
+  const res = await fetch(url);
+  const json = (await res.json()) as ApiResponse<T>;
+  if (!res.ok || !json.success) {
+    throw new Error(json.message || "Request failed");
+  }
+  return json.data;
 }
 
 function getInitials(value: string) {
