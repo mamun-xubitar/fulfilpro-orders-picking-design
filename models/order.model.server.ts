@@ -82,7 +82,7 @@ export class OrderModel {
     storeDomain: string;
   }) {
     const { payload, storeId } = params;
-    console.log('Processing order webhook', JSON.stringify(payload, null, 2));
+    // console.log('Processing order webhook', JSON.stringify(payload, null, 2));
     const exists = await prisma.order.findUnique({
       where: { number: `${payload.order_number}` },
       select: { id: true },

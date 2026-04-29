@@ -69,3 +69,14 @@ model Order {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 }
+
+model AppSettings {
+  id                    String   @id @default("default")
+  timezone              String   @default("Australia/Sydney")
+  staffAccessDays       Json     @default("[\"Mon\",\"Tue\",\"Wed\",\"Thu\",\"Fri\"]")
+  staffAccessStart      String   @default("08:00")
+  staffAccessEnd        String   @default("16:00")
+  sessionTimeoutMinutes Int      @default(30)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
