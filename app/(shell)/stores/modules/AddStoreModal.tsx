@@ -86,7 +86,7 @@ export default function AddStoreModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/40" aria-hidden="true" />
       <div className="relative bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto">
         <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200 md:px-6">
           <h2 className="text-base font-semibold text-gray-900">Connect Shopify Store</h2>
