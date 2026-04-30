@@ -6,6 +6,7 @@ export type StoreRow = {
   name: string | null;
   url: string | null;
   email: string | null;
+  logoPath: string | null;
   status: string;
   createdAt: string;
   updatedAt: string;
@@ -24,6 +25,7 @@ export type UpdateStoreData = {
   name?: string;
   url?: string | null;
   email?: string | null;
+  logoPath?: string | null;
   clientId?: string;
   clientSecret?: string;
 };
@@ -37,6 +39,7 @@ export class StoreModel {
       name: s.name,
       url: s.url,
       email: s.email,
+      logoPath: s.logoPath,
       status: s.status,
       createdAt: s.createdAt.toISOString(),
       updatedAt: s.updatedAt.toISOString(),

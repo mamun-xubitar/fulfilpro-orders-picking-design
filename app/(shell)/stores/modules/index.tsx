@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { toast } from 'react-toastify';
 import useRequest from '@/hooks/useRequest';
-import { StoreRow } from '@/models/store.model.server';
+import type { StoreRow } from '@/models/store.model.server';
 import StoresTable from './StoresTable';
 import AddStoreModal from './AddStoreModal';
 
@@ -27,6 +27,8 @@ export default function StoresPage() {
   const [stores, setStores] = useState<StoreRow[]>([]);
   const [disconnectingIds, setDisconnectingIds] = useState<string[]>([]);
   const [deletingIds, setDeletingIds] = useState<string[]>([]);
+  const [uploadingLogoIds, setUploadingLogoIds] = useState<string[]>([]);
+  const [logoErrors, setLogoErrors] = useState<Record<string, string>>({});
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [addForm, setAddForm] = useState(EMPTY_FORM);
 
@@ -154,6 +156,93 @@ export default function StoresPage() {
       },
     });
     setDeletingIds((prev) => prev.filter((item) => item !== id));
+  };
+
+  const handleLogoUpload = async (id: string, file: File) => {
+    setLogoErrors((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+
+    if (!file.type.startsWith('image/')) {
+      setLogoErrors((prev) => ({ ...prev, [id]: 'Choose an image file.' }));
+      return;
+    }
+
+    const formData = new FormData();
+    formData.set('logo', file);
+    const toastId = toast.loading('Uploading logo...');
+
+    setUploadingLogoIds((prev) => [...prev, id]);
+    try {
+      const res = await fetch(`/api/stores/${id}/logo`, {
+        method: 'POST',
+        body: formData,
+      });
+      const json = (await res.json()) as ApiResponse<StoreRow>;
+
+      if (!res.ok || !json.success) {
+        throw new Error(json.message || 'Logo upload failed.');
+      }
+
+      setStores((prev) => prev.map((item) => item.id === id ? { ...item, logoPath: json.data.logoPath } : item));
+      toast.update(toastId, {
+        render: json.message || 'Logo uploaded.',
+        type: 'success',
+        isLoading: false,
+        autoClose: 3000,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Logo upload failed.';
+      setLogoErrors((prev) => ({ ...prev, [id]: message }));
+      toast.update(toastId, {
+        render: message,
+        type: 'error',
+        isLoading: false,
+        autoClose: 4000,
+      });
+    } finally {
+      setUploadingLogoIds((prev) => prev.filter((item) => item !== id));
+    }
+  };
+
+  const handleLogoRemove = async (id: string) => {
+    const toastId = toast.loading('Removing logo...');
+    setUploadingLogoIds((prev) => [...prev, id]);
+    setLogoErrors((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+
+    try {
+      const res = await fetch(`/api/stores/${id}/logo`, { method: 'DELETE' });
+      const json = (await res.json()) as ApiResponse<StoreRow>;
+
+      if (!res.ok || !json.success) {
+        throw new Error(json.message || 'Logo removal failed.');
+      }
+
+      setStores((prev) => prev.map((item) => item.id === id ? { ...item, logoPath: null } : item));
+      toast.update(toastId, {
+        render: json.message || 'Logo removed.',
+        type: 'success',
+        isLoading: false,
+        autoClose: 3000,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Logo removal failed.';
+      setLogoErrors((prev) => ({ ...prev, [id]: message }));
+      toast.update(toastId, {
+        render: message,
+        type: 'error',
+        isLoading: false,
+        autoClose: 4000,
+      });
+    } finally {
+      setUploadingLogoIds((prev) => prev.filter((item) => item !== id));
+    }
   };
 
   const handleOpenConnectModal = () => {
@@ -379,8 +468,12 @@ export default function StoresPage() {
           onDisconnect={(id) => void handleDisconnect(id)}
           onReconnect={(id) => void handleReconnect(id)}
           onDelete={(id) => void handleDelete(id)}
+          onLogoUpload={(id, file) => void handleLogoUpload(id, file)}
+          onLogoRemove={(id) => void handleLogoRemove(id)}
           disconnectingIds={disconnectingIds}
           deletingIds={deletingIds}
+          uploadingLogoIds={uploadingLogoIds}
+          logoErrors={logoErrors}
         />
       </div>
 

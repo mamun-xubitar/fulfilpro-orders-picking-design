@@ -34,6 +34,7 @@ model Store {
   accessToken  String?
   url          String?
   email        String?
+  logoPath     String?
   status       String   @default("pending")
   clientId     String
   clientSecret String
