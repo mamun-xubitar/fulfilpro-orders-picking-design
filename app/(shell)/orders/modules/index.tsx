@@ -88,6 +88,7 @@ type FulfillmentConfirmation = {
   shopifyFulfillmentId?: string | null;
   shopifyFulfillmentStatus?: string | null;
   barcodes?: string[];
+  shippingDate?: string | null;
   trackingInfo?: {
     number?: string;
     company?: string;
@@ -379,6 +380,7 @@ export default function OrdersPage() {
     lines: FulfillmentLine[];
     notifyCustomer: boolean;
     barcodeInput: string;
+    shippingDate: string;
     trackingNumber: string;
     trackingUrl: string;
     trackingCompany: string;
@@ -645,6 +647,23 @@ export default function OrdersPage() {
     return value.split(/\s+/).map((barcode) => barcode.trim()).filter(Boolean);
   };
 
+  const getFulfillmentShippingDates = (order: OrderRow) => {
+    return order.fulfillmentItems.confirmations
+      .map((confirmation) => confirmation.shippingDate?.trim() ?? '')
+      .filter(Boolean);
+  };
+
+  const formatShippingDate = (value: string) => {
+    const [year, month, day] = value.split('-').map(Number);
+    if (!year || !month || !day) return value;
+
+    return new Date(year, month - 1, day).toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+
   const setFulfillmentMessage = (orderId: string, message: string) => {
     setFulMessages((prev) => ({ ...prev, [orderId]: message }));
     if (messageTimerRef.current[orderId]) {
@@ -673,6 +692,7 @@ export default function OrdersPage() {
       lines,
       notifyCustomer: true,
       barcodeInput: '',
+      shippingDate: '',
       trackingNumber: '',
       trackingUrl: '',
       trackingCompany: '',
@@ -691,7 +711,7 @@ export default function OrdersPage() {
   const confirmFul = async () => {
     if (!pendingFulfillment) return;
 
-    const { order, lines, notifyCustomer, barcodeInput, trackingNumber, trackingUrl, trackingCompany } = pendingFulfillment;
+    const { order, lines, notifyCustomer, barcodeInput, shippingDate, trackingNumber, trackingUrl, trackingCompany } = pendingFulfillment;
     const barcodes = parseBarcodes(barcodeInput);
     const trackingInfo = {
       number: trackingNumber.trim(),
@@ -707,6 +727,7 @@ export default function OrdersPage() {
           lines,
           notifyCustomer,
           trackingInfo,
+          shippingDate: shippingDate || undefined,
           barcodes,
         }),
       });
@@ -994,7 +1015,7 @@ export default function OrdersPage() {
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-[720px] w-full text-sm">
+          <table className="min-w-[820px] w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="hidden sm:table-cell px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-10">#</th>
@@ -1004,25 +1025,26 @@ export default function OrdersPage() {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Ordered At</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
                 <th className="hidden sm:table-cell px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Items</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Shipping Date</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading && (
                 <tr>
-                  <td colSpan={8} className="text-center text-gray-400 py-12 text-sm">Loading orders...</td>
+                  <td colSpan={9} className="text-center text-gray-400 py-12 text-sm">Loading orders...</td>
                 </tr>
               )}
 
               {!loading && error && (
                 <tr>
-                  <td colSpan={8} className="text-center text-red-500 py-12 text-sm">{error}</td>
+                  <td colSpan={9} className="text-center text-red-500 py-12 text-sm">{error}</td>
                 </tr>
               )}
 
               {!loading && !error && orders.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="text-center text-gray-400 py-16 text-sm">No orders found.</td>
+                  <td colSpan={9} className="text-center text-gray-400 py-16 text-sm">No orders found.</td>
                 </tr>
               )}
 
@@ -1031,6 +1053,7 @@ export default function OrdersPage() {
                 const status = STATUS_MAP[statusKey] ?? STATUS_MAP.pending;
                 const isExpanded = expandedId === order.id;
                 const orderAddressLines = getOrderAddressLines(order);
+                const shippingDates = getFulfillmentShippingDates(order);
                 return (
                   <Fragment key={order.id}>
                     <tr
@@ -1052,6 +1075,17 @@ export default function OrdersPage() {
                       </td>
                       <td className="hidden sm:table-cell px-4 py-3 text-sm text-gray-600">
                         {order.itemsCount} item{order.itemsCount !== 1 ? 's' : ''}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-gray-600">
+                        {shippingDates.length > 0 ? (
+                          <div className="space-y-1">
+                            {shippingDates.map((shippingDate, shippingDateIndex) => (
+                              <div key={`${shippingDate}-${shippingDateIndex}`}>{formatShippingDate(shippingDate)}</div>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1">
@@ -1091,7 +1125,7 @@ export default function OrdersPage() {
                     </tr>
                     {isExpanded && (
                       <tr>
-                        <td colSpan={8} className="p-0">
+                        <td colSpan={9} className="p-0">
                           <div className="bg-blue-50 border-b border-blue-100 p-5">
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
                               <div>
@@ -1314,6 +1348,20 @@ export default function OrdersPage() {
               </label>
 
               <div className="grid grid-cols-1 gap-3">
+                <label className="text-sm text-gray-700">
+                  <span className="block text-xs font-semibold uppercase text-gray-500 mb-1">Shipping date</span>
+                  <input
+                    type="date"
+                    value={pendingFulfillment.shippingDate}
+                    onChange={(event) => {
+                      setPendingFulfillment((prev) => (
+                        prev ? { ...prev, shippingDate: event.target.value } : prev
+                      ));
+                    }}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                </label>
+
                 <div className="text-sm text-gray-700">
                   <span className="block text-xs font-semibold uppercase text-gray-500 mb-1">Shipping carrier</span>
                   <div className="relative">

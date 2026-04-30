@@ -235,7 +235,8 @@ export class OrderModel {
     lines: FulfillmentLineInput[],
     notifyCustomer: boolean,
     trackingInfo: FulfillmentTrackingInput | null,
-    barcodes: string[] = []
+    barcodes: string[] = [],
+    shippingDate: string | null = null
   ) {
     const order = await prisma.order.findUnique({
       where: { id: orderId },
@@ -289,6 +290,7 @@ export class OrderModel {
       shopifyFulfillmentStatus: shopifyResult.fulfillmentStatus,
       notifyCustomer,
       barcodes: fulfillmentBarcodes,
+      shippingDate,
       trackingInfo,
       lines: fulfillableLines,
     };
@@ -519,6 +521,13 @@ function mergeFulfillmentConfirmations(
 ) {
   if (syncedConfirmations.length === 0) return currentConfirmations;
 
+  const currentByShopifyId = new Map(
+    currentConfirmations
+      .filter((confirmation): confirmation is { lines: FulfillmentRequestLine[]; shopifyFulfillmentId: string } => {
+        return typeof confirmation.shopifyFulfillmentId === 'string';
+      })
+      .map((confirmation) => [confirmation.shopifyFulfillmentId, confirmation])
+  );
   const syncedIds = new Set(
     syncedConfirmations
       .map((confirmation) => confirmation.shopifyFulfillmentId)
@@ -529,7 +538,14 @@ function mergeFulfillmentConfirmations(
     return typeof confirmation.shopifyFulfillmentId !== 'string' || !syncedIds.has(confirmation.shopifyFulfillmentId);
   });
 
-  return [...currentWithoutSyncedDuplicates, ...syncedConfirmations];
+  const mergedSyncedConfirmations = syncedConfirmations.map((confirmation) => {
+    if (typeof confirmation.shopifyFulfillmentId !== 'string') return confirmation;
+
+    const existing = currentByShopifyId.get(confirmation.shopifyFulfillmentId);
+    return existing ? { ...existing, ...confirmation } : confirmation;
+  });
+
+  return [...currentWithoutSyncedDuplicates, ...mergedSyncedConfirmations];
 }
 
 function extractBarcode(lineItems: Array<{ sku: string }>) {
