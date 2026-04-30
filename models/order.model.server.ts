@@ -12,6 +12,7 @@ export type ShopifyOrderPayload = {
   order_number: string | number;
   email?: string | null;
   phone?: string | null;
+  note?: string | null;
   total_price?: string | number | null;
   current_total_price?: string | number | null;
   fulfillment_status?: string | null;
@@ -187,6 +188,7 @@ export class OrderModel {
         id: row.id,
         number: row.number,
         customer: row.cusName,
+        note: row.note,
         // customerEmail: row.cusEmail,
         barcodes: parseBarcodeList(row.boarcode),
         address: row.address,
@@ -351,6 +353,7 @@ export class OrderModel {
       zip: order.zip,
       country: order.country,
       phone: order.phone,
+      note: order.note,
       storeName: order.store.name ?? order.store.storeDomain,
       storeDomain: order.store.storeDomain,
       storeUrl: order.store.url,
@@ -436,6 +439,7 @@ function buildOrderWriteData(
   return {
     cusName: customerName,
     cusEmail: customerEmail,
+    note: payload.note ?? null,
     address: shippingAddress?.address1 ?? null,
     address2: shippingAddress?.address2 ?? null,
     phone: customerPhone,

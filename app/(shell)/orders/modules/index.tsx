@@ -8,6 +8,7 @@ type OrderRow = {
   id: string;
   number: string;
   customer: string;
+  note: string | null;
   address: string | null;
   address2: string | null;
   city: string | null;
@@ -43,6 +44,7 @@ type PackingSlipLabel = {
   zip: string | null;
   country: string | null;
   phone: string | null;
+  note: string | null;
   storeName: string;
   storeDomain: string;
   storeUrl: string | null;
@@ -858,6 +860,8 @@ export default function OrdersPage() {
             .recipient { font-size: 18px; font-weight: 800; line-height: 1.2; margin-bottom: 10px; overflow-wrap: anywhere; }
             .address { font-size: 20px; font-weight: 700; line-height: 1.32; overflow-wrap: anywhere; }
             .phone { margin-top: 14px; font-size: 16px; font-weight: 700; }
+            .note { margin-top: 14px; border-top: 1px solid #ddd; padding-top: 10px; font-size: 13px; font-weight: 700; line-height: 1.35; overflow-wrap: anywhere; white-space: pre-wrap; }
+            .note-label { color: #555; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 4px; }
             .content { flex: 1; }
             @media print {
               @page { size: 4in 6in; margin: 0; }
@@ -884,6 +888,7 @@ export default function OrdersPage() {
               ${addressLines.map((line) => `<div>${escapeHtml(line)}</div>`).join('')}
             </div>
             ${label.phone ? `<div class="phone">Phone: ${escapeHtml(label.phone)}</div>` : ''}
+            ${label.note ? `<div class="note"><div class="note-label">Note</div>${escapeHtml(label.note)}</div>` : ''}
           </div>
         </section>
         </body>
@@ -1139,6 +1144,9 @@ export default function OrdersPage() {
                                   </div>
                                 )}
                                 <p className="text-xs text-gray-400 mt-2">{order.storeName} · {order.number}</p>
+                                {order.note && (
+                                  <p className="text-xs text-gray-600 mt-2 whitespace-pre-wrap">{order.note}</p>
+                                )}
                               </div>
 
                               <div>

@@ -63,6 +63,7 @@ model Order {
   fulfillmentStatus String?
   boarcode          String?
   currencyCode      String?
+  note              String?
   lineItems         Json
   fulfillmentItems  Json?
   price             Float

@@ -34,6 +34,7 @@ type ShopifyGraphQLOrder = {
   name: string;
   email: string | null;
   phone: string | null;
+  note: string | null;
   createdAt: string;
   closedAt: string | null;
   cancelledAt: string | null;
@@ -103,6 +104,7 @@ const ORDERS_QUERY = `
         name
         email
         phone
+        note
         createdAt
         closedAt
         cancelledAt
@@ -315,6 +317,7 @@ function toShopifyOrderPayload(order: ShopifyGraphQLOrder): ShopifyOrderPayload 
     order_number: getOrderNumber(order.name),
     email: order.email,
     phone: order.phone,
+    note: order.note,
     total_price: totalPrice?.amount ?? null,
     current_total_price: totalPrice?.amount ?? null,
     fulfillment_status: normalizeGraphQLFulfillmentStatus(order.displayFulfillmentStatus),
