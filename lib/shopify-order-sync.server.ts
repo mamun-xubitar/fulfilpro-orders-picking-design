@@ -67,6 +67,7 @@ type ShopifyGraphQLOrder = {
       name: string;
       sku: string | null;
       quantity: number;
+      fulfillableQuantity: number;
       discountedUnitPriceSet: {
         shopMoney: {
           amount: string;
@@ -137,6 +138,7 @@ const ORDERS_QUERY = `
             name
             sku
             quantity
+            fulfillableQuantity
             discountedUnitPriceSet {
               shopMoney {
                 amount
@@ -357,6 +359,7 @@ function toShopifyOrderPayload(order: ShopifyGraphQLOrder): ShopifyOrderPayload 
       name: lineItem.name,
       sku: lineItem.sku,
       quantity: lineItem.quantity,
+      fulfillable_quantity: lineItem.fulfillableQuantity,
       price: lineItem.discountedUnitPriceSet?.shopMoney.amount ?? null,
       price_set: lineItem.discountedUnitPriceSet
         ? {

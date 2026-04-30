@@ -153,9 +153,6 @@ export async function getStoreInfo(shop: string, accessToken: string) {
 const ORDER_WEBHOOK_TOPICS = [
   'orders/create',
   'orders/updated',
-  'orders/cancelled',
-  'orders/fulfilled',
-  'orders/partially_fulfilled',
 ] as const;
 
 export async function registerOrderWebhooks(shop: string, accessToken: string) {

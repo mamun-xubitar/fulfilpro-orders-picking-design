@@ -47,6 +47,7 @@ export type ShopifyOrderPayload = {
     name?: string | null;
     sku?: string | null;
     quantity?: number | null;
+    fulfillable_quantity?: number | null;
     price?: string | number | null;
     price_set?: {
       shop_money?: {
@@ -402,11 +403,14 @@ function buildOrderWriteData(
   storeId: string,
   existingFulfillmentItems: Prisma.JsonValue | null
 ) {
+  const currentFulfillmentItems = toFulfillmentItems(existingFulfillmentItems);
+  const syncedFulfillmentConfirmations = toShopifyFulfillmentConfirmations(payload);
+  const fulfilledQuantityByLineItem = getFulfilledQuantityByLineItem(syncedFulfillmentConfirmations);
   const lineItems = (payload.line_items ?? []).map((item) => ({
     id: item.id,
     name: item.name ?? '',
     sku: item.sku ?? '',
-    qty: Number(item.quantity ?? 0),
+    qty: resolveLineItemQuantity(item, fulfilledQuantityByLineItem),
     price: Number(item.price_set?.shop_money?.amount ?? item.price ?? 0),
     currencyCode: item.price_set?.shop_money?.currency_code ?? null,
   }));
@@ -424,8 +428,6 @@ function buildOrderWriteData(
   const priceRaw = payload.total_price_set?.shop_money?.amount ?? payload.total_price ?? payload.current_total_price ?? 0;
   const price = Number(priceRaw);
   const currencyCode = payload.total_price_set?.shop_money?.currency_code ?? null;
-  const currentFulfillmentItems = toFulfillmentItems(existingFulfillmentItems);
-  const syncedFulfillmentConfirmations = toShopifyFulfillmentConfirmations(payload);
   // console.log("payload", JSON.stringify(payload, null, 2));
   const shopifyOrderId = payload.id ? `gid://shopify/Order/${payload.id}` : currentFulfillmentItems.shopifyOrderId;
   const fulfillmentItems = {
@@ -435,7 +437,7 @@ function buildOrderWriteData(
       syncedFulfillmentConfirmations
     ),
   } as Prisma.InputJsonValue;
-
+  console.log("my status", payload.fulfillment_status, fulfillmentStatus)
   return {
     cusName: customerName,
     cusEmail: customerEmail,
@@ -465,6 +467,7 @@ function buildOrderWriteData(
 function resolveFulfillmentStatus(payloadStatus?: string | null) {
   const normalized = (payloadStatus ?? '').toLowerCase();
   if (normalized.includes('partial')) return 'partial';
+  if (normalized.includes('unfulfill')) return 'unfulfilled';
   if (normalized.includes('fulfill')) return 'fulfilled';
   return normalized || 'unfulfilled';
 }
@@ -523,8 +526,6 @@ function mergeFulfillmentConfirmations(
   currentConfirmations: Array<{ lines: FulfillmentRequestLine[]; shopifyFulfillmentId?: unknown }>,
   syncedConfirmations: Array<{ lines: FulfillmentRequestLine[]; shopifyFulfillmentId: string | null }>
 ) {
-  if (syncedConfirmations.length === 0) return currentConfirmations;
-
   const currentByShopifyId = new Map(
     currentConfirmations
       .filter((confirmation): confirmation is { lines: FulfillmentRequestLine[]; shopifyFulfillmentId: string } => {
@@ -532,14 +533,8 @@ function mergeFulfillmentConfirmations(
       })
       .map((confirmation) => [confirmation.shopifyFulfillmentId, confirmation])
   );
-  const syncedIds = new Set(
-    syncedConfirmations
-      .map((confirmation) => confirmation.shopifyFulfillmentId)
-      .filter((id): id is string => typeof id === 'string')
-  );
-
   const currentWithoutSyncedDuplicates = currentConfirmations.filter((confirmation) => {
-    return typeof confirmation.shopifyFulfillmentId !== 'string' || !syncedIds.has(confirmation.shopifyFulfillmentId);
+    return typeof confirmation.shopifyFulfillmentId !== 'string';
   });
 
   const mergedSyncedConfirmations = syncedConfirmations.map((confirmation) => {
@@ -550,6 +545,29 @@ function mergeFulfillmentConfirmations(
   });
 
   return [...currentWithoutSyncedDuplicates, ...mergedSyncedConfirmations];
+}
+
+function getFulfilledQuantityByLineItem(
+  confirmations: Array<{ lines: FulfillmentRequestLine[] }>
+) {
+  const quantities = new Map<string, number>();
+  for (const confirmation of confirmations) {
+    for (const line of confirmation.lines) {
+      quantities.set(line.lineItemId, (quantities.get(line.lineItemId) ?? 0) + line.quantity);
+    }
+  }
+  return quantities;
+}
+
+function resolveLineItemQuantity(
+  item: { id: string | number; quantity?: number | null; fulfillable_quantity?: number | null },
+  fulfilledQuantityByLineItem: Map<string, number>
+) {
+  const originalQuantity = Math.max(0, Number(item.quantity ?? 0));
+  if (typeof item.fulfillable_quantity !== 'number') return originalQuantity;
+
+  const fulfilledQuantity = fulfilledQuantityByLineItem.get(String(item.id)) ?? 0;
+  return Math.min(originalQuantity, Math.max(0, item.fulfillable_quantity) + fulfilledQuantity);
 }
 
 function extractBarcode(lineItems: Array<{ sku: string }>) {

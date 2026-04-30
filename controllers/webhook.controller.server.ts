@@ -1,4 +1,5 @@
 import { OrderModel, type ShopifyOrderPayload } from '@/models/order.model.server';
+import { fetchShopifyOrderById } from '@/lib/shopify-order-fetch.server';
 
 const orderModel = new OrderModel();
 
@@ -24,43 +25,32 @@ export class WebhookController {
     return { data: { created: false }, message: 'Order already exists' };
   }
 
-  async handleOrderCancelled(params: {
+  async handleOrderUpdated(params: {
     topic: string;
     payload: ShopifyOrderPayload;
     storeId: string;
     storeDomain: string;
+    accessToken: string;
   }) {
-    const { payload, storeId } = params;
-
-    const result = await orderModel.upsertFromShopifyOrder({
-      payload,
-      storeId,
-    });
-
-    if (result.created) {
-      return { data: { created: true, updated: false }, message: 'Canceled order created' };
+    const { payload, storeId, storeDomain, accessToken } = params;
+    if (!payload.id) {
+      throw new Error('Order update webhook payload is missing order id');
     }
 
-    return { data: { created: false, updated: true }, message: 'Order marked canceled' };
-  }
-
-  async handleOrderFulfillmentUpdate(params: {
-    topic: string;
-    payload: ShopifyOrderPayload;
-    storeId: string;
-    storeDomain: string;
-  }) {
-    const { payload, storeId } = params;
-
-    const result = await orderModel.upsertFromShopifyOrder({
-      payload,
-      storeId,
+    const order = await fetchShopifyOrderById({
+      shop: storeDomain,
+      accessToken,
+      orderId: payload.id,
     });
 
+    const result = await orderModel.upsertFromShopifyOrder({
+      payload: order,
+      storeId,
+    });
     if (result.created) {
-      return { data: { created: true, updated: false }, message: 'Fulfilled order created' };
+      return { data: { created: true, updated: false }, message: 'Updated order created' };
     }
 
-    return { data: { created: false, updated: true }, message: 'Order fulfillment updated' };
+    return { data: { created: false, updated: true }, message: 'Order updated' };
   }
 }

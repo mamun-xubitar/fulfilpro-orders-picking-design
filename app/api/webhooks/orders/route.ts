@@ -9,9 +9,7 @@ const webhookController = new WebhookController();
 
 const ALLOWED_TOPICS = new Set([
   'orders/create',
-  'orders/cancelled',
-  'orders/fulfilled',
-  'orders/partially_fulfilled',
+  'orders/updated',
 ]);
 
 export async function POST(request: NextRequest) {
@@ -62,21 +60,17 @@ export async function POST(request: NextRequest) {
           storeDomain: normalizedShop,
         })
         break;
-      case "orders/cancelled":
-        await webhookController.handleOrderCancelled({
+      case "orders/updated":
+        if (!store.accessToken) {
+          throw new Error('Store is missing a Shopify access token');
+        }
+
+        await webhookController.handleOrderUpdated({
           topic,
           payload: payload as ShopifyOrderPayload,
           storeId: store.id,
           storeDomain: normalizedShop,
-        })
-        break;
-      case "orders/fulfilled":
-      case "orders/partially_fulfilled":
-        await webhookController.handleOrderFulfillmentUpdate({
-          topic,
-          payload: payload as ShopifyOrderPayload,
-          storeId: store.id,
-          storeDomain: normalizedShop,
+          accessToken: store.accessToken,
         })
         break;
       default:
