@@ -349,14 +349,14 @@ export default function StoresPage() {
   };
 
   return (
-    <main className="flex-1 p-6 space-y-5">
+    <main className="flex-1 p-4 space-y-5 md:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-gray-500">Manage connected Shopify stores.</p>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full items-center gap-2 sm:w-auto">
           <button
             onClick={loadStores}
             disabled={listLoading}
-            className="flex items-center gap-1.5 bg-white border border-gray-300 text-gray-600 text-sm px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors shadow-sm cursor-pointer disabled:opacity-50"
+            className="flex flex-1 items-center justify-center gap-1.5 bg-white border border-gray-300 text-gray-600 text-sm px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors shadow-sm cursor-pointer disabled:opacity-50 sm:flex-none"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -365,7 +365,7 @@ export default function StoresPage() {
           </button>
           <button
             onClick={handleOpenConnectModal}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors cursor-pointer"
+            className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors cursor-pointer sm:flex-none"
           >
             + Connect Store
           </button>

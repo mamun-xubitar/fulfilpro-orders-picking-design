@@ -949,9 +949,9 @@ export default function OrdersPage() {
     : lastSynced || 'Not synced yet';
 
   return (
-    <main className="flex-1 p-6">
+    <main className="flex-1 p-4 md:p-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-5">
-        <div className="flex items-center bg-white border border-gray-300 rounded-xl overflow-hidden shadow-sm flex-1 max-w-xs min-w-48">
+        <div className="flex w-full items-center bg-white border border-gray-300 rounded-xl overflow-hidden shadow-sm flex-1 sm:max-w-xs sm:min-w-48">
           <input
             type="text"
             placeholder="Search orders..."
@@ -964,7 +964,7 @@ export default function OrdersPage() {
         <select
           value={storeId}
           onChange={(e) => handleStoreChange(e.target.value)}
-          className="bg-white w-full max-w-36 border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-600 shadow-sm focus:outline-none cursor-pointer"
+          className="bg-white w-full sm:max-w-36 border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-600 shadow-sm focus:outline-none cursor-pointer"
         >
           <option value="">All Stores</option>
           {stores.map((store) => (
@@ -974,19 +974,19 @@ export default function OrdersPage() {
           ))}
         </select>
 
-        <div className="flex items-center bg-white border border-gray-300 rounded-xl overflow-hidden shadow-sm text-sm">
+        <div className="grid w-full grid-cols-4 bg-white border border-gray-300 rounded-xl overflow-hidden shadow-sm text-sm sm:flex sm:w-auto sm:items-center">
           {PERIODS.map((item) => (
             <button
               key={item.value}
               onClick={() => handlePeriodChange(item.value)}
-              className={`px-3 py-2 transition-colors duration-150 cursor-pointer ${period === item.value ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}
+              className={`px-2 py-2 transition-colors duration-150 cursor-pointer sm:px-3 ${period === item.value ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}
             >
               {item.label}
             </button>
           ))}
         </div>
 
-        <div className="flex items-center gap-2 ml-auto">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto">
           <button
             onClick={handleSync}
             disabled={syncing || loading || syncActive}
@@ -1018,13 +1018,13 @@ export default function OrdersPage() {
             </svg>
             Refresh
           </button>
-          <span className="text-xs text-gray-400 whitespace-nowrap">{syncMessage}</span>
+          <span className="min-w-0 flex-1 text-xs text-gray-400 sm:flex-none sm:whitespace-nowrap">{syncMessage}</span>
         </div>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="min-w-[720px] w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="hidden sm:table-cell px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-10">#</th>
@@ -1310,14 +1310,14 @@ export default function OrdersPage() {
 
       {pendingPrint && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 px-4"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-gray-900/50 px-4 pb-4 sm:items-center sm:pb-0"
           role="dialog"
           aria-modal="true"
           aria-labelledby="print-selection-title"
           onClick={closePrintSelection}
         >
           <div
-            className="w-full max-w-lg rounded-lg bg-white shadow-xl border border-gray-200"
+            className="w-full max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-lg bg-white shadow-xl border border-gray-200"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="px-5 py-4 border-b border-gray-200">
@@ -1389,7 +1389,7 @@ export default function OrdersPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-gray-200 bg-gray-50 rounded-b-lg">
+            <div className="flex flex-col-reverse gap-2 px-5 py-4 border-t border-gray-200 bg-gray-50 rounded-b-lg sm:flex-row sm:items-center sm:justify-end">
               <button
                 onClick={closePrintSelection}
                 className="px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 cursor-pointer"
@@ -1410,14 +1410,14 @@ export default function OrdersPage() {
 
       {pendingFulfillment && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 px-4"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-gray-900/50 px-4 pb-4 sm:items-center sm:pb-0"
           role="dialog"
           aria-modal="true"
           aria-labelledby="fulfillment-confirmation-title"
           onClick={closeFulfillmentConfirmation}
         >
           <div
-            className="w-full max-w-md rounded-lg bg-white shadow-xl border border-gray-200"
+            className="w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-lg bg-white shadow-xl border border-gray-200"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="px-5 py-4 border-b border-gray-200">
@@ -1561,7 +1561,7 @@ export default function OrdersPage() {
               </label>
             </div>
 
-            <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-gray-200 bg-gray-50 rounded-b-lg">
+            <div className="flex flex-col-reverse gap-2 px-5 py-4 border-t border-gray-200 bg-gray-50 rounded-b-lg sm:flex-row sm:items-center sm:justify-end">
               <button
                 onClick={closeFulfillmentConfirmation}
                 disabled={fulSaving[pendingFulfillment.order.id]}

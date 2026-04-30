@@ -25,6 +25,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname();
   const { data: session, status } = useSession();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [policy, setPolicy] = useState<SessionPolicy | null>(null);
   const [now, setNow] = useState(() => Date.now());
@@ -186,16 +187,24 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
       )}
 
       {/* Sidebar */}
+      {mobileSidebarOpen && (
+        <button
+          type="button"
+          aria-label="Close navigation"
+          className="fixed inset-0 z-[35] bg-gray-900/50 md:hidden"
+          onClick={() => setMobileSidebarOpen(false)}
+        />
+      )}
       <aside
         id="sidebar"
-        className="bg-gray-900 text-white flex flex-col fixed top-0 left-0 h-full z-40 overflow-hidden"
+        className={`bg-gray-900 text-white flex flex-col fixed top-0 left-0 h-full z-40 overflow-hidden transition-transform duration-200 md:translate-x-0 ${mobileSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
         style={{ width: sidebarWidth }}
       >
         <div className="flex items-center justify-between px-4 py-4 border-b border-gray-700 min-h-[60px]">
           {!sidebarCollapsed && <span className="app-name text-lg font-bold text-blue-400 whitespace-nowrap">FulfilPro</span>}
           <button
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="text-gray-400 hover:text-white transition-colors duration-150 cursor-pointer ml-auto"
+            className="hidden md:block text-gray-400 hover:text-white transition-colors duration-150 cursor-pointer ml-auto"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               {sidebarCollapsed ? (
@@ -203,6 +212,16 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
               ) : (
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7"/>
               )}
+            </svg>
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileSidebarOpen(false)}
+            className="md:hidden text-gray-400 hover:text-white transition-colors duration-150 cursor-pointer ml-auto"
+            aria-label="Close navigation"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18 18 6M6 6l12 12"/>
             </svg>
           </button>
         </div>
@@ -215,6 +234,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
               <Link
                 key={item.id}
                 href={item.href}
+                onClick={() => setMobileSidebarOpen(false)}
                 className={`nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150 cursor-pointer ${isActive ? "bg-blue-600 text-white" : "text-gray-300 hover:bg-gray-700 hover:text-white"}`}
                 style={sidebarCollapsed ? { justifyContent: "center", paddingLeft: 0, paddingRight: 0 } : undefined}
               >
@@ -230,6 +250,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
         <div className="px-2 py-4 border-t border-gray-700">
           <Link
             href="/profile"
+            onClick={() => setMobileSidebarOpen(false)}
             className={`nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150 cursor-pointer ${activeId === "profile" ? "bg-blue-600 text-white" : "text-gray-300 hover:bg-gray-700 hover:text-white"}`}
             style={sidebarCollapsed ? { justifyContent: "center", paddingLeft: 0, paddingRight: 0 } : undefined}
           >
@@ -248,8 +269,20 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
         style={{ marginLeft: sidebarWidth }}
       >
         {/* Header */}
-        <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between sticky top-0 z-30 min-h-[60px]">
-          <h1 className="text-lg font-semibold text-gray-900">{pageTitles[activeId] || ""}</h1>
+        <header className="bg-white border-b border-gray-200 px-4 md:px-6 py-3 flex items-center justify-between sticky top-0 z-30 min-h-[60px]">
+          <div className="flex min-w-0 items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setMobileSidebarOpen(true)}
+              className="md:hidden -ml-1 rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors duration-150 cursor-pointer"
+              aria-label="Open navigation"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16"/>
+              </svg>
+            </button>
+            <h1 className="truncate text-lg font-semibold text-gray-900">{pageTitles[activeId] || ""}</h1>
+          </div>
           <div className="flex items-center gap-3 relative">
             <span className="text-sm text-gray-600 hidden sm:block">{user?.name}</span>
             <button

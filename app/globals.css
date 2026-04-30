@@ -20,9 +20,12 @@ body {
 .digit-input { text-align: center; font-size: 1.25rem; font-weight: 700; }
 
 /* Shell */
-#sidebar { transition: width .2s ease; }
-#main-content { transition: margin-left .2s ease; }
-@media (max-width: 767px) { #main-content { margin-left: 0 !important; } }
+#sidebar { transition: width .2s ease, transform .2s ease; }
+#main-content { min-width: 0; transition: margin-left .2s ease; }
+@media (max-width: 767px) {
+  #sidebar { width: 240px !important; }
+  #main-content { margin-left: 0 !important; }
+}
 
 /* Tooltip */
 .tooltip { position: relative; }

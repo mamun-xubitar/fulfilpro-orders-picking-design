@@ -172,12 +172,12 @@ export default function UsersPage() {
   }
 
   return (
-    <main className="flex-1 p-6">
+    <main className="flex-1 p-4 md:p-6">
       <div className="flex flex-col gap-6">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6">
           <h2 className="text-base font-semibold text-gray-900 mb-5">{formTitle}</h2>
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Full Name *</label>
                 <input type="text" placeholder="Jane Smith" value={form.name} onChange={(e) => updateForm("name", e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
@@ -233,7 +233,7 @@ export default function UsersPage() {
             <span className="text-xs text-gray-400">{loading ? "Loading..." : `${users.length} user${users.length !== 1 ? "s" : ""}`}</span>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="min-w-[680px] w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Name</th>

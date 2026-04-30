@@ -205,7 +205,7 @@ export default function SettingsPage() {
 
   if (!mounted) {
     return (
-      <main className="flex-1 p-6">
+      <main className="flex-1 p-4 md:p-6">
         <div className="max-w-2xl space-y-5">
           <div className="text-sm text-center text-gray-500 pb-2">Loading settings...</div>
         </div>
@@ -214,13 +214,13 @@ export default function SettingsPage() {
   }
 
   return (
-    <main className="flex-1 p-6">
+    <main className="flex-1 p-4 md:p-6">
       <div className="max-w-2xl space-y-5">
 
         {/* Timezone */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-5">
           <h2 className="text-sm font-semibold text-gray-900 mb-3">Timezone</h2>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <select
               value={tz}
               onChange={(e) => setTz(e.target.value)}
@@ -228,12 +228,12 @@ export default function SettingsPage() {
             >
               {TIMEZONES.map((t) => <option key={t}>{t}</option>)}
             </select>
-            <button disabled={savingSection === "timezone" || loading} onClick={() => save("timezone")} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed">{savingSection === "timezone" ? "Saving..." : "Save"}</button>
+            <button disabled={savingSection === "timezone" || loading} onClick={() => save("timezone")} className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed sm:w-auto">{savingSection === "timezone" ? "Saving..." : "Save"}</button>
           </div>
         </div>
 
         {/* Staff Access Restrictions */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-5">
           <h2 className="text-sm font-semibold text-gray-900 mb-1">Staff Access Restrictions</h2>
           <p className="text-xs text-gray-500 mb-4">Staff users can only log in during the selected days and time window. Admin accounts are unaffected.</p>
           <div className="mb-4">
@@ -253,7 +253,7 @@ export default function SettingsPage() {
               })}
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4 mb-4">
+          <div className="grid grid-cols-1 gap-4 mb-4 sm:grid-cols-2">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Access Start Time</label>
               <input type="time" value={tStart} onChange={(e) => setTStart(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"/>
@@ -263,13 +263,13 @@ export default function SettingsPage() {
               <input type="time" value={tEnd} onChange={(e) => setTEnd(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"/>
             </div>
           </div>
-          <button disabled={savingSection === "access" || loading} onClick={() => save("access")} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed">{savingSection === "access" ? "Saving..." : "Save Restrictions"}</button>
+          <button disabled={savingSection === "access" || loading} onClick={() => save("access")} className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed sm:w-auto">{savingSection === "access" ? "Saving..." : "Save Restrictions"}</button>
         </div>
 
         {/* Session Settings */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-5">
           <h2 className="text-sm font-semibold text-gray-900 mb-3">Session Settings</h2>
-          <div className="flex items-end gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
             <div className="flex-1">
               <label className="block text-xs font-medium text-gray-600 mb-1">User session timeout</label>
               <select value={session} onChange={(e) => setSession(Number(e.target.value))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer">
@@ -278,13 +278,13 @@ export default function SettingsPage() {
                 ))}
               </select>
             </div>
-            <button disabled={savingSection === "session" || loading} onClick={() => save("session")} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed">{savingSection === "session" ? "Saving..." : "Save"}</button>
+            <button disabled={savingSection === "session" || loading} onClick={() => save("session")} className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed sm:w-auto">{savingSection === "session" ? "Saving..." : "Save"}</button>
           </div>
         </div>
 
         {/* Google Account */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
-          <div className="flex items-start justify-between gap-4 mb-4">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-5">
+          <div className="flex flex-col items-start justify-between gap-3 mb-4 sm:flex-row sm:gap-4">
             <div>
               <h2 className="text-sm font-semibold text-gray-900 mb-1">Google Account</h2>
               <p className="text-xs text-gray-500">Connect Google so the app can use the approved account for Google-powered email access.</p>
@@ -310,7 +310,7 @@ export default function SettingsPage() {
                 type="button"
                 disabled={googleDisconnecting || loading}
                 onClick={() => void disconnectGoogle()}
-                className="border border-gray-300 bg-white text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                className="w-full border border-gray-300 bg-white text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed sm:w-auto"
               >
                 {googleDisconnecting ? "Disconnecting..." : "Disconnect"}
               </button>
@@ -320,7 +320,7 @@ export default function SettingsPage() {
               type="button"
               disabled={googleConnecting || loading}
               onClick={() => void connectGoogle()}
-              className="inline-flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+              className="inline-flex w-full items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed sm:w-auto"
             >
               <svg className="h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
                 <path fill="currentColor" d="M21.35 11.1h-9.18v2.73h5.28c-.23 1.48-1.6 4.34-5.28 4.34-3.18 0-5.77-2.63-5.77-5.87s2.59-5.87 5.77-5.87c1.81 0 3.02.77 3.71 1.43l2.53-2.44C16.78 3.91 14.66 3 12.17 3 7.37 3 3.48 6.89 3.48 11.69s3.89 8.69 8.69 8.69c5.01 0 8.33-3.52 8.33-8.48 0-.57-.06-.8-.15-1.15v.35Z" />

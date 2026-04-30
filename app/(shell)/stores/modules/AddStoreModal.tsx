@@ -85,10 +85,10 @@ export default function AddStoreModal({
   const isBusy = isAuthorizing || isCreatingApp || isListingOrgs;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative bg-white rounded-xl shadow-xl w-full max-w-lg">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+      <div className="relative bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto">
+        <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200 md:px-6">
           <h2 className="text-base font-semibold text-gray-900">Connect Shopify Store</h2>
           <button
             onClick={onClose}
@@ -100,7 +100,7 @@ export default function AddStoreModal({
           </button>
         </div>
 
-        <div className="px-6 pt-4 pb-2">
+        <div className="px-4 pt-4 pb-2 md:px-6">
           <div className="flex items-center gap-3">
             <StepPill step={1} active={currentStep === 1} done={currentStep > 1} />
             <div className="h-px flex-1 bg-gray-200" />
@@ -112,7 +112,7 @@ export default function AddStoreModal({
           </div>
         </div>
 
-        <div className="px-6 py-5 space-y-4">
+        <div className="px-4 py-5 space-y-4 md:px-6">
           {currentStep === 1 && (
             <>
               <p className="text-sm text-gray-600">
@@ -143,7 +143,7 @@ export default function AddStoreModal({
               </p>
               <div className="rounded-lg bg-gray-900 text-white p-4 text-center">
                 <p className="text-xs text-gray-300 mb-2">Authorization Code</p>
-                <p className="font-mono text-2xl tracking-[0.25em]">{authorizationCode}</p>
+                <p className="break-all font-mono text-xl tracking-[0.18em] sm:text-2xl sm:tracking-[0.25em]">{authorizationCode}</p>
                 <button
                   onClick={onCopyCode}
                   className="mt-3 px-3 py-1.5 rounded-md bg-white/15 hover:bg-white/20 text-xs"
@@ -194,7 +194,7 @@ export default function AddStoreModal({
           )}
         </div>
 
-        <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200">
+        <div className="flex flex-col-reverse gap-3 px-4 py-4 border-t border-gray-200 sm:flex-row sm:justify-end md:px-6">
           {currentStep === 1 && (
             <>
               <button

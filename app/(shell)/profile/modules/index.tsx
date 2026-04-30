@@ -98,7 +98,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <main className="flex-1 p-6">
+    <main className="flex-1 p-4 md:p-6">
       <div className="max-w-lg mx-auto">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-8 text-center">
@@ -109,8 +109,8 @@ export default function ProfilePage() {
             <p className="text-blue-200 text-sm mt-1">{formatRole(user?.role)}</p>
           </div>
 
-          <div className="p-6 space-y-6">
-            <div className="grid grid-cols-2 gap-4">
+          <div className="p-4 space-y-6 md:p-6">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <p className="text-xs text-gray-400 uppercase font-semibold mb-0.5">Full Name</p>
                 <p className="text-sm font-medium text-gray-800" data-protected>{user?.name}</p>
