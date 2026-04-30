@@ -4,6 +4,7 @@ import {
   type FulfillmentRequestLine,
   type FulfillmentTrackingInput,
 } from '@/lib/shopify-fulfillment.server';
+import { sendGoogleMail } from '@/lib/google-mail.server';
 import { Prisma } from '@prisma/client';
 
 export type ShopifyOrderPayload = {
@@ -175,6 +176,11 @@ export class OrderModel {
               storeDomain: true,
             },
           },
+          _count: {
+            select: {
+              messages: true,
+            },
+          },
         },
         orderBy: { orderedAt: 'desc' },
         skip: (page - 1) * pageSize,
@@ -209,6 +215,7 @@ export class OrderModel {
         items: lineItems,
         fulfillmentItems: toFulfillmentItems(row.fulfillmentItems),
         itemsCount: itemCount,
+        messageCount: row._count.messages,
       };
     });
 
@@ -380,6 +387,129 @@ export class OrderModel {
       barcodes: parseBarcodeList(order.boarcode),
     };
   }
+
+  async getOrderMessageCenter(orderId: string) {
+    const [order, admins, messages] = await Promise.all([
+      prisma.order.findUnique({
+        where: { id: orderId },
+        select: { id: true },
+      }),
+      prisma.user.findMany({
+        where: {
+          role: 'admin',
+          active: true,
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+        orderBy: [{ name: 'asc' }, { email: 'asc' }],
+      }),
+      prisma.orderMessage.findMany({
+        where: { orderId },
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
+
+    if (!order) {
+      throw new Error('Order not found');
+    }
+
+    return {
+      admins,
+      messages: messages.map(toOrderMessageRow),
+    };
+  }
+
+  async sendAdminOrderMessage(params: {
+    orderId: string;
+    adminId: string;
+    message: string;
+    sender?: {
+      id?: string | null;
+      name?: string | null;
+      email?: string | null;
+    } | null;
+  }) {
+    const [order, admin] = await Promise.all([
+      prisma.order.findUnique({
+        where: { id: params.orderId },
+        include: {
+          store: {
+            select: {
+              name: true,
+              storeDomain: true,
+            },
+          },
+        },
+      }),
+      prisma.user.findFirst({
+        where: {
+          id: params.adminId,
+          role: 'admin',
+          active: true,
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      }),
+    ]);
+
+    if (!order) {
+      throw new Error('Order not found');
+    }
+
+    if (!admin) {
+      throw new Error('Selected admin was not found');
+    }
+
+    const senderName = params.sender?.name?.trim() || null;
+    const senderEmail = params.sender?.email?.trim() || null;
+    await sendGoogleMail({
+      to: [admin.email],
+      subject: `Order ${order.number} message`,
+      text: buildOrderMessageEmailText({ order, message: params.message, senderName, senderEmail }),
+      html: buildOrderMessageEmailHtml({ order, message: params.message, senderName, senderEmail }),
+    });
+
+    const savedMessage = await prisma.orderMessage.create({
+      data: {
+        orderId: order.id,
+        adminId: admin.id,
+        adminName: admin.name,
+        adminEmail: admin.email,
+        senderId: params.sender?.id ?? null,
+        senderName,
+        senderEmail,
+        message: params.message,
+      },
+    });
+
+    return toOrderMessageRow(savedMessage);
+  }
+}
+
+function toOrderMessageRow(message: {
+  id: string;
+  adminName: string;
+  adminEmail: string;
+  senderName: string | null;
+  senderEmail: string | null;
+  message: string;
+  createdAt: Date;
+}) {
+  return {
+    id: message.id,
+    adminName: message.adminName,
+    adminEmail: message.adminEmail,
+    senderName: message.senderName,
+    senderEmail: message.senderEmail,
+    message: message.message,
+    createdAt: message.createdAt.toISOString(),
+  };
 }
 
 function buildOrderCreateData(payload: ShopifyOrderPayload, storeId: string): Prisma.OrderUncheckedCreateInput {
@@ -581,6 +711,102 @@ function parseBarcodeList(value: string | null) {
 
 function normalizeBarcodes(values: string[]) {
   return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
+}
+
+function buildOrderMessageEmailText({
+  order,
+  message,
+  senderName,
+  senderEmail,
+}: {
+  order: OrderEmailDetails;
+  message: string;
+  senderName: string | null;
+  senderEmail: string | null;
+}) {
+  const items = toLineItems(order.lineItems);
+  return [
+    `Order ${order.number}`,
+    `Store: ${order.store.name ?? order.store.storeDomain}`,
+    `Customer: ${order.cusName}`,
+    order.cusEmail ? `Customer email: ${order.cusEmail}` : null,
+    order.phone ? `Phone: ${order.phone}` : null,
+    order.address ? `Address: ${[order.address, order.address2, order.city, order.state, order.zip, order.country].filter(Boolean).join(', ')}` : null,
+    `Status: ${getDisplayStatus(order)}`,
+    senderName || senderEmail ? `Sent by: ${[senderName, senderEmail].filter(Boolean).join(' - ')}` : null,
+    '',
+    'Message:',
+    message,
+    '',
+    'Items:',
+    ...items.map((item) => `- ${item.name}${item.sku ? ` (${item.sku})` : ''} x${item.qty}`),
+  ].filter((line): line is string => line !== null).join('\n');
+}
+
+function buildOrderMessageEmailHtml({
+  order,
+  message,
+  senderName,
+  senderEmail,
+}: {
+  order: OrderEmailDetails;
+  message: string;
+  senderName: string | null;
+  senderEmail: string | null;
+}) {
+  const items = toLineItems(order.lineItems);
+  const address = [order.address, order.address2, order.city, order.state, order.zip, order.country].filter(Boolean).join(', ');
+  const sender = [senderName, senderEmail].filter(Boolean).join(' - ');
+
+  return `
+    <div style="font-family:Arial,sans-serif;line-height:1.5;color:#111827">
+      <h2 style="margin:0 0 12px">Order ${escapeHtml(order.number)} message</h2>
+      <table style="border-collapse:collapse;margin-bottom:16px">
+        <tr><td style="padding:3px 12px 3px 0;color:#6b7280">Store</td><td style="padding:3px 0">${escapeHtml(order.store.name ?? order.store.storeDomain)}</td></tr>
+        <tr><td style="padding:3px 12px 3px 0;color:#6b7280">Customer</td><td style="padding:3px 0">${escapeHtml(order.cusName)}</td></tr>
+        ${order.cusEmail ? `<tr><td style="padding:3px 12px 3px 0;color:#6b7280">Customer email</td><td style="padding:3px 0">${escapeHtml(order.cusEmail)}</td></tr>` : ''}
+        ${order.phone ? `<tr><td style="padding:3px 12px 3px 0;color:#6b7280">Phone</td><td style="padding:3px 0">${escapeHtml(order.phone)}</td></tr>` : ''}
+        ${address ? `<tr><td style="padding:3px 12px 3px 0;color:#6b7280">Address</td><td style="padding:3px 0">${escapeHtml(address)}</td></tr>` : ''}
+        <tr><td style="padding:3px 12px 3px 0;color:#6b7280">Status</td><td style="padding:3px 0">${escapeHtml(getDisplayStatus(order))}</td></tr>
+        ${sender ? `<tr><td style="padding:3px 12px 3px 0;color:#6b7280">Sent by</td><td style="padding:3px 0">${escapeHtml(sender)}</td></tr>` : ''}
+      </table>
+      <div style="border:1px solid #e5e7eb;border-radius:8px;padding:12px;margin-bottom:16px;white-space:pre-wrap">${escapeHtml(message)}</div>
+      <h3 style="font-size:14px;margin:0 0 8px">Items</h3>
+      <ul style="margin:0;padding-left:20px">
+        ${items.map((item) => `<li>${escapeHtml(item.name)}${item.sku ? ` (${escapeHtml(item.sku)})` : ''} x${item.qty}</li>`).join('')}
+      </ul>
+    </div>
+  `;
+}
+
+type OrderEmailDetails = {
+  number: string;
+  cusName: string;
+  cusEmail: string | null;
+  phone: string | null;
+  address: string | null;
+  address2: string | null;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
+  country: string | null;
+  canceled: boolean;
+  closed: boolean;
+  fulfillmentStatus: string | null;
+  lineItems: Prisma.JsonValue;
+  store: {
+    name: string | null;
+    storeDomain: string;
+  };
+};
+
+function escapeHtml(value: string | number | null | undefined) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
 
 function getPeriodStartDate(period: 'all' | 'week' | 'month' | 'year') {

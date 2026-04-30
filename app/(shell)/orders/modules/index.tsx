@@ -30,9 +30,20 @@ type OrderRow = {
     confirmations: FulfillmentConfirmation[];
   };
   itemsCount: number;
+  messageCount: number;
 };
 
 type StoreOption = { id: string; name: string; storeDomain: string };
+type AdminOption = { id: string; name: string; email: string };
+type OrderAdminMessage = {
+  id: string;
+  adminName: string;
+  adminEmail: string;
+  senderName: string | null;
+  senderEmail: string | null;
+  message: string;
+  createdAt: string;
+};
 type PackingSlipLabel = {
   id: string;
   number: string;
@@ -386,6 +397,16 @@ export default function OrdersPage() {
     trackingNumber: string;
     trackingUrl: string;
     trackingCompany: string;
+  } | null>(null);
+  const [messageModal, setMessageModal] = useState<{
+    order: OrderRow;
+    admins: AdminOption[];
+    messages: OrderAdminMessage[];
+    selectedAdminId: string;
+    message: string;
+    loading: boolean;
+    sending: boolean;
+    error: string;
   } | null>(null);
   const [printingOrderId, setPrintingOrderId] = useState<string | null>(null);
   const messageTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -793,6 +814,101 @@ export default function OrdersPage() {
     }
   };
 
+  const openMessageModal = async (order: OrderRow) => {
+    setMessageModal({
+      order,
+      admins: [],
+      messages: [],
+      selectedAdminId: '',
+      message: '',
+      loading: true,
+      sending: false,
+      error: '',
+    });
+
+    try {
+      const res = await fetch(`/api/orders/${encodeURIComponent(order.id)}/messages`);
+      const json = (await res.json()) as ApiResponse<{
+        admins: AdminOption[];
+        messages: OrderAdminMessage[];
+      }>;
+
+      if (!res.ok || !json.success) {
+        throw new Error(getApiErrorMessage(json, 'Failed to load order messages'));
+      }
+
+      setMessageModal((prev) => {
+        if (!prev || prev.order.id !== order.id) return prev;
+        return {
+          ...prev,
+          admins: json.data.admins,
+          messages: json.data.messages,
+          selectedAdminId: json.data.admins[0]?.id ?? '',
+          loading: false,
+        };
+      });
+      setOrders((prev) => prev.map((item) => (
+        item.id === order.id ? { ...item, messageCount: json.data.messages.length } : item
+      )));
+    } catch (err) {
+      setMessageModal((prev) => (
+        prev && prev.order.id === order.id
+          ? { ...prev, loading: false, error: err instanceof Error ? err.message : 'Failed to load order messages.' }
+          : prev
+      ));
+    }
+  };
+
+  const closeMessageModal = () => {
+    if (messageModal?.sending) return;
+    setMessageModal(null);
+  };
+
+  const submitAdminMessage = async () => {
+    if (!messageModal || messageModal.sending) return;
+
+    const message = messageModal.message.trim();
+    if (!messageModal.selectedAdminId || !message) {
+      setMessageModal((prev) => prev ? { ...prev, error: 'Select an admin and enter a message.' } : prev);
+      return;
+    }
+
+    setMessageModal((prev) => prev ? { ...prev, sending: true, error: '' } : prev);
+    try {
+      const res = await fetch(`/api/orders/${encodeURIComponent(messageModal.order.id)}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adminId: messageModal.selectedAdminId,
+          message,
+        }),
+      });
+      const json = (await res.json()) as ApiResponse<OrderAdminMessage>;
+
+      if (!res.ok || !json.success) {
+        throw new Error(getApiErrorMessage(json, 'Failed to send message'));
+      }
+
+      setMessageModal((prev) => {
+        if (!prev || prev.order.id !== messageModal.order.id) return prev;
+        return {
+          ...prev,
+          messages: [json.data, ...prev.messages],
+          message: '',
+          sending: false,
+        };
+      });
+      setOrders((prev) => prev.map((item) => (
+        item.id === messageModal.order.id ? { ...item, messageCount: item.messageCount + 1 } : item
+      )));
+      toast.success('Message sent to admin.');
+    } catch (err) {
+      setMessageModal((prev) => (
+        prev ? { ...prev, sending: false, error: err instanceof Error ? err.message : 'Failed to send message.' } : prev
+      ));
+    }
+  };
+
   const writePrintDocument = (printWindow: Window, documentHtml: string) => {
     printWindow.document.open();
     printWindow.document.write(documentHtml);
@@ -1127,6 +1243,25 @@ export default function OrdersPage() {
                             </button>
                             <span className="tt">Print Label</span>
                           </div>
+                          <div className="tooltip">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void openMessageModal(order);
+                              }}
+                              className="relative p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-blue-600 transition-colors duration-150 cursor-pointer"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.77 9.77 0 01-4-.8L3 20l1.4-3.5A7.5 7.5 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                              </svg>
+                              {order.messageCount > 0 && (
+                                <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-blue-600 px-1 text-[10px] font-semibold leading-4 text-white">
+                                  {order.messageCount > 99 ? '99+' : order.messageCount}
+                                </span>
+                              )}
+                            </button>
+                            <span className="tt">Admin Messages</span>
+                          </div>
                         </div>
                       </td>
                     </tr>
@@ -1244,6 +1379,17 @@ export default function OrdersPage() {
                                   >
                                     {printingOrderId === order.id ? 'Loading label...' : 'Print Label'}
                                   </button>
+                                  <button
+                                    onClick={() => void openMessageModal(order)}
+                                    className="relative flex-1 border border-gray-300 bg-white text-gray-600 py-1.5 rounded-lg text-xs font-medium hover:bg-gray-50 transition-colors duration-150 cursor-pointer"
+                                  >
+                                    Message
+                                    {order.messageCount > 0 && (
+                                      <span className="ml-1 inline-flex min-w-4 items-center justify-center rounded-full bg-blue-600 px-1 text-[10px] font-semibold leading-4 text-white">
+                                        {order.messageCount > 99 ? '99+' : order.messageCount}
+                                      </span>
+                                    )}
+                                  </button>
                                 </div>
                                 {fulMessages[order.id] && (
                                   <div className="mt-2 text-xs text-center text-green-600 font-medium">{fulMessages[order.id]}</div>
@@ -1297,6 +1443,134 @@ export default function OrdersPage() {
           </div>
         </div>
       </div>
+
+      {messageModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-gray-900/50 px-4 pb-4 sm:items-center sm:pb-0"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="admin-message-title"
+          onClick={closeMessageModal}
+        >
+          <div
+            className="w-full max-w-2xl max-h-[calc(100dvh-2rem)] overflow-hidden rounded-lg bg-white shadow-xl border border-gray-200"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-gray-200">
+              <div>
+                <h3 id="admin-message-title" className="text-base font-semibold text-gray-900">
+                  Admin message
+                </h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  Order {messageModal.order.number} · {messageModal.order.customer}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeMessageModal}
+                disabled={messageModal.sending}
+                className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                aria-label="Close"
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="max-h-[calc(100dvh-10rem)] overflow-y-auto px-5 py-4">
+              {messageModal.loading ? (
+                <div className="py-12 text-center text-sm text-gray-400">Loading messages...</div>
+              ) : (
+                <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+                  <div className="space-y-3">
+                    <label className="block text-sm text-gray-700">
+                      <span className="block text-xs font-semibold uppercase text-gray-500 mb-1">Admin</span>
+                      <select
+                        value={messageModal.selectedAdminId}
+                        onChange={(event) => {
+                          setMessageModal((prev) => prev ? { ...prev, selectedAdminId: event.target.value } : prev);
+                        }}
+                        disabled={messageModal.sending || messageModal.admins.length === 0}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:bg-gray-100 disabled:text-gray-400"
+                      >
+                        {messageModal.admins.length === 0 ? (
+                          <option value="">No active admins</option>
+                        ) : (
+                          messageModal.admins.map((admin) => (
+                            <option key={admin.id} value={admin.id}>
+                              {admin.name} - {admin.email}
+                            </option>
+                          ))
+                        )}
+                      </select>
+                    </label>
+
+                    <label className="block text-sm text-gray-700">
+                      <span className="block text-xs font-semibold uppercase text-gray-500 mb-1">Message</span>
+                      <textarea
+                        value={messageModal.message}
+                        onChange={(event) => {
+                          setMessageModal((prev) => prev ? { ...prev, message: event.target.value, error: '' } : prev);
+                        }}
+                        rows={7}
+                        maxLength={5000}
+                        disabled={messageModal.sending}
+                        placeholder="Write a message for the admin"
+                        className="w-full resize-none border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:bg-gray-100"
+                      />
+                    </label>
+
+                    {messageModal.error && (
+                      <p className="text-sm text-red-600">{messageModal.error}</p>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={submitAdminMessage}
+                      disabled={messageModal.sending || messageModal.admins.length === 0}
+                      className="w-full rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {messageModal.sending ? 'Sending...' : 'Send Message'}
+                    </button>
+                  </div>
+
+                  <div>
+                    <h4 className="mb-2 text-xs font-semibold uppercase text-gray-500">Message history</h4>
+                    {messageModal.messages.length === 0 ? (
+                      <div className="rounded-lg border border-dashed border-gray-300 px-4 py-8 text-center text-sm text-gray-400">
+                        No messages sent yet.
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {messageModal.messages.map((item) => (
+                          <div key={item.id} className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                            <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                              <div className="min-w-0">
+                                <p className="text-sm font-semibold text-gray-800 truncate">{item.adminName}</p>
+                                <p className="text-xs text-gray-500 truncate">{item.adminEmail}</p>
+                              </div>
+                              <p className="text-xs text-gray-400 sm:text-right">
+                                {new Date(item.createdAt).toLocaleString()}
+                              </p>
+                            </div>
+                            {(item.senderName || item.senderEmail) && (
+                              <p className="mt-1 text-xs text-gray-500">
+                                Sent by {[item.senderName, item.senderEmail].filter(Boolean).join(' - ')}
+                              </p>
+                            )}
+                            <p className="mt-2 whitespace-pre-wrap break-words text-sm text-gray-700">{item.message}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {pendingFulfillment && (
         <div

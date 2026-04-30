@@ -78,6 +78,62 @@ export class OrderController {
       message: 'Barcodes saved',
     };
   }
+
+  async getOrderMessageCenter(orderId: string) {
+    const result = await model.getOrderMessageCenter(orderId);
+
+    return {
+      data: result,
+      message: 'Order messages retrieved',
+    };
+  }
+
+  async sendAdminOrderMessage(
+    orderId: string,
+    body: unknown,
+    sender?: {
+      id?: string | null;
+      name?: string | null;
+      email?: string | null;
+    } | null
+  ) {
+    const { adminId, message } = parseAdminOrderMessage(body);
+    const result = await model.sendAdminOrderMessage({
+      orderId,
+      adminId,
+      message,
+      sender,
+    });
+
+    return {
+      data: result,
+      message: 'Message sent',
+    };
+  }
+}
+
+function parseAdminOrderMessage(body: unknown) {
+  if (!body || typeof body !== 'object') {
+    throw new Error('Message data is required');
+  }
+
+  const value = body as Record<string, unknown>;
+  const adminId = typeof value.adminId === 'string' ? value.adminId.trim() : '';
+  const message = typeof value.message === 'string' ? value.message.trim() : '';
+
+  if (!adminId) {
+    throw new Error('Admin is required');
+  }
+
+  if (!message) {
+    throw new Error('Message is required');
+  }
+
+  if (message.length > 5000) {
+    throw new Error('Message must be 5000 characters or fewer');
+  }
+
+  return { adminId, message };
 }
 
 function parseBarcodes(body: unknown) {
