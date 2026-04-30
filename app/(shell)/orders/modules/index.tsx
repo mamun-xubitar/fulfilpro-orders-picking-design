@@ -87,6 +87,7 @@ type FulfillmentConfirmation = {
   confirmedAt?: string | null;
   shopifyFulfillmentId?: string | null;
   shopifyFulfillmentStatus?: string | null;
+  barcodes?: string[];
   trackingInfo?: {
     number?: string;
     company?: string;
@@ -367,9 +368,6 @@ export default function OrdersPage() {
   const [lastSynced, setLastSynced] = useState('');
   const [refreshRotation, setRefreshRotation] = useState(0);
   const [refreshToken, setRefreshToken] = useState(0);
-  const [barcodeLists, setBarcodeLists] = useState<Record<string, string[]>>({});
-  const [bcInputs, setBcInputs] = useState<Record<string, string>>({});
-  const [barcodeSaving, setBarcodeSaving] = useState<Record<string, boolean>>({});
   const [fullChecks, setFullChecks] = useState<Record<string, boolean>>({});
   const [partialValues, setPartialValues] = useState<Record<string, number>>({});
   const [fulMessages, setFulMessages] = useState<Record<string, string>>({});
@@ -380,6 +378,7 @@ export default function OrdersPage() {
     order: OrderRow;
     lines: FulfillmentLine[];
     notifyCustomer: boolean;
+    barcodeInput: string;
     trackingNumber: string;
     trackingUrl: string;
     trackingCompany: string;
@@ -408,9 +407,15 @@ export default function OrdersPage() {
   }, [pagination.page, pagination.pageSize, period, search, storeId]);
 
   const filteredTrackingCarriers = useMemo(() => {
-    const query = carrierSearch.trim().toLowerCase();
+    const query = carrierSearch.trim();
     if (!query) return SHOPIFY_TRACKING_CARRIERS;
-    return SHOPIFY_TRACKING_CARRIERS.filter((carrier) => carrier.toLowerCase().includes(query));
+
+    const matchingCarriers = SHOPIFY_TRACKING_CARRIERS.filter((carrier) => (
+      carrier.toLowerCase().includes(query.toLowerCase())
+    ));
+    const hasExactMatch = matchingCarriers.some((carrier) => carrier.toLowerCase() === query.toLowerCase());
+
+    return hasExactMatch ? matchingCarriers : [query, ...matchingCarriers];
   }, [carrierSearch]);
 
   const loadSyncStatus = useCallback(async (refreshAfterCompletion = false) => {
@@ -508,13 +513,6 @@ export default function OrdersPage() {
 
         setOrders(json.data.orders);
         setStores(json.data.stores);
-        setBarcodeLists((prev) => {
-          const next = { ...prev };
-          json.data.orders.forEach((order) => {
-            next[order.id] = prev[order.id] ?? order.barcodes;
-          });
-          return next;
-        });
         setPagination(json.data.pagination);
         setExpandedId(search ? json.data.orders[0]?.id ?? null : null);
       } catch (err) {
@@ -647,52 +645,6 @@ export default function OrdersPage() {
     return value.split(/\s+/).map((barcode) => barcode.trim()).filter(Boolean);
   };
 
-  const mergeBarcodes = (existing: string[], incoming: string[]) => {
-    return Array.from(new Set([...existing, ...incoming]));
-  };
-
-  const saveBC = async (order: OrderRow) => {
-    const inputBarcodes = parseBarcodes(bcInputs[order.id] ?? '');
-    const nextBarcodes = mergeBarcodes(barcodeLists[order.id] ?? order.barcodes, inputBarcodes);
-
-    if (nextBarcodes.length === 0) {
-      toast.warning('Enter at least one barcode.');
-      return;
-    }
-
-    setBarcodeSaving((prev) => ({ ...prev, [order.id]: true }));
-    try {
-      const res = await fetch(`/api/orders/${order.id}/barcodes`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ barcodes: nextBarcodes }),
-      });
-      const json = (await res.json()) as ApiResponse<{ orderId: string; barcodes: string[] }>;
-
-      if (!res.ok || !json.success) {
-        throw new Error(getApiErrorMessage(json, 'Failed to save barcodes'));
-      }
-
-      setBarcodeLists((prev) => ({ ...prev, [order.id]: json.data.barcodes }));
-      setOrders((prev) => prev.map((item) => (
-        item.id === order.id ? { ...item, barcodes: json.data.barcodes } : item
-      )));
-      setBcInputs((prev) => ({ ...prev, [order.id]: '' }));
-      toast.success('Barcodes saved.');
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to save barcodes.');
-    } finally {
-      setBarcodeSaving((prev) => ({ ...prev, [order.id]: false }));
-    }
-  };
-
-  const removeBC = (orderId: string, value: string) => {
-    setBarcodeLists((prev) => ({
-      ...prev,
-      [orderId]: (prev[orderId] ?? []).filter((barcode) => barcode !== value),
-    }));
-  };
-
   const setFulfillmentMessage = (orderId: string, message: string) => {
     setFulMessages((prev) => ({ ...prev, [orderId]: message }));
     if (messageTimerRef.current[orderId]) {
@@ -720,6 +672,7 @@ export default function OrdersPage() {
       order,
       lines,
       notifyCustomer: true,
+      barcodeInput: '',
       trackingNumber: '',
       trackingUrl: '',
       trackingCompany: '',
@@ -738,7 +691,8 @@ export default function OrdersPage() {
   const confirmFul = async () => {
     if (!pendingFulfillment) return;
 
-    const { order, lines, notifyCustomer, trackingNumber, trackingUrl, trackingCompany } = pendingFulfillment;
+    const { order, lines, notifyCustomer, barcodeInput, trackingNumber, trackingUrl, trackingCompany } = pendingFulfillment;
+    const barcodes = parseBarcodes(barcodeInput);
     const trackingInfo = {
       number: trackingNumber.trim(),
       url: trackingUrl.trim(),
@@ -749,7 +703,12 @@ export default function OrdersPage() {
       const res = await fetch(`/api/orders/${order.id}/fulfill`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lines, notifyCustomer, trackingInfo }),
+        body: JSON.stringify({
+          lines,
+          notifyCustomer,
+          trackingInfo,
+          barcodes,
+        }),
       });
       const json = (await res.json()) as ApiResponse<{
         orderId: string;
@@ -1218,37 +1177,7 @@ export default function OrdersPage() {
                                   const isConfirmDisabled = fulSaving[order.id] || !canConfirmFulfillment;
                                   return (
                                     <>
-                                <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">Barcode &amp; Actions</h4>
-                                <div className="flex gap-2 mb-2">
-                                  <input
-                                    type="text"
-                                    placeholder="Scan or type barcodes separated by spaces"
-                                    value={bcInputs[order.id] ?? ''}
-                                    onChange={(e) => setBcInputs((prev) => ({ ...prev, [order.id]: e.target.value }))}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter') {
-                                        e.preventDefault();
-                                        void saveBC(order);
-                                      }
-                                    }}
-                                    className="flex-1 border border-blue-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-400"
-                                  />
-                                  <button
-                                    onClick={() => saveBC(order)}
-                                    disabled={barcodeSaving[order.id]}
-                                    className="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-blue-700 transition-colors duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                                  >
-                                    {barcodeSaving[order.id] ? 'Saving...' : 'Save'}
-                                  </button>
-                                </div>
-                                <div className="chip-list mb-3 min-h-[20px]">
-                                  {(barcodeLists[order.id] ?? order.barcodes).map((barcode) => (
-                                    <span key={barcode} className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs font-mono">
-                                      {barcode}
-                                      <button onClick={() => removeBC(order.id, barcode)} className="hover:text-red-500 transition-colors cursor-pointer text-blue-400">×</button>
-                                    </span>
-                                  ))}
-                                </div>
+                                <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">Actions</h4>
                                 <button
                                   onClick={() => openFulfillmentConfirmation(order)}
                                   disabled={isConfirmDisabled}
@@ -1365,6 +1294,24 @@ export default function OrdersPage() {
                   })}
                 </ul>
               </div>
+
+              <label className="block text-sm text-gray-700">
+                <span className="block text-xs font-semibold uppercase text-gray-500 mb-1">Barcodes</span>
+                <input
+                  type="text"
+                  value={pendingFulfillment.barcodeInput}
+                  onChange={(event) => {
+                    setPendingFulfillment((prev) => (
+                      prev ? { ...prev, barcodeInput: event.target.value } : prev
+                    ));
+                  }}
+                  placeholder="Scan or type barcodes"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                />
+                <span className="mt-1 block text-xs text-gray-500">
+                  Use a space between barcodes when adding multiple barcodes.
+                </span>
+              </label>
 
               <div className="grid grid-cols-1 gap-3">
                 <div className="text-sm text-gray-700">

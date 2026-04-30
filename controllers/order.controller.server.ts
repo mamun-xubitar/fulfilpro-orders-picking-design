@@ -50,7 +50,8 @@ export class OrderController {
     const lines = parseFulfillmentLines(body);
     const notifyCustomer = parseNotifyCustomer(body);
     const trackingInfo = parseTrackingInfo(body);
-    const result = await model.confirmFulfillment(orderId, lines, notifyCustomer, trackingInfo);
+    const barcodes = parseFulfillmentBarcodes(body);
+    const result = await model.confirmFulfillment(orderId, lines, notifyCustomer, trackingInfo, barcodes);
 
     return {
       data: result,
@@ -84,6 +85,14 @@ function parseBarcodes(body: unknown) {
   }
 
   return (body as { barcodes: unknown[] }).barcodes.map((barcode) => String(barcode ?? ''));
+}
+
+function parseFulfillmentBarcodes(body: unknown) {
+  if (!body || typeof body !== 'object') return [];
+  const value = (body as { barcodes?: unknown }).barcodes;
+  if (!Array.isArray(value)) return [];
+
+  return value.map((barcode) => String(barcode ?? ''));
 }
 
 function parseTrackingInfo(body: unknown) {

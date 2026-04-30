@@ -234,7 +234,8 @@ export class OrderModel {
     orderId: string,
     lines: FulfillmentLineInput[],
     notifyCustomer: boolean,
-    trackingInfo: FulfillmentTrackingInput | null
+    trackingInfo: FulfillmentTrackingInput | null,
+    barcodes: string[] = []
   ) {
     const order = await prisma.order.findUnique({
       where: { id: orderId },
@@ -266,6 +267,7 @@ export class OrderModel {
 
     const lineItems = toLineItems(order.lineItems);
     const fulfillableLines = normalizeFulfillmentLines(lines, lineItems);
+    const fulfillmentBarcodes = normalizeBarcodes(barcodes);
     const currentFulfillmentItems = toFulfillmentItems(order.fulfillmentItems);
     const shopifyResult = await createShopifyFulfillment({
       shop: order.store.storeDomain,
@@ -286,6 +288,7 @@ export class OrderModel {
       shopifyFulfillmentId: shopifyResult.fulfillmentId,
       shopifyFulfillmentStatus: shopifyResult.fulfillmentStatus,
       notifyCustomer,
+      barcodes: fulfillmentBarcodes,
       trackingInfo,
       lines: fulfillableLines,
     };
