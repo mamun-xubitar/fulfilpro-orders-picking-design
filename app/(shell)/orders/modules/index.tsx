@@ -580,11 +580,11 @@ export default function OrdersPage() {
     return isLineFullyFulfilled(order, item) || (fullChecks[rowItemKey(order.id, itemIndex)] ?? false);
   };
 
-  const toggleFull = (orderId: string, itemIndex: number, maxQty: number, fulfilledQty: number) => {
+  const toggleFull = (orderId: string, itemIndex: number, remainingQty: number) => {
     const key = rowItemKey(orderId, itemIndex);
     const nextChecked = !(fullChecks[key] ?? false);
     setFullChecks((prev) => ({ ...prev, [key]: nextChecked }));
-    setPartialValues((prev) => ({ ...prev, [key]: nextChecked ? maxQty : fulfilledQty }));
+    setPartialValues((prev) => ({ ...prev, [key]: nextChecked ? remainingQty : 0 }));
   };
 
   const toggleAllFull = (order: OrderRow) => {
@@ -604,15 +604,17 @@ export default function OrdersPage() {
     setPartialValues((prev) => {
       const updated = { ...prev };
       order.items.forEach((item, itemIndex) => {
-        updated[rowItemKey(order.id, itemIndex)] = nextValue ? item.qty : getFulfilledQty(order, item.id);
+        const fulfilledQty = getFulfilledQty(order, item.id);
+        const remainingQty = Math.max(0, item.qty - fulfilledQty);
+        updated[rowItemKey(order.id, itemIndex)] = nextValue ? remainingQty : 0;
       });
       return updated;
     });
   };
 
-  const validPartial = (orderId: string, itemIndex: number, minQty: number, maxQty: number, value: string) => {
+  const validPartial = (orderId: string, itemIndex: number, maxQty: number, value: string) => {
     const parsed = parseInt(value, 10);
-    const clamped = Number.isNaN(parsed) || parsed < minQty ? minQty : parsed > maxQty ? maxQty : parsed;
+    const clamped = Number.isNaN(parsed) || parsed < 0 ? 0 : parsed > maxQty ? maxQty : parsed;
     setPartialValues((prev) => ({ ...prev, [rowItemKey(orderId, itemIndex)]: clamped }));
   };
 
@@ -631,8 +633,8 @@ export default function OrdersPage() {
         const fulfilledQty = getFulfilledQty(order, item.id);
         const remainingQty = Math.max(0, item.qty - fulfilledQty);
         const isFull = isLineFullChecked(order, item, itemIndex);
-        const requestedTotal = Math.min(item.qty, Math.max(fulfilledQty, partialValues[key] ?? fulfilledQty));
-        const quantity = isFull ? remainingQty : Math.max(0, requestedTotal - fulfilledQty);
+        const requestedQty = Math.min(remainingQty, Math.max(0, partialValues[key] ?? 0));
+        const quantity = isFull ? remainingQty : requestedQty;
 
         if (quantity < 1) return null;
 
@@ -1177,7 +1179,7 @@ export default function OrdersPage() {
                                       const fulfilledQty = getFulfilledQty(order, item.id);
                                       const remainingQty = Math.max(0, item.qty - fulfilledQty);
                                       const isFull = isLineFullChecked(order, item, itemIndex);
-                                      const partialValue = partialValues[key] ?? fulfilledQty;
+                                      const partialValue = Math.min(remainingQty, Math.max(0, partialValues[key] ?? 0));
                                       return (
                                         <tr key={`${order.id}-${itemIndex}`} className="border-b border-blue-100">
                                           <td className="py-1.5 pr-2 text-gray-700">{item.name}</td>
@@ -1190,18 +1192,18 @@ export default function OrdersPage() {
                                               type="checkbox"
                                               checked={isFull}
                                               disabled={remainingQty === 0}
-                                              onChange={() => toggleFull(order.id, itemIndex, item.qty, fulfilledQty)}
+                                              onChange={() => toggleFull(order.id, itemIndex, remainingQty)}
                                               className="rounded border-gray-300 text-blue-600 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                                             />
                                           </td>
                                           <td className="py-1.5 text-center">
                                             <input
                                               type="number"
-                                              min={fulfilledQty}
-                                              max={item.qty}
+                                              min={0}
+                                              max={remainingQty}
                                               value={partialValue}
                                               disabled={isFull || remainingQty === 0}
-                                              onChange={(e) => validPartial(order.id, itemIndex, fulfilledQty, item.qty, e.target.value)}
+                                              onChange={(e) => validPartial(order.id, itemIndex, remainingQty, e.target.value)}
                                               className="w-14 border border-blue-200 rounded px-1 py-0.5 text-center text-xs bg-white cursor-pointer disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
                                             />
                                           </td>
