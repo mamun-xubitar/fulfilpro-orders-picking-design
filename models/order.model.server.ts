@@ -316,6 +316,43 @@ export class OrderModel {
     };
   }
 
+  async getPackingSlipLabel(orderId: string) {
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        store: {
+          select: {
+            name: true,
+            storeDomain: true,
+            url: true,
+            logoPath: true,
+          },
+        },
+      },
+    });
+
+    if (!order) {
+      throw new Error('Order not found');
+    }
+
+    return {
+      id: order.id,
+      number: order.number,
+      customer: order.cusName,
+      address: order.address,
+      address2: order.address2,
+      city: order.city,
+      state: order.state,
+      zip: order.zip,
+      country: order.country,
+      phone: order.phone,
+      storeName: order.store.name ?? order.store.storeDomain,
+      storeDomain: order.store.storeDomain,
+      storeUrl: order.store.url,
+      storeLogoPath: order.store.logoPath,
+    };
+  }
+
   async saveBarcodes(orderId: string, barcodes: string[]) {
     const uniqueBarcodes = normalizeBarcodes(barcodes);
     const order = await prisma.order.update({

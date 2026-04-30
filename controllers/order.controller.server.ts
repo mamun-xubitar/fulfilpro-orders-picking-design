@@ -58,6 +58,15 @@ export class OrderController {
     };
   }
 
+  async getPackingSlipLabel(orderId: string) {
+    const label = await model.getPackingSlipLabel(orderId);
+
+    return {
+      data: label,
+      message: 'Packing slip label retrieved',
+    };
+  }
+
   async saveBarcodes(orderId: string, body: unknown) {
     const barcodes = parseBarcodes(body);
     const result = await model.saveBarcodes(orderId, barcodes);
