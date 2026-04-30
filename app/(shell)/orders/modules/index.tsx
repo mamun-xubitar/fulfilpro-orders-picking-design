@@ -284,16 +284,16 @@ const SHOPIFY_TRACKING_CARRIERS = [
   'Skynet',
 ] as const;
 
-const STATUS_MAP: Record<string, { chip: string; label: string }> = {
+const STATUS_MAP: Record<string, { chip: string; label: string; row?: string }> = {
   pending: { chip: 'bg-white border border-gray-300 text-gray-600', label: 'Pending' },
-  partial: { chip: 'bg-amber-100 text-amber-700 border border-amber-200', label: 'Partially Fulfilled' },
-  partially_fulfilled: { chip: 'bg-amber-100 text-amber-700 border border-amber-200', label: 'Partially Fulfilled' },
-  fulfilled: { chip: 'bg-blue-600 text-white', label: 'Fulfilled' },
-  shipped: { chip: 'bg-blue-600 text-white', label: 'Shipped' },
+  partial: { chip: 'bg-amber-100 text-amber-700 border border-amber-200', label: 'Partially Fulfilled', row: 'bg-amber-100 hover:bg-amber-200' },
+  partially_fulfilled: { chip: 'bg-amber-100 text-amber-700 border border-amber-200', label: 'Partially Fulfilled', row: 'bg-amber-100 hover:bg-amber-200' },
+  fulfilled: { chip: 'bg-blue-600 text-white', label: 'Fulfilled', row: 'bg-blue-100 hover:bg-blue-200' },
+  shipped: { chip: 'bg-blue-600 text-white', label: 'Shipped', row: 'bg-blue-100 hover:bg-blue-200' },
   unfulfilled: { chip: 'bg-white border border-gray-300 text-gray-600', label: 'Pending' },
-  closed: { chip: 'bg-gray-200 text-gray-700 border border-gray-300', label: 'Closed' },
-  canceled: { chip: 'bg-red-100 text-red-700 border border-red-200', label: 'Canceled' },
-  cancelled: { chip: 'bg-red-100 text-red-700 border border-red-200', label: 'Canceled' },
+  closed: { chip: 'bg-gray-200 text-gray-700 border border-gray-300', label: 'Closed', row: 'bg-gray-100 hover:bg-gray-200' },
+  canceled: { chip: 'bg-red-100 text-red-700 border border-red-200', label: 'Canceled', row: 'bg-red-100 hover:bg-red-200' },
+  cancelled: { chip: 'bg-red-100 text-red-700 border border-red-200', label: 'Canceled', row: 'bg-red-100 hover:bg-red-200' },
 };
 
 const DEFAULT_PAGINATION: Pagination = {
@@ -1062,7 +1062,7 @@ export default function OrdersPage() {
                 return (
                   <Fragment key={order.id}>
                     <tr
-                      className="border-b border-gray-100 hover:bg-gray-50 transition-colors duration-100"
+                      className={`border-b border-gray-100 ${status.row ?? 'hover:bg-gray-50'} transition-colors duration-100`}
                     >
                       <td className="hidden sm:table-cell px-4 py-3 text-gray-400 text-xs">
                         {(pagination.page - 1) * pagination.pageSize + index + 1}
