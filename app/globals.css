@@ -22,8 +22,8 @@ body {
 /* Shell */
 #sidebar { transition: width .2s ease, transform .2s ease; }
 #main-content { min-width: 0; transition: margin-left .2s ease; }
-.protected-shell,
-.protected-shell * {
+.protected-orders-page,
+.protected-orders-page * {
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;

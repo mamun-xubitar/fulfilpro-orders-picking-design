@@ -33,6 +33,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
   const [blockedActionMessage, setBlockedActionMessage] = useState("");
   const blockedActionWarningAt = useRef(0);
   const blockedActionTimer = useRef<number | null>(null);
+  const isOrdersPath = pathname === "/orders" || pathname.startsWith("/orders/");
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -88,11 +89,15 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
   }, []);
 
   useEffect(() => {
+    if (!isOrdersPath) {
+      return;
+    }
+
     const showBlockedActionMessage = () => {
       const currentTime = Date.now();
       if (currentTime - blockedActionWarningAt.current < 1200) return;
       blockedActionWarningAt.current = currentTime;
-      setBlockedActionMessage("This action is blocked on protected pages.");
+      setBlockedActionMessage("Copy and selection are blocked on the orders page.");
       if (blockedActionTimer.current !== null) {
         window.clearTimeout(blockedActionTimer.current);
       }
@@ -110,18 +115,14 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
     const handleKeyDown = (event: KeyboardEvent) => {
       const key = event.key.toLowerCase();
       const blocksSelectOrCopy = (event.ctrlKey || event.metaKey) && (key === "a" || key === "c");
-      const blocksPrintScreen = event.key === "PrintScreen";
-      const blocksBrowserScreenshot =
-        event.metaKey && event.shiftKey && (key === "3" || key === "4" || key === "5");
 
-      if (!blocksSelectOrCopy && !blocksPrintScreen && !blocksBrowserScreenshot) return;
+      if (!blocksSelectOrCopy) return;
 
       event.preventDefault();
       event.stopPropagation();
       showBlockedActionMessage();
     };
 
-    document.addEventListener("contextmenu", blockAction);
     document.addEventListener("copy", blockAction);
     document.addEventListener("cut", blockAction);
     document.addEventListener("selectstart", blockAction);
@@ -129,12 +130,16 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
     document.addEventListener("keydown", handleKeyDown, true);
 
     return () => {
-      document.removeEventListener("contextmenu", blockAction);
       document.removeEventListener("copy", blockAction);
       document.removeEventListener("cut", blockAction);
       document.removeEventListener("selectstart", blockAction);
       document.removeEventListener("dragstart", blockAction);
       document.removeEventListener("keydown", handleKeyDown, true);
+    };
+  }, [isOrdersPath]);
+
+  useEffect(() => {
+    return () => {
       if (blockedActionTimer.current !== null) {
         window.clearTimeout(blockedActionTimer.current);
       }
@@ -204,8 +209,8 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
   }
 
   return (
-    <div className="protected-shell">
-      {blockedActionMessage && (
+    <div className={isOrdersPath ? "protected-orders-page" : undefined}>
+      {isOrdersPath && blockedActionMessage && (
         <div
           role="alert"
           className="fixed bottom-5 left-1/2 z-[100] -translate-x-1/2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900 shadow-lg"
