@@ -73,6 +73,27 @@ model Order {
   updatedAt         DateTime  @updatedAt
 }
 
+model OrderSyncJob {
+  id              String    @id @default(uuid())
+  status          String    @default("queued")
+  windowStartedAt DateTime
+  windowEndedAt   DateTime
+  totalStores     Int       @default(0)
+  totalFetched    Int       @default(0)
+  totalCreated    Int       @default(0)
+  totalUpdated    Int       @default(0)
+  failedStores    Int       @default(0)
+  error           String?
+  startedAt       DateTime?
+  finishedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([finishedAt])
+}
+
 model AppSettings {
   id                    String   @id @default("default")
   timezone              String   @default("Australia/Sydney")

@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useEffect, useMemo, useState, useRef } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { toast } from 'react-toastify';
 
 type OrderItem = { id: string; name: string; sku: string; qty: number };
@@ -46,6 +46,23 @@ type ApiResponse<T> = {
   message: string;
   errors?: string[];
   data: T;
+};
+
+type OrderSyncJob = {
+  id: string;
+  status: 'queued' | 'running' | 'completed' | 'failed' | string;
+  windowStartedAt: string;
+  windowEndedAt: string;
+  totalStores: number;
+  totalFetched: number;
+  totalCreated: number;
+  totalUpdated: number;
+  failedStores: number;
+  error: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
 };
 
 type FulfillmentLine = { lineItemId: string; quantity: number; full: boolean };
@@ -302,6 +319,13 @@ function escapeHtml(value: string | number | null | undefined) {
     .replaceAll("'", '&#039;');
 }
 
+function formatSyncDate(value: string) {
+  return new Date(value).toLocaleString(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
+}
+
 export default function OrdersPage() {
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [stores, setStores] = useState<StoreOption[]>([]);
@@ -313,8 +337,9 @@ export default function OrdersPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [syncJob, setSyncJob] = useState<OrderSyncJob | null>(null);
   const [error, setError] = useState('');
-  const [lastSynced, setLastSynced] = useState('Not synced yet');
+  const [lastSynced, setLastSynced] = useState('');
   const [refreshRotation, setRefreshRotation] = useState(0);
   const [refreshToken, setRefreshToken] = useState(0);
   const [barcodeLists, setBarcodeLists] = useState<Record<string, string[]>>({});
@@ -339,6 +364,8 @@ export default function OrdersPage() {
     selectedKeys: string[];
   } | null>(null);
   const messageTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const activeSyncJobIdRef = useRef<string | null>(null);
+  const completedSyncJobIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -363,6 +390,80 @@ export default function OrdersPage() {
     if (!query) return SHOPIFY_TRACKING_CARRIERS;
     return SHOPIFY_TRACKING_CARRIERS.filter((carrier) => carrier.toLowerCase().includes(query));
   }, [carrierSearch]);
+
+  const loadSyncStatus = useCallback(async (refreshAfterCompletion = false) => {
+    const res = await fetch('/api/orders/sync');
+    const json = (await res.json()) as ApiResponse<{
+      activeJob: OrderSyncJob | null;
+      lastSuccessfulJob: OrderSyncJob | null;
+      latestJob: OrderSyncJob | null;
+    }>;
+
+    if (!res.ok || !json.success) {
+      throw new Error(json.message || 'Failed to load Shopify order sync status');
+    }
+
+    setSyncJob(json.data.activeJob);
+    if (json.data.activeJob) {
+      activeSyncJobIdRef.current = json.data.activeJob.id;
+    }
+
+    if (json.data.lastSuccessfulJob?.finishedAt) {
+      const completedJobId = json.data.lastSuccessfulJob.id;
+      setLastSynced(`Last synced: ${formatSyncDate(json.data.lastSuccessfulJob.finishedAt)}`);
+
+      if (
+        refreshAfterCompletion &&
+        activeSyncJobIdRef.current === completedJobId &&
+        completedSyncJobIdRef.current !== completedJobId
+      ) {
+        completedSyncJobIdRef.current = completedJobId;
+        activeSyncJobIdRef.current = null;
+        setRefreshToken((prev) => prev + 1);
+      }
+    }
+
+    if (
+      refreshAfterCompletion &&
+      json.data.latestJob?.status === 'failed' &&
+      activeSyncJobIdRef.current === json.data.latestJob.id
+    ) {
+      setError(json.data.latestJob.error || 'Shopify order sync failed');
+      activeSyncJobIdRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchSyncStatus = async () => {
+      try {
+        await loadSyncStatus(false);
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Failed to load Shopify order sync status');
+        }
+      }
+    };
+
+    void fetchSyncStatus();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loadSyncStatus]);
+
+  useEffect(() => {
+    if (!syncJob || (syncJob.status !== 'queued' && syncJob.status !== 'running')) return;
+
+    const timer = window.setInterval(() => {
+      void loadSyncStatus(true).catch((err) => {
+        setError(err instanceof Error ? err.message : 'Failed to load Shopify order sync status');
+      });
+    }, 2000);
+
+    return () => window.clearInterval(timer);
+  }, [loadSyncStatus, syncJob]);
 
   useEffect(() => {
     let cancelled = false;
@@ -394,7 +495,6 @@ export default function OrdersPage() {
         });
         setPagination(json.data.pagination);
         setExpandedId(search ? json.data.orders[0]?.id ?? null : null);
-        setLastSynced(`Last synced: ${new Date().toLocaleTimeString()}`);
       } catch (err) {
         if (cancelled) return;
         setError(err instanceof Error ? err.message : 'Failed to load orders');
@@ -419,28 +519,30 @@ export default function OrdersPage() {
   };
 
   const handleSync = async () => {
+    if (syncJob && (syncJob.status === 'queued' || syncJob.status === 'running')) return;
+
     setSyncing(true);
     setError('');
     try {
       const res = await fetch('/api/orders/sync', { method: 'POST' });
       const json = (await res.json()) as ApiResponse<{
-        totalStores: number;
-        totalFetched: number;
-        totalCreated: number;
-        totalUpdated: number;
-        failedStores: number;
+        job: OrderSyncJob;
+        alreadyRunning: boolean;
       }>;
 
-      if (!res.ok || !json.success) {
-        throw new Error(json.message || 'Failed to sync Shopify orders');
+      if ((!res.ok && res.status !== 409) || !json.success) {
+        throw new Error(json.message || 'Failed to queue Shopify order sync');
       }
 
-      setLastSynced(
-        `Synced ${json.data.totalFetched} orders (${json.data.totalCreated} new, ${json.data.totalUpdated} updated)`
-      );
-      setRefreshToken((prev) => prev + 1);
+      setSyncJob(json.data.job);
+      activeSyncJobIdRef.current = json.data.job.id;
+      if (json.data.alreadyRunning) {
+        toast.info('A Shopify order sync is already running.');
+      } else {
+        toast.success('Shopify order sync queued.');
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to sync Shopify orders');
+      setError(err instanceof Error ? err.message : 'Failed to queue Shopify order sync');
     } finally {
       setSyncing(false);
     }
@@ -839,6 +941,13 @@ export default function OrdersPage() {
     };
   }, []);
 
+  const syncActive = syncJob?.status === 'queued' || syncJob?.status === 'running';
+  const syncMessage = syncActive
+    ? syncJob.status === 'queued'
+      ? 'Sync queued for last 30 days'
+      : `Syncing last 30 days: ${syncJob.totalFetched} fetched`
+    : lastSynced || 'Not synced yet';
+
   return (
     <main className="flex-1 p-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-5">
@@ -880,18 +989,18 @@ export default function OrdersPage() {
         <div className="flex items-center gap-2 ml-auto">
           <button
             onClick={handleSync}
-            disabled={syncing || loading}
+            disabled={syncing || loading || syncActive}
             className="flex items-center gap-1.5 bg-white border border-gray-300 text-gray-600 text-sm px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors duration-150 cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <svg
-              className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`}
+              className={`w-4 h-4 ${syncing || syncActive ? 'animate-spin' : ''}`}
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
             >
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v6h6M20 20v-6h-6M5 19A9 9 0 0119 5m0 0h-5m5 0v5M19 5A9 9 0 005 19m0 0h5m-5 0v-5" />
             </svg>
-            {syncing ? 'Syncing...' : 'Sync'}
+            {syncActive ? 'Syncing...' : syncing ? 'Queueing...' : 'Sync'}
           </button>
           <button
             onClick={handleRefresh}
@@ -909,7 +1018,7 @@ export default function OrdersPage() {
             </svg>
             Refresh
           </button>
-          <span className="text-xs text-gray-400 whitespace-nowrap">{lastSynced}</span>
+          <span className="text-xs text-gray-400 whitespace-nowrap">{syncMessage}</span>
         </div>
       </div>
 

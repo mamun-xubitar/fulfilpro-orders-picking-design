@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 
-const DEFAULT_SCOPES = process.env.SHOPIFY_SCOPES || 'read_products,write_products,read_orders,write_orders,read_fulfillments,write_fulfillments,read_merchant_managed_fulfillment_orders,write_merchant_managed_fulfillment_orders';
+const DEFAULT_SCOPES = process.env.SHOPIFY_SCOPES || 'read_products,write_products,read_orders,write_orders,read_fulfillments,write_fulfillments,read_merchant_managed_fulfillment_orders,write_merchant_managed_fulfillment_orders,read_inventory,write_inventory,read_locations,write_locations,read_customers';
 
 export type ShopifyCallbackQuery = {
   code: string | null;
@@ -107,6 +107,7 @@ export async function getAccessToken(
     signal: AbortSignal.timeout(15000),
   });
   // console.log("my res", JSON.stringify(res, null, 2), endpoint, normalizedShop)
+  // console.log("response status", res.status, await res.text())
   if (!res.ok) {
     const errorText = await res.text();
     throw new Error(

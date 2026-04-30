@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "worker:orders-sync": "tsx workers/order-sync.worker.ts",
     "lint": "eslint"
   },
   "dependencies": {

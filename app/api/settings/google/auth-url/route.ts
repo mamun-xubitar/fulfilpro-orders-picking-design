@@ -19,7 +19,6 @@ export async function GET(request: NextRequest) {
   }
 
   const appUrl = getAppUrl(request);
-  console.log("app url", appUrl)
   const url = new URL(GOOGLE_AUTH_URL);
   url.searchParams.set('client_id', clientId);
   url.searchParams.set('redirect_uri', `${appUrl}/api/settings/google/callback`);

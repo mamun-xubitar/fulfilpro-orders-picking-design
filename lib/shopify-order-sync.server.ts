@@ -2,6 +2,7 @@ import prisma from '@/lib/prisma.server';
 import { OrderModel, type ShopifyOrderPayload } from '@/models/order.model.server';
 
 const SHOPIFY_API_VERSION = '2026-04';
+const SHOPIFY_ORDERS_PAGE_SIZE = 200;
 const orderModel = new OrderModel();
 
 type SyncStoreResult = {
@@ -13,7 +14,170 @@ type SyncStoreResult = {
   error?: string;
 };
 
-export async function syncConnectedStoreOrders() {
+type ShopifyGraphQLResponse<T> = {
+  data?: T;
+  errors?: Array<{ message: string }>;
+};
+
+type ShopifyGraphQLOrdersResult = {
+  orders: {
+    nodes: ShopifyGraphQLOrder[];
+    pageInfo: {
+      hasNextPage: boolean;
+      endCursor: string | null;
+    };
+  };
+};
+
+type ShopifyGraphQLOrder = {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  createdAt: string;
+  closedAt: string | null;
+  cancelledAt: string | null;
+  displayFulfillmentStatus: string | null;
+  currentTotalPriceSet: {
+    shopMoney: {
+      amount: string;
+      currencyCode: string;
+    };
+  } | null;
+  customer: {
+    firstName: string | null;
+    lastName: string | null;
+    email: string | null;
+    phone: string | null;
+  } | null;
+  shippingAddress: {
+    address1: string | null;
+    address2: string | null;
+    city: string | null;
+    province: string | null;
+    zip: string | null;
+    country: string | null;
+    phone: string | null;
+    name: string | null;
+  } | null;
+  lineItems: {
+    nodes: Array<{
+      id: string;
+      name: string;
+      sku: string | null;
+      quantity: number;
+      discountedUnitPriceSet: {
+        shopMoney: {
+          amount: string;
+          currencyCode: string;
+        };
+      } | null;
+    }>;
+  };
+  fulfillments: Array<{
+    id: string;
+    status: string | null;
+    createdAt: string | null;
+    updatedAt: string | null;
+    trackingInfo: Array<{
+      number: string | null;
+      company: string | null;
+      url: string | null;
+    }>;
+    fulfillmentLineItems: {
+      nodes: Array<{
+        quantity: number;
+        lineItem: {
+          id: string;
+        } | null;
+      }>;
+    };
+  }>;
+};
+
+const ORDERS_QUERY = `
+  query OrdersForSync($first: Int!, $after: String, $query: String!) {
+    orders(first: $first, after: $after, reverse: true, sortKey: CREATED_AT, query: $query) {
+      nodes {
+        id
+        name
+        email
+        phone
+        createdAt
+        closedAt
+        cancelledAt
+        displayFulfillmentStatus
+        currentTotalPriceSet {
+          shopMoney {
+            amount
+            currencyCode
+          }
+        }
+        customer {
+          firstName
+          lastName
+          email
+          phone
+        }
+        shippingAddress {
+          address1
+          address2
+          city
+          province
+          zip
+          country
+          phone
+          name
+        }
+        lineItems(first: 100) {
+          nodes {
+            id
+            name
+            sku
+            quantity
+            discountedUnitPriceSet {
+              shopMoney {
+                amount
+                currencyCode
+              }
+            }
+          }
+        }
+        fulfillments(first: 50) {
+          id
+          status
+          createdAt
+          updatedAt
+          trackingInfo {
+            number
+            company
+            url
+          }
+          fulfillmentLineItems(first: 100) {
+            nodes {
+              quantity
+              lineItem {
+                id
+              }
+            }
+          }
+        }
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+    }
+  }
+`;
+
+export async function syncConnectedStoreOrders(params?: {
+  windowStartedAt?: Date;
+  windowEndedAt?: Date;
+  onStoreSynced?: (result: SyncStoreResult) => Promise<void> | void;
+}) {
+  const windowEndedAt = params?.windowEndedAt ?? new Date();
+  const windowStartedAt = params?.windowStartedAt ?? new Date(windowEndedAt.getTime() - 30 * 24 * 60 * 60 * 1000);
   const stores = await prisma.store.findMany({
     where: {
       status: 'connected',
@@ -33,8 +197,7 @@ export async function syncConnectedStoreOrders() {
         let fetched = 0;
         let created = 0;
         let updated = 0;
-
-        for await (const order of fetchShopifyOrders(store.storeDomain, store.accessToken!)) {
+        for await (const order of fetchShopifyOrders(store.storeDomain, store.accessToken!, windowStartedAt, windowEndedAt)) {
           fetched += 1;
           const result = await orderModel.upsertFromShopifyOrder({
             payload: order,
@@ -44,15 +207,21 @@ export async function syncConnectedStoreOrders() {
           if (result.updated) updated += 1;
         }
 
-        return {
+        const result = {
           storeId: store.id,
           storeDomain: store.storeDomain,
           fetched,
           created,
           updated,
         };
+        await params?.onStoreSynced?.(result);
+        return result;
       } catch (error) {
-        return {
+        console.error('Order sync failed for store', {
+          storeDomain: store.storeDomain,
+          error: error instanceof Error ? error.message : error,
+        });
+        const result = {
           storeId: store.id,
           storeDomain: store.storeDomain,
           fetched: 0,
@@ -60,6 +229,8 @@ export async function syncConnectedStoreOrders() {
           updated: 0,
           error: error instanceof Error ? error.message : 'Unknown sync error',
         };
+        await params?.onStoreSynced?.(result);
+        return result;
       }
     })
   );
@@ -71,50 +242,165 @@ export async function syncConnectedStoreOrders() {
     totalUpdated: results.reduce((sum, item) => sum + item.updated, 0),
     failedStores: results.filter((item) => item.error).length,
     results,
+    windowStartedAt,
+    windowEndedAt,
   };
 }
 
-async function* fetchShopifyOrders(shop: string, accessToken: string): AsyncGenerator<ShopifyOrderPayload> {
-  let nextUrl: string | null = getInitialOrdersUrl(shop);
-
-  while (nextUrl) {
-    const response = await fetch(nextUrl, {
-      headers: {
-        'X-Shopify-Access-Token': accessToken,
-        Accept: 'application/json',
-      },
-      signal: AbortSignal.timeout(30000),
+async function* fetchShopifyOrders(
+  shop: string,
+  accessToken: string,
+  windowStartedAt: Date,
+  windowEndedAt: Date
+): AsyncGenerator<ShopifyOrderPayload> {
+  let after: string | null = null;
+  let hasNextPage = true;
+  const query = getOrdersSearchQuery(windowStartedAt, windowEndedAt);
+  
+  while (hasNextPage) {
+    const data: ShopifyGraphQLOrdersResult = await shopifyGraphQL<ShopifyGraphQLOrdersResult>(shop, accessToken, ORDERS_QUERY, {
+      first: SHOPIFY_ORDERS_PAGE_SIZE,
+      after,
+      query,
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Shopify order sync failed (${response.status}): ${errorText}`);
+    for (const order of data.orders.nodes) {
+      yield toShopifyOrderPayload(order);
     }
 
-    const data = (await response.json()) as { orders?: ShopifyOrderPayload[] };
-    for (const order of data.orders ?? []) {
-      yield order;
-    }
-
-    nextUrl = getNextPageUrl(response.headers.get('link'));
+    hasNextPage = data.orders.pageInfo.hasNextPage;
+    after = data.orders.pageInfo.endCursor;
   }
 }
 
-function getInitialOrdersUrl(shop: string) {
-  const url = new URL(`https://${shop}/admin/api/${SHOPIFY_API_VERSION}/orders.json`);
-  url.searchParams.set('status', 'any');
-  url.searchParams.set('limit', '250');
-  url.searchParams.set('order', 'created_at desc');
-  return url.toString();
+async function shopifyGraphQL<T>(
+  shop: string,
+  accessToken: string,
+  query: string,
+  variables: Record<string, unknown>
+) {
+  const response = await fetch(`https://${shop}/admin/api/${SHOPIFY_API_VERSION}/graphql.json`, {
+    method: 'POST',
+    headers: {
+      'X-Shopify-Access-Token': accessToken,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({ query, variables }),
+    signal: AbortSignal.timeout(30000),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Shopify order sync failed (${response.status}): ${errorText}`);
+  }
+
+  const payload = (await response.json()) as ShopifyGraphQLResponse<T>;
+  if (payload.errors?.length) {
+    throw new Error(`Shopify order sync failed: ${payload.errors.map((error) => error.message).join(', ')}`);
+  }
+  if (!payload.data) {
+    throw new Error('Shopify order sync failed: missing GraphQL response data');
+  }
+
+  return payload.data;
 }
 
-function getNextPageUrl(linkHeader: string | null) {
-  if (!linkHeader) return null;
+function toShopifyOrderPayload(order: ShopifyGraphQLOrder): ShopifyOrderPayload {
+  const totalPrice = order.currentTotalPriceSet?.shopMoney;
 
-  const nextLink = linkHeader
-    .split(',')
-    .map((part) => part.trim())
-    .find((part) => part.includes('rel="next"'));
+  return {
+    id: getLegacyId(order.id),
+    name: order.name,
+    order_number: getOrderNumber(order.name),
+    email: order.email,
+    phone: order.phone,
+    total_price: totalPrice?.amount ?? null,
+    current_total_price: totalPrice?.amount ?? null,
+    fulfillment_status: normalizeGraphQLFulfillmentStatus(order.displayFulfillmentStatus),
+    created_at: order.createdAt,
+    closed_at: order.closedAt,
+    cancelled_at: order.cancelledAt,
+    total_price_set: totalPrice
+      ? {
+          shop_money: {
+            amount: totalPrice.amount,
+            currency_code: totalPrice.currencyCode,
+          },
+        }
+      : undefined,
+    customer: order.customer
+      ? {
+          first_name: order.customer.firstName,
+          last_name: order.customer.lastName,
+          email: order.customer.email,
+          phone: order.customer.phone,
+        }
+      : null,
+    shipping_address: order.shippingAddress
+      ? {
+          address1: order.shippingAddress.address1,
+          address2: order.shippingAddress.address2,
+          city: order.shippingAddress.city,
+          province: order.shippingAddress.province,
+          zip: order.shippingAddress.zip,
+          country: order.shippingAddress.country,
+          phone: order.shippingAddress.phone,
+          name: order.shippingAddress.name,
+        }
+      : null,
+    line_items: order.lineItems.nodes.map((lineItem) => ({
+      id: getLegacyId(lineItem.id),
+      name: lineItem.name,
+      sku: lineItem.sku,
+      quantity: lineItem.quantity,
+      price: lineItem.discountedUnitPriceSet?.shopMoney.amount ?? null,
+      price_set: lineItem.discountedUnitPriceSet
+        ? {
+            shop_money: {
+              amount: lineItem.discountedUnitPriceSet.shopMoney.amount,
+              currency_code: lineItem.discountedUnitPriceSet.shopMoney.currencyCode,
+            },
+          }
+        : undefined,
+    })),
+    fulfillments: order.fulfillments.map((fulfillment) => {
+      const tracking = fulfillment.trackingInfo[0];
 
-  return nextLink?.match(/<([^>]+)>/)?.[1] ?? null;
+      return {
+        id: getLegacyId(fulfillment.id),
+        status: fulfillment.status,
+        created_at: fulfillment.createdAt,
+        updated_at: fulfillment.updatedAt,
+        tracking_number: tracking?.number ?? null,
+        tracking_company: tracking?.company ?? null,
+        tracking_url: tracking?.url ?? null,
+        line_items: fulfillment.fulfillmentLineItems.nodes.map((lineItem) => ({
+          id: lineItem.lineItem ? getLegacyId(lineItem.lineItem.id) : null,
+          quantity: lineItem.quantity,
+        })),
+      };
+    }),
+  };
+}
+
+function getOrdersSearchQuery(windowStartedAt: Date, windowEndedAt: Date) {
+  return [
+    `created_at:>='${windowStartedAt.toISOString()}'`,
+    `created_at:<='${windowEndedAt.toISOString()}'`,
+  ].join(' ');
+}
+
+function getLegacyId(gid: string) {
+  return gid.split('/').at(-1) ?? gid;
+}
+
+function getOrderNumber(name: string) {
+  const normalized = name.trim().replace(/^#/, '');
+  const numericOrderNumber = Number(normalized);
+  return Number.isFinite(numericOrderNumber) ? numericOrderNumber : normalized;
+}
+
+function normalizeGraphQLFulfillmentStatus(status: string | null) {
+  return status?.toLowerCase() ?? null;
 }

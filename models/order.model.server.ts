@@ -9,7 +9,7 @@ import { Prisma } from '@prisma/client';
 export type ShopifyOrderPayload = {
   id?: string | number;
   name?: string;
-  order_number: number;
+  order_number: string | number;
   email?: string | null;
   phone?: string | null;
   total_price?: string | number | null;
@@ -42,7 +42,7 @@ export type ShopifyOrderPayload = {
     name?: string | null;
   } | null;
   line_items?: Array<{
-    id: number;
+    id: string | number;
     name?: string | null;
     sku?: string | null;
     quantity?: number | null;
