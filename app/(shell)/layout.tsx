@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
@@ -30,6 +30,9 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
   const [policy, setPolicy] = useState<SessionPolicy | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [sessionWarningDismissed, setSessionWarningDismissed] = useState(false);
+  const [blockedActionMessage, setBlockedActionMessage] = useState("");
+  const blockedActionWarningAt = useRef(0);
+  const blockedActionTimer = useRef<number | null>(null);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -82,6 +85,60 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
     }
     document.addEventListener("click", handleClick);
     return () => document.removeEventListener("click", handleClick);
+  }, []);
+
+  useEffect(() => {
+    const showBlockedActionMessage = () => {
+      const currentTime = Date.now();
+      if (currentTime - blockedActionWarningAt.current < 1200) return;
+      blockedActionWarningAt.current = currentTime;
+      setBlockedActionMessage("This action is blocked on protected pages.");
+      if (blockedActionTimer.current !== null) {
+        window.clearTimeout(blockedActionTimer.current);
+      }
+      blockedActionTimer.current = window.setTimeout(() => {
+        setBlockedActionMessage("");
+        blockedActionTimer.current = null;
+      }, 2200);
+    };
+
+    const blockAction = (event: Event) => {
+      event.preventDefault();
+      showBlockedActionMessage();
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const key = event.key.toLowerCase();
+      const blocksSelectOrCopy = (event.ctrlKey || event.metaKey) && (key === "a" || key === "c");
+      const blocksPrintScreen = event.key === "PrintScreen";
+      const blocksBrowserScreenshot =
+        event.metaKey && event.shiftKey && (key === "3" || key === "4" || key === "5");
+
+      if (!blocksSelectOrCopy && !blocksPrintScreen && !blocksBrowserScreenshot) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      showBlockedActionMessage();
+    };
+
+    document.addEventListener("contextmenu", blockAction);
+    document.addEventListener("copy", blockAction);
+    document.addEventListener("cut", blockAction);
+    document.addEventListener("selectstart", blockAction);
+    document.addEventListener("dragstart", blockAction);
+    document.addEventListener("keydown", handleKeyDown, true);
+
+    return () => {
+      document.removeEventListener("contextmenu", blockAction);
+      document.removeEventListener("copy", blockAction);
+      document.removeEventListener("cut", blockAction);
+      document.removeEventListener("selectstart", blockAction);
+      document.removeEventListener("dragstart", blockAction);
+      document.removeEventListener("keydown", handleKeyDown, true);
+      if (blockedActionTimer.current !== null) {
+        window.clearTimeout(blockedActionTimer.current);
+      }
+    };
   }, []);
 
   async function logout() {
@@ -147,7 +204,16 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
   }
 
   return (
-    <div onContextMenu={(e) => e.preventDefault()}>
+    <div className="protected-shell">
+      {blockedActionMessage && (
+        <div
+          role="alert"
+          className="fixed bottom-5 left-1/2 z-[100] -translate-x-1/2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900 shadow-lg"
+        >
+          {blockedActionMessage}
+        </div>
+      )}
+
       {showSessionWarning && (
         <div className="fixed top-0 left-0 right-0 z-50 bg-amber-400 text-amber-950 px-4 py-2 flex items-center justify-between shadow-md">
           <span className="text-sm font-medium">Your session expires in {remainingMinutes} minute{remainingMinutes === 1 ? "" : "s"}. Please save your work.</span>
