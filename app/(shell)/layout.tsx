@@ -5,7 +5,7 @@ import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
 
 type SessionPolicy = {
-  sessionTimeoutMinutes: number;
+  sessionTimeoutMinutes: number | null;
   staffAccess: null | {
     allowed: boolean;
     timezone: string;
@@ -83,8 +83,8 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
     return () => document.removeEventListener("click", handleClick);
   }, []);
 
-  async function logout(timeout = false) {
-    await signOut({ callbackUrl: timeout ? "/?timeout=1" : "/" });
+  async function logout() {
+    await signOut({ callbackUrl: "/" });
   }
 
   const navItems = [
@@ -96,7 +96,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
     {
       id: "stores", label: "Stores", href: "/stores",
       icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/>,
-      adminOnly: false,
+      adminOnly: true,
     },
     {
       id: "users", label: "Users", href: "/users",
@@ -121,18 +121,21 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
   const sidebarWidth = sidebarCollapsed ? "64px" : "240px";
   const user = session?.user;
   const initials = getInitials(user?.name ?? user?.email ?? "");
+  const isStaff = user?.role === "staff";
   const loginAt = user?.loginAt ?? now;
-  const timeoutMinutes = policy?.sessionTimeoutMinutes ?? 30;
-  const expiresAt = loginAt + timeoutMinutes * 60 * 1000;
-  const remainingMs = expiresAt - now;
-  const remainingMinutes = Math.max(0, Math.ceil(remainingMs / 60_000));
-  const showSessionWarning = remainingMs > 0 && remainingMs <= 15 * 60 * 1000 && !sessionWarningDismissed;
+  const timeoutMinutes = isStaff ? policy?.sessionTimeoutMinutes ?? null : null;
+  const expiresAt = timeoutMinutes ? loginAt + timeoutMinutes * 60 * 1000 : null;
+  const remainingMs = expiresAt ? expiresAt - now : null;
+  const remainingMinutes = remainingMs === null ? 0 : Math.max(0, Math.ceil(remainingMs / 60_000));
+  const showSessionWarning = Boolean(
+    isStaff && remainingMs && remainingMs > 0 && remainingMs <= 15 * 60 * 1000 && !sessionWarningDismissed
+  );
   const staffRestricted = policy?.staffAccess && !policy.staffAccess.allowed;
 
   useEffect(() => {
-    if (status !== "authenticated" || !policy || remainingMs > 0) return;
-    void logout(true);
-  }, [policy, remainingMs, status]);
+    if (status !== "authenticated" || !isStaff || !policy || remainingMs === null || remainingMs > 0) return;
+    router.push("/session-expired");
+  }, [isStaff, policy, remainingMs, router, status]);
 
   if (status === "loading") {
     return (

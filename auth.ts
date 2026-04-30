@@ -28,7 +28,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (!email || !password) {
           throw new Error('Invalid credentials.');
         }
-        console.log("being authorized")
         const user = await prisma.user.findUnique({ where: { email } });
 
         if (!user || !user.active || !verifyPassword(password, user.password)) {
@@ -95,7 +94,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         session.user.active = token.active as boolean;
         session.user.isTempPassword = token.isTempPassword as boolean;
         session.user.loginAt = token.loginAt as number;
-        console.log("my session", session)
       }
       return session;
     },

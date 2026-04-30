@@ -15,7 +15,7 @@ export async function GET() {
   return apiSuccess({
     message: 'Session policy retrieved',
     data: {
-      sessionTimeoutMinutes: policy.sessionTimeoutMinutes,
+      sessionTimeoutMinutes: session.user.role === 'staff' ? policy.sessionTimeoutMinutes : null,
       staffAccess,
     },
   });
