@@ -4,10 +4,21 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
+    "build": "npm run prisma:setup && next build",
+    "prisma:setup": "prisma generate && prisma migrate deploy",
+    "start": "next start -p 9090",
     "worker:orders-sync": "tsx workers/order-sync.worker.ts",
-    "lint": "eslint"
+    "lint": "eslint",
+    "pm2": "pm2",
+    "pm2:start": "pm2 start .pm2.json",
+    "pm2:stop": "pm2 stop .pm2.json",
+    "pm2:restart": "pm2 restart .pm2.json",
+    "pm2:delete": "pm2 delete .pm2.json",
+    "pm2:logrotate:install": "pm2 install pm2-logrotate || true",
+    "pm2:logrotate:config": "pm2 set pm2-logrotate:max_size 10M && pm2 set pm2-logrotate:retain 7 && pm2 set pm2-logrotate:compress true && pm2 set pm2-logrotate:rotateInterval '0 0 * * *'",
+    "pm2:setup": "npm run pm2:logrotate:install && npm run pm2:logrotate:config && npm run pm2:start",
+    "pm2:logrotate:remove": "pm2 uninstall pm2-logrotate",
+    "pm2:logrotate:disable": "pm2 set pm2-logrotate:enabled false"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.8.0",
@@ -29,6 +40,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
+    "pm2": "^6.0.14",
     "prisma": "^7.8.0",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
