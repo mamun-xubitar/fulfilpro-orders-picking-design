@@ -15,6 +15,7 @@ const PUBLIC_ROUTES = [
   '/api/settings/google/callback',
   '/api/auth/staff-login-approvals/.*',
   '/api/webhooks/.*',
+  '/api/fulfillment-requests/.*',
 ];
 
 const AUTH_ONLY_ROUTES = ['/'];
@@ -23,16 +24,27 @@ const LOGIN_ROUTE = '/';
 const RESTRICTED_ROUTE = '/restricted';
 const SESSION_EXPIRED_ROUTE = '/session-expired';
 const STAFF_ALLOWED_PAGE_ROUTES = ['/orders', '/profile'];
-const STAFF_ALLOWED_API_ROUTES = ['/api/orders', '/api/uploads/logos', '/api/profile', '/api/auth/.*'];
+const STAFF_ALLOWED_API_ROUTES = [
+  '/api/orders',
+  '/api/orders/.*',
+  '/api/uploads/logos',
+  '/api/profile',
+  '/api/auth/.*',
+  '/api/fulfillment-requests',
+];
 const STAFF_RESTRICTED_API_ROUTES = ['/api/auth/.*'];
 const STAFF_EXPIRED_API_ROUTES = ['/api/auth/.*'];
 
 function matchesRoute(pathname: string, routes: string[]) {
   return routes.some((route) => {
+    // if (route.includes('[')) {
+    //   const pattern = route.replace(/\[[^\]]+\]/g, '[^/]+');
+    //   return new RegExp(`^${pattern}/?$`).test(pathname);
+    // }
     if (route.includes('.*') || route.includes('^') || route.includes('$')) {
       return new RegExp(`^${route}$`).test(pathname);
     }
-    return pathname === route || pathname.startsWith(`${route}/`);
+    return pathname === route || pathname === `${route}/`;
   });
 }
 

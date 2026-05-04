@@ -158,6 +158,94 @@ async function createFulfillmentForLocation(
   return data;
 }
 
+type FulfillmentUpdateTrackingResult = {
+  fulfillmentTrackingInfoUpdateV2: {
+    fulfillment: { id: string; status: string } | null;
+    userErrors: Array<{ field: string[] | null; message: string }>;
+  };
+};
+
+type FulfillmentCancelResult = {
+  fulfillmentCancel: {
+    fulfillment: { id: string; status: string } | null;
+    userErrors: Array<{ field: string[] | null; message: string }>;
+  };
+};
+
+export async function updateShopifyFulfillmentTracking(params: {
+  shop: string;
+  accessToken: string;
+  shopifyFulfillmentId: string;
+  trackingInfo: FulfillmentTrackingInput;
+  notifyCustomer?: boolean;
+}) {
+  const shop = normalizeShopDomain(params.shop);
+  const data = await shopifyGraphQL<FulfillmentUpdateTrackingResult>(shop, params.accessToken, {
+    query: `
+      mutation FulfillmentTrackingInfoUpdateV2($fulfillmentId: ID!, $trackingInfoInput: FulfillmentTrackingInput!, $notifyCustomer: Boolean) {
+        fulfillmentTrackingInfoUpdateV2(fulfillmentId: $fulfillmentId, trackingInfoInput: $trackingInfoInput, notifyCustomer: $notifyCustomer) {
+          fulfillment {
+            id
+            status
+          }
+          userErrors {
+            field
+            message
+          }
+        }
+      }
+    `,
+    variables: {
+      fulfillmentId: params.shopifyFulfillmentId,
+      trackingInfoInput: {
+        ...(params.trackingInfo.number ? { number: params.trackingInfo.number } : {}),
+        ...(params.trackingInfo.url ? { url: params.trackingInfo.url } : {}),
+        ...(params.trackingInfo.company ? { company: params.trackingInfo.company } : {}),
+      },
+      notifyCustomer: params.notifyCustomer ?? false,
+    },
+  });
+
+  const userErrors = data.fulfillmentTrackingInfoUpdateV2.userErrors;
+  if (userErrors.length > 0) {
+    throw new Error(userErrors.map((e) => e.message).join(', '));
+  }
+
+  return data.fulfillmentTrackingInfoUpdateV2.fulfillment;
+}
+
+export async function cancelShopifyFulfillment(params: {
+  shop: string;
+  accessToken: string;
+  shopifyFulfillmentId: string;
+}) {
+  const shop = normalizeShopDomain(params.shop);
+  const data = await shopifyGraphQL<FulfillmentCancelResult>(shop, params.accessToken, {
+    query: `
+      mutation FulfillmentCancel($id: ID!) {
+        fulfillmentCancel(id: $id) {
+          fulfillment {
+            id
+            status
+          }
+          userErrors {
+            field
+            message
+          }
+        }
+      }
+    `,
+    variables: { id: params.shopifyFulfillmentId },
+  });
+
+  const userErrors = data.fulfillmentCancel.userErrors;
+  if (userErrors.length > 0) {
+    throw new Error(userErrors.map((e) => e.message).join(', '));
+  }
+
+  return data.fulfillmentCancel.fulfillment;
+}
+
 function hasTrackingInfo(trackingInfo: FulfillmentTrackingInput) {
   return Boolean(trackingInfo.number || trackingInfo.url || trackingInfo.company);
 }

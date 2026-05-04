@@ -134,6 +134,39 @@ model AppSettings {
   updatedAt             DateTime @updatedAt
 }
 
+model FulfillmentEditRequest {
+  id               String    @id @default(uuid())
+  orderId          String
+  orderNumber      String
+  fulfillmentId    String
+  requestType      String
+  requestedById    String
+  requestedByName  String
+  requestedByEmail String
+  reason           String
+  status           String    @default("pending")
+  adminTargets     Json
+  approveToken     String    @unique
+  rejectToken      String    @unique
+  approvedById     String?
+  approvedByName   String?
+  approvedAt       DateTime?
+  rejectedById     String?
+  rejectedByName   String?
+  rejectedAt       DateTime?
+  completedAt      DateTime?
+  expiresAt        DateTime
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([orderId])
+  @@index([fulfillmentId])
+  @@index([status])
+  @@index([requestedById])
+  @@index([approveToken])
+  @@index([rejectToken])
+}
+
 model StaffLoginApproval {
   id           String    @id @default(uuid())
   userId       String

@@ -1,6 +1,8 @@
 import prisma from '@/lib/prisma.server';
 import {
   createShopifyFulfillment,
+  updateShopifyFulfillmentTracking,
+  cancelShopifyFulfillment,
   type FulfillmentRequestLine,
   type FulfillmentTrackingInput,
 } from '@/lib/shopify-fulfillment.server';
@@ -377,6 +379,121 @@ export class OrderModel {
       status: fulfillmentStatus,
       fulfillmentItems: nextFulfillmentItems,
     };
+  }
+
+  async editFulfillmentConfirmation(
+    orderId: string,
+    fulfillmentId: string,
+    editData: {
+      barcodes?: string[];
+      shippingDate?: string | null;
+      trackingInfo?: FulfillmentTrackingInput | null;
+    }
+  ) {
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: { store: { select: { storeDomain: true, accessToken: true } } },
+    });
+
+    if (!order) throw new Error('Order not found');
+
+    const currentFulfillmentItems = toFulfillmentItems(order.fulfillmentItems);
+    const confIndex = currentFulfillmentItems.confirmations.findIndex((c) => {
+      const conf = c as Record<string, unknown>;
+      return conf.id === fulfillmentId;
+    });
+
+    if (confIndex === -1) throw new Error('Fulfillment confirmation not found');
+
+    const existing = currentFulfillmentItems.confirmations[confIndex] as Record<string, unknown>;
+    const shopifyFulfillmentId = typeof existing.shopifyFulfillmentId === 'string' ? existing.shopifyFulfillmentId : null;
+
+    if (shopifyFulfillmentId && editData.trackingInfo && order.store.accessToken) {
+      const hasNewTracking = editData.trackingInfo.number || editData.trackingInfo.url || editData.trackingInfo.company;
+      if (hasNewTracking) {
+        await updateShopifyFulfillmentTracking({
+          shop: order.store.storeDomain,
+          accessToken: order.store.accessToken,
+          shopifyFulfillmentId,
+          trackingInfo: editData.trackingInfo,
+          notifyCustomer: false,
+        });
+      }
+    }
+
+    const updatedConf = {
+      ...existing,
+      ...(editData.barcodes !== undefined ? { barcodes: normalizeBarcodes(editData.barcodes) } : {}),
+      ...(editData.shippingDate !== undefined ? { shippingDate: editData.shippingDate } : {}),
+      ...(editData.trackingInfo !== undefined ? { trackingInfo: editData.trackingInfo } : {}),
+    };
+
+    const updatedConfirmations = [...currentFulfillmentItems.confirmations];
+    updatedConfirmations[confIndex] = updatedConf as typeof updatedConfirmations[number];
+
+    const nextFulfillmentItems = {
+      shopifyOrderId: currentFulfillmentItems.shopifyOrderId,
+      confirmations: updatedConfirmations,
+    };
+
+    await prisma.order.update({
+      where: { id: order.id },
+      data: { fulfillmentItems: nextFulfillmentItems as Prisma.InputJsonValue },
+    });
+
+    return { orderId: order.id, fulfillmentItems: nextFulfillmentItems };
+  }
+
+  async cancelFulfillmentConfirmation(orderId: string, fulfillmentId: string) {
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: { store: { select: { storeDomain: true, accessToken: true } } },
+    });
+
+    if (!order) throw new Error('Order not found');
+
+    const currentFulfillmentItems = toFulfillmentItems(order.fulfillmentItems);
+    const conf = currentFulfillmentItems.confirmations.find((c) => {
+      return (c as Record<string, unknown>).id === fulfillmentId;
+    }) as Record<string, unknown> | undefined;
+
+    if (!conf) throw new Error('Fulfillment confirmation not found');
+
+    const shopifyFulfillmentId = typeof conf.shopifyFulfillmentId === 'string' ? conf.shopifyFulfillmentId : null;
+
+    if (shopifyFulfillmentId && order.store.accessToken) {
+      await cancelShopifyFulfillment({
+        shop: order.store.storeDomain,
+        accessToken: order.store.accessToken,
+        shopifyFulfillmentId,
+      });
+    }
+
+    const remainingConfirmations = currentFulfillmentItems.confirmations.filter((c) => {
+      return (c as Record<string, unknown>).id !== fulfillmentId;
+    });
+
+    const lineItems = toLineItems(order.lineItems);
+    const totalQuantity = lineItems.reduce((sum, item) => sum + Math.max(0, item.qty), 0);
+    const fulfilledQuantity = remainingConfirmations.reduce((sum, c) => {
+      return sum + (c as { lines: FulfillmentRequestLine[] }).lines.reduce((ls, l) => ls + l.quantity, 0);
+    }, 0);
+    const fulfillmentStatus = fulfilledQuantity >= totalQuantity ? 'fulfilled' : fulfilledQuantity > 0 ? 'partial' : 'unfulfilled';
+
+    const nextFulfillmentItems = {
+      shopifyOrderId: currentFulfillmentItems.shopifyOrderId,
+      confirmations: remainingConfirmations,
+    };
+
+    await prisma.order.update({
+      where: { id: order.id },
+      data: {
+        fulfillmentItems: nextFulfillmentItems as Prisma.InputJsonValue,
+        fulfillmentStatus,
+      },
+    });
+
+    return { orderId: order.id, status: fulfillmentStatus, fulfillmentItems: nextFulfillmentItems };
   }
 
   async getPackingSlipLabel(orderId: string) {

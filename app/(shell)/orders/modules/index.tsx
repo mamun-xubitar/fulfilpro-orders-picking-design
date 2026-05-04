@@ -1,6 +1,7 @@
 'use client';
 
 import { Fragment, useCallback, useEffect, useMemo, useState, useRef } from 'react';
+import { useSession } from 'next-auth/react';
 import { toast } from 'react-toastify';
 
 type OrderItem = { id: string; name: string; sku: string; qty: number };
@@ -92,6 +93,27 @@ type OrderSyncJob = {
   finishedAt: string | null;
   createdAt: string;
   updatedAt: string;
+};
+
+type FulfillmentEditRequestRow = {
+  id: string;
+  orderId: string;
+  orderNumber: string;
+  fulfillmentId: string;
+  requestType: 'edit' | 'cancel';
+  requestedById: string;
+  requestedByName: string;
+  requestedByEmail: string;
+  reason: string;
+  status: 'pending' | 'approved' | 'rejected' | 'completed';
+  adminTargets: Array<{ id: string; name: string; email: string }>;
+  approvedByName: string | null;
+  approvedAt: string | null;
+  rejectedByName: string | null;
+  rejectedAt: string | null;
+  completedAt: string | null;
+  expiresAt: string;
+  createdAt: string;
 };
 
 type FulfillmentLine = { lineItemId: string; quantity: number; full: boolean };
@@ -288,7 +310,6 @@ const SHOPIFY_TRACKING_CARRIERS = [
   '日本通運',
   '名鉄運輸',
   '第一貨物',
-  'DHL Parcel',
   'Bring',
   'Inpost',
   'PTT',
@@ -450,6 +471,45 @@ export default function OrdersPage() {
     error: string;
   } | null>(null);
   const [printingOrderId, setPrintingOrderId] = useState<string | null>(null);
+  const [fulfillmentViewOrderId, setFulfillmentViewOrderId] = useState<string | null>(null);
+  const { data: session } = useSession();
+  const userRole = (session?.user?.role as string) ?? '';
+  const userIsAdmin = userRole === 'admin';
+  const userIsStaff = userRole === 'staff';
+  const [orderFulfillmentRequests, setOrderFulfillmentRequests] = useState<Record<string, FulfillmentEditRequestRow[]>>({});
+  const [pendingRequests, setPendingRequests] = useState<FulfillmentEditRequestRow[]>([]);
+  const [pendingRequestsPanelOpen, setPendingRequestsPanelOpen] = useState(false);
+  const [editFulModal, setEditFulModal] = useState<{
+    order: OrderRow;
+    conf: FulfillmentConfirmation;
+    confId: string;
+    barcodes: string;
+    shippingDate: string;
+    carrier: string;
+    trackingNumber: string;
+    trackingUrl: string;
+    saving: boolean;
+    error: string;
+  } | null>(null);
+  const [cancelFulModal, setCancelFulModal] = useState<{
+    order: OrderRow;
+    conf: FulfillmentConfirmation;
+    confId: string;
+    saving: boolean;
+    error: string;
+  } | null>(null);
+  const [requestPermModal, setRequestPermModal] = useState<{
+    order: OrderRow;
+    conf: FulfillmentConfirmation;
+    confId: string;
+    requestType: 'edit' | 'cancel';
+    availableAdmins: AdminOption[];
+    selectedAdminIds: string[];
+    reason: string;
+    loadingAdmins: boolean;
+    saving: boolean;
+    error: string;
+  } | null>(null);
   const storeDropdownRef = useRef<HTMLDivElement>(null);
   const statusDropdownRef = useRef<HTMLDivElement>(null);
   const periodDropdownRef = useRef<HTMLDivElement>(null);
@@ -829,6 +889,176 @@ export default function OrdersPage() {
     }
   };
 
+  const loadFulfillmentRequests = useCallback(async (orderId: string) => {
+    try {
+      const res = await fetch(`/api/fulfillment-requests?orderId=${encodeURIComponent(orderId)}`);
+      const json = (await res.json()) as ApiResponse<FulfillmentEditRequestRow[]>;
+      if (res.ok && json.success) {
+        setOrderFulfillmentRequests((prev) => ({ ...prev, [orderId]: json.data }));
+      }
+    } catch { /* silent */ }
+  }, []);
+
+  const loadPendingRequests = useCallback(async () => {
+    try {
+      const res = await fetch('/api/fulfillment-requests?pending=true');
+      const json = (await res.json()) as ApiResponse<FulfillmentEditRequestRow[]>;
+      if (res.ok && json.success) {
+        setPendingRequests(json.data);
+      }
+    } catch { /* silent */ }
+  }, []);
+
+  const getActiveFulfillmentRequest = (orderId: string, fulfillmentId: string | undefined, requestType: 'edit' | 'cancel') => {
+    if (!fulfillmentId) return null;
+    const requests = orderFulfillmentRequests[orderId] ?? [];
+    return requests.find((r) =>
+      r.fulfillmentId === fulfillmentId &&
+      r.requestType === requestType &&
+      (r.status === 'pending' || r.status === 'approved') &&
+      new Date(r.expiresAt) > new Date()
+    ) ?? null;
+  };
+
+  const openEditFulModal = (order: OrderRow, conf: FulfillmentConfirmation, confId: string) => {
+    setEditFulModal({
+      order, conf, confId,
+      barcodes: conf.barcodes?.join(' ') ?? '',
+      shippingDate: conf.shippingDate ?? '',
+      carrier: conf.trackingInfo?.company ?? '',
+      trackingNumber: conf.trackingInfo?.number ?? '',
+      trackingUrl: conf.trackingInfo?.url ?? '',
+      saving: false, error: '',
+    });
+  };
+
+  const submitEditFulfillment = async () => {
+    if (!editFulModal) return;
+    const { order, confId, barcodes, shippingDate, carrier, trackingNumber, trackingUrl } = editFulModal;
+    setEditFulModal((prev) => prev ? { ...prev, saving: true, error: '' } : null);
+    try {
+      const res = await fetch(`/api/orders/${order.id}/fulfillments/${encodeURIComponent(confId)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          barcodes: barcodes.split(/\s+/).filter(Boolean),
+          shippingDate: shippingDate || null,
+          trackingInfo: { number: trackingNumber.trim(), url: trackingUrl.trim(), company: carrier.trim() },
+        }),
+      });
+      const json = (await res.json()) as ApiResponse<{ orderId: string; fulfillmentItems: OrderRow['fulfillmentItems'] }>;
+      if (!res.ok || !json.success) throw new Error(getApiErrorMessage(json, 'Failed to update fulfillment'));
+      setOrders((prev) => prev.map((o) => o.id === order.id ? { ...o, fulfillmentItems: json.data.fulfillmentItems } : o));
+      setOrderFulfillmentRequests((prev) => {
+        const updated = (prev[order.id] ?? []).map((r) =>
+          r.fulfillmentId === confId && r.requestType === 'edit' && r.status === 'approved'
+            ? { ...r, status: 'completed' as const } : r
+        );
+        return { ...prev, [order.id]: updated };
+      });
+      toast.success('Fulfillment updated.');
+      setEditFulModal(null);
+    } catch (err) {
+      setEditFulModal((prev) => prev ? { ...prev, saving: false, error: err instanceof Error ? err.message : 'Failed to update' } : null);
+    }
+  };
+
+  const openCancelFulModal = (order: OrderRow, conf: FulfillmentConfirmation, confId: string) => {
+    setCancelFulModal({ order, conf, confId, saving: false, error: '' });
+  };
+
+  const submitCancelFulfillment = async () => {
+    if (!cancelFulModal) return;
+    const { order, confId } = cancelFulModal;
+    setCancelFulModal((prev) => prev ? { ...prev, saving: true, error: '' } : null);
+    try {
+      const res = await fetch(`/api/orders/${order.id}/fulfillments/${encodeURIComponent(confId)}`, { method: 'DELETE' });
+      const json = (await res.json()) as ApiResponse<{ orderId: string; status: string; fulfillmentItems: OrderRow['fulfillmentItems'] }>;
+      if (!res.ok || !json.success) throw new Error(getApiErrorMessage(json, 'Failed to cancel fulfillment'));
+      setOrders((prev) => prev.map((o) => o.id === order.id ? { ...o, status: json.data.status, fulfillmentItems: json.data.fulfillmentItems } : o));
+      setOrderFulfillmentRequests((prev) => {
+        const updated = (prev[order.id] ?? []).map((r) =>
+          r.fulfillmentId === confId && r.requestType === 'cancel' && r.status === 'approved'
+            ? { ...r, status: 'completed' as const } : r
+        );
+        return { ...prev, [order.id]: updated };
+      });
+      toast.success('Fulfillment cancelled.');
+      setCancelFulModal(null);
+    } catch (err) {
+      setCancelFulModal((prev) => prev ? { ...prev, saving: false, error: err instanceof Error ? err.message : 'Failed to cancel' } : null);
+    }
+  };
+
+  const openRequestPermModal = async (order: OrderRow, conf: FulfillmentConfirmation, confId: string, requestType: 'edit' | 'cancel') => {
+    setRequestPermModal({ order, conf, confId, requestType, availableAdmins: [], selectedAdminIds: [], reason: '', loadingAdmins: true, saving: false, error: '' });
+    try {
+      const res = await fetch(`/api/orders/${encodeURIComponent(order.id)}/messages`);
+      const json = (await res.json()) as ApiResponse<{ admins: AdminOption[]; messages: unknown[] }>;
+      if (res.ok && json.success) {
+        setRequestPermModal((prev) => prev ? { ...prev, availableAdmins: json.data.admins, loadingAdmins: false } : null);
+      } else {
+        setRequestPermModal((prev) => prev ? { ...prev, loadingAdmins: false, error: 'Failed to load admin list' } : null);
+      }
+    } catch {
+      setRequestPermModal((prev) => prev ? { ...prev, loadingAdmins: false, error: 'Failed to load admin list' } : null);
+    }
+  };
+
+  const submitPermissionRequest = async () => {
+    if (!requestPermModal) return;
+    const { order, confId, requestType, selectedAdminIds, reason } = requestPermModal;
+    if (!reason.trim()) { setRequestPermModal((prev) => prev ? { ...prev, error: 'Reason is required' } : null); return; }
+    if (selectedAdminIds.length === 0) { setRequestPermModal((prev) => prev ? { ...prev, error: 'Select at least one admin' } : null); return; }
+    setRequestPermModal((prev) => prev ? { ...prev, saving: true, error: '' } : null);
+    try {
+      const res = await fetch('/api/fulfillment-requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId: order.id, orderNumber: order.number, fulfillmentId: confId, requestType, adminIds: selectedAdminIds, reason: reason.trim() }),
+      });
+      const json = (await res.json()) as ApiResponse<FulfillmentEditRequestRow>;
+      if (!res.ok || !json.success) throw new Error(getApiErrorMessage(json, 'Failed to submit request'));
+      setOrderFulfillmentRequests((prev) => ({ ...prev, [order.id]: [...(prev[order.id] ?? []), json.data] }));
+      toast.success('Permission request submitted. Admin has been notified.');
+      setRequestPermModal(null);
+    } catch (err) {
+      setRequestPermModal((prev) => prev ? { ...prev, saving: false, error: err instanceof Error ? err.message : 'Failed to submit' } : null);
+    }
+  };
+
+  const handleAdminApproveRequest = async (requestId: string) => {
+    try {
+      const res = await fetch(`/api/fulfillment-requests/${requestId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'approve' }),
+      });
+      const json = (await res.json()) as ApiResponse<FulfillmentEditRequestRow>;
+      if (!res.ok || !json.success) throw new Error(getApiErrorMessage(json, 'Failed to approve'));
+      setPendingRequests((prev) => prev.filter((r) => r.id !== requestId));
+      toast.success('Request approved. Staff can now perform the action.');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to approve request');
+    }
+  };
+
+  const handleAdminRejectRequest = async (requestId: string) => {
+    try {
+      const res = await fetch(`/api/fulfillment-requests/${requestId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reject' }),
+      });
+      const json = (await res.json()) as ApiResponse<FulfillmentEditRequestRow>;
+      if (!res.ok || !json.success) throw new Error(getApiErrorMessage(json, 'Failed to reject'));
+      setPendingRequests((prev) => prev.filter((r) => r.id !== requestId));
+      toast.info('Request rejected.');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to reject request');
+    }
+  };
+
   const printPackingSlipLabel = async (order: OrderRow) => {
     const printWindow = window.open('', '_blank', 'width=900,height=700');
     if (!printWindow) {
@@ -1156,6 +1386,15 @@ export default function OrdersPage() {
   }, []);
 
   useEffect(() => {
+    if (userIsAdmin) void loadPendingRequests();
+  }, [userIsAdmin, loadPendingRequests]);
+
+  useEffect(() => {
+    if (!fulfillmentViewOrderId) return;
+    void loadFulfillmentRequests(fulfillmentViewOrderId);
+  }, [fulfillmentViewOrderId, loadFulfillmentRequests]);
+
+  useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (periodDropdownRef.current && !periodDropdownRef.current.contains(e.target as Node)) {
         setPeriodDropdownOpen(false);
@@ -1181,6 +1420,51 @@ export default function OrdersPage() {
 
   return (
     <main className="flex-1 p-4 md:p-6">
+      {userIsAdmin && pendingRequests.length > 0 && (
+        <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl overflow-hidden">
+          <button
+            onClick={() => setPendingRequestsPanelOpen((prev) => !prev)}
+            className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-amber-100 transition-colors duration-150 cursor-pointer"
+          >
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-500 text-white text-xs font-bold">{pendingRequests.length}</span>
+              <span className="text-sm font-semibold text-amber-800">Fulfillment permission request{pendingRequests.length > 1 ? 's' : ''} pending</span>
+            </div>
+            <svg className={`w-4 h-4 text-amber-600 transition-transform ${pendingRequestsPanelOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {pendingRequestsPanelOpen && (
+            <div className="border-t border-amber-200 divide-y divide-amber-100">
+              {pendingRequests.map((req) => (
+                <div key={req.id} className="px-4 py-3 bg-white">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="text-sm min-w-0">
+                      <p className="font-semibold text-gray-800">{req.requestedByName} &mdash; <span className="font-normal text-gray-600">{req.requestType === 'edit' ? 'Edit' : 'Cancel'} fulfillment</span></p>
+                      <p className="text-xs text-gray-500 mt-0.5">Order #{req.orderNumber} &bull; {new Date(req.createdAt).toLocaleString()}</p>
+                      <p className="text-xs text-gray-700 mt-1 italic truncate max-w-sm">&ldquo;{req.reason}&rdquo;</p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => void handleAdminApproveRequest(req.id)}
+                        className="text-xs font-semibold text-white bg-green-600 rounded-lg px-3 py-1.5 hover:bg-green-700 cursor-pointer"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => void handleAdminRejectRequest(req.id)}
+                        className="text-xs font-semibold text-white bg-red-500 rounded-lg px-3 py-1.5 hover:bg-red-600 cursor-pointer"
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       <div className="flex flex-wrap items-start gap-2 mb-5">
         {/* Search */}
         <div className="flex items-center bg-white border border-gray-300 rounded-xl overflow-hidden shadow-sm flex-1 min-w-48 sm:flex-none sm:w-64">
@@ -1587,7 +1871,32 @@ export default function OrdersPage() {
                     {isExpanded && (
                       <tr>
                         <td colSpan={9} className="p-0">
-                          <div className="bg-blue-50 border-b border-blue-100 p-5">
+                          <div className="relative bg-blue-50 border-b border-blue-100 p-5">
+                            {order.fulfillmentItems.confirmations.length > 0 && (
+                              <div className="absolute top-3 right-4">
+                                {fulfillmentViewOrderId === order.id ? (
+                                  <button
+                                    onClick={() => setFulfillmentViewOrderId(null)}
+                                    className="flex items-center gap-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50 cursor-pointer"
+                                  >
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                    </svg>
+                                    Back
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => setFulfillmentViewOrderId(order.id)}
+                                    className="flex items-center gap-1.5 text-xs font-medium text-blue-600 bg-white border border-blue-300 rounded-lg px-3 py-1.5 hover:bg-blue-50 cursor-pointer"
+                                  >
+                                    Fulfillments
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                    </svg>
+                                  </button>
+                                )}
+                              </div>
+                            )}
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
                               <div>
                                 <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">Customer &amp; Order</h4>
@@ -1605,115 +1914,226 @@ export default function OrdersPage() {
                                 )}
                               </div>
 
-                              <div>
-                                <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">Product Fulfilment</h4>
-                                <table className="w-full text-xs">
-                                  <thead>
-                                    <tr className="border-b border-blue-200">
-                                      <th className="text-left py-1 text-gray-400 font-medium">Product</th>
-                                      <th className="text-left py-1 text-gray-400 font-medium">SKU</th>
-                                      <th className="text-center py-1 text-gray-400 font-medium">QTY</th>
-                                      <th className="text-start py-1 text-gray-400 font-medium">
-                                        <label className="inline-flex items-center gap-1 cursor-pointer justify-start">
-                                          <input
-                                            type="checkbox"
-                                            checked={order.items.length > 0 && order.items.every((item, itemIndex) => isLineFullChecked(order, item, itemIndex))}
-                                            onChange={() => toggleAllFull(order)}
-                                            className="rounded border-gray-300 text-blue-600 cursor-pointer"
-                                          />
-                                          Full
-                                        </label>
-                                      </th>
-                                      <th className="text-center py-1 text-gray-400 font-medium">Partial</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {order.items.map((item, itemIndex) => {
-                                      const key = rowItemKey(order.id, itemIndex);
-                                      const fulfilledQty = getFulfilledQty(order, item.id);
-                                      const remainingQty = Math.max(0, item.qty - fulfilledQty);
-                                      const isFull = isLineFullChecked(order, item, itemIndex);
-                                      const partialValue = Math.min(remainingQty, Math.max(0, partialValues[key] ?? 0));
-                                      return (
-                                        <tr key={`${order.id}-${itemIndex}`} className="border-b border-blue-100">
-                                          <td className="py-1.5 pr-2 text-gray-700">{item.name}</td>
-                                          <td className="py-1.5 pr-2 font-mono text-gray-500">{item.sku || '-'}</td>
-                                          <td className="py-1.5 text-center text-gray-700">
-                                            {fulfilledQty}/{item.qty}
-                                          </td>
-                                          <td className="py-1.5 flex-inline justify-start items-center">
-                                            <input
-                                              type="checkbox"
-                                              checked={isFull}
-                                              disabled={remainingQty === 0}
-                                              onChange={() => toggleFull(order.id, itemIndex, remainingQty)}
-                                              className="rounded border-gray-300 text-blue-600 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-                                            />
-                                          </td>
-                                          <td className="py-1.5 text-center">
-                                            <input
-                                              type="number"
-                                              min={0}
-                                              max={remainingQty}
-                                              value={partialValue}
-                                              disabled={isFull || remainingQty === 0}
-                                              onChange={(e) => validPartial(order.id, itemIndex, remainingQty, e.target.value)}
-                                              className="w-14 border border-blue-200 rounded px-1 py-0.5 text-center text-xs bg-white cursor-pointer disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
-                                            />
-                                          </td>
-                                        </tr>
-                                      );
-                                    })}
-                                  </tbody>
-                                </table>
-                              </div>
-
-                              <div>
-                                {(() => {
-                                  const lockedFulfillment = isOrderFulfillmentLocked(order);
-                                  const canConfirmFulfillment = !lockedFulfillment && getFulfillmentLines(order).length > 0;
-                                  const isConfirmDisabled = fulSaving[order.id] || !canConfirmFulfillment;
-                                  return (
-                                    <>
-                                <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">Actions</h4>
-                                <button
-                                  onClick={() => openFulfillmentConfirmation(order)}
-                                  disabled={isConfirmDisabled}
-                                  className={`w-full py-2 rounded-lg text-xs font-semibold transition-colors duration-150 mb-2 ${
-                                    isConfirmDisabled
-                                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                                      : 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer'
-                                  }`}
-                                >
-                                  {lockedFulfillment ? 'Fulfilment Locked' : fulSaving[order.id] ? 'Confirming...' : 'Confirm Fulfilment'}
-                                </button>
-                                    </>
-                                  );
-                                })()}
-                                <div className="flex items-center gap-2">
-                                  <button
-                                    onClick={() => void printPackingSlipLabel(order)}
-                                    disabled={printingOrderId === order.id}
-                                    className="flex-1 border border-gray-300 bg-white text-gray-600 py-1.5 rounded-lg text-xs font-medium hover:bg-gray-50 transition-colors duration-150 cursor-pointer"
-                                  >
-                                    {printingOrderId === order.id ? 'Loading label...' : 'Print Label'}
-                                  </button>
-                                  <button
-                                    onClick={() => void openMessageModal(order)}
-                                    className="relative flex-1 border border-gray-300 bg-white text-gray-600 py-1.5 rounded-lg text-xs font-medium hover:bg-gray-50 transition-colors duration-150 cursor-pointer"
-                                  >
-                                    Message
-                                    {order.messageCount > 0 && (
-                                      <span className="ml-1 inline-flex min-w-4 items-center justify-center rounded-full bg-blue-600 px-1 text-[10px] font-semibold leading-4 text-white">
-                                        {order.messageCount > 99 ? '99+' : order.messageCount}
-                                      </span>
-                                    )}
-                                  </button>
+                              {fulfillmentViewOrderId === order.id ? (
+                                <div className="lg:col-span-2">
+                                  <h4 className="text-xs font-semibold text-gray-500 uppercase mb-3">Fulfillment Details</h4>
+                                  <div className="space-y-3">
+                                    {order.fulfillmentItems.confirmations.map((conf, confIndex) => (
+                                      <div key={conf.id ?? confIndex} className="bg-white rounded-lg border border-blue-200 p-3">
+                                        <div className="flex flex-wrap gap-x-4 gap-y-1 mb-2 text-xs text-gray-600">
+                                          {conf.confirmedAt && (
+                                            <span><span className="font-medium text-gray-500">Confirmed:</span> {new Date(conf.confirmedAt).toLocaleString()}</span>
+                                          )}
+                                          {conf.shippingDate && (
+                                            <span><span className="font-medium text-gray-500">Ship:</span> {formatShippingDate(conf.shippingDate)}</span>
+                                          )}
+                                          {conf.shopifyFulfillmentStatus && (
+                                            <span><span className="font-medium text-gray-500">Status:</span> {conf.shopifyFulfillmentStatus}</span>
+                                          )}
+                                          {conf.trackingInfo?.company && (
+                                            <span><span className="font-medium text-gray-500">Carrier:</span> {conf.trackingInfo.company}</span>
+                                          )}
+                                          {conf.trackingInfo?.number && (
+                                            <span>
+                                              <span className="font-medium text-gray-500">Tracking:</span>{' '}
+                                              {conf.trackingInfo.url ? (
+                                                <a href={conf.trackingInfo.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{conf.trackingInfo.number}</a>
+                                              ) : conf.trackingInfo.number}
+                                            </span>
+                                          )}
+                                        </div>
+                                        <table className="w-full text-xs">
+                                          <thead>
+                                            <tr className="border-b border-blue-100">
+                                              <th className="text-left py-1 text-gray-400 font-medium">Product</th>
+                                              <th className="text-left py-1 text-gray-400 font-medium">SKU</th>
+                                              <th className="text-center py-1 text-gray-400 font-medium">Qty</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {conf.lines.map((line) => {
+                                              const lineItem = order.items.find((i) => i.id === line.lineItemId);
+                                              return (
+                                                <tr key={line.lineItemId} className="border-b border-blue-50">
+                                                  <td className="py-1.5 pr-2 text-gray-700">{lineItem?.name ?? line.lineItemId}</td>
+                                                  <td className="py-1.5 pr-2 font-mono text-gray-500">{lineItem?.sku || '-'}</td>
+                                                  <td className="py-1.5 text-center text-gray-700">{line.quantity}</td>
+                                                </tr>
+                                              );
+                                            })}
+                                          </tbody>
+                                        </table>
+                                        {conf.barcodes && conf.barcodes.length > 0 && (
+                                          <div className="mt-2 text-xs text-gray-500">
+                                            <span className="font-medium">Barcodes:</span> {conf.barcodes.join(', ')}
+                                          </div>
+                                        )}
+                                        {(userIsAdmin || userIsStaff) && (() => {
+                                          const confId = conf.id ?? String(confIndex);
+                                          if (userIsAdmin) {
+                                            return (
+                                              <div className="mt-3 flex items-center gap-2 pt-2 border-t border-blue-50">
+                                                <button
+                                                  onClick={() => openEditFulModal(order, conf, confId)}
+                                                  className="flex-1 text-xs font-medium text-blue-700 bg-white border border-blue-300 rounded-lg py-1.5 hover:bg-blue-50 cursor-pointer"
+                                                >
+                                                  Edit
+                                                </button>
+                                                <button
+                                                  onClick={() => openCancelFulModal(order, conf, confId)}
+                                                  className="flex-1 text-xs font-medium text-red-600 bg-white border border-red-300 rounded-lg py-1.5 hover:bg-red-50 cursor-pointer"
+                                                >
+                                                  Cancel
+                                                </button>
+                                              </div>
+                                            );
+                                          }
+                                          const editReq = getActiveFulfillmentRequest(order.id, confId, 'edit');
+                                          const cancelReq = getActiveFulfillmentRequest(order.id, confId, 'cancel');
+                                          return (
+                                            <div className="mt-3 flex items-center gap-2 pt-2 border-t border-blue-50">
+                                              {editReq?.status === 'approved' ? (
+                                                <button onClick={() => openEditFulModal(order, conf, confId)} className="flex-1 text-xs font-semibold text-green-700 bg-green-50 border border-green-300 rounded-lg py-1.5 hover:bg-green-100 cursor-pointer">
+                                                  ✓ Edit Now
+                                                </button>
+                                              ) : editReq?.status === 'pending' ? (
+                                                <div className="flex-1 text-xs text-center text-amber-700 bg-amber-50 border border-amber-200 rounded-lg py-1.5">Edit Pending…</div>
+                                              ) : (
+                                                <button onClick={() => void openRequestPermModal(order, conf, confId, 'edit')} className="flex-1 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-lg py-1.5 hover:bg-gray-50 cursor-pointer">
+                                                  Request Edit
+                                                </button>
+                                              )}
+                                              {cancelReq?.status === 'approved' ? (
+                                                <button onClick={() => openCancelFulModal(order, conf, confId)} className="flex-1 text-xs font-semibold text-red-700 bg-red-50 border border-red-300 rounded-lg py-1.5 hover:bg-red-100 cursor-pointer">
+                                                  ✓ Cancel Now
+                                                </button>
+                                              ) : cancelReq?.status === 'pending' ? (
+                                                <div className="flex-1 text-xs text-center text-amber-700 bg-amber-50 border border-amber-200 rounded-lg py-1.5">Cancel Pending…</div>
+                                              ) : (
+                                                <button onClick={() => void openRequestPermModal(order, conf, confId, 'cancel')} className="flex-1 text-xs font-medium text-red-600 bg-white border border-red-300 rounded-lg py-1.5 hover:bg-red-50 cursor-pointer">
+                                                  Request Cancel
+                                                </button>
+                                              )}
+                                            </div>
+                                          );
+                                        })()}
+                                      </div>
+                                    ))}
+                                  </div>
                                 </div>
-                                {fulMessages[order.id] && (
-                                  <div className="mt-2 text-xs text-center text-green-600 font-medium">{fulMessages[order.id]}</div>
-                                )}
-                              </div>
+                              ) : (
+                                <>
+                                  <div>
+                                    <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">Product Fulfilment</h4>
+                                    <table className="w-full text-xs">
+                                      <thead>
+                                        <tr className="border-b border-blue-200">
+                                          <th className="text-left py-1 text-gray-400 font-medium">Product</th>
+                                          <th className="text-left py-1 text-gray-400 font-medium">SKU</th>
+                                          <th className="text-center py-1 text-gray-400 font-medium">QTY</th>
+                                          <th className="text-start py-1 text-gray-400 font-medium">
+                                            <label className="inline-flex items-center gap-1 cursor-pointer justify-start">
+                                              <input
+                                                type="checkbox"
+                                                checked={order.items.length > 0 && order.items.every((item, itemIndex) => isLineFullChecked(order, item, itemIndex))}
+                                                onChange={() => toggleAllFull(order)}
+                                                className="rounded border-gray-300 text-blue-600 cursor-pointer"
+                                              />
+                                              Full
+                                            </label>
+                                          </th>
+                                          <th className="text-center py-1 text-gray-400 font-medium">Partial</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {order.items.map((item, itemIndex) => {
+                                          const key = rowItemKey(order.id, itemIndex);
+                                          const fulfilledQty = getFulfilledQty(order, item.id);
+                                          const remainingQty = Math.max(0, item.qty - fulfilledQty);
+                                          const isFull = isLineFullChecked(order, item, itemIndex);
+                                          const partialValue = Math.min(remainingQty, Math.max(0, partialValues[key] ?? 0));
+                                          return (
+                                            <tr key={`${order.id}-${itemIndex}`} className="border-b border-blue-100">
+                                              <td className="py-1.5 pr-2 text-gray-700">{item.name}</td>
+                                              <td className="py-1.5 pr-2 font-mono text-gray-500">{item.sku || '-'}</td>
+                                              <td className="py-1.5 text-center text-gray-700">
+                                                {fulfilledQty}/{item.qty}
+                                              </td>
+                                              <td className="py-1.5 flex-inline justify-start items-center">
+                                                <input
+                                                  type="checkbox"
+                                                  checked={isFull}
+                                                  disabled={remainingQty === 0}
+                                                  onChange={() => toggleFull(order.id, itemIndex, remainingQty)}
+                                                  className="rounded border-gray-300 text-blue-600 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                                                />
+                                              </td>
+                                              <td className="py-1.5 text-center">
+                                                <input
+                                                  type="number"
+                                                  min={0}
+                                                  max={remainingQty}
+                                                  value={partialValue}
+                                                  disabled={isFull || remainingQty === 0}
+                                                  onChange={(e) => validPartial(order.id, itemIndex, remainingQty, e.target.value)}
+                                                  className="w-14 border border-blue-200 rounded px-1 py-0.5 text-center text-xs bg-white cursor-pointer disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+                                                />
+                                              </td>
+                                            </tr>
+                                          );
+                                        })}
+                                      </tbody>
+                                    </table>
+                                  </div>
+
+                                  <div>
+                                    {(() => {
+                                      const lockedFulfillment = isOrderFulfillmentLocked(order);
+                                      const canConfirmFulfillment = !lockedFulfillment && getFulfillmentLines(order).length > 0;
+                                      const isConfirmDisabled = fulSaving[order.id] || !canConfirmFulfillment;
+                                      return (
+                                        <>
+                                          <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">Actions</h4>
+                                          <button
+                                            onClick={() => openFulfillmentConfirmation(order)}
+                                            disabled={isConfirmDisabled}
+                                            className={`w-full py-2 rounded-lg text-xs font-semibold transition-colors duration-150 mb-2 ${
+                                              isConfirmDisabled
+                                                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                                : 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer'
+                                            }`}
+                                          >
+                                            {lockedFulfillment ? 'Fulfilment Locked' : fulSaving[order.id] ? 'Confirming...' : 'Confirm Fulfilment'}
+                                          </button>
+                                        </>
+                                      );
+                                    })()}
+                                    <div className="flex items-center gap-2">
+                                      <button
+                                        onClick={() => void printPackingSlipLabel(order)}
+                                        disabled={printingOrderId === order.id}
+                                        className="flex-1 border border-gray-300 bg-white text-gray-600 py-1.5 rounded-lg text-xs font-medium hover:bg-gray-50 transition-colors duration-150 cursor-pointer"
+                                      >
+                                        {printingOrderId === order.id ? 'Loading label...' : 'Print Label'}
+                                      </button>
+                                      <button
+                                        onClick={() => void openMessageModal(order)}
+                                        className="relative flex-1 border border-gray-300 bg-white text-gray-600 py-1.5 rounded-lg text-xs font-medium hover:bg-gray-50 transition-colors duration-150 cursor-pointer"
+                                      >
+                                        Message
+                                        {order.messageCount > 0 && (
+                                          <span className="ml-1 inline-flex min-w-4 items-center justify-center rounded-full bg-blue-600 px-1 text-[10px] font-semibold leading-4 text-white">
+                                            {order.messageCount > 99 ? '99+' : order.messageCount}
+                                          </span>
+                                        )}
+                                      </button>
+                                    </div>
+                                    {fulMessages[order.id] && (
+                                      <div className="mt-2 text-xs text-center text-green-600 font-medium">{fulMessages[order.id]}</div>
+                                    )}
+                                  </div>
+                                </>
+                              )}
                             </div>
                           </div>
                         </td>
@@ -2091,6 +2511,132 @@ export default function OrdersPage() {
               >
                 {fulSaving[pendingFulfillment.order.id] ? 'Confirming...' : 'Confirm fulfilment'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Edit Fulfillment Modal */}
+      {editFulModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-200">
+              <h2 className="text-base font-semibold text-gray-900">Edit Fulfillment</h2>
+              <p className="text-xs text-gray-500 mt-0.5">Order #{editFulModal.order.number}</p>
+            </div>
+            <div className="p-5 space-y-4 max-h-[60vh] overflow-y-auto">
+              {editFulModal.error && <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{editFulModal.error}</div>}
+              <label className="block text-sm text-gray-700">
+                <span className="block text-xs font-semibold uppercase text-gray-500 mb-1">Barcodes (space-separated)</span>
+                <input type="text" value={editFulModal.barcodes} onChange={(e) => setEditFulModal((p) => p ? { ...p, barcodes: e.target.value } : null)} placeholder="barcode1 barcode2" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+              </label>
+              <label className="block text-sm text-gray-700">
+                <span className="block text-xs font-semibold uppercase text-gray-500 mb-1">Shipping Date</span>
+                <input type="date" value={editFulModal.shippingDate} onChange={(e) => setEditFulModal((p) => p ? { ...p, shippingDate: e.target.value } : null)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+              </label>
+              <label className="block text-sm text-gray-700">
+                <span className="block text-xs font-semibold uppercase text-gray-500 mb-1">Carrier</span>
+                <input type="text" value={editFulModal.carrier} onChange={(e) => setEditFulModal((p) => p ? { ...p, carrier: e.target.value } : null)} list="edit-ful-carriers" placeholder="e.g. Australia Post" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                <datalist id="edit-ful-carriers">{SHOPIFY_TRACKING_CARRIERS.map((c) => <option key={c} value={c} />)}</datalist>
+              </label>
+              <label className="block text-sm text-gray-700">
+                <span className="block text-xs font-semibold uppercase text-gray-500 mb-1">Tracking Number</span>
+                <input type="text" value={editFulModal.trackingNumber} onChange={(e) => setEditFulModal((p) => p ? { ...p, trackingNumber: e.target.value } : null)} placeholder="Enter tracking number" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+              </label>
+              <label className="block text-sm text-gray-700">
+                <span className="block text-xs font-semibold uppercase text-gray-500 mb-1">Tracking URL</span>
+                <input type="url" value={editFulModal.trackingUrl} onChange={(e) => setEditFulModal((p) => p ? { ...p, trackingUrl: e.target.value } : null)} placeholder="https://..." className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+              </label>
+            </div>
+            <div className="flex flex-col-reverse gap-2 px-5 py-4 border-t border-gray-200 bg-gray-50 sm:flex-row sm:justify-end">
+              <button onClick={() => setEditFulModal(null)} disabled={editFulModal.saving} className="px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 cursor-pointer disabled:opacity-50">Cancel</button>
+              <button onClick={() => void submitEditFulfillment()} disabled={editFulModal.saving} className="px-3 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 cursor-pointer disabled:opacity-60">{editFulModal.saving ? 'Saving…' : 'Save Changes'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel Fulfillment Modal */}
+      {cancelFulModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-200">
+              <h2 className="text-base font-semibold text-gray-900">Cancel Fulfillment</h2>
+              <p className="text-xs text-gray-500 mt-0.5">Order #{cancelFulModal.order.number}</p>
+            </div>
+            <div className="p-5">
+              {cancelFulModal.error && <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-4">{cancelFulModal.error}</div>}
+              <div className="flex items-start gap-3 text-sm text-gray-700">
+                <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center shrink-0">
+                  <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                  </svg>
+                </div>
+                <div>
+                  <p className="font-semibold text-gray-800 mb-1">Are you sure?</p>
+                  <p className="text-gray-600 text-xs">This will cancel the fulfillment in Shopify and remove it from this order. This cannot be undone.</p>
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-col-reverse gap-2 px-5 py-4 border-t border-gray-200 bg-gray-50 sm:flex-row sm:justify-end">
+              <button onClick={() => setCancelFulModal(null)} disabled={cancelFulModal.saving} className="px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 cursor-pointer disabled:opacity-50">Go Back</button>
+              <button onClick={() => void submitCancelFulfillment()} disabled={cancelFulModal.saving} className="px-3 py-2 text-sm font-semibold text-white bg-red-600 rounded-lg hover:bg-red-700 cursor-pointer disabled:opacity-60">{cancelFulModal.saving ? 'Cancelling…' : 'Yes, Cancel Fulfillment'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Staff Permission Request Modal */}
+      {requestPermModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-200">
+              <h2 className="text-base font-semibold text-gray-900">Request {requestPermModal.requestType === 'edit' ? 'Edit' : 'Cancel'} Permission</h2>
+              <p className="text-xs text-gray-500 mt-0.5">Order #{requestPermModal.order.number}</p>
+            </div>
+            <div className="p-5 space-y-4 max-h-[60vh] overflow-y-auto">
+              {requestPermModal.error && <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{requestPermModal.error}</div>}
+              <div>
+                <span className="block text-xs font-semibold uppercase text-gray-500 mb-2">Notify admin(s) *</span>
+                {requestPermModal.loadingAdmins ? (
+                  <div className="text-xs text-gray-400">Loading admins…</div>
+                ) : (
+                  <div className="space-y-1.5 max-h-36 overflow-y-auto">
+                    {requestPermModal.availableAdmins.map((admin) => (
+                      <label key={admin.id} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={requestPermModal.selectedAdminIds.includes(admin.id)}
+                          onChange={() => setRequestPermModal((prev) => {
+                            if (!prev) return null;
+                            const next = prev.selectedAdminIds.includes(admin.id)
+                              ? prev.selectedAdminIds.filter((id) => id !== admin.id)
+                              : [...prev.selectedAdminIds, admin.id];
+                            return { ...prev, selectedAdminIds: next };
+                          })}
+                          className="rounded border-gray-300 text-blue-600 cursor-pointer"
+                        />
+                        <span className="text-sm text-gray-700">{admin.name} <span className="text-xs text-gray-400">({admin.email})</span></span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <label className="block text-sm text-gray-700">
+                <span className="block text-xs font-semibold uppercase text-gray-500 mb-1">Reason *</span>
+                <textarea
+                  value={requestPermModal.reason}
+                  onChange={(e) => setRequestPermModal((p) => p ? { ...p, reason: e.target.value } : null)}
+                  rows={4}
+                  maxLength={2000}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
+                  placeholder="Explain why you need this permission…"
+                />
+                <span className="text-xs text-gray-400">{requestPermModal.reason.length}/2000</span>
+              </label>
+            </div>
+            <div className="flex flex-col-reverse gap-2 px-5 py-4 border-t border-gray-200 bg-gray-50 sm:flex-row sm:justify-end">
+              <button onClick={() => setRequestPermModal(null)} disabled={requestPermModal.saving} className="px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 cursor-pointer disabled:opacity-50">Cancel</button>
+              <button onClick={() => void submitPermissionRequest()} disabled={requestPermModal.saving || requestPermModal.loadingAdmins} className="px-3 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 cursor-pointer disabled:opacity-60">{requestPermModal.saving ? 'Submitting…' : 'Submit Request'}</button>
             </div>
           </div>
         </div>
