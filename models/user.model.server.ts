@@ -82,6 +82,10 @@ export class UserModel {
 
     return toUserRow(user);
   }
+
+  async delete(id: string): Promise<void> {
+    await prisma.user.delete({ where: { id } });
+  }
 }
 
 function toUserRow(user: {

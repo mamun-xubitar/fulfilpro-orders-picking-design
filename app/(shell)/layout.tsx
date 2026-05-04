@@ -5,6 +5,7 @@ import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
 
 type SessionPolicy = {
+  forceLogout: boolean;
   sessionTimeoutMinutes: number | null;
   inactivityTimeoutMinutes: number | null;
   staffAccess: null | {
@@ -217,8 +218,13 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
     : 0;
 
   useEffect(() => {
-    if (status !== "authenticated" || !isStaff || !policy || remainingMs === null || remainingMs > 0) return;
-    router.push("/session-expired");
+    if (status !== "authenticated" || !policy?.forceLogout) return;
+    void logout();
+  }, [status, policy]);
+
+  useEffect(() => {
+    if (status !== 'authenticated' || !isStaff || !policy || remainingMs === null || remainingMs > 0) return;
+    router.push('/session-expired');
   }, [isStaff, policy, remainingMs, router, status]);
 
   useEffect(() => {

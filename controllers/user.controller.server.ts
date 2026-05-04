@@ -35,6 +35,20 @@ export class UserController {
     }
   }
 
+  async delete(id: string, currentUserId: string) {
+    if (id === currentUserId) {
+      return { error: { message: 'You cannot delete your own account', status: 400 } };
+    }
+
+    const user = await model.findById(id);
+    if (!user) {
+      return { error: { message: 'User not found', status: 404 } };
+    }
+
+    await model.delete(id);
+    return { data: null, message: 'User deleted successfully' };
+  }
+
   async update(id: string, body: unknown) {
     const user = await model.findById(id);
     if (!user) {

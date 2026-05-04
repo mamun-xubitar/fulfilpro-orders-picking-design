@@ -28,6 +28,8 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const editing = editingId !== null;
   const formTitle = editing ? "Edit User" : "Add New User";
@@ -153,6 +155,20 @@ export default function UsersPage() {
       showMessage(error instanceof Error ? error.message : "Failed to update user", "error");
     } finally {
       setUpdatingId(null);
+    }
+  }
+
+  async function deleteUser(id: string) {
+    setDeletingId(id);
+    try {
+      await getJson<null>(`/api/users/${id}`, { method: "DELETE" });
+      setUsers((prev) => prev.filter((u) => u.id !== id));
+      setConfirmDeleteId(null);
+    } catch (error) {
+      showMessage(error instanceof Error ? error.message : "Failed to delete user", "error");
+      setConfirmDeleteId(null);
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -289,6 +305,12 @@ export default function UsersPage() {
                         >
                           {user.active ? "Deactivate" : "Activate"}
                         </button>
+                        <button
+                          onClick={() => setConfirmDeleteId(user.id)}
+                          className="px-2.5 py-1 text-xs border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-colors duration-150 cursor-pointer"
+                        >
+                          Delete
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -298,6 +320,36 @@ export default function UsersPage() {
           </div>
         </div>
       </div>
+
+      {confirmDeleteId && (() => {
+        const target = users.find((u) => u.id === confirmDeleteId);
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+            <div className="bg-white rounded-xl shadow-xl border border-gray-200 p-6 w-full max-w-sm mx-4">
+              <h3 className="text-base font-semibold text-gray-900 mb-2">Delete User</h3>
+              <p className="text-sm text-gray-600 mb-5">
+                Are you sure you want to permanently delete <span className="font-medium text-gray-900">{target?.name}</span>? This action cannot be undone.
+              </p>
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => setConfirmDeleteId(null)}
+                  disabled={deletingId === confirmDeleteId}
+                  className="px-4 py-2 text-sm border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => void deleteUser(confirmDeleteId)}
+                  disabled={deletingId === confirmDeleteId}
+                  className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {deletingId === confirmDeleteId ? "Deleting..." : "Delete"}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </main>
   );
 }
