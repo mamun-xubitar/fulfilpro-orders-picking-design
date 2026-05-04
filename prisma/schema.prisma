@@ -19,12 +19,16 @@ model User {
   role           String   @default("admin")
   active         Boolean  @default(true)
   isTempPassword Boolean  @default(true)
+  isLoggedIn     Boolean  @default(false)
+  lastLoginAt    DateTime?
+  lastLogoutAt   DateTime?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   staffLoginApprovals StaffLoginApproval[]
 
   @@index([email])
   @@index([active])
+  @@index([isLoggedIn])
 }
 
 model Store {

@@ -32,6 +32,15 @@ export default function RestrictedPage() {
   const role = session?.user.role;
   const [staffAccess, setStaffAccess] = useState<StaffAccessInfo | null>(null);
 
+  async function logout() {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      // Still clear the local auth session if the tracking update fails.
+    }
+    await signOut({ callbackUrl: "/" });
+  }
+
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/");
@@ -89,7 +98,7 @@ export default function RestrictedPage() {
         </div>
 
         <button
-          onClick={() => void signOut({ callbackUrl: "/" })}
+          onClick={() => void logout()}
           className="w-full bg-red-500 text-white py-2.5 rounded-lg font-semibold text-sm hover:bg-red-600 transition-colors duration-150 cursor-pointer"
         >
           Logout

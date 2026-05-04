@@ -147,6 +147,11 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
   }, []);
 
   async function logout() {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      // Still clear the local auth session if the tracking update fails.
+    }
     await signOut({ callbackUrl: "/" });
   }
 

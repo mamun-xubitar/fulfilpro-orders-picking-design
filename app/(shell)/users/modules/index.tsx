@@ -45,7 +45,8 @@ export default function UsersPage() {
   useEffect(() => {
     let cancelled = false;
 
-    async function loadUsers() {
+    async function loadUsers(showInitialLoading = false) {
+      if (showInitialLoading) setLoading(true);
       try {
         const data = await getJson<UserRow[]>("/api/users");
         if (cancelled) return;
@@ -55,14 +56,18 @@ export default function UsersPage() {
           showMessage(error instanceof Error ? error.message : "Failed to load users", "error");
         }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled && showInitialLoading) setLoading(false);
       }
     }
 
-    void loadUsers();
+    void loadUsers(true);
+    const intervalId = window.setInterval(() => {
+      void loadUsers();
+    }, 30_000);
 
     return () => {
       cancelled = true;
+      window.clearInterval(intervalId);
     };
   }, []);
 
@@ -239,14 +244,15 @@ export default function UsersPage() {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Name</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Email</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Role</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Account</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Session</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {!loading && users.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-sm text-gray-500">No users found.</td>
+                    <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-500">No users found.</td>
                   </tr>
                 )}
                 {users.map((user) => (
@@ -262,6 +268,16 @@ export default function UsersPage() {
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${user.active ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}>
                         {user.active ? "Active" : "Inactive"}
                       </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-col gap-1">
+                        <span title={user.sessionStatusDetail} className={`inline-flex w-fit items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getSessionBadgeClass(user.sessionStatus)}`}>
+                          {user.sessionStatusLabel}
+                        </span>
+                        <span className="text-[11px] text-gray-400">
+                          {getSessionTimeText(user)}
+                        </span>
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex gap-1">
@@ -284,6 +300,37 @@ export default function UsersPage() {
       </div>
     </main>
   );
+}
+
+function getSessionBadgeClass(status: UserRow["sessionStatus"]) {
+  switch (status) {
+    case "logged_in":
+      return "bg-emerald-100 text-emerald-700";
+    case "access_restricted":
+      return "bg-amber-100 text-amber-700";
+    case "session_timeout":
+      return "bg-red-100 text-red-700";
+    case "logout":
+    default:
+      return "bg-gray-100 text-gray-600";
+  }
+}
+
+function getSessionTimeText(user: UserRow) {
+  if (user.sessionStatus === "logout") {
+    return user.lastLogoutAt ? `Logged out ${formatDateTime(user.lastLogoutAt)}` : "No active session";
+  }
+
+  return user.lastLoginAt ? `Login ${formatDateTime(user.lastLoginAt)}` : "Login time unknown";
+}
+
+function formatDateTime(value: string) {
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(value));
 }
 
 async function getJson<T>(url: string, init?: RequestInit) {

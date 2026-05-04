@@ -64,6 +64,16 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           });
         }
 
+        const loginAt = Date.now();
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            isLoggedIn: true,
+            lastLoginAt: new Date(loginAt),
+            lastLogoutAt: null,
+          },
+        });
+
         return {
           id: user.id,
           name: user.name,
@@ -71,7 +81,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           role: user.role,
           active: user.active,
           isTempPassword: user.isTempPassword,
-          loginAt: Date.now(),
+          loginAt,
         };
       },
     }),

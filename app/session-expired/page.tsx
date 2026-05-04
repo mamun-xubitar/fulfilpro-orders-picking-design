@@ -8,6 +8,15 @@ export default function SessionExpiredPage() {
   const router = useRouter();
   const { data: session, status } = useSession();
 
+  async function logout() {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      // Still clear the local auth session if the tracking update fails.
+    }
+    await signOut({ callbackUrl: "/" });
+  }
+
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/");
@@ -32,7 +41,7 @@ export default function SessionExpiredPage() {
           Your staff session has timed out. Please log out, then sign in again to continue.
         </p>
         <button
-          onClick={() => void signOut({ callbackUrl: "/" })}
+          onClick={() => void logout()}
           className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-semibold text-sm hover:bg-blue-700 transition-colors duration-150 cursor-pointer"
         >
           Logout
