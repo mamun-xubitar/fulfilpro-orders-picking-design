@@ -111,10 +111,19 @@ type FulfillmentConfirmation = {
 };
 
 const PERIODS = [
-  { label: 'All', value: 'all' },
+  { label: 'All Time', value: 'all' },
   { label: 'This Week', value: 'week' },
   { label: 'This Month', value: 'month' },
   { label: 'This Year', value: 'year' },
+  { label: 'Custom', value: 'custom' },
+] as const;
+
+const FULFILLMENT_STATUSES = [
+  { label: 'Unfulfilled', value: 'unfulfilled' },
+  { label: 'Partial', value: 'partial' },
+  { label: 'Fulfilled', value: 'fulfilled' },
+  { label: 'Closed', value: 'closed' },
+  { label: 'Canceled', value: 'canceled' },
 ] as const;
 
 const SHOPIFY_TRACKING_CARRIERS = [
@@ -366,12 +375,44 @@ function formatSyncDate(value: string) {
   });
 }
 
+const MONTH_LABELS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+const DAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+
+function getMonthDays(year: number, month: number): (string | null)[] {
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const days: (string | null)[] = [];
+  for (let i = 0; i < firstDay; i++) days.push(null);
+  for (let d = 1; d <= daysInMonth; d++) {
+    days.push(`${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
+  }
+  return days;
+}
+
+function fmtCalDate(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  const yr = new Date().getFullYear() !== y ? ` ${y}` : '';
+  return `${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m - 1]} ${d}${yr}`;
+}
+
 export default function OrdersPage() {
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [stores, setStores] = useState<StoreOption[]>([]);
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
-  const [storeId, setStoreId] = useState('');
+  const [storeIds, setStoreIds] = useState<string[]>([]);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [fulfillmentStatuses, setFulfillmentStatuses] = useState<string[]>([]);
+  const [storeDropdownOpen, setStoreDropdownOpen] = useState(false);
+  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
+  const [periodDropdownOpen, setPeriodDropdownOpen] = useState(false);
+  const [calendarNav, setCalendarNav] = useState<{ year: number; month: number }>(() => {
+    const n = new Date();
+    return { year: n.getFullYear(), month: n.getMonth() };
+  });
+  const [hoverDate, setHoverDate] = useState<string | null>(null);
   const [period, setPeriod] = useState<(typeof PERIODS)[number]['value']>('all');
   const [pagination, setPagination] = useState<Pagination>(DEFAULT_PAGINATION);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -409,6 +450,9 @@ export default function OrdersPage() {
     error: string;
   } | null>(null);
   const [printingOrderId, setPrintingOrderId] = useState<string | null>(null);
+  const storeDropdownRef = useRef<HTMLDivElement>(null);
+  const statusDropdownRef = useRef<HTMLDivElement>(null);
+  const periodDropdownRef = useRef<HTMLDivElement>(null);
   const messageTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const activeSyncJobIdRef = useRef<string | null>(null);
   const completedSyncJobIdRef = useRef<string | null>(null);
@@ -425,11 +469,14 @@ export default function OrdersPage() {
     const params = new URLSearchParams();
     params.set('page', String(pagination.page));
     params.set('pageSize', String(pagination.pageSize));
-    params.set('period', period);
+    params.set('period', period === 'custom' ? 'all' : period);
     if (search) params.set('search', search);
-    if (storeId) params.set('storeId', storeId);
+    storeIds.forEach((id) => params.append('storeId', id));
+    if (dateFrom) params.set('dateFrom', dateFrom);
+    if (dateTo) params.set('dateTo', dateTo);
+    fulfillmentStatuses.forEach((s) => params.append('status', s));
     return params.toString();
-  }, [pagination.page, pagination.pageSize, period, search, storeId]);
+  }, [pagination.page, pagination.pageSize, period, search, storeIds, dateFrom, dateTo, fulfillmentStatuses]);
 
   const filteredTrackingCarriers = useMemo(() => {
     const query = carrierSearch.trim();
@@ -1024,13 +1071,66 @@ export default function OrdersPage() {
     return "https://" + value.replace(/^https?:\/\//i, '').replace(/\/$/, '');
   };
 
-  const handleStoreChange = (value: string) => {
-    setStoreId(value);
+  const handleStoreToggle = (id: string) => {
+    setStoreIds((prev) => (prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]));
     setPagination((prev) => ({ ...prev, page: 1 }));
   };
 
   const handlePeriodChange = (value: (typeof PERIODS)[number]['value']) => {
     setPeriod(value);
+    if (value !== 'custom') {
+      setDateFrom('');
+      setDateTo('');
+      setHoverDate(null);
+      setPeriodDropdownOpen(false);
+    }
+    setPagination((prev) => ({ ...prev, page: 1 }));
+  };
+
+  const handleDateFromChange = (value: string) => {
+    setDateFrom(value);
+    setPeriod('all');
+    setPagination((prev) => ({ ...prev, page: 1 }));
+  };
+
+  const handleDateToChange = (value: string) => {
+    setDateTo(value);
+    setPeriod('all');
+    setPagination((prev) => ({ ...prev, page: 1 }));
+  };
+
+  const handleStatusToggle = (status: string) => {
+    setFulfillmentStatuses((prev) => (prev.includes(status) ? prev.filter((s) => s !== status) : [...prev, status]));
+    setPagination((prev) => ({ ...prev, page: 1 }));
+  };
+
+  const handleCalendarDateClick = (date: string) => {
+    if (!dateFrom || (dateFrom && dateTo)) {
+      setDateFrom(date);
+      setDateTo('');
+      setHoverDate(null);
+      setPeriod('custom');
+      setPagination((prev) => ({ ...prev, page: 1 }));
+    } else {
+      const [start, end] = date >= dateFrom ? [dateFrom, date] : [date, dateFrom];
+      setDateFrom(start);
+      setDateTo(end);
+      setHoverDate(null);
+      setPeriodDropdownOpen(false);
+      setPeriod('custom');
+      setPagination((prev) => ({ ...prev, page: 1 }));
+    }
+  };
+
+  const handleClearFilters = () => {
+    setSearchInput('');
+    setSearch('');
+    setStoreIds([]);
+    setPeriod('all');
+    setDateFrom('');
+    setDateTo('');
+    setHoverDate(null);
+    setFulfillmentStatuses([]);
     setPagination((prev) => ({ ...prev, page: 1 }));
   };
 
@@ -1055,6 +1155,23 @@ export default function OrdersPage() {
     };
   }, []);
 
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (periodDropdownRef.current && !periodDropdownRef.current.contains(e.target as Node)) {
+        setPeriodDropdownOpen(false);
+      }
+      if (storeDropdownRef.current && !storeDropdownRef.current.contains(e.target as Node)) {
+        setStoreDropdownOpen(false);
+      }
+      if (statusDropdownRef.current && !statusDropdownRef.current.contains(e.target as Node)) {
+        setStatusDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const hasActiveFilters = searchInput !== '' || storeIds.length > 0 || period !== 'all' || !!dateFrom || !!dateTo || fulfillmentStatuses.length > 0;
   const syncActive = syncJob?.status === 'queued' || syncJob?.status === 'running';
   const syncMessage = syncActive
     ? syncJob.status === 'queued'
@@ -1064,43 +1181,245 @@ export default function OrdersPage() {
 
   return (
     <main className="flex-1 p-4 md:p-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-5">
-        <div className="flex w-full items-center bg-white border border-gray-300 rounded-xl overflow-hidden shadow-sm flex-1 sm:max-w-xs sm:min-w-48">
+      <div className="flex flex-wrap items-start gap-2 mb-5">
+        {/* Search */}
+        <div className="flex items-center bg-white border border-gray-300 rounded-xl overflow-hidden shadow-sm flex-1 min-w-48 sm:flex-none sm:w-64">
+          <svg className="w-4 h-4 text-gray-400 ml-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
           <input
             type="text"
-            placeholder="Search orders..."
+            placeholder="name order# SKU address… (space = AND)"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            className="flex-1 px-3 py-2 text-sm focus:outline-none"
+            className="flex-1 px-2 py-2 text-sm focus:outline-none min-w-0"
           />
         </div>
 
-        <select
-          value={storeId}
-          onChange={(e) => handleStoreChange(e.target.value)}
-          className="bg-white w-full sm:max-w-36 border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-600 shadow-sm focus:outline-none cursor-pointer"
-        >
-          <option value="">All Stores</option>
-          {stores.map((store) => (
-            <option key={store.id} value={store.id}>
-              {store.name}
-            </option>
-          ))}
-        </select>
-
-        <div className="grid w-full grid-cols-4 bg-white border border-gray-300 rounded-xl overflow-hidden shadow-sm text-sm sm:flex sm:w-auto sm:items-center">
-          {PERIODS.map((item) => (
-            <button
-              key={item.value}
-              onClick={() => handlePeriodChange(item.value)}
-              className={`px-2 py-2 transition-colors duration-150 cursor-pointer sm:px-3 ${period === item.value ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}
-            >
-              {item.label}
-            </button>
-          ))}
+        {/* Store multi-select */}
+        <div className="relative" ref={storeDropdownRef}>
+          <button
+            onClick={() => setStoreDropdownOpen((prev) => !prev)}
+            className="flex items-center gap-1.5 bg-white border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-600 shadow-sm hover:bg-gray-50 cursor-pointer whitespace-nowrap"
+          >
+            {storeIds.length === 0 ? 'All Stores' : `${storeIds.length} Store${storeIds.length > 1 ? 's' : ''}`}
+            <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {storeDropdownOpen && (
+            <div className="absolute top-full mt-1 left-0 z-20 bg-white border border-gray-200 rounded-xl shadow-lg min-w-44 py-1">
+              <button
+                onClick={() => { setStoreIds([]); setPagination((prev) => ({ ...prev, page: 1 })); }}
+                className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2 ${storeIds.length === 0 ? 'font-semibold text-blue-600' : 'text-gray-700'}`}
+              >
+                All Stores
+              </button>
+              {stores.length > 0 && <div className="border-t border-gray-100 my-1" />}
+              {stores.map((store) => (
+                <button
+                  key={store.id}
+                  onClick={() => handleStoreToggle(store.id)}
+                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2"
+                >
+                  <span className={`flex-shrink-0 w-4 h-4 rounded border flex items-center justify-center ${storeIds.includes(store.id) ? 'bg-blue-600 border-blue-600' : 'border-gray-300'}`}>
+                    {storeIds.includes(store.id) && (
+                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </span>
+                  <span className="text-gray-700">{store.name}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
-        <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto">
+        {/* Period + calendar dropdown */}
+        <div className="relative" ref={periodDropdownRef}>
+          <button
+            onClick={() => setPeriodDropdownOpen((prev) => !prev)}
+            className="flex items-center gap-1.5 bg-white border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-600 shadow-sm hover:bg-gray-50 cursor-pointer whitespace-nowrap"
+          >
+            {period === 'custom'
+              ? dateFrom && dateTo
+                ? `${fmtCalDate(dateFrom)} – ${fmtCalDate(dateTo)}`
+                : dateFrom
+                ? `From ${fmtCalDate(dateFrom)}`
+                : 'Custom Range'
+              : PERIODS.find((p) => p.value === period)?.label ?? 'All Time'}
+            <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {periodDropdownOpen && (
+            <div className="absolute top-full mt-1 left-0 z-30 bg-white border border-gray-200 rounded-xl shadow-xl py-1 w-max min-w-40">
+              {PERIODS.map((item) => (
+                <button
+                  key={item.value}
+                  onClick={() => handlePeriodChange(item.value)}
+                  className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center justify-between ${period === item.value ? 'font-semibold text-blue-600' : 'text-gray-700'}`}
+                >
+                  {item.label}
+                  {period === item.value && (
+                    <svg className="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                </button>
+              ))}
+
+              {/* Calendar — shown when Custom is active */}
+              {period === 'custom' && (
+                <div className="border-t border-gray-100 p-3" onMouseLeave={() => setHoverDate(null)}>
+                  {/* Month navigation */}
+                  <div className="flex items-center justify-between mb-3">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setCalendarNav((prev) => { const d = new Date(prev.year, prev.month - 1, 1); return { year: d.getFullYear(), month: d.getMonth() }; }); }}
+                      className="p-1 rounded-lg hover:bg-gray-100 cursor-pointer text-gray-500"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                      </svg>
+                    </button>
+                    <div className="flex gap-10 text-xs font-semibold text-gray-700 select-none">
+                      {[0, 1].map((offset) => {
+                        const d = new Date(calendarNav.year, calendarNav.month + offset, 1);
+                        return <span key={offset}>{MONTH_LABELS[d.getMonth()]} {d.getFullYear()}</span>;
+                      })}
+                    </div>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setCalendarNav((prev) => { const d = new Date(prev.year, prev.month + 1, 1); return { year: d.getFullYear(), month: d.getMonth() }; }); }}
+                      className="p-1 rounded-lg hover:bg-gray-100 cursor-pointer text-gray-500"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  {/* Two-month grid */}
+                  <div className="flex gap-5">
+                    {[0, 1].map((offset) => {
+                      const d = new Date(calendarNav.year, calendarNav.month + offset, 1);
+                      const yr = d.getFullYear();
+                      const mo = d.getMonth();
+                      const days = getMonthDays(yr, mo);
+                      const today = new Date().toISOString().split('T')[0];
+                      const effTo = !dateTo && hoverDate ? hoverDate : dateTo;
+                      const rStart = dateFrom && effTo ? (dateFrom <= effTo ? dateFrom : effTo) : dateFrom;
+                      const rEnd = dateFrom && effTo ? (dateFrom <= effTo ? effTo : dateFrom) : effTo;
+
+                      return (
+                        <div key={offset}>
+                          <div className="grid grid-cols-7 mb-1">
+                            {DAY_LABELS.map((dl) => (
+                              <div key={dl} className="w-8 h-6 flex items-center justify-center text-xs text-gray-400 font-medium select-none">{dl}</div>
+                            ))}
+                          </div>
+                          <div className="grid grid-cols-7">
+                            {days.map((date, i) => {
+                              if (!date) return <div key={i} className="w-8 h-8" />;
+                              const isStart = date === dateFrom;
+                              const isEnd = !!dateTo && date === dateTo;
+                              const inRange = !!(rStart && rEnd && date > rStart && date < rEnd);
+                              const isToday = date === today;
+                              let cls = 'w-8 h-8 flex items-center justify-center text-xs select-none transition-colors cursor-pointer ';
+                              if (isStart || isEnd) cls += 'bg-blue-600 text-white rounded-full font-semibold';
+                              else if (inRange) cls += 'bg-blue-100 text-blue-800 hover:bg-blue-200';
+                              else if (isToday) cls += 'font-bold text-blue-500 hover:bg-gray-100 rounded-full';
+                              else cls += 'text-gray-700 hover:bg-gray-100 rounded-full';
+                              return (
+                                <div
+                                  key={date}
+                                  className={cls}
+                                  onClick={(e) => { e.stopPropagation(); handleCalendarDateClick(date); }}
+                                  onMouseEnter={() => !dateTo && setHoverDate(date)}
+                                >
+                                  {new Date(date + 'T00:00:00').getDate()}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Clear date range link */}
+                  {(dateFrom || dateTo) && (
+                    <div className="mt-2 pt-2 border-t border-gray-100 flex items-center justify-between">
+                      <span className="text-xs text-gray-400">
+                        {dateFrom && dateTo ? `${fmtCalDate(dateFrom)} – ${fmtCalDate(dateTo)}` : dateFrom ? `From ${fmtCalDate(dateFrom)}` : ''}
+                      </span>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setDateFrom(''); setDateTo(''); setPeriod('all'); }}
+                        className="text-xs text-gray-400 hover:text-red-500 cursor-pointer"
+                      >
+                        Clear dates
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Fulfillment status multi-select */}
+        <div className="relative" ref={statusDropdownRef}>
+          <button
+            onClick={() => setStatusDropdownOpen((prev) => !prev)}
+            className="flex items-center gap-1.5 bg-white border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-600 shadow-sm hover:bg-gray-50 cursor-pointer whitespace-nowrap"
+          >
+            {fulfillmentStatuses.length === 0 ? 'All Statuses' : `${fulfillmentStatuses.length} Status${fulfillmentStatuses.length > 1 ? 'es' : ''}`}
+            <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {statusDropdownOpen && (
+            <div className="absolute top-full mt-1 left-0 z-20 bg-white border border-gray-200 rounded-xl shadow-lg min-w-44 py-1">
+              <button
+                onClick={() => { setFulfillmentStatuses([]); setPagination((prev) => ({ ...prev, page: 1 })); }}
+                className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2 ${fulfillmentStatuses.length === 0 ? 'font-semibold text-blue-600' : 'text-gray-700'}`}
+              >
+                All Statuses
+              </button>
+              <div className="border-t border-gray-100 my-1" />
+              {FULFILLMENT_STATUSES.map((item) => (
+                <button
+                  key={item.value}
+                  onClick={() => handleStatusToggle(item.value)}
+                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2"
+                >
+                  <span className={`flex-shrink-0 w-4 h-4 rounded border flex items-center justify-center ${fulfillmentStatuses.includes(item.value) ? 'bg-blue-600 border-blue-600' : 'border-gray-300'}`}>
+                    {fulfillmentStatuses.includes(item.value) && (
+                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </span>
+                  <span className="text-gray-700">{item.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Sync / Refresh */}
+        <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+          {hasActiveFilters && (
+            <button
+              onClick={handleClearFilters}
+              className="flex items-center gap-1 text-sm text-gray-500 hover:text-red-500 px-2.5 py-2 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              Clear filters
+            </button>
+          )}
           <button
             onClick={handleSync}
             disabled={syncing || loading || syncActive}

@@ -133,35 +133,83 @@ export class OrderModel {
 
   async listForConnectedStores(params: {
     search?: string;
-    storeId?: string;
+    storeIds?: string[];
     period?: 'all' | 'week' | 'month' | 'year';
+    dateFrom?: string;
+    dateTo?: string;
+    fulfillmentStatuses?: string[];
     page: number;
     pageSize: number;
   }) {
-    const { search, storeId, period = 'all', page, pageSize } = params;
+    const { search, storeIds = [], period = 'all', dateFrom, dateTo, fulfillmentStatuses = [], page, pageSize } = params;
     const where: Prisma.OrderWhereInput = {
       store: {
         is: {
           status: 'connected',
-          ...(storeId ? { id: storeId } : {}),
+          ...(storeIds.length > 0 ? { id: { in: storeIds } } : {}),
         },
       },
     };
 
-    const trimmedSearch = search?.trim();
-    if (trimmedSearch) {
-      where.OR = [
-        { number: { contains: trimmedSearch, mode: 'insensitive' } },
-        { cusName: { contains: trimmedSearch, mode: 'insensitive' } },
-        { cusEmail: { contains: trimmedSearch, mode: 'insensitive' } },
-        { store: { is: { name: { contains: trimmedSearch, mode: 'insensitive' } } } },
-        { store: { is: { storeDomain: { contains: trimmedSearch, mode: 'insensitive' } } } },
-      ];
+    const tokens = (search?.trim() ?? '').split(/\s+/).filter(Boolean);
+    const andConditions: Prisma.OrderWhereInput[] = [];
+
+    if (tokens.length > 0) {
+      const tokenLineItemIds = await Promise.all(
+        tokens.map(async (token) => {
+          const raw = await prisma.$queryRaw<{ id: string }[]>(
+            Prisma.sql`SELECT id FROM "Order" WHERE "lineItems"::text ILIKE ${`%${token}%`}`
+          );
+          return raw.map((r) => r.id);
+        })
+      );
+
+      for (let i = 0; i < tokens.length; i++) {
+        const token = tokens[i];
+        const lineItemIds = tokenLineItemIds[i];
+        andConditions.push({
+          OR: [
+            { number: { contains: token, mode: 'insensitive' } },
+            { cusName: { contains: token, mode: 'insensitive' } },
+            { cusEmail: { contains: token, mode: 'insensitive' } },
+            { boarcode: { contains: token, mode: 'insensitive' } },
+            { address: { contains: token, mode: 'insensitive' } },
+            { address2: { contains: token, mode: 'insensitive' } },
+            { city: { contains: token, mode: 'insensitive' } },
+            { state: { contains: token, mode: 'insensitive' } },
+            { country: { contains: token, mode: 'insensitive' } },
+            { store: { is: { name: { contains: token, mode: 'insensitive' } } } },
+            { store: { is: { storeDomain: { contains: token, mode: 'insensitive' } } } },
+            ...(lineItemIds.length > 0 ? [{ id: { in: lineItemIds } }] : []),
+            ...getStatusConditionsForToken(token),
+          ],
+        });
+      }
     }
 
-    const periodDate = getPeriodStartDate(period);
-    if (periodDate) {
-      where.createdAt = { gte: periodDate };
+    if (dateFrom || dateTo) {
+      const fromDate = dateFrom ? new Date(`${dateFrom}T00:00:00.000Z`) : undefined;
+      const toDate = dateTo ? new Date(`${dateTo}T23:59:59.999Z`) : undefined;
+      where.orderedAt = {
+        ...(fromDate ? { gte: fromDate } : {}),
+        ...(toDate ? { lte: toDate } : {}),
+      };
+    } else {
+      const periodDate = getPeriodStartDate(period);
+      if (periodDate) {
+        where.orderedAt = { gte: periodDate };
+      }
+    }
+
+    if (fulfillmentStatuses.length > 0) {
+      const statusConditions = buildFulfillmentStatusConditions(fulfillmentStatuses);
+      if (statusConditions.length > 0) {
+        andConditions.push({ OR: statusConditions });
+      }
+    }
+
+    if (andConditions.length > 0) {
+      where.AND = andConditions;
     }
 
     const [total, rows] = await Promise.all([
@@ -807,6 +855,115 @@ function escapeHtml(value: string | number | null | undefined) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+const STATUS_SEARCH_KEYWORDS: { keywords: string[]; condition: Prisma.OrderWhereInput }[] = [
+  {
+    keywords: ['unfulfilled', 'pending'],
+    condition: {
+      canceled: false,
+      closed: false,
+      OR: [
+        { fulfillmentStatus: null },
+        { fulfillmentStatus: 'unfulfilled' },
+        { fulfillmentStatus: 'pending' },
+        { fulfillmentStatus: '' },
+      ],
+    },
+  },
+  {
+    keywords: ['partial', 'partially'],
+    condition: {
+      canceled: false,
+      closed: false,
+      OR: [{ fulfillmentStatus: 'partial' }, { fulfillmentStatus: 'partially_fulfilled' }],
+    },
+  },
+  {
+    keywords: ['fulfilled'],
+    condition: {
+      canceled: false,
+      OR: [
+        { closed: false, fulfillmentStatus: { in: ['fulfilled', 'shipped'] } },
+        { closed: true, fulfillmentStatus: { in: ['fulfilled', 'shipped', 'partially_fulfilled'] } },
+      ],
+    },
+  },
+  {
+    keywords: ['closed'],
+    condition: {
+      canceled: false,
+      closed: true,
+      AND: [{ OR: [{ fulfillmentStatus: null }, { fulfillmentStatus: { notIn: ['fulfilled', 'shipped', 'partially_fulfilled'] } }] }],
+    },
+  },
+  {
+    keywords: ['canceled', 'cancelled'],
+    condition: { canceled: true },
+  },
+];
+
+function getStatusConditionsForToken(token: string): Prisma.OrderWhereInput[] {
+  if (token.length < 3) return [];
+  const lower = token.toLowerCase();
+  return STATUS_SEARCH_KEYWORDS
+    .filter(({ keywords }) => keywords.some((kw) => kw.startsWith(lower)))
+    .map(({ condition }) => condition);
+}
+
+function buildFulfillmentStatusConditions(statuses: string[]): Prisma.OrderWhereInput[] {
+  const conditions: Prisma.OrderWhereInput[] = [];
+  for (const status of statuses) {
+    switch (status) {
+      case 'unfulfilled':
+        conditions.push({
+          canceled: false,
+          closed: false,
+          OR: [
+            { fulfillmentStatus: null },
+            { fulfillmentStatus: 'unfulfilled' },
+            { fulfillmentStatus: 'pending' },
+            { fulfillmentStatus: '' },
+          ],
+        });
+        break;
+      case 'partial':
+        conditions.push({
+          canceled: false,
+          closed: false,
+          OR: [
+            { fulfillmentStatus: 'partial' },
+            { fulfillmentStatus: 'partially_fulfilled' },
+          ],
+        });
+        break;
+      case 'fulfilled':
+        conditions.push({
+          canceled: false,
+          OR: [
+            { closed: false, fulfillmentStatus: { in: ['fulfilled', 'shipped'] } },
+            { closed: true, fulfillmentStatus: { in: ['fulfilled', 'shipped', 'partially_fulfilled'] } },
+          ],
+        });
+        break;
+      case 'closed':
+        conditions.push({
+          canceled: false,
+          closed: true,
+          AND: [{
+            OR: [
+              { fulfillmentStatus: null },
+              { fulfillmentStatus: { notIn: ['fulfilled', 'shipped', 'partially_fulfilled'] } },
+            ],
+          }],
+        });
+        break;
+      case 'canceled':
+        conditions.push({ canceled: true });
+        break;
+    }
+  }
+  return conditions;
 }
 
 function getPeriodStartDate(period: 'all' | 'week' | 'month' | 'year') {

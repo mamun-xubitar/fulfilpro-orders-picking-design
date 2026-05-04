@@ -7,16 +7,22 @@ type Period = 'all' | 'week' | 'month' | 'year';
 export class OrderController {
   async list(searchParams: URLSearchParams) {
     const search = searchParams.get('search')?.trim() ?? '';
-    const storeId = searchParams.get('storeId')?.trim() ?? '';
+    const storeIds = searchParams.getAll('storeId').map((s) => s.trim()).filter(Boolean);
     const period = normalizePeriod(searchParams.get('period'));
+    const dateFrom = searchParams.get('dateFrom')?.trim() ?? '';
+    const dateTo = searchParams.get('dateTo')?.trim() ?? '';
+    const fulfillmentStatuses = searchParams.getAll('status').map((s) => s.trim()).filter(Boolean);
     const page = normalizePositiveInt(searchParams.get('page'), 1);
     const pageSize = clamp(normalizePositiveInt(searchParams.get('pageSize'), 20), 5, 100);
 
     const [result, stores] = await Promise.all([
       model.listForConnectedStores({
         search,
-        storeId: storeId || undefined,
+        storeIds,
         period,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
+        fulfillmentStatuses,
         page,
         pageSize,
       }),
@@ -30,8 +36,11 @@ export class OrderController {
         orders: result.orders,
         filters: {
           search,
-          storeId,
+          storeIds,
           period,
+          dateFrom,
+          dateTo,
+          fulfillmentStatuses,
         },
         stores,
         pagination: {
