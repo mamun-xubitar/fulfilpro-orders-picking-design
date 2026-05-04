@@ -7,6 +7,7 @@ export type AuthPolicy = {
   staffAccessStart: string;
   staffAccessEnd: string;
   sessionTimeoutMinutes: number;
+  inactivityTimeoutMinutes: number | null;
 };
 
 const DEFAULT_POLICY: AuthPolicy = {
@@ -15,6 +16,7 @@ const DEFAULT_POLICY: AuthPolicy = {
   staffAccessStart: '08:00',
   staffAccessEnd: '16:00',
   sessionTimeoutMinutes: 30,
+  inactivityTimeoutMinutes: null,
 };
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -28,6 +30,7 @@ export async function getAuthPolicy(): Promise<AuthPolicy> {
     staffAccessStart: settings?.staffAccessStart ?? DEFAULT_POLICY.staffAccessStart,
     staffAccessEnd: settings?.staffAccessEnd ?? DEFAULT_POLICY.staffAccessEnd,
     sessionTimeoutMinutes: settings?.sessionTimeoutMinutes ?? DEFAULT_POLICY.sessionTimeoutMinutes,
+    inactivityTimeoutMinutes: settings?.inactivityTimeoutMinutes ?? null,
   };
 }
 

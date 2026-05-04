@@ -6,6 +6,7 @@ export type AppSettingsRow = {
   staffAccessStart: string;
   staffAccessEnd: string;
   sessionTimeoutMinutes: number;
+  inactivityTimeoutMinutes: number | null;
   googleEmail: string | null;
   googleConnected: boolean;
   googleTokenExpiresAt: string | null;
@@ -18,6 +19,7 @@ export type UpdateAppSettingsData = Partial<{
   staffAccessStart: string;
   staffAccessEnd: string;
   sessionTimeoutMinutes: number;
+  inactivityTimeoutMinutes: number | null;
 }>;
 
 const SETTINGS_ID = 'default';
@@ -27,6 +29,7 @@ const DEFAULT_SETTINGS = {
   staffAccessStart: '08:00',
   staffAccessEnd: '16:00',
   sessionTimeoutMinutes: 30,
+  inactivityTimeoutMinutes: null,
   googleEmail: null,
   googleAccessToken: null,
   googleRefreshToken: null,
@@ -116,6 +119,7 @@ function toSettingsRow(settings: {
   staffAccessStart: string;
   staffAccessEnd: string;
   sessionTimeoutMinutes: number;
+  inactivityTimeoutMinutes?: number | null;
   googleEmail: string | null;
   googleRefreshToken: string | null;
   googleTokenExpiresAt: Date | null;
@@ -127,6 +131,7 @@ function toSettingsRow(settings: {
     staffAccessStart: settings.staffAccessStart,
     staffAccessEnd: settings.staffAccessEnd,
     sessionTimeoutMinutes: settings.sessionTimeoutMinutes,
+    inactivityTimeoutMinutes: settings.inactivityTimeoutMinutes ?? null,
     googleEmail: settings.googleEmail,
     googleConnected: Boolean(settings.googleEmail && settings.googleRefreshToken),
     googleTokenExpiresAt: settings.googleTokenExpiresAt?.toISOString() ?? null,

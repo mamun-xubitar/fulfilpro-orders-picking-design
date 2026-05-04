@@ -76,6 +76,19 @@ export class SettingsController {
       }
     }
 
+    if ('inactivityTimeoutMinutes' in data) {
+      if (data.inactivityTimeoutMinutes === null) {
+        updateData.inactivityTimeoutMinutes = null;
+      } else {
+        const timeout = Number(data.inactivityTimeoutMinutes);
+        if (!Number.isInteger(timeout) || timeout < 1) {
+          errors.push('inactivityTimeoutMinutes: Enter a valid inactivity timeout (minimum 1 minute)');
+        } else {
+          updateData.inactivityTimeoutMinutes = timeout;
+        }
+      }
+    }
+
     if (errors.length) {
       return { error: { message: 'Validation failed', errors, status: 400 } };
     }

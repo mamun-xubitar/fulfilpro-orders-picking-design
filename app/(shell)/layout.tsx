@@ -6,6 +6,7 @@ import { signOut, useSession } from "next-auth/react";
 
 type SessionPolicy = {
   sessionTimeoutMinutes: number | null;
+  inactivityTimeoutMinutes: number | null;
   staffAccess: null | {
     allowed: boolean;
     timezone: string;
@@ -31,6 +32,9 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
   const [now, setNow] = useState(() => Date.now());
   const [sessionWarningDismissed, setSessionWarningDismissed] = useState(false);
   const [blockedActionMessage, setBlockedActionMessage] = useState("");
+  const lastActivityAt = useRef(Date.now());
+  const inactivityWarningActiveRef = useRef(false);
+  const inactivityLogoutTriggeredRef = useRef(false);
   const blockedActionWarningAt = useRef(0);
   const blockedActionTimer = useRef<number | null>(null);
   const isOrdersPath = pathname === "/orders" || pathname.startsWith("/orders/");
@@ -200,10 +204,46 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
   );
   const staffRestricted = policy?.staffAccess && !policy.staffAccess.allowed;
 
+  const inactivityThresholdMs = isStaff && policy?.inactivityTimeoutMinutes
+    ? policy.inactivityTimeoutMinutes * 60 * 1000
+    : null;
+  const inactiveForMs = now - lastActivityAt.current;
+  const inactivityCountdownMs = inactivityThresholdMs !== null
+    ? Math.max(0, inactivityThresholdMs - inactiveForMs)
+    : null;
+  const showInactivityWarning = Boolean(inactivityCountdownMs !== null && inactivityCountdownMs <= 60_000);
+  const inactivityCountdownSecs = inactivityCountdownMs !== null
+    ? Math.ceil(inactivityCountdownMs / 1000)
+    : 0;
+
   useEffect(() => {
     if (status !== "authenticated" || !isStaff || !policy || remainingMs === null || remainingMs > 0) return;
     router.push("/session-expired");
   }, [isStaff, policy, remainingMs, router, status]);
+
+  useEffect(() => {
+    if (status !== "authenticated" || !isStaff) return;
+
+    function handleActivity() {
+      if (inactivityWarningActiveRef.current) return;
+      lastActivityAt.current = Date.now();
+    }
+
+    const events = ["mousemove", "mousedown", "keydown", "scroll", "touchstart", "click"] as const;
+    events.forEach((e) => document.addEventListener(e, handleActivity, { passive: true }));
+    return () => events.forEach((e) => document.removeEventListener(e, handleActivity));
+  }, [status, isStaff]);
+
+  useEffect(() => {
+    inactivityWarningActiveRef.current = showInactivityWarning;
+  }, [showInactivityWarning]);
+
+  useEffect(() => {
+    if (!showInactivityWarning || inactivityCountdownSecs > 0) return;
+    if (inactivityLogoutTriggeredRef.current) return;
+    inactivityLogoutTriggeredRef.current = true;
+    void logout();
+  });
 
   if (status === "loading") {
     return (
@@ -221,6 +261,34 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
           className="fixed bottom-5 left-1/2 z-[100] -translate-x-1/2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900 shadow-lg"
         >
           {blockedActionMessage}
+        </div>
+      )}
+
+      {showInactivityWarning && (
+        <div className="fixed inset-0 z-[65] flex items-center justify-center bg-gray-900/60">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4">
+            <div className="w-14 h-14 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-7 h-7 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+            </div>
+            <h2 className="text-lg font-bold text-gray-900 text-center mb-2">Still there?</h2>
+            <p className="text-sm text-gray-500 text-center mb-5">You will be logged out due to inactivity in</p>
+            <div className="text-5xl font-bold text-amber-500 text-center mb-6 tabular-nums">
+              {inactivityCountdownSecs}
+              <span className="text-lg font-medium text-gray-400 ml-1">s</span>
+            </div>
+            <button
+              onClick={() => {
+                inactivityWarningActiveRef.current = false;
+                inactivityLogoutTriggeredRef.current = false;
+                lastActivityAt.current = Date.now();
+              }}
+              className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-semibold text-sm hover:bg-blue-700 transition-colors duration-150 cursor-pointer"
+            >
+              Stay Logged In
+            </button>
+          </div>
         </div>
       )}
 

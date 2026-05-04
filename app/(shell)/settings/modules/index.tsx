@@ -25,10 +25,33 @@ const SESSION_TIMEOUT_OPTIONS = [
   { value: 10080, label: "7 days" },
 ];
 
+const INACTIVITY_UNITS = [
+  { value: "minutes", label: "Minutes" },
+  { value: "hours", label: "Hours" },
+  { value: "days", label: "Days" },
+] as const;
+type InactivityUnit = "minutes" | "hours" | "days";
+
+function minutesToUnitValue(minutes: number | null): { value: string; unit: InactivityUnit } {
+  if (!minutes) return { value: "", unit: "minutes" };
+  if (minutes % 1440 === 0) return { value: String(minutes / 1440), unit: "days" };
+  if (minutes % 60 === 0) return { value: String(minutes / 60), unit: "hours" };
+  return { value: String(minutes), unit: "minutes" };
+}
+
+function unitValueToMinutes(value: string, unit: InactivityUnit): number | null {
+  const n = parseInt(value, 10);
+  if (!n || n <= 0) return null;
+  if (unit === "hours") return n * 60;
+  if (unit === "days") return n * 1440;
+  return n;
+}
+
 const SECTION_LABELS: Record<string, string> = {
   timezone: "Timezone",
   access: "Staff access restrictions",
   session: "Session settings",
+  inactivity: "Inactivity logout",
 };
 
 type ApiResponse<T> = { success: boolean; message: string; data: T };
@@ -40,6 +63,8 @@ export default function SettingsPage() {
   const [tStart, setTStart] = useState("08:00");
   const [tEnd, setTEnd] = useState("16:00");
   const [session, setSession] = useState(30);
+  const [inactivityValue, setInactivityValue] = useState("");
+  const [inactivityUnit, setInactivityUnit] = useState<InactivityUnit>("minutes");
   const [saveMsg, setSaveMsg] = useState("");
   const [showSaveMsg, setShowSaveMsg] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -96,6 +121,10 @@ export default function SettingsPage() {
       };
     }
 
+    if (section === "inactivity") {
+      return { inactivityTimeoutMinutes: unitValueToMinutes(inactivityValue, inactivityUnit) };
+    }
+
     return { sessionTimeoutMinutes: session };
   }
 
@@ -105,6 +134,9 @@ export default function SettingsPage() {
     setTStart(settings.staffAccessStart);
     setTEnd(settings.staffAccessEnd);
     setSession(settings.sessionTimeoutMinutes);
+    const { value: iVal, unit: iUnit } = minutesToUnitValue(settings.inactivityTimeoutMinutes);
+    setInactivityValue(iVal);
+    setInactivityUnit(iUnit);
     setGoogleEmail(settings.googleEmail);
     setGoogleConnected(settings.googleConnected);
   }
@@ -279,6 +311,44 @@ export default function SettingsPage() {
               </select>
             </div>
             <button disabled={savingSection === "session" || loading} onClick={() => save("session")} className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed sm:w-auto">{savingSection === "session" ? "Saving..." : "Save"}</button>
+          </div>
+        </div>
+
+        {/* Inactivity Logout */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-5">
+          <h2 className="text-sm font-semibold text-gray-900 mb-1">Inactivity Logout</h2>
+          <p className="text-xs text-gray-500 mb-4">Automatically log out staff members after a period of inactivity. Admins are not affected. Leave the value empty to disable.</p>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <div className="flex-1">
+              <label className="block text-xs font-medium text-gray-600 mb-1">Inactivity timeout</label>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={inactivityValue}
+                  onChange={(e) => setInactivityValue(e.target.value)}
+                  placeholder="Disabled"
+                  className="w-28 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <select
+                  value={inactivityUnit}
+                  onChange={(e) => setInactivityUnit(e.target.value as InactivityUnit)}
+                  className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer"
+                >
+                  {INACTIVITY_UNITS.map((u) => (
+                    <option key={u.value} value={u.value}>{u.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <button
+              disabled={savingSection === "inactivity" || loading}
+              onClick={() => save("inactivity")}
+              className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed sm:w-auto"
+            >
+              {savingSection === "inactivity" ? "Saving..." : "Save"}
+            </button>
           </div>
         </div>
 
