@@ -285,7 +285,7 @@ export default function SettingsPage() {
               })}
             </div>
           </div>
-          <div className="grid grid-cols-1 gap-4 mb-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Access Start Time</label>
               <input type="time" value={tStart} onChange={(e) => setTStart(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"/>
@@ -295,7 +295,12 @@ export default function SettingsPage() {
               <input type="time" value={tEnd} onChange={(e) => setTEnd(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"/>
             </div>
           </div>
-          <button disabled={savingSection === "access" || loading} onClick={() => save("access")} className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed sm:w-auto">{savingSection === "access" ? "Saving..." : "Save Restrictions"}</button>
+          {tEnd && tStart && tEnd <= tStart ? (
+            <p className="mt-2 mb-2 text-xs text-red-600">End time must be later than start time.</p>
+          ) : (
+            <div className="mb-4" />
+          )}
+          <button disabled={savingSection === "access" || loading || (!!tEnd && !!tStart && tEnd <= tStart)} onClick={() => save("access")} className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed sm:w-auto">{savingSection === "access" ? "Saving..." : "Save Restrictions"}</button>
         </div>
 
         {/* Session Settings */}

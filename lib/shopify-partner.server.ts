@@ -333,7 +333,7 @@ export async function createApp(
   const appNumericId = extractNumericId(appId);
   const partnerUrl =
     organizationNumericId && appNumericId
-      ? `https://partners.shopify.com/org/${organizationNumericId}/org_apps/${appNumericId}/customer_data`
+      ? `https://partners.shopify.com/org/${organizationNumericId}/org_apps/${appNumericId}/distribution`
       : null;
 
   return {

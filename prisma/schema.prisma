@@ -32,21 +32,25 @@ model User {
 }
 
 model Store {
-  id           String   @id @default(uuid())
-  storeDomain  String   @unique
-  name         String?
-  accessToken  String?
-  url          String?
-  email        String?
-  logoPath     String?
-  status       String   @default("pending")
-  clientId     String
-  clientSecret String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  orders       Order[]
+  id             String   @id @default(uuid())
+  storeDomain    String   @unique
+  name           String?
+  accessToken    String?
+  url            String?
+  email          String?
+  logoPath       String?
+  status         String   @default("pending")
+  clientId       String
+  clientSecret   String
+  partnerStoreId String?
+  partnerStore   Store?   @relation("PartnerStores", fields: [partnerStoreId], references: [id], onDelete: SetNull)
+  childStores    Store[]  @relation("PartnerStores")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  orders         Order[]
 
   @@index([status])
+  @@index([partnerStoreId])
 }
 
 model Order {

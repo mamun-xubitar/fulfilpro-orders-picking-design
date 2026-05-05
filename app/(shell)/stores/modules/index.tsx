@@ -10,7 +10,7 @@ import AddStoreModal from './AddStoreModal';
 
 type ConnectStep = 1 | 2 | 3 | 4;
 
-const EMPTY_FORM = { storeDomain: '' };
+const EMPTY_FORM = { storeDomain: '', partnerStoreId: '' };
 
 type ApiResponse<T> = { success: boolean; message: string; data: T };
 
@@ -31,6 +31,10 @@ export default function StoresPage() {
   const [logoErrors, setLogoErrors] = useState<Record<string, string>>({});
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [addForm, setAddForm] = useState(EMPTY_FORM);
+  const [partnerStores, setPartnerStores] = useState<Array<{ id: string; name: string | null; storeDomain: string }>>([]);
+  const [newPartnerStore, setNewPartnerStore] = useState('');
+  const [addingPartnerStore, setAddingPartnerStore] = useState(false);
+  const [partnerStoreError, setPartnerStoreError] = useState('');
 
   const [connectStep, setConnectStep] = useState<ConnectStep>(1);
   const [normalizedDomain, setNormalizedDomain] = useState('');
@@ -63,14 +67,25 @@ export default function StoresPage() {
       method: 'GET',
       showToast: false,
       onSuccess: ({ data }) => {
-        setStores(data ?? []);
+        const filteredStores = (data ?? []).filter((s) => s.status !== 'partner');
+        setStores(filteredStores);
       },
     });
   }, [listStoresRequest]);
 
+  const loadPartnerStores = useCallback(async () => {
+    try {
+      const data = await getJson<Array<{ id: string; name: string | null; storeDomain: string }>>('/api/partner-stores');
+      setPartnerStores(data);
+    } catch (error) {
+      console.error('Failed to load partner stores:', error);
+    }
+  }, []);
+
   useEffect(() => {
     loadStores();
-  }, [loadStores]);
+    void loadPartnerStores();
+  }, [loadStores, loadPartnerStores]);
 
   useEffect(() => {
     if (searchParams.get('connected')) {
@@ -136,7 +151,7 @@ export default function StoresPage() {
 
     resetConnectFlow();
     setAddModalOpen(true);
-    setAddForm({ storeDomain: store.storeDomain });
+    setAddForm({ storeDomain: store.storeDomain, partnerStoreId: store.partnerStoreId ?? '' });
     setTimeout(() => {
       void handleStartConnect(store.storeDomain);
     }, 0);
@@ -250,17 +265,55 @@ export default function StoresPage() {
     setAddModalOpen(true);
   };
 
+  const handleAddPartnerStore = async () => {
+    const domain = newPartnerStore.trim();
+    setPartnerStoreError('');
+
+    if (!domain) {
+      setPartnerStoreError('Please enter a store domain.');
+      return;
+    }
+
+    setAddingPartnerStore(true);
+    try {
+      const data = await getJson<{ id: string; name: string | null; storeDomain: string }>(
+        `/api/partner-stores?domain=${encodeURIComponent(domain)}`
+      );
+      setPartnerStores((prev) => [...prev, data]);
+      setNewPartnerStore('');
+      toast.success('Partner store added successfully.');
+    } catch (error) {
+      setPartnerStoreError(error instanceof Error ? error.message : 'Failed to add partner store.');
+    } finally {
+      setAddingPartnerStore(false);
+    }
+  };
+
+  const handleRemovePartnerStore = async (id: string) => {
+    const store = partnerStores.find((s) => s.id === id);
+    if (!store || !confirm(`Remove ${store.name || store.storeDomain} from partner stores?`)) return;
+
+    try {
+      await fetch(`/api/partner-stores/${id}`, { method: 'DELETE' });
+      setPartnerStores((prev) => prev.filter((s) => s.id !== id));
+      toast.success('Partner store removed.');
+    } catch (error) {
+      toast.error('Failed to remove partner store.');
+    }
+  };
+
   const handleGetOrganizationsAndCreateApp = useCallback(async (tokens: {
     appManagementToken: string;
     businessPlatformToken: string;
   }) => {
     try {
       setIsListingOrgs(true);
+      const partnerStoreParam = addForm.partnerStoreId ? `&partnerStoreId=${encodeURIComponent(addForm.partnerStoreId)}` : '';
       const organizations = await getJson<{
         realShopUrl: string | null;
         storeOrganizationId: string | null;
       }>(
-        `/api/list-organizations?businessPlatformToken=${encodeURIComponent(tokens.businessPlatformToken)}&store=${encodeURIComponent(normalizedDomain)}`
+        `/api/list-organizations?businessPlatformToken=${encodeURIComponent(tokens.businessPlatformToken)}&store=${encodeURIComponent(normalizedDomain)}${partnerStoreParam}`
       );
       setIsListingOrgs(false);
 
@@ -274,7 +327,7 @@ export default function StoresPage() {
 
       setIsCreatingApp(true);
       const created = await getJson<{ installUrl: string; partnerUrl?: string | null }>(
-        `/api/create-app?appManagementToken=${encodeURIComponent(tokens.appManagementToken)}&organizationId=${encodeURIComponent(organizations.storeOrganizationId)}&store=${encodeURIComponent(normalizedDomain)}`
+        `/api/create-app?appManagementToken=${encodeURIComponent(tokens.appManagementToken)}&organizationId=${encodeURIComponent(organizations.storeOrganizationId)}&store=${encodeURIComponent(normalizedDomain)}&partnerStoreId=${encodeURIComponent(addForm.partnerStoreId)}`
       );
       setIsCreatingApp(false);
       setInstallUrl(created.installUrl);
@@ -287,7 +340,7 @@ export default function StoresPage() {
       setIsAuthorizing(false);
       setAuthorizationError(error instanceof Error ? error.message : 'Failed to create Shopify app');
     }
-  }, [normalizedDomain]);
+  }, [normalizedDomain, addForm.partnerStoreId]);
 
   const pollAuthorization = useCallback(async () => {
     if (!deviceCode || authPollLock.current) return;
@@ -362,6 +415,11 @@ export default function StoresPage() {
       return;
     }
 
+    if (!addForm.partnerStoreId) {
+      setDomainError('Please select a partner store.');
+      return;
+    }
+
     try {
       setIsCheckingDomain(true);
       const status = await getJson<{
@@ -386,7 +444,7 @@ export default function StoresPage() {
       }
 
       setNormalizedDomain(status.storeDomain);
-      setAddForm({ storeDomain: status.storeDomain });
+      setAddForm((prev) => ({ ...prev, storeDomain: status.storeDomain }));
       setDeviceCode(codeData.device_code);
       setUserCode(codeData.user_code);
       setAuthorizationUrl(codeData.verification_uri_complete);
@@ -439,6 +497,55 @@ export default function StoresPage() {
 
   return (
     <main className="flex-1 p-4 space-y-5 md:p-6">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-5">
+        <h3 className="text-sm font-semibold text-gray-900 mb-3">Partner Stores</h3>
+        <p className="text-xs text-gray-500 mb-3">Add stores with partner accounts to create apps for other stores.</p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+          <div className="flex-1">
+            <input
+              type="text"
+              placeholder="partner-store.myshopify.com"
+              value={newPartnerStore}
+              onChange={(e) => setNewPartnerStore(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void handleAddPartnerStore();
+              }}
+              disabled={addingPartnerStore}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+            />
+            {partnerStoreError && <p className="text-xs text-red-500 mt-1">{partnerStoreError}</p>}
+          </div>
+          <button
+            onClick={() => void handleAddPartnerStore()}
+            disabled={addingPartnerStore}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors cursor-pointer disabled:opacity-50 whitespace-nowrap"
+          >
+            {addingPartnerStore ? 'Adding...' : '+ Add Partner Store'}
+          </button>
+        </div>
+        {partnerStores.length > 0 && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {partnerStores.map((store) => (
+              <div
+                key={store.id}
+                className="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5 text-sm"
+              >
+                <span className="text-blue-900 font-medium">{store.name || store.storeDomain}</span>
+                <button
+                  onClick={() => void handleRemovePartnerStore(store.id)}
+                  className="text-blue-600 hover:text-blue-800 transition-colors"
+                  title="Remove"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-gray-500">Manage connected Shopify stores.</p>
         <div className="flex w-full items-center gap-2 sm:w-auto">
@@ -485,7 +592,10 @@ export default function StoresPage() {
         }}
         currentStep={connectStep}
         storeDomain={addForm.storeDomain}
-        onStoreDomainChange={(value) => setAddForm({ storeDomain: value })}
+        onStoreDomainChange={(value) => setAddForm((prev) => ({ ...prev, storeDomain: value }))}
+        partnerStoreId={addForm.partnerStoreId}
+        onPartnerStoreIdChange={(value) => setAddForm((prev) => ({ ...prev, partnerStoreId: value }))}
+        partnerStores={partnerStores}
         onStartConnect={() => void handleStartConnect()}
         domainError={domainError}
         isCheckingDomain={isCheckingDomain}

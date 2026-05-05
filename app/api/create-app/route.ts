@@ -9,6 +9,7 @@ export async function GET(req: Request) {
   const store = searchParams.get('store');
   const appManagementToken = searchParams.get('appManagementToken');
   const organizationId = searchParams.get('organizationId');
+  const partnerStoreId = searchParams.get('partnerStoreId');
 
   if (!store || !appManagementToken || !organizationId) {
     return apiError({
@@ -18,12 +19,29 @@ export async function GET(req: Request) {
     });
   }
 
+  if (!partnerStoreId) {
+    return apiError({
+      message: 'Partner store is required to create app',
+      status: 400,
+    });
+  }
+
   try {
+    const partnerStore = await storeModel.findById(partnerStoreId);
+    if (!partnerStore) {
+      return apiError({
+        message: 'Partner store not found',
+        status: 404,
+      });
+    }
+
     const data = await createApp(appManagementToken, organizationId, store);
+    
     await storeModel.createOrUpdateFromAppCreation({
       storeDomain: store,
       clientId: data.clientId,
       clientSecret: data.secretKey,
+      partnerStoreId: partnerStoreId,
     });
 
     return apiSuccess({

@@ -8,6 +8,9 @@ interface AddStoreModalProps {
   currentStep: ConnectStep;
   storeDomain: string;
   onStoreDomainChange: (value: string) => void;
+  partnerStoreId: string;
+  onPartnerStoreIdChange: (value: string) => void;
+  partnerStores: Array<{ id: string; name: string | null; storeDomain: string }>;
   onStartConnect: () => void;
   domainError: string;
   isCheckingDomain: boolean;
@@ -57,6 +60,9 @@ export default function AddStoreModal({
   currentStep,
   storeDomain,
   onStoreDomainChange,
+  partnerStoreId,
+  onPartnerStoreIdChange,
+  partnerStores,
   onStartConnect,
   domainError,
   isCheckingDomain,
@@ -116,10 +122,31 @@ export default function AddStoreModal({
           {currentStep === 1 && (
             <>
               <p className="text-sm text-gray-600">
-                Enter your store URL or `*.myshopify.com` domain.
+                Select the partner account where the app will be created and enter the store to connect.
               </p>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Shopify Store Domain</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Store with Partner Account (where app will be created) <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={partnerStoreId}
+                  onChange={(e) => onPartnerStoreIdChange(e.target.value)}
+                  disabled={isCheckingDomain}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                >
+                  <option value="">Select a partner store...</option>
+                  {partnerStores.map((store) => (
+                    <option key={store.id} value={store.id}>
+                      {store.name || store.storeDomain}
+                    </option>
+                  ))}
+                </select>
+                {partnerStores.length === 0 && (
+                  <p className="text-xs text-amber-600 mt-1">No partner stores available. Add one from the stores page first.</p>
+                )}
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Store to Connect</label>
                 <input
                   type="text"
                   placeholder="yourstore.myshopify.com or https://yourstore.com"
@@ -169,14 +196,14 @@ export default function AddStoreModal({
               </p>
               <div className="space-y-2">
                 <div className="rounded-lg bg-blue-50 border border-blue-100 px-3 py-2 text-xs text-blue-700">
-                  1. Allow Customer Data
+                  1. Change App Distribution
                 </div>
                 <div className="rounded-lg bg-blue-50 border border-blue-100 px-3 py-2 text-xs text-blue-700">
                   2. Install App
                 </div>
               </div>
               <div className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs text-slate-700 break-all">
-                <p className="font-medium text-slate-800 mb-1">Customer Data URL</p>
+                <p className="font-medium text-slate-800 mb-1">App Distribution URL</p>
                 {partnerUrl || 'Partner URL unavailable for this app.'}
               </div>
               <div className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs text-slate-700 break-all">
@@ -247,7 +274,7 @@ export default function AddStoreModal({
                 disabled={!partnerUrl}
                 className="px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer disabled:opacity-50"
               >
-                Allow Customer Data
+                Change Distribution
               </button>
               <button
                 onClick={onCopyInstallUrl}

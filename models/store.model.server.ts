@@ -8,6 +8,8 @@ export type StoreRow = {
   email: string | null;
   logoPath: string | null;
   status: string;
+  partnerStoreId: string | null;
+  partnerStoreName: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -17,6 +19,7 @@ export type CreateStoreData = {
   name?: string | null;
   clientId: string;
   clientSecret: string;
+  partnerStoreId?: string | null;
 };
 
 export type UpdateStoreData = {
@@ -28,11 +31,15 @@ export type UpdateStoreData = {
   logoPath?: string | null;
   clientId?: string;
   clientSecret?: string;
+  partnerStoreId?: string | null;
 };
 
 export class StoreModel {
   async findMany(): Promise<StoreRow[]> {
-    const stores = await prisma.store.findMany({ orderBy: { createdAt: 'desc' } });
+    const stores = await prisma.store.findMany({ 
+      orderBy: { createdAt: 'desc' },
+      include: { partnerStore: true }
+    });
     return stores.map((s) => ({
       id: s.id,
       storeDomain: s.storeDomain,
@@ -41,6 +48,8 @@ export class StoreModel {
       email: s.email,
       logoPath: s.logoPath,
       status: s.status,
+      partnerStoreId: s.partnerStoreId,
+      partnerStoreName: s.partnerStore?.name ?? null,
       createdAt: s.createdAt.toISOString(),
       updatedAt: s.updatedAt.toISOString(),
     }));
@@ -66,6 +75,7 @@ export class StoreModel {
         name: data.name ?? null,
         clientId: data.clientId,
         clientSecret: data.clientSecret,
+        partnerStoreId: data.partnerStoreId ?? null,
         status: 'pending',
       },
     });
@@ -75,18 +85,21 @@ export class StoreModel {
     storeDomain: string;
     clientId: string;
     clientSecret: string;
+    partnerStoreId?: string | null;
   }) {
     return prisma.store.upsert({
       where: { storeDomain: data.storeDomain },
       update: {
         clientId: data.clientId,
         clientSecret: data.clientSecret,
+        partnerStoreId: data.partnerStoreId ?? undefined,
         status: 'pending',
       },
       create: {
         storeDomain: data.storeDomain,
         clientId: data.clientId,
         clientSecret: data.clientSecret,
+        partnerStoreId: data.partnerStoreId ?? null,
         status: 'pending',
       },
     });
