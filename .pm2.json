@@ -15,7 +15,7 @@
     {
       "name": "order-fulfillment--order-sync-worker",
       "script": "npm",
-      "args": "run worker:order-sync",
+      "args": "run worker:orders-sync",
       "time": true,
       "error_file": "./logs/worker--order-sync-error.log",
       "out_file": "./logs/worker--order-sync-out.log",
