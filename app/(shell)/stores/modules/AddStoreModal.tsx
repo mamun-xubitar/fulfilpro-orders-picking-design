@@ -1,5 +1,7 @@
 'use client';
 
+import { useState, useEffect } from 'react';
+
 type ConnectStep = 1 | 2 | 3 | 4;
 
 interface AddStoreModalProps {
@@ -27,18 +29,32 @@ interface AddStoreModalProps {
   onAuthorize: () => void;
   onBackToStepOne: () => void;
   isInstalling: boolean;
-  installUrl: string;
   partnerUrl: string;
   onOpenPartnerUrl: () => void;
   onInstall: () => void;
   onCopyInstallUrl: () => void;
   onStartOver: () => void;
+  appManagementTokenExpiresAt: string;
 }
 
 function formatTimeLeft(seconds: number) {
   const mins = Math.floor(seconds / 60);
   const secs = seconds % 60;
   return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+function formatTokenTimeLeft(seconds: number) {
+  if (seconds <= 0) return 'Expired';
+  const hours = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  if (hours > 0) {
+    return `${hours}h ${mins}m ${secs}s`;
+  }
+  if (mins > 0) {
+    return `${mins}m ${secs}s`;
+  }
+  return `${secs}s`;
 }
 
 function StepPill({ step, active, done }: { step: number; active: boolean; done: boolean }) {
@@ -78,14 +94,42 @@ export default function AddStoreModal({
   onCopyAuthorizationUrl,
   onAuthorize,
   onBackToStepOne,
-  isInstalling,
-  installUrl,
   partnerUrl,
   onOpenPartnerUrl,
   onInstall,
   onCopyInstallUrl,
   onStartOver,
+  appManagementTokenExpiresAt,
 }: AddStoreModalProps) {
+  const [tokenTimeLeft, setTokenTimeLeft] = useState(0);
+  const [imagePopup, setImagePopup] = useState<string | null>(null);
+  const [isOpeningShopifyApp, setIsOpeningShopifyApp] = useState(false);
+
+  useEffect(() => {
+    if (!appManagementTokenExpiresAt || currentStep !== 3) return;
+    
+    const calculateTimeLeft = () => {
+      const expiresAt = new Date(appManagementTokenExpiresAt).getTime();
+      const now = Date.now();
+      const diff = Math.floor((expiresAt - now) / 1000);
+      return Math.max(0, diff);
+    };
+
+    setTokenTimeLeft(calculateTimeLeft());
+
+    const timer = window.setInterval(() => {
+      setTokenTimeLeft(calculateTimeLeft());
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [appManagementTokenExpiresAt, currentStep]);
+
+  useEffect(() => {
+    if (currentStep !== 3) {
+      setIsOpeningShopifyApp(false);
+    }
+  }, [currentStep, isOpen]);
+
   if (!isOpen) return null;
 
   const isBusy = isAuthorizing || isCreatingApp || isListingOrgs;
@@ -191,24 +235,139 @@ export default function AddStoreModal({
 
           {currentStep === 3 && (
             <>
+              <div className="rounded-lg bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 px-4 py-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-amber-900">Token Expires In</p>
+                  <p className={`text-lg font-bold tabular-nums ${
+                    tokenTimeLeft <= 60 ? 'text-red-600' : tokenTimeLeft <= 300 ? 'text-amber-600' : 'text-green-600'
+                  }`}>
+                    {formatTokenTimeLeft(tokenTimeLeft)}
+                  </p>
+                </div>
+              </div>
+
               <p className="text-sm text-gray-600">
                 Shopify app is ready for <span className="font-medium">{storeDomain}</span>.
               </p>
-              <div className="space-y-2">
-                <div className="rounded-lg bg-blue-50 border border-blue-100 px-3 py-2 text-xs text-blue-700">
-                  1. Change App Distribution
+
+
+              <div className="rounded-lg bg-blue-50 border border-blue-200 px-4 py-3">
+                <h4 className="text-sm font-semibold text-blue-900 mb-3">Installation Instructions</h4>
+                <div className="space-y-3 text-xs text-blue-800">
+                  <div className="flex gap-2">
+                    <span className="font-bold text-blue-600 shrink-0">1.</span>
+                    <div>
+                      <p className="mb-1">
+                        <button
+                          onClick={() => {
+                            setIsOpeningShopifyApp(true);
+                            onOpenPartnerUrl();
+                            onInstall();
+                          }}
+                          disabled={!partnerUrl || isOpeningShopifyApp}
+                          className="text-blue-600 hover:text-blue-800 underline font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Click here
+                        </button> to go to Shopify App. When the page loads, choose <span className="font-semibold">Distribution</span> from app navigation (step 1), then choose <span className="font-semibold">Custom distribution</span> (step 2) and click on <span className="font-semibold">Select</span> (step 3).
+                      </p>
+                      <button
+                        onClick={() => setImagePopup('/install-step/step-img-1.png')}
+                        className="text-blue-600 hover:text-blue-800 underline font-medium"
+                      >
+                        View Screenshot →
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <span className="font-bold text-blue-600 shrink-0">2.</span>
+                    <div>
+                      <p className="mb-1">
+                        You will be shown a popup. Click on <span className="font-semibold">"Select custom distribution"</span> (step 5).
+                      </p>
+                      <button
+                        onClick={() => setImagePopup('/install-step/step-img-2.png')}
+                        className="text-blue-600 hover:text-blue-800 underline font-medium"
+                      >
+                        View Screenshot →
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <span className="font-bold text-blue-600 shrink-0">3.</span>
+                    <div>
+                      <p className="mb-1">
+                        Add <span className="font-semibold bg-white px-1.5 py-0.5 rounded border border-blue-300">{storeDomain}</span> to the store domain field (step 6) and click on <span className="font-semibold">Generate link</span> (step 7).
+                      </p>
+                      <button
+                        onClick={() => setImagePopup('/install-step/step-img-3.png')}
+                        className="text-blue-600 hover:text-blue-800 underline font-medium"
+                      >
+                        View Screenshot →
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <span className="font-bold text-blue-600 shrink-0">4.</span>
+                    <div>
+                      <p className="mb-1">
+                        Now copy the install link (step 8).
+                      </p>
+                      <button
+                        onClick={() => setImagePopup('/install-step/step-img-4.png')}
+                        className="text-blue-600 hover:text-blue-800 underline font-medium"
+                      >
+                        View Screenshot →
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <span className="font-bold text-blue-600 shrink-0">5.</span>
+                    <div>
+                      <p className="mb-1">
+                        Now navigate to <span className="font-semibold">"API access requests"</span> (step 9) and click on <span className="font-semibold">Request access</span> button (step 10).
+                      </p>
+                      <button
+                        onClick={() => setImagePopup('/install-step/step-img-5.png')}
+                        className="text-blue-600 hover:text-blue-800 underline font-medium"
+                      >
+                        View Screenshot →
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <span className="font-bold text-blue-600 shrink-0">6.</span>
+                    <div>
+                      <p className="mb-1">
+                        In the description field, input anything you want (step 11) and click on <span className="font-semibold">"Request access"</span> button.
+                      </p>
+                      <button
+                        onClick={() => setImagePopup('/install-step/step-img-6.png')}
+                        className="text-blue-600 hover:text-blue-800 underline font-medium"
+                      >
+                        View Screenshot →
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <span className="font-bold text-blue-600 shrink-0">7.</span>
+                    <p>
+                      Now open a new tab in the browser and paste the copied install link (copied in 7 - step 8) and hit enter.
+                    </p>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <span className="font-bold text-blue-600 shrink-0">8.</span>
+                    <p>
+                      Once finished, come back to this app and check whether the store is connected or not.
+                    </p>
+                  </div>
                 </div>
-                <div className="rounded-lg bg-blue-50 border border-blue-100 px-3 py-2 text-xs text-blue-700">
-                  2. Install App
-                </div>
-              </div>
-              <div className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs text-slate-700 break-all">
-                <p className="font-medium text-slate-800 mb-1">App Distribution URL</p>
-                {partnerUrl || 'Partner URL unavailable for this app.'}
-              </div>
-              <div className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs text-slate-700 break-all">
-                <p className="font-medium text-slate-800 mb-1">Install URL</p>
-                {installUrl}
               </div>
             </>
           )}
@@ -270,25 +429,28 @@ export default function AddStoreModal({
           {currentStep === 3 && (
             <>
               <button
-                onClick={onOpenPartnerUrl}
-                disabled={!partnerUrl}
-                className="px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer disabled:opacity-50"
-              >
-                Change Distribution
-              </button>
-              <button
                 onClick={onCopyInstallUrl}
-                disabled={!installUrl}
+                disabled={!partnerUrl}
                 className="px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer disabled:opacity-50"
               >
                 Copy Link
               </button>
               <button
-                onClick={onInstall}
-                disabled={isInstalling || !installUrl}
-                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors cursor-pointer disabled:opacity-50"
+                onClick={() => {
+                  setIsOpeningShopifyApp(true);
+                  onOpenPartnerUrl();
+                  onInstall();
+                }}
+                disabled={!partnerUrl || isOpeningShopifyApp}
+                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {isInstalling ? 'Waiting...' : 'Install App'}
+                {isOpeningShopifyApp && (
+                  <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                )}
+                {isOpeningShopifyApp ? 'Checking Installation...' : 'Go to Shopify App'}
               </button>
             </>
           )}
@@ -311,6 +473,32 @@ export default function AddStoreModal({
           )}
         </div>
       </div>
+
+      {imagePopup && (
+        <div 
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70"
+          onClick={() => setImagePopup(null)}
+        >
+          <div className="relative max-w-5xl w-full max-h-[90vh] bg-white rounded-lg overflow-hidden shadow-2xl">
+            <button
+              onClick={() => setImagePopup(null)}
+              className="absolute top-3 right-3 z-10 bg-white/90 hover:bg-white text-gray-700 rounded-full p-2 shadow-lg transition-colors"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <div className="overflow-auto max-h-[90vh] p-4">
+              <img 
+                src={imagePopup} 
+                alt="Installation step" 
+                className="w-full h-auto"
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

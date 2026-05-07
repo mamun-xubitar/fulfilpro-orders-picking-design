@@ -176,21 +176,20 @@ const ORDERS_QUERY = `
 `;
 
 export async function syncConnectedStoreOrders(params?: {
-  windowStartedAt?: Date;
-  windowEndedAt?: Date;
+  storeIds?: string[] | null;
   onStoreSynced?: (result: SyncStoreResult) => Promise<void> | void;
 }) {
-  const windowEndedAt = params?.windowEndedAt ?? new Date();
-  const windowStartedAt = params?.windowStartedAt ?? new Date(windowEndedAt.getTime() - 30 * 24 * 60 * 60 * 1000);
   const stores = await prisma.store.findMany({
     where: {
       status: 'connected',
       accessToken: { not: null },
+      ...(params?.storeIds && params.storeIds.length > 0 ? { id: { in: params.storeIds } } : {}),
     },
     select: {
       id: true,
       storeDomain: true,
       accessToken: true,
+      lastSyncedAt: true,
     },
     orderBy: { createdAt: 'desc' },
   });
@@ -201,7 +200,8 @@ export async function syncConnectedStoreOrders(params?: {
         let fetched = 0;
         let created = 0;
         let updated = 0;
-        for await (const order of fetchShopifyOrders(store.storeDomain, store.accessToken!, windowStartedAt, windowEndedAt)) {
+
+        for await (const order of fetchShopifyOrders(store.storeDomain, store.accessToken!, store.lastSyncedAt)) {
           fetched += 1;
           const result = await orderModel.upsertFromShopifyOrder({
             payload: order,
@@ -210,6 +210,12 @@ export async function syncConnectedStoreOrders(params?: {
           if (result.created) created += 1;
           if (result.updated) updated += 1;
         }
+
+        await prisma.store.update({
+          where: { id: store.id },
+          data: { lastSyncedAt: new Date() },
+        });
+
 
         const result = {
           storeId: store.id,
@@ -246,21 +252,18 @@ export async function syncConnectedStoreOrders(params?: {
     totalUpdated: results.reduce((sum, item) => sum + item.updated, 0),
     failedStores: results.filter((item) => item.error).length,
     results,
-    windowStartedAt,
-    windowEndedAt,
   };
 }
 
 async function* fetchShopifyOrders(
   shop: string,
   accessToken: string,
-  windowStartedAt: Date,
-  windowEndedAt: Date
+  lastSyncedAt: Date | null
 ): AsyncGenerator<ShopifyOrderPayload> {
   let after: string | null = null;
   let hasNextPage = true;
-  const query = getOrdersSearchQuery(windowStartedAt, windowEndedAt);
-  
+  const query = lastSyncedAt ? `created_at:>'${lastSyncedAt.toISOString()}'` : '';
+
   while (hasNextPage) {
     const data: ShopifyGraphQLOrdersResult = await shopifyGraphQL<ShopifyGraphQLOrdersResult>(shop, accessToken, ORDERS_QUERY, {
       first: SHOPIFY_ORDERS_PAGE_SIZE,
@@ -328,31 +331,31 @@ function toShopifyOrderPayload(order: ShopifyGraphQLOrder): ShopifyOrderPayload 
     cancelled_at: order.cancelledAt,
     total_price_set: totalPrice
       ? {
-          shop_money: {
-            amount: totalPrice.amount,
-            currency_code: totalPrice.currencyCode,
-          },
-        }
+        shop_money: {
+          amount: totalPrice.amount,
+          currency_code: totalPrice.currencyCode,
+        },
+      }
       : undefined,
     customer: order.customer
       ? {
-          first_name: order.customer.firstName,
-          last_name: order.customer.lastName,
-          email: order.customer.email,
-          phone: order.customer.phone,
-        }
+        first_name: order.customer.firstName,
+        last_name: order.customer.lastName,
+        email: order.customer.email,
+        phone: order.customer.phone,
+      }
       : null,
     shipping_address: order.shippingAddress
       ? {
-          address1: order.shippingAddress.address1,
-          address2: order.shippingAddress.address2,
-          city: order.shippingAddress.city,
-          province: order.shippingAddress.province,
-          zip: order.shippingAddress.zip,
-          country: order.shippingAddress.country,
-          phone: order.shippingAddress.phone,
-          name: order.shippingAddress.name,
-        }
+        address1: order.shippingAddress.address1,
+        address2: order.shippingAddress.address2,
+        city: order.shippingAddress.city,
+        province: order.shippingAddress.province,
+        zip: order.shippingAddress.zip,
+        country: order.shippingAddress.country,
+        phone: order.shippingAddress.phone,
+        name: order.shippingAddress.name,
+      }
       : null,
     line_items: order.lineItems.nodes.map((lineItem) => ({
       id: getLegacyId(lineItem.id),
@@ -363,11 +366,11 @@ function toShopifyOrderPayload(order: ShopifyGraphQLOrder): ShopifyOrderPayload 
       price: lineItem.discountedUnitPriceSet?.shopMoney.amount ?? null,
       price_set: lineItem.discountedUnitPriceSet
         ? {
-            shop_money: {
-              amount: lineItem.discountedUnitPriceSet.shopMoney.amount,
-              currency_code: lineItem.discountedUnitPriceSet.shopMoney.currencyCode,
-            },
-          }
+          shop_money: {
+            amount: lineItem.discountedUnitPriceSet.shopMoney.amount,
+            currency_code: lineItem.discountedUnitPriceSet.shopMoney.currencyCode,
+          },
+        }
         : undefined,
     })),
     fulfillments: order.fulfillments.map((fulfillment) => {
@@ -390,12 +393,6 @@ function toShopifyOrderPayload(order: ShopifyGraphQLOrder): ShopifyOrderPayload 
   };
 }
 
-function getOrdersSearchQuery(windowStartedAt: Date, windowEndedAt: Date) {
-  return [
-    `created_at:>='${windowStartedAt.toISOString()}'`,
-    `created_at:<='${windowEndedAt.toISOString()}'`,
-  ].join(' ');
-}
 
 function getLegacyId(gid: string) {
   return gid.split('/').at(-1) ?? gid;

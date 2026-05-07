@@ -71,9 +71,11 @@ export async function pollForToken(deviceCode: string) {
 
   const businessPlatformToken = await getBusinessPlatformToken(data.access_token as string);
   const appManagementToken = await getAppManagementToken(data.access_token as string);
-
+  const d = new Date();
+  d.setSeconds(d.getSeconds() + (appManagementToken.expires_in as number));
   return {
     appManagementToken: appManagementToken.access_token,
+    appManagementTokenExpiresAt: d.toISOString(),
     businessPlatformToken: businessPlatformToken.access_token,
   };
 }
@@ -247,6 +249,7 @@ export async function createApp(
 ) {
   const appName = process.env.SHOPIFY_APP_NAME?.trim() || 'Order Fulfillment';
   const appUrl = process.env.APP_URL?.trim();
+
   if (!appUrl) throw new Error('APP_URL is required');
 
   const query = `
@@ -278,7 +281,7 @@ export async function createApp(
           {
             type: 'app_home',
             config: {
-              app_url: appUrl,
+              app_url: `${appUrl.replace(/\/$/, '')}/api/shopify-auth`,
               embedded: false,
             },
           },
@@ -348,4 +351,215 @@ export async function createApp(
 function extractNumericId(gidOrId: string) {
   const match = gidOrId.match(/(\d+)(?!.*\d)/);
   return match ? match[1] : null;
+}
+
+type UpdateAppScopesOptions = {
+  appId: string;
+  appManagementToken: string;
+  newScopes: string[];
+  versionTag?: string;
+  message?: string;
+};
+
+type UpdateAppScopesResult = {
+  success: boolean;
+  versionId?: string;
+  versionTag?: string;
+  requestedScopes: string[];
+  errors?: string[];
+};
+
+export async function updateAppScopes(
+  options: UpdateAppScopesOptions
+): Promise<UpdateAppScopesResult> {
+  const {
+    appId,
+    appManagementToken,
+    newScopes,
+    versionTag = 'scope-update',
+    message = 'Update app scopes',
+  } = options;
+
+  const createVersionQuery = `
+    mutation CreateAppVersion($appId: ID!, $version: AppVersionInput!, $metadata: VersionMetadataInput) {
+      appVersionCreate(appId: $appId, version: $version, metadata: $metadata) {
+        version {
+          id
+          appModules {
+            ...ReleasedAppModule
+          }
+          metadata {
+            versionTag
+            message
+          }
+        }
+        userErrors {
+          field
+          message
+          category
+          code
+          on
+        }
+      }
+    }
+
+    fragment ReleasedAppModule on AppModule {
+      uuid
+      userIdentifier
+      handle
+      config
+      target
+      specification {
+        identifier
+        externalIdentifier
+        name
+        experience
+        managementExperience
+      }
+    }
+  `;
+
+  const releaseVersionQuery = `
+    mutation ReleaseVersion($appId: ID!, $versionId: ID!) {
+      appReleaseCreate(appId: $appId, versionId: $versionId) {
+        release {
+          version {
+            id
+            metadata {
+              message
+              versionTag
+            }
+          }
+        }
+        userErrors {
+          field
+          message
+          category
+          code
+          on
+        }
+      }
+    }
+  `;
+
+  const appName = process.env.SHOPIFY_APP_NAME?.trim() || 'Order Fulfillment';
+  const appUrl = process.env.APP_URL?.trim();
+  if (!appUrl) throw new Error('APP_URL is required');
+
+  const appManifest = {
+    name: appName,
+    modules: [
+      {
+        type: 'app_home',
+        config: {
+          app_url: `${appUrl.replace(/\/$/, '')}/api/shopify-auth`,
+          embedded: false,
+        },
+      },
+      {
+        type: 'branding',
+        config: { name: appName },
+      },
+      {
+        type: 'webhooks',
+        config: { api_version: '2024-10' },
+      },
+      {
+        type: 'app_access',
+        config: {
+          redirect_url_allowlist: [`${appUrl.replace(/\/$/, '')}/api/shopify-auth-callback`],
+          scopes:
+            process.env.SHOPIFY_SCOPES ? [...process.env.SHOPIFY_SCOPES.split(","), ...(process.env.EXTRA_SCOPES || "").split(",")].join(",") :
+            'read_products,write_products,read_orders,write_orders,read_fulfillments,write_fulfillments,read_merchant_managed_fulfillment_orders,write_merchant_managed_fulfillment_orders,read_inventory,write_inventory,read_locations,write_locations,read_customers,read_all_orders',
+        },
+      },
+    ],
+  };
+
+  const createVariables = {
+    appId,
+    version: {
+      source: appManifest,
+    },
+    metadata: {
+      versionTag,
+      message,
+    },
+  };
+
+  const createRes = await fetch('https://app.shopify.com/app_management/unstable/graphql.json', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${appManagementToken}`,
+    },
+    body: JSON.stringify({ query: createVersionQuery, variables: createVariables }),
+    signal: AbortSignal.timeout(30000),
+  });
+
+  const createResult = await createRes.json();
+
+  const createErrors = createResult?.data?.appVersionCreate?.userErrors ?? [];
+  if (createErrors.length > 0) {
+    const errors = createErrors.map((err: { field?: string[]; message: string }) => {
+      const field = err.field?.join('.') || 'unknown';
+      return `${field}: ${err.message}`;
+    });
+
+    return {
+      success: false,
+      requestedScopes: newScopes,
+      errors,
+    };
+  }
+
+  const version = createResult?.data?.appVersionCreate?.version;
+  if (!version) {
+    return {
+      success: false,
+      requestedScopes: newScopes,
+      errors: ['Failed to create app version'],
+    };
+  }
+
+  const versionId = version.id as string;
+
+  const releaseVariables = {
+    appId,
+    versionId,
+  };
+
+  const releaseRes = await fetch('https://app.shopify.com/app_management/unstable/graphql.json', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${appManagementToken}`,
+    },
+    body: JSON.stringify({ query: releaseVersionQuery, variables: releaseVariables }),
+    signal: AbortSignal.timeout(30000),
+  });
+
+  const releaseResult = await releaseRes.json();
+
+  const releaseErrors = releaseResult?.data?.appReleaseCreate?.userErrors ?? [];
+  if (releaseErrors.length > 0) {
+    const errors = releaseErrors.map((err: { field?: string[]; message: string }) => {
+      const field = err.field?.join('.') || 'unknown';
+      return `${field}: ${err.message}`;
+    });
+
+    return {
+      success: false,
+      versionId,
+      requestedScopes: newScopes,
+      errors: [`Version created but release failed: ${errors.join(', ')}`],
+    };
+  }
+
+  return {
+    success: true,
+    versionId,
+    versionTag: version.metadata.versionTag as string,
+    requestedScopes: newScopes,
+  };
 }

@@ -732,7 +732,6 @@ function buildOrderWriteData(
       syncedFulfillmentConfirmations
     ),
   } as Prisma.InputJsonValue;
-  console.log("my status", payload.fulfillment_status, fulfillmentStatus)
   return {
     cusName: customerName,
     cusEmail: customerEmail,

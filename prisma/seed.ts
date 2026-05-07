@@ -14,11 +14,7 @@ async function main() {
 
   await prisma.user.upsert({
     where: { email: 'admin@example.com' },
-    update: {
-      password: adminPassword,
-      active: true,
-      isTempPassword: false,
-    },
+    update: {},
     create: {
       name: 'John Doe',
       email: 'admin@example.com',
@@ -31,11 +27,7 @@ async function main() {
 
   await prisma.user.upsert({
     where: { email: 'staff@example.com' },
-    update: {
-      password: staffPassword,
-      active: true,
-      isTempPassword: true,
-    },
+    update: {},
     create: {
       name: 'Alice Wong',
       email: 'staff@example.com',

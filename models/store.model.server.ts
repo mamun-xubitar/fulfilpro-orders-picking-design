@@ -36,7 +36,7 @@ export type UpdateStoreData = {
 
 export class StoreModel {
   async findMany(): Promise<StoreRow[]> {
-    const stores = await prisma.store.findMany({ 
+    const stores = await prisma.store.findMany({
       orderBy: { createdAt: 'desc' },
       include: { partnerStore: true }
     });
@@ -81,11 +81,21 @@ export class StoreModel {
     });
   }
 
+  async updateStoreWithTokens(appManagementToken: string, expireAt: string, store: string) {
+    return prisma.store.update({
+      where: { storeDomain: store },
+      data: { appManagementToken: appManagementToken, appManagementTokenExpiresAt: expireAt }
+    })
+  }
+
   async createOrUpdateFromAppCreation(data: {
     storeDomain: string;
     clientId: string;
+    appId: string;
     clientSecret: string;
     partnerStoreId?: string | null;
+    appManagementToken: string;
+    appManagementTokenExpiresAt: string;
   }) {
     return prisma.store.upsert({
       where: { storeDomain: data.storeDomain },
@@ -94,6 +104,9 @@ export class StoreModel {
         clientSecret: data.clientSecret,
         partnerStoreId: data.partnerStoreId ?? undefined,
         status: 'pending',
+        appId: data.appId,
+        appManagementToken: data.appManagementToken,
+        appManagementTokenExpiresAt: data.appManagementTokenExpiresAt
       },
       create: {
         storeDomain: data.storeDomain,
@@ -101,6 +114,9 @@ export class StoreModel {
         clientSecret: data.clientSecret,
         partnerStoreId: data.partnerStoreId ?? null,
         status: 'pending',
+        appId: data.appId,
+        appManagementToken: data.appManagementToken,
+        appManagementTokenExpiresAt: data.appManagementTokenExpiresAt
       },
     });
   }

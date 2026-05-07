@@ -52,6 +52,9 @@ export default function StoresPage() {
   const [isListingOrgs, setIsListingOrgs] = useState(false);
   const [isCreatingApp, setIsCreatingApp] = useState(false);
   const [isInstalling, setIsInstalling] = useState(false);
+  const [isUpdatingScopes, setIsUpdatingScopes] = useState(false);
+  const [appManagementToken, setAppManagementToken] = useState('');
+  const [appManagementTokenExpiresAt, setAppManagementTokenExpiresAt] = useState('');
 
   const authPollLock = useRef(false);
 
@@ -127,6 +130,9 @@ export default function StoresPage() {
     setIsListingOrgs(false);
     setIsCreatingApp(false);
     setIsInstalling(false);
+    setIsUpdatingScopes(false);
+    setAppManagementToken('');
+    setAppManagementTokenExpiresAt('');
     authPollLock.current = false;
   };
 
@@ -305,6 +311,7 @@ export default function StoresPage() {
   const handleGetOrganizationsAndCreateApp = useCallback(async (tokens: {
     appManagementToken: string;
     businessPlatformToken: string;
+    appManagementTokenExpiresAt: string;
   }) => {
     try {
       setIsListingOrgs(true);
@@ -327,11 +334,13 @@ export default function StoresPage() {
 
       setIsCreatingApp(true);
       const created = await getJson<{ installUrl: string; partnerUrl?: string | null }>(
-        `/api/create-app?appManagementToken=${encodeURIComponent(tokens.appManagementToken)}&organizationId=${encodeURIComponent(organizations.storeOrganizationId)}&store=${encodeURIComponent(normalizedDomain)}&partnerStoreId=${encodeURIComponent(addForm.partnerStoreId)}`
+        `/api/create-app?appManagementToken=${encodeURIComponent(tokens.appManagementToken)}&organizationId=${encodeURIComponent(organizations.storeOrganizationId)}&store=${encodeURIComponent(normalizedDomain)}&partnerStoreId=${encodeURIComponent(addForm.partnerStoreId)}&appManagementTokenExpiresAt=${encodeURIComponent(tokens.appManagementTokenExpiresAt)}`
       );
       setIsCreatingApp(false);
       setInstallUrl(created.installUrl);
       setPartnerUrl(created.partnerUrl ?? '');
+      setAppManagementToken(tokens.appManagementToken);
+      setAppManagementTokenExpiresAt(tokens.appManagementTokenExpiresAt);
       setConnectStep(3);
       setIsAuthorizing(false);
     } catch (error) {
@@ -350,7 +359,8 @@ export default function StoresPage() {
         error?: string;
         appManagementToken?: string;
         businessPlatformToken?: string;
-      }>(`/api/poll-token?device_code=${encodeURIComponent(deviceCode)}`);
+        appManagementTokenExpiresAt?: string;
+      }>(`/api/poll-token?device_code=${encodeURIComponent(deviceCode)}&shop=${encodeURIComponent(normalizedDomain)}`);
 
       if (polled.error === 'authorization_pending' || polled.error === 'slow_down') return;
 
@@ -369,6 +379,7 @@ export default function StoresPage() {
       await handleGetOrganizationsAndCreateApp({
         appManagementToken: polled.appManagementToken,
         businessPlatformToken: polled.businessPlatformToken,
+        appManagementTokenExpiresAt: polled.appManagementTokenExpiresAt!
       });
     } catch (error) {
       setAuthorizationError(error instanceof Error ? error.message : 'Authorization polling failed');
@@ -376,7 +387,7 @@ export default function StoresPage() {
     } finally {
       authPollLock.current = false;
     }
-  }, [deviceCode, handleGetOrganizationsAndCreateApp]);
+  }, [deviceCode, handleGetOrganizationsAndCreateApp, normalizedDomain]);
 
   useEffect(() => {
     if (!isAuthorizing || !deviceCode || connectStep !== 2) return;
@@ -485,8 +496,8 @@ export default function StoresPage() {
   };
 
   const handleCopyInstallUrl = () => {
-    if (!installUrl) return;
-    navigator.clipboard.writeText(installUrl);
+    if (!partnerUrl) return;
+    navigator.clipboard.writeText(partnerUrl);
     toast.info('Install URL copied.');
   };
 
@@ -494,7 +505,6 @@ export default function StoresPage() {
     if (!partnerUrl) return;
     window.open(partnerUrl, '_blank', 'noopener,noreferrer');
   };
-
   return (
     <main className="flex-1 p-4 space-y-5 md:p-6">
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-5">
@@ -618,12 +628,12 @@ export default function StoresPage() {
           setIsCreatingApp(false);
         }}
         isInstalling={isInstalling}
-        installUrl={installUrl}
         partnerUrl={partnerUrl}
         onOpenPartnerUrl={handleOpenPartnerUrl}
         onInstall={handleInstall}
         onCopyInstallUrl={handleCopyInstallUrl}
         onStartOver={resetConnectFlow}
+        appManagementTokenExpiresAt={appManagementTokenExpiresAt}
       />
     </main>
   );

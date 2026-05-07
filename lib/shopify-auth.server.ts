@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 
-const DEFAULT_SCOPES = process.env.SHOPIFY_SCOPES || 'read_products,write_products,read_orders,write_orders,read_fulfillments,write_fulfillments,read_merchant_managed_fulfillment_orders,write_merchant_managed_fulfillment_orders,read_inventory,write_inventory,read_locations,write_locations,read_customers';
+const DEFAULT_SCOPES = 'read_products,write_products,read_orders,write_orders,read_fulfillments,write_fulfillments,read_merchant_managed_fulfillment_orders,write_merchant_managed_fulfillment_orders,read_inventory,write_inventory,read_locations,write_locations,read_customers';
 
 export type ShopifyCallbackQuery = {
   code: string | null;
@@ -47,7 +47,14 @@ export function normalizeShopDomain(input: string) {
 export function generateInstallLink(shop: string, clientId: string) {
   const normalizedShop = normalizeShopDomain(shop);
   const redirectUri = encodeURIComponent(getShopifyAuthCallbackUrl());
-  const scopes = encodeURIComponent(process.env.SHOPIFY_SCOPES || DEFAULT_SCOPES);
+  const scopes = encodeURIComponent(
+    process.env.SHOPIFY_SCOPES
+      ? [
+          ...process.env.SHOPIFY_SCOPES.split(","),
+          ...(process.env.EXTRA_SCOPES?.split(",") || []),
+        ].join(",")
+      : DEFAULT_SCOPES
+  );
   const state = crypto.randomUUID();
 
   return `https://${normalizedShop}/admin/oauth/authorize?client_id=${encodeURIComponent(clientId)}&scope=${scopes}&redirect_uri=${redirectUri}&state=${state}`;

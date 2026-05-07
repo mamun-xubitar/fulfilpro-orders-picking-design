@@ -10,11 +10,12 @@ export async function GET(req: Request) {
   const appManagementToken = searchParams.get('appManagementToken');
   const organizationId = searchParams.get('organizationId');
   const partnerStoreId = searchParams.get('partnerStoreId');
+  const appManagementTokenExpiresAt = searchParams.get("appManagementTokenExpiresAt");
 
-  if (!store || !appManagementToken || !organizationId) {
+  if (!store || !appManagementToken || !organizationId || !appManagementTokenExpiresAt) {
     return apiError({
-      message: 'store, appManagementToken, and organizationId are required',
-      errors: ['store, appManagementToken, and organizationId are required'],
+      message: 'store, appManagementToken, appManagementTokenExpiresAt and organizationId are required',
+      errors: ['store, appManagementToken, appManagementTokenExpiresAt and organizationId are required'],
       status: 400,
     });
   }
@@ -39,9 +40,12 @@ export async function GET(req: Request) {
     
     await storeModel.createOrUpdateFromAppCreation({
       storeDomain: store,
+      appId: data.appId,
       clientId: data.clientId,
       clientSecret: data.secretKey,
       partnerStoreId: partnerStoreId,
+      appManagementToken: appManagementToken,
+      appManagementTokenExpiresAt: appManagementTokenExpiresAt
     });
 
     return apiSuccess({

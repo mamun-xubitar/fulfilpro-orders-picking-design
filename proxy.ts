@@ -11,6 +11,7 @@ export const config = {
 
 const PUBLIC_ROUTES = [
   '/api/auth/.*',
+  '/api/shopify-auth',
   '/api/shopify-auth-callback',
   '/api/settings/google/callback',
   '/api/auth/staff-login-approvals/.*',

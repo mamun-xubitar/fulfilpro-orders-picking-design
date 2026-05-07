@@ -16,9 +16,11 @@ export async function GET() {
   }
 }
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
-    const result = await enqueueOrderSyncJob();
+    const body = await request.json().catch(() => ({}));
+    const storeIds = Array.isArray(body.storeIds) ? body.storeIds : undefined;
+    const result = await enqueueOrderSyncJob(storeIds);
     return apiSuccess({
       message: result.alreadyRunning ? 'A Shopify order sync is already running' : 'Shopify order sync queued',
       data: result,

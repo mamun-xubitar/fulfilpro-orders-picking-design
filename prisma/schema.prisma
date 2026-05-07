@@ -32,22 +32,26 @@ model User {
 }
 
 model Store {
-  id             String   @id @default(uuid())
-  storeDomain    String   @unique
-  name           String?
-  accessToken    String?
-  url            String?
-  email          String?
-  logoPath       String?
-  status         String   @default("pending")
-  clientId       String
-  clientSecret   String
-  partnerStoreId String?
-  partnerStore   Store?   @relation("PartnerStores", fields: [partnerStoreId], references: [id], onDelete: SetNull)
-  childStores    Store[]  @relation("PartnerStores")
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  orders         Order[]
+  id                          String    @id @default(uuid())
+  storeDomain                 String    @unique
+  name                        String?
+  accessToken                 String?
+  url                         String?
+  email                       String?
+  logoPath                    String?
+  status                      String    @default("pending")
+  clientId                    String
+  appId                       String?
+  clientSecret                String
+  appManagementToken          String?
+  appManagementTokenExpiresAt DateTime?
+  partnerStoreId              String?
+  lastSyncedAt                DateTime?
+  partnerStore                Store?    @relation("PartnerStores", fields: [partnerStoreId], references: [id], onDelete: SetNull)
+  childStores                 Store[]   @relation("PartnerStores")
+  createdAt                   DateTime  @default(now())
+  updatedAt                   DateTime  @updatedAt
+  orders                      Order[]
 
   @@index([status])
   @@index([partnerStoreId])
@@ -102,20 +106,19 @@ model OrderMessage {
 }
 
 model OrderSyncJob {
-  id              String    @id @default(uuid())
-  status          String    @default("queued")
-  windowStartedAt DateTime
-  windowEndedAt   DateTime
-  totalStores     Int       @default(0)
-  totalFetched    Int       @default(0)
-  totalCreated    Int       @default(0)
-  totalUpdated    Int       @default(0)
-  failedStores    Int       @default(0)
-  error           String?
-  startedAt       DateTime?
-  finishedAt      DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id           String    @id @default(uuid())
+  status       String    @default("queued")
+  storeIds     Json?
+  totalStores  Int       @default(0)
+  totalFetched Int       @default(0)
+  totalCreated Int       @default(0)
+  totalUpdated Int       @default(0)
+  failedStores Int       @default(0)
+  error        String?
+  startedAt    DateTime?
+  finishedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   @@index([status])
   @@index([createdAt])

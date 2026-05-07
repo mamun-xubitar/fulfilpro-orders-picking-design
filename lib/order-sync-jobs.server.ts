@@ -3,7 +3,6 @@ import { syncConnectedStoreOrders } from '@/lib/shopify-order-sync.server';
 import { Prisma } from '@prisma/client';
 
 const ACTIVE_SYNC_STATUSES = ['queued', 'running'];
-const SYNC_WINDOW_DAYS = 30;
 
 type OrderSyncJobRow = Awaited<ReturnType<typeof getOrderSyncJobById>>;
 
@@ -11,8 +10,7 @@ export function serializeOrderSyncJob(job: NonNullable<OrderSyncJobRow>) {
   return {
     id: job.id,
     status: job.status,
-    windowStartedAt: job.windowStartedAt.toISOString(),
-    windowEndedAt: job.windowEndedAt.toISOString(),
+    storeIds: job.storeIds as string[] | null,
     totalStores: job.totalStores,
     totalFetched: job.totalFetched,
     totalCreated: job.totalCreated,
@@ -26,7 +24,7 @@ export function serializeOrderSyncJob(job: NonNullable<OrderSyncJobRow>) {
   };
 }
 
-export async function enqueueOrderSyncJob() {
+export async function enqueueOrderSyncJob(storeIds?: string[]) {
   const activeJob = await findActiveOrderSyncJob();
   if (activeJob) {
     return {
@@ -35,14 +33,10 @@ export async function enqueueOrderSyncJob() {
     };
   }
 
-  const windowEndedAt = new Date();
-  const windowStartedAt = new Date(windowEndedAt.getTime() - SYNC_WINDOW_DAYS * 24 * 60 * 60 * 1000);
-
   try {
     const job = await prisma.orderSyncJob.create({
       data: {
-        windowStartedAt,
-        windowEndedAt,
+        storeIds: storeIds && storeIds.length > 0 ? storeIds : undefined,
       },
     });
 
@@ -119,8 +113,7 @@ export async function runOrderSyncJob(jobId: string) {
 
   try {
     const result = await syncConnectedStoreOrders({
-      windowStartedAt: job.windowStartedAt,
-      windowEndedAt: job.windowEndedAt,
+      storeIds: job.storeIds as string[] | null,
       onStoreSynced: async (storeResult) => {
         await prisma.orderSyncJob.update({
           where: { id: job.id },

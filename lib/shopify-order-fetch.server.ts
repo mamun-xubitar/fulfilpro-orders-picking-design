@@ -165,7 +165,7 @@ export async function fetchShopifyOrderById(params: {
   if (!data.order) {
     throw new Error(`Shopify order ${orderId} was not found`);
   }
-  console.log("my data", JSON.stringify(data.order, null, 2))
+
   return toShopifyOrderPayload(data.order);
 }
 
