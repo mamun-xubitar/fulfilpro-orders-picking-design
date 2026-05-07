@@ -759,6 +759,14 @@ export default function OrdersPage() {
     }, 0);
   };
 
+  const isOrderFullyFulfilled = (order: OrderRow) => {
+    const totalQuantity = order.items.reduce((sum, item) => sum + Math.max(0, item.qty), 0);
+    const fulfilledQuantity = order.fulfillmentItems.confirmations.reduce((sum, confirmation) => {
+      return sum + confirmation.lines.reduce((lineSum, line) => lineSum + line.quantity, 0);
+    }, 0);
+    return totalQuantity > 0 && fulfilledQuantity >= totalQuantity;
+  };
+
   const getFulfillmentLines = (order: OrderRow) => {
     return order.items
       .map((item, itemIndex) => {
@@ -1838,6 +1846,7 @@ export default function OrdersPage() {
                 const isExpanded = expandedId === order.id;
                 const orderAddressLines = getOrderAddressLines(order);
                 const fulfillmentInfo = getFulfillmentInfo(order);
+                const isFullyFulfilled = isOrderFullyFulfilled(order);
                 return (
                   <Fragment key={order.id}>
                     <tr
@@ -1917,8 +1926,12 @@ export default function OrdersPage() {
                                 e.stopPropagation();
                                 void printPackingSlipLabel(order);
                               }}
-                              disabled={printingOrderId === order.id}
-                              className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors duration-150 cursor-pointer"
+                              disabled={printingOrderId === order.id || isFullyFulfilled}
+                              className={`p-1.5 rounded-lg transition-colors duration-150 ${
+                                printingOrderId === order.id || isFullyFulfilled
+                                  ? 'text-gray-300 cursor-not-allowed'
+                                  : 'hover:bg-gray-100 text-gray-500 hover:text-gray-700 cursor-pointer'
+                              }`}
                             >
                               {printingOrderId === order.id ? (
                                 <span className="block h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-gray-700" aria-label="Loading label" />
@@ -1936,7 +1949,12 @@ export default function OrdersPage() {
                                 e.stopPropagation();
                                 void openMessageModal(order);
                               }}
-                              className="relative p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-blue-600 transition-colors duration-150 cursor-pointer"
+                              disabled={isFullyFulfilled}
+                              className={`relative p-1.5 rounded-lg transition-colors duration-150 ${
+                                isFullyFulfilled
+                                  ? 'text-gray-300 cursor-not-allowed'
+                                  : 'hover:bg-gray-100 text-gray-500 hover:text-blue-600 cursor-pointer'
+                              }`}
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.77 9.77 0 01-4-.8L3 20l1.4-3.5A7.5 7.5 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
@@ -2195,14 +2213,23 @@ export default function OrdersPage() {
                                     <div className="flex items-center gap-2">
                                       <button
                                         onClick={() => void printPackingSlipLabel(order)}
-                                        disabled={printingOrderId === order.id}
-                                        className="flex-1 border border-gray-300 bg-white text-gray-600 py-1.5 rounded-lg text-xs font-medium hover:bg-gray-50 transition-colors duration-150 cursor-pointer"
+                                        disabled={printingOrderId === order.id || isFullyFulfilled}
+                                        className={`flex-1 border py-1.5 rounded-lg text-xs font-medium transition-colors duration-150 ${
+                                          printingOrderId === order.id || isFullyFulfilled
+                                            ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                                            : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-50 cursor-pointer'
+                                        }`}
                                       >
                                         {printingOrderId === order.id ? 'Loading label...' : 'Print Label'}
                                       </button>
                                       <button
                                         onClick={() => void openMessageModal(order)}
-                                        className="relative flex-1 border border-gray-300 bg-white text-gray-600 py-1.5 rounded-lg text-xs font-medium hover:bg-gray-50 transition-colors duration-150 cursor-pointer"
+                                        disabled={isFullyFulfilled}
+                                        className={`relative flex-1 border py-1.5 rounded-lg text-xs font-medium transition-colors duration-150 ${
+                                          isFullyFulfilled
+                                            ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                                            : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-50 cursor-pointer'
+                                        }`}
                                       >
                                         Message
                                         {order.messageCount > 0 && (
