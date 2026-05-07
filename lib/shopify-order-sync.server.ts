@@ -201,12 +201,15 @@ export async function syncConnectedStoreOrders(params?: {
         let created = 0;
         let updated = 0;
 
-        for await (const order of fetchShopifyOrders(store.storeDomain, store.accessToken!, store.lastSyncedAt)) {
-          fetched += 1;
+        const orders = await fetchShopifyOrders(store.storeDomain, store.accessToken!, store.lastSyncedAt);
+        fetched = orders.length;
+
+        for (const order of orders) {
           const result = await orderModel.upsertFromShopifyOrder({
             payload: order,
             storeId: store.id,
           });
+
           if (result.created) created += 1;
           if (result.updated) updated += 1;
         }
@@ -255,11 +258,12 @@ export async function syncConnectedStoreOrders(params?: {
   };
 }
 
-async function* fetchShopifyOrders(
+async function fetchShopifyOrders(
   shop: string,
   accessToken: string,
   lastSyncedAt: Date | null
-): AsyncGenerator<ShopifyOrderPayload> {
+): Promise<ShopifyOrderPayload[]> {
+  const orders: ShopifyOrderPayload[] = [];
   let after: string | null = null;
   let hasNextPage = true;
   const query = lastSyncedAt ? `created_at:>'${lastSyncedAt.toISOString()}'` : '';
@@ -272,12 +276,14 @@ async function* fetchShopifyOrders(
     });
 
     for (const order of data.orders.nodes) {
-      yield toShopifyOrderPayload(order);
+      orders.push(toShopifyOrderPayload(order));
     }
 
     hasNextPage = data.orders.pageInfo.hasNextPage;
     after = data.orders.pageInfo.endCursor;
   }
+
+  return orders;
 }
 
 async function shopifyGraphQL<T>(

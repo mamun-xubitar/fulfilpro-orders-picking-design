@@ -122,7 +122,7 @@ type FulfillmentConfirmation = {
   shopifyFulfillmentId?: string | null;
   shopifyFulfillmentStatus?: string | null;
   barcodes?: string[];
-  shippingDate?: string | null;
+  fulfillmentDate?: string | null;
   trackingInfo?: {
     number?: string;
     company?: string;
@@ -454,7 +454,6 @@ export default function OrdersPage() {
     lines: FulfillmentLine[];
     notifyCustomer: boolean;
     barcodeInput: string;
-    shippingDate: string;
     trackingNumber: string;
     trackingUrl: string;
     trackingCompany: string;
@@ -483,7 +482,7 @@ export default function OrdersPage() {
     conf: FulfillmentConfirmation;
     confId: string;
     barcodes: string;
-    shippingDate: string;
+    fulfillmentDate: string;
     carrier: string;
     trackingNumber: string;
     trackingUrl: string;
@@ -785,13 +784,18 @@ export default function OrdersPage() {
     return value.split(/\s+/).map((barcode) => barcode.trim()).filter(Boolean);
   };
 
-  const getFulfillmentShippingDates = (order: OrderRow) => {
+  const getFulfillmentInfo = (order: OrderRow) => {
     return order.fulfillmentItems.confirmations
-      .map((confirmation) => confirmation.shippingDate?.trim() ?? '')
-      .filter(Boolean);
+      .map((confirmation) => ({
+        date: confirmation.fulfillmentDate?.trim() ?? '',
+        carrier: confirmation.trackingInfo?.company?.trim() ?? '',
+        trackingNumber: confirmation.trackingInfo?.number?.trim() ?? '',
+        trackingUrl: confirmation.trackingInfo?.url?.trim() ?? '',
+      }))
+      .filter((info) => info.date || info.carrier || info.trackingNumber);
   };
 
-  const formatShippingDate = (value: string) => {
+  const formatFulfillmentDate = (value: string) => {
     const [year, month, day] = value.split('-').map(Number);
     if (!year || !month || !day) return value;
 
@@ -830,7 +834,6 @@ export default function OrdersPage() {
       lines,
       notifyCustomer: true,
       barcodeInput: '',
-      shippingDate: '',
       trackingNumber: '',
       trackingUrl: '',
       trackingCompany: '',
@@ -849,7 +852,7 @@ export default function OrdersPage() {
   const confirmFul = async () => {
     if (!pendingFulfillment) return;
 
-    const { order, lines, notifyCustomer, barcodeInput, shippingDate, trackingNumber, trackingUrl, trackingCompany } = pendingFulfillment;
+    const { order, lines, notifyCustomer, barcodeInput, trackingNumber, trackingUrl, trackingCompany } = pendingFulfillment;
     const barcodes = parseBarcodes(barcodeInput);
     const trackingInfo = {
       number: trackingNumber.trim(),
@@ -865,7 +868,6 @@ export default function OrdersPage() {
           lines,
           notifyCustomer,
           trackingInfo,
-          shippingDate: shippingDate || undefined,
           barcodes,
         }),
       });
@@ -930,7 +932,7 @@ export default function OrdersPage() {
     setEditFulModal({
       order, conf, confId,
       barcodes: conf.barcodes?.join(' ') ?? '',
-      shippingDate: conf.shippingDate ?? '',
+      fulfillmentDate: conf.fulfillmentDate ?? '',
       carrier: conf.trackingInfo?.company ?? '',
       trackingNumber: conf.trackingInfo?.number ?? '',
       trackingUrl: conf.trackingInfo?.url ?? '',
@@ -940,7 +942,7 @@ export default function OrdersPage() {
 
   const submitEditFulfillment = async () => {
     if (!editFulModal) return;
-    const { order, confId, barcodes, shippingDate, carrier, trackingNumber, trackingUrl } = editFulModal;
+    const { order, confId, barcodes, fulfillmentDate, carrier, trackingNumber, trackingUrl } = editFulModal;
     setEditFulModal((prev) => prev ? { ...prev, saving: true, error: '' } : null);
     try {
       const res = await fetch(`/api/orders/${order.id}/fulfillments/${encodeURIComponent(confId)}`, {
@@ -948,7 +950,7 @@ export default function OrdersPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           barcodes: barcodes.split(/\s+/).filter(Boolean),
-          shippingDate: shippingDate || null,
+          fulfillmentDate: fulfillmentDate || null,
           trackingInfo: { number: trackingNumber.trim(), url: trackingUrl.trim(), company: carrier.trim() },
         }),
       });
@@ -1807,7 +1809,7 @@ export default function OrdersPage() {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Ordered At</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
                 <th className="hidden sm:table-cell px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Items</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Shipping Date</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Fulfillment</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Actions</th>
               </tr>
             </thead>
@@ -1835,7 +1837,7 @@ export default function OrdersPage() {
                 const status = STATUS_MAP[statusKey] ?? STATUS_MAP.pending;
                 const isExpanded = expandedId === order.id;
                 const orderAddressLines = getOrderAddressLines(order);
-                const shippingDates = getFulfillmentShippingDates(order);
+                const fulfillmentInfo = getFulfillmentInfo(order);
                 return (
                   <Fragment key={order.id}>
                     <tr
@@ -1859,10 +1861,36 @@ export default function OrdersPage() {
                         {order.itemsCount} item{order.itemsCount !== 1 ? 's' : ''}
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-600">
-                        {shippingDates.length > 0 ? (
-                          <div className="space-y-1">
-                            {shippingDates.map((shippingDate, shippingDateIndex) => (
-                              <div key={`${shippingDate}-${shippingDateIndex}`}>{formatShippingDate(shippingDate)}</div>
+                        {fulfillmentInfo.length > 0 ? (
+                          <div className="space-y-2">
+                            {fulfillmentInfo.map((info, infoIndex) => (
+                              <div key={infoIndex}>
+                                {infoIndex > 0 && <div className="border-t border-gray-200 my-2" />}
+                                <div className="space-y-0.5">
+                                  {info.date && (
+                                    <div className="text-gray-700 font-medium">{formatFulfillmentDate(info.date)}</div>
+                                  )}
+                                  {info.carrier && (
+                                    <div className="text-gray-500">{info.carrier}</div>
+                                  )}
+                                  {info.trackingNumber && (
+                                    <div>
+                                      {info.trackingUrl ? (
+                                        <a
+                                          href={info.trackingUrl}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-blue-600 hover:text-blue-800 hover:underline"
+                                        >
+                                          {info.trackingNumber}
+                                        </a>
+                                      ) : (
+                                        <span className="text-gray-600">{info.trackingNumber}</span>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
                             ))}
                           </div>
                         ) : (
@@ -1980,8 +2008,8 @@ export default function OrdersPage() {
                                           {conf.confirmedAt && (
                                             <span><span className="font-medium text-gray-500">Confirmed:</span> {new Date(conf.confirmedAt).toLocaleString()}</span>
                                           )}
-                                          {conf.shippingDate && (
-                                            <span><span className="font-medium text-gray-500">Ship:</span> {formatShippingDate(conf.shippingDate)}</span>
+                                          {conf.fulfillmentDate && (
+                                            <span><span className="font-medium text-gray-500">Fulfilled:</span> {formatFulfillmentDate(conf.fulfillmentDate)}</span>
                                           )}
                                           {conf.shopifyFulfillmentStatus && (
                                             <span><span className="font-medium text-gray-500">Status:</span> {conf.shopifyFulfillmentStatus}</span>
@@ -2427,20 +2455,6 @@ export default function OrdersPage() {
               </label>
 
               <div className="grid grid-cols-1 gap-3">
-                <label className="text-sm text-gray-700">
-                  <span className="block text-xs font-semibold uppercase text-gray-500 mb-1">Shipping date</span>
-                  <input
-                    type="date"
-                    value={pendingFulfillment.shippingDate}
-                    onChange={(event) => {
-                      setPendingFulfillment((prev) => (
-                        prev ? { ...prev, shippingDate: event.target.value } : prev
-                      ));
-                    }}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                  />
-                </label>
-
                 <div className="text-sm text-gray-700">
                   <span className="block text-xs font-semibold uppercase text-gray-500 mb-1">Shipping carrier</span>
                   <div className="relative">
@@ -2586,8 +2600,8 @@ export default function OrdersPage() {
                 <input type="text" value={editFulModal.barcodes} onChange={(e) => setEditFulModal((p) => p ? { ...p, barcodes: e.target.value } : null)} placeholder="barcode1 barcode2" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
               </label>
               <label className="block text-sm text-gray-700">
-                <span className="block text-xs font-semibold uppercase text-gray-500 mb-1">Shipping Date</span>
-                <input type="date" value={editFulModal.shippingDate} onChange={(e) => setEditFulModal((p) => p ? { ...p, shippingDate: e.target.value } : null)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                <span className="block text-xs font-semibold uppercase text-gray-500 mb-1">Fulfillment Date</span>
+                <input type="date" value={editFulModal.fulfillmentDate} onChange={(e) => setEditFulModal((p) => p ? { ...p, fulfillmentDate: e.target.value } : null)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
               </label>
               <label className="block text-sm text-gray-700">
                 <span className="block text-xs font-semibold uppercase text-gray-500 mb-1">Carrier</span>

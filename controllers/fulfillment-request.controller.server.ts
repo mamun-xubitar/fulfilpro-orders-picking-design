@@ -133,7 +133,7 @@ function parseEditData(body: unknown) {
 
   const result: {
     barcodes?: string[];
-    shippingDate?: string | null;
+    fulfillmentDate?: string | null;
     trackingInfo?: FulfillmentTrackingInput | null;
   } = {};
 
@@ -143,10 +143,10 @@ function parseEditData(body: unknown) {
       : [];
   }
 
-  if ('shippingDate' in v) {
-    const sd = typeof v.shippingDate === 'string' ? v.shippingDate.trim() : '';
-    if (sd && !/^\d{4}-\d{2}-\d{2}$/.test(sd)) throw new Error('Invalid shipping date format');
-    result.shippingDate = sd || null;
+  if ('fulfillmentDate' in v) {
+    const fd = typeof v.fulfillmentDate === 'string' ? v.fulfillmentDate.trim() : '';
+    if (fd && !/^\d{4}-\d{2}-\d{2}$/.test(fd)) throw new Error('Invalid fulfillment date format');
+    result.fulfillmentDate = fd || null;
   }
 
   if ('trackingInfo' in v) {

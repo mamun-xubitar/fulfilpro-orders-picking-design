@@ -54,7 +54,17 @@ type OrderSearchLookup = {
 
 type FulfillmentCreateResult = {
   fulfillmentCreate: {
-    fulfillment: { id: string; status: string } | null;
+    fulfillment: {
+      id: string;
+      status: string
+      estimatedDeliveryAt?: string;
+      deliveredAt?: string;
+      trackingInfo?: {
+        company?: string
+        number?: string;
+        url?: string
+      }[]
+    } | null;
     userErrors: Array<{ field: string[] | null; message: string }>;
   };
 };
@@ -132,6 +142,13 @@ async function createFulfillmentForLocation(
           fulfillment {
             id
             status
+            estimatedDeliveryAt
+            deliveredAt
+            trackingInfo{
+              company
+              number
+              url
+            }
           }
           userErrors {
             field
@@ -261,6 +278,8 @@ async function getOrderFulfillmentOrdersById(shop: string, accessToken: string, 
             nodes {
               id
               status
+              fulfillAt
+              fulfillBy
               assignedLocation {
                 location {
                   id
@@ -298,6 +317,8 @@ async function findOrderFulfillmentOrdersByNumber(shop: string, accessToken: str
               nodes {
                 id
                 status
+                fulfillAt
+                fulfillBy
                 assignedLocation {
                   location {
                     id
@@ -358,7 +379,7 @@ function buildFulfillmentGroups(
   for (const line of lines) {
     let quantityLeft = line.quantity;
     const candidates = remainingByLineItem.get(line.lineItemId) ?? [];
-    
+
     for (const candidate of candidates) {
       if (quantityLeft <= 0) break;
 

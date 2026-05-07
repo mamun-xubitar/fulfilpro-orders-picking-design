@@ -59,7 +59,7 @@ model Store {
 
 model Order {
   id                String    @id @default(uuid())
-  number            String    @unique
+  number            String
   cusName           String
   cusEmail          String?
   address           String?
@@ -86,6 +86,8 @@ model Order {
   messages          OrderMessage[]
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
+
+  @@unique([storeId, number])
 }
 
 model OrderMessage {

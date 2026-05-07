@@ -60,8 +60,8 @@ export class OrderController {
     const notifyCustomer = parseNotifyCustomer(body);
     const trackingInfo = parseTrackingInfo(body);
     const barcodes = parseFulfillmentBarcodes(body);
-    const shippingDate = parseShippingDate(body);
-    const result = await model.confirmFulfillment(orderId, lines, notifyCustomer, trackingInfo, barcodes, shippingDate);
+    const fulfillmentDate = parseFulfillmentDate(body);
+    const result = await model.confirmFulfillment(orderId, lines, notifyCustomer, trackingInfo, barcodes, fulfillmentDate);
 
     return {
       data: result,
@@ -161,20 +161,20 @@ function parseFulfillmentBarcodes(body: unknown) {
   return value.map((barcode) => String(barcode ?? ''));
 }
 
-function parseShippingDate(body: unknown) {
+function parseFulfillmentDate(body: unknown) {
   if (!body || typeof body !== 'object') return null;
-  const value = (body as { shippingDate?: unknown }).shippingDate;
+  const value = (body as { fulfillmentDate?: unknown }).fulfillmentDate;
   if (typeof value !== 'string') return null;
 
   const trimmed = value.trim();
   if (!trimmed) return null;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
-    throw new Error('Shipping date must be a valid date');
+    throw new Error('Fulfillment date must be a valid date');
   }
 
   const parsed = new Date(`${trimmed}T00:00:00.000Z`);
   if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== trimmed) {
-    throw new Error('Shipping date must be a valid date');
+    throw new Error('Fulfillment date must be a valid date');
   }
 
   return trimmed;

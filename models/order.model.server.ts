@@ -89,7 +89,7 @@ export class OrderModel {
     const { payload, storeId } = params;
     // console.log('Processing order webhook', JSON.stringify(payload, null, 2));
     const exists = await prisma.order.findUnique({
-      where: { number: `${payload.order_number}` },
+      where: { storeId_number: {number: payload.order_number.toString(), storeId} },
       select: { id: true },
     });
 
@@ -111,20 +111,25 @@ export class OrderModel {
     const { payload, storeId } = params;
     const number = `${payload.order_number}`;
     const existing = await prisma.order.findUnique({
-      where: { number },
+      where: {
+        storeId_number: {
+          storeId,
+          number
+        }
+      },
       select: {
         id: true,
         fulfillmentItems: true,
       },
     });
 
+    console.log("exisint", !!existing, storeId)
     if (!existing) {
       await prisma.order.create({
         data: buildOrderCreateData(payload, storeId),
       });
       return { created: true, updated: false };
     }
-
     await prisma.order.update({
       where: { id: existing.id },
       data: buildOrderUpdateData(payload, storeId, existing.fulfillmentItems),
@@ -296,7 +301,7 @@ export class OrderModel {
     notifyCustomer: boolean,
     trackingInfo: FulfillmentTrackingInput | null,
     barcodes: string[] = [],
-    shippingDate: string | null = null
+    fulfillmentDate: string | null = null
   ) {
     const order = await prisma.order.findUnique({
       where: { id: orderId },
@@ -343,6 +348,8 @@ export class OrderModel {
       })),
     });
 
+    const fulfillment = shopifyResult.fulfillments[0];
+    const fulfillmentDate2 = (new Date(fulfillment?.estimatedDeliveryAt || fulfillment?.deliveredAt || new Date().toISOString()).toISOString()).split("T")[0];
     const confirmation = {
       id: crypto.randomUUID(),
       confirmedAt: new Date().toISOString(),
@@ -350,8 +357,8 @@ export class OrderModel {
       shopifyFulfillmentStatus: shopifyResult.fulfillmentStatus,
       notifyCustomer,
       barcodes: fulfillmentBarcodes,
-      shippingDate,
-      trackingInfo,
+      fulfillmentDate: fulfillmentDate2,
+      trackingInfo: fulfillment?.trackingInfo?.[0] || trackingInfo,
       lines: fulfillableLines,
     };
 
@@ -386,7 +393,7 @@ export class OrderModel {
     fulfillmentId: string,
     editData: {
       barcodes?: string[];
-      shippingDate?: string | null;
+      fulfillmentDate?: string | null;
       trackingInfo?: FulfillmentTrackingInput | null;
     }
   ) {
@@ -424,7 +431,7 @@ export class OrderModel {
     const updatedConf = {
       ...existing,
       ...(editData.barcodes !== undefined ? { barcodes: normalizeBarcodes(editData.barcodes) } : {}),
-      ...(editData.shippingDate !== undefined ? { shippingDate: editData.shippingDate } : {}),
+      ...(editData.fulfillmentDate !== undefined ? { fulfillmentDate: editData.fulfillmentDate } : {}),
       ...(editData.trackingInfo !== undefined ? { trackingInfo: editData.trackingInfo } : {}),
     };
 
@@ -799,11 +806,15 @@ function toShopifyFulfillmentConfirmations(payload: ShopifyOrderPayload) {
         }))
         .filter((line) => line.lineItemId && line.quantity > 0);
 
+      const createdAt = fulfillment.created_at ?? fulfillment.updated_at ?? null;
+      const fulfillmentDate = createdAt ? createdAt.split('T')[0] : null;
+
       return {
         id: shopifyFulfillmentId ?? crypto.randomUUID(),
-        confirmedAt: fulfillment.created_at ?? fulfillment.updated_at ?? null,
+        confirmedAt: createdAt,
         shopifyFulfillmentId,
         shopifyFulfillmentStatus: fulfillment.status ?? null,
+        fulfillmentDate,
         trackingInfo: {
           number: fulfillment.tracking_number ?? '',
           company: fulfillment.tracking_company ?? '',
