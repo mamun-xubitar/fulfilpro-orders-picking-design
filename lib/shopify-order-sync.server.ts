@@ -66,8 +66,12 @@ type ShopifyGraphQLOrder = {
       id: string;
       name: string;
       sku: string | null;
+      vendor: string | null;
       quantity: number;
       fulfillableQuantity: number;
+      product: {
+        id: string;
+      } | null;
       discountedUnitPriceSet: {
         shopMoney: {
           amount: string;
@@ -137,8 +141,12 @@ const ORDERS_QUERY = `
             id
             name
             sku
+            vendor
             quantity
             fulfillableQuantity
+            product {
+              id
+            }
             discountedUnitPriceSet {
               shopMoney {
                 amount
@@ -367,6 +375,8 @@ function toShopifyOrderPayload(order: ShopifyGraphQLOrder): ShopifyOrderPayload 
       id: getLegacyId(lineItem.id),
       name: lineItem.name,
       sku: lineItem.sku,
+      product_id: lineItem.product?.id ? getLegacyId(lineItem.product.id) : null,
+      vendor: lineItem.vendor,
       quantity: lineItem.quantity,
       fulfillable_quantity: lineItem.fulfillableQuantity,
       price: lineItem.discountedUnitPriceSet?.shopMoney.amount ?? null,

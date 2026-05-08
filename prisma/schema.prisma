@@ -85,10 +85,49 @@ model Order {
   store             Store     @relation(fields: [storeId], references: [id])
   messages          OrderMessage[]
   notes             OrderNote[]
+  backInStockRequests BackInStockRequest[]
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
   @@unique([storeId, number])
+}
+
+model BackInStockRequest {
+  id                String               @id @default(uuid())
+  orderId           String
+  orderNumber       String
+  requesterId       String
+  requesterName     String
+  requesterEmail    String
+  status            String               @default("pending")
+  items             Json
+  requestMessage    String?
+  requesterViewedAt DateTime?
+  lastAdminUpdateAt DateTime?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  order             Order                @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  messages          BackInStockMessage[]
+
+  @@index([orderId])
+  @@index([requesterId])
+  @@index([status])
+  @@index([updatedAt])
+}
+
+model BackInStockMessage {
+  id          String             @id @default(uuid())
+  requestId   String
+  senderId    String?
+  senderName  String
+  senderEmail String
+  senderRole  String
+  message     String
+  status      String?
+  createdAt   DateTime           @default(now())
+  request     BackInStockRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId, createdAt])
 }
 
 model OrderNote {

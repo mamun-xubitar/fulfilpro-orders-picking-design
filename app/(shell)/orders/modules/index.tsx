@@ -5,7 +5,7 @@ import { useSession } from 'next-auth/react';
 import { toast } from 'react-toastify';
 import { isStaffLikeRole, isTestUserRole } from '@/lib/roles';
 
-type OrderItem = { id: string; name: string; sku: string; qty: number };
+type OrderItem = { id: string; productId: string | null; name: string; sku: string; vendor: string; qty: number };
 type OrderRow = {
   id: string;
   number: string;
@@ -34,6 +34,8 @@ type OrderRow = {
   itemsCount: number;
   messageCount: number;
   noteCount: number;
+  stockRequestCount: number;
+  backInStockStatus: BackInStockStatus | null;
 };
 
 type StoreOption = { id: string; name: string; storeDomain: string };
@@ -54,6 +56,31 @@ type OrderNote = {
   authorEmail: string | null;
   editorName: string | null;
   editorEmail: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+type BackInStockStatus = 'pending' | 'partially_back_in_stock' | 'back_in_stock';
+type BackInStockItem = { lineItemId: string; dueDate: string; supplierName: string; quantity: number; item: string; restockedQuantity?: number };
+type BackInStockMessage = {
+  id: string;
+  senderName: string;
+  senderEmail: string;
+  senderRole: string;
+  message: string;
+  status: BackInStockStatus | null;
+  createdAt: string;
+};
+type BackInStockRequest = {
+  id: string;
+  orderId: string;
+  orderNumber: string;
+  requesterName: string;
+  requesterEmail: string;
+  status: BackInStockStatus;
+  items: BackInStockItem[];
+  requestMessage: string | null;
+  unreadUpdateCount: number;
+  messages: BackInStockMessage[];
   createdAt: string;
   updatedAt: string;
 };
@@ -357,6 +384,8 @@ const DEFAULT_PAGINATION: Pagination = {
   hasNext: false,
 };
 
+type PaginationItem = number | 'ellipsis';
+
 function compactAddressParts(parts: Array<string | null>) {
   return parts
     .map((part) => part?.trim())
@@ -405,6 +434,18 @@ function formatSyncDate(value: string) {
     dateStyle: 'medium',
     timeStyle: 'short',
   });
+}
+
+function formatStockStatus(status: BackInStockStatus) {
+  if (status === 'back_in_stock') return 'Back in stock';
+  if (status === 'partially_back_in_stock') return 'Partially back in stock';
+  return 'Pending';
+}
+
+function getStockStatusChip(status: BackInStockStatus) {
+  if (status === 'back_in_stock') return 'bg-emerald-50 text-emerald-700 border border-emerald-200';
+  if (status === 'partially_back_in_stock') return 'bg-blue-50 text-blue-700 border border-blue-200';
+  return 'bg-amber-50 text-amber-800 border border-amber-200';
 }
 
 const MONTH_LABELS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -490,6 +531,15 @@ export default function OrdersPage() {
     loading: boolean;
     saving: boolean;
     deletingId: string | null;
+    error: string;
+  } | null>(null);
+  const [stockModal, setStockModal] = useState<{
+    order: OrderRow;
+    requests: BackInStockRequest[];
+    items: BackInStockItem[];
+    message: string;
+    loading: boolean;
+    saving: boolean;
     error: string;
   } | null>(null);
   const [printingOrderId, setPrintingOrderId] = useState<string | null>(null);
@@ -874,6 +924,48 @@ export default function OrdersPage() {
       month: 'short',
       day: 'numeric',
     });
+  };
+
+  const getBackInStockEligibleItems = (order: OrderRow) => {
+    return order.items
+      .map((item) => {
+        const fulfilledQty = getFulfilledQty(order, item.id);
+        const remainingQty = Math.max(0, item.qty - fulfilledQty);
+        return {
+          lineItemId: item.id,
+          name: item.name,
+          sku: item.sku,
+          vendor: item.vendor,
+          remainingQty,
+        };
+      })
+      .filter((item) => item.remainingQty > 0);
+  };
+
+  const createDefaultStockItem = (order: OrderRow): BackInStockItem => {
+    const firstItem = getBackInStockEligibleItems(order)[0];
+    return {
+      lineItemId: firstItem?.lineItemId ?? '',
+      dueDate: '',
+      supplierName: firstItem?.vendor ?? '',
+      quantity: firstItem?.remainingQty ?? 1,
+      item: firstItem?.name ?? '',
+    };
+  };
+
+  const getAvailableStockItemsForRow = (order: OrderRow, items: BackInStockItem[], rowIndex: number) => {
+    const selectedIds = new Set(
+      items
+        .map((item, index) => (index === rowIndex ? '' : item.lineItemId))
+        .filter(Boolean)
+    );
+    return getBackInStockEligibleItems(order).filter((item) => !selectedIds.has(item.lineItemId));
+  };
+
+  const hasStockItemAvailableToAdd = (order: OrderRow, items: BackInStockItem[]) => {
+    return getBackInStockEligibleItems(order).some((item) => (
+      !items.some((selected) => selected.lineItemId === item.lineItemId)
+    ));
   };
 
   const setFulfillmentMessage = (orderId: string, message: string) => {
@@ -1427,6 +1519,162 @@ export default function OrdersPage() {
     }
   };
 
+  const openStockModal = async (order: OrderRow) => {
+    setStockModal({
+      order,
+      requests: [],
+      items: [createDefaultStockItem(order)],
+      message: '',
+      loading: true,
+      saving: false,
+      error: '',
+    });
+
+    try {
+      const res = await fetch(`/api/orders/${encodeURIComponent(order.id)}/back-in-stock`);
+      const json = (await res.json()) as ApiResponse<BackInStockRequest[]>;
+
+      if (!res.ok || !json.success) {
+        throw new Error(getApiErrorMessage(json, 'Failed to load back in stock requests'));
+      }
+
+      setStockModal((prev) => (
+        prev && prev.order.id === order.id ? { ...prev, requests: json.data, loading: false } : prev
+      ));
+    } catch (err) {
+      setStockModal((prev) => (
+        prev && prev.order.id === order.id
+          ? { ...prev, loading: false, error: err instanceof Error ? err.message : 'Failed to load back in stock requests.' }
+          : prev
+      ));
+    }
+  };
+
+  const closeStockModal = () => {
+    if (stockModal?.saving) return;
+    setStockModal(null);
+  };
+
+  const updateStockItem = (index: number, field: keyof BackInStockItem, value: string) => {
+    setStockModal((prev) => {
+      if (!prev) return prev;
+      const eligibleItems = getBackInStockEligibleItems(prev.order);
+      const items = prev.items.map((item, itemIndex) => (
+        itemIndex === index
+          ? (() => {
+              if (field === 'lineItemId') {
+                const selected = eligibleItems.find((eligible) => eligible.lineItemId === value);
+                return {
+                  ...item,
+                  lineItemId: value,
+                  item: selected?.name ?? '',
+                  supplierName: selected?.vendor ?? '',
+                  quantity: selected?.remainingQty ?? 1,
+                };
+              }
+              if (field === 'quantity') {
+                const selected = eligibleItems.find((eligible) => eligible.lineItemId === item.lineItemId);
+                const maxQty = selected?.remainingQty ?? 1;
+                return { ...item, quantity: Math.min(Math.max(1, Number(value) || 1), maxQty) };
+              }
+              return { ...item, [field]: value };
+            })()
+          : item
+      ));
+      return { ...prev, items, error: '' };
+    });
+  };
+
+  const addStockItem = () => {
+    setStockModal((prev) => {
+      if (!prev) return prev;
+      const nextItem = getBackInStockEligibleItems(prev.order).find((item) => (
+        !prev.items.some((selected) => selected.lineItemId === item.lineItemId)
+      ));
+      if (!nextItem) return { ...prev, error: 'No more products available to add.' };
+      return {
+        ...prev,
+        items: [
+          ...prev.items,
+          {
+            lineItemId: nextItem.lineItemId,
+            dueDate: '',
+            supplierName: nextItem.vendor,
+            quantity: nextItem.remainingQty,
+            item: nextItem.name,
+          },
+        ],
+        error: '',
+      };
+    });
+  };
+
+  const removeStockItem = (index: number) => {
+    setStockModal((prev) => {
+      if (!prev || prev.items.length === 1) return prev;
+      return { ...prev, items: prev.items.filter((_, itemIndex) => itemIndex !== index), error: '' };
+    });
+  };
+
+  const submitStockRequest = async () => {
+    if (!stockModal || stockModal.saving) return;
+    if (blockTestModeAction()) return;
+
+    const items = stockModal.items.map((item) => ({
+      lineItemId: item.lineItemId.trim(),
+      dueDate: item.dueDate.trim(),
+      supplierName: item.supplierName.trim(),
+      quantity: Number(item.quantity),
+      item: item.item.trim(),
+    }));
+    const eligibleItems = getBackInStockEligibleItems(stockModal.order);
+    const eligibleIds = new Set(eligibleItems.map((item) => item.lineItemId));
+
+    if (eligibleItems.length === 0) {
+      setStockModal((prev) => prev ? { ...prev, error: 'No product to request back in stock.' } : prev);
+      return;
+    }
+
+    if (items.some((item) => !eligibleIds.has(item.lineItemId) || !item.dueDate || !item.supplierName || !item.item || !Number.isFinite(item.quantity) || item.quantity <= 0)) {
+      setStockModal((prev) => prev ? { ...prev, error: 'Complete every product detail before submitting.' } : prev);
+      return;
+    }
+
+    setStockModal((prev) => prev ? { ...prev, saving: true, error: '' } : prev);
+    try {
+      const res = await fetch('/api/back-in-stock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId: stockModal.order.id,
+          items,
+          message: stockModal.message.trim(),
+        }),
+      });
+      const json = (await res.json()) as ApiResponse<BackInStockRequest>;
+
+      if (!res.ok || !json.success) {
+        throw new Error(getApiErrorMessage(json, 'Failed to submit back in stock request'));
+      }
+
+      setStockModal((prev) => (
+        prev && prev.order.id === stockModal.order.id
+          ? { ...prev, requests: [json.data], saving: false, message: '', error: '' }
+          : prev
+      ));
+      setOrders((prev) => prev.map((item) => (
+        item.id === stockModal.order.id
+          ? { ...item, stockRequestCount: Math.max(1, item.stockRequestCount), backInStockStatus: json.data.status }
+          : item
+      )));
+      toast.success('Back in stock request submitted.');
+    } catch (err) {
+      setStockModal((prev) => (
+        prev ? { ...prev, saving: false, error: err instanceof Error ? err.message : 'Failed to submit back in stock request.' } : prev
+      ));
+    }
+  };
+
   const writePrintDocument = (printWindow: Window, documentHtml: string) => {
     printWindow.document.open();
     printWindow.document.write(documentHtml);
@@ -1613,14 +1861,21 @@ export default function OrdersPage() {
     setPagination((prev) => ({ ...prev, page }));
   };
 
-  const pageNumbers = useMemo(() => {
-    const current = pagination.page;
+  const pageNumbers = useMemo<PaginationItem[]>(() => {
     const total = pagination.totalPages;
-    const from = Math.max(1, current - 2);
-    const to = Math.min(total, current + 2);
-    const pages: number[] = [];
-    for (let i = from; i <= to; i += 1) pages.push(i);
-    return pages;
+    if (total <= 5) {
+      return Array.from({ length: total }, (_, index) => index + 1);
+    }
+
+    if (pagination.page <= 2) {
+      return [1, 2, 3, 'ellipsis', total];
+    }
+
+    if (pagination.page >= total - 1) {
+      return [1, 'ellipsis', total - 2, total - 1, total];
+    }
+
+    return [1, 'ellipsis', pagination.page - 1, pagination.page, pagination.page + 1, 'ellipsis', total];
   }, [pagination.page, pagination.totalPages]);
 
   useEffect(() => {
@@ -2077,10 +2332,11 @@ export default function OrdersPage() {
                 const orderAddressLines = getOrderAddressLines(order);
                 const fulfillmentInfo = getFulfillmentInfo(order);
                 const isFullyFulfilled = isOrderFullyFulfilled(order);
+                const hasBackInStockSignal = Boolean(order.backInStockStatus && !isFullyFulfilled);
                 return (
                   <Fragment key={order.id}>
                     <tr
-                      className={`border-b border-gray-100 ${status.row ?? 'hover:bg-gray-50'} transition-colors duration-100`}
+                      className={`border-b border-gray-100 ${hasBackInStockSignal ? 'bg-amber-50 hover:bg-amber-100' : status.row ?? 'hover:bg-gray-50'} transition-colors duration-100`}
                     >
                       <td className="hidden sm:table-cell px-4 py-3 text-gray-400 text-xs">
                         {(pagination.page - 1) * pagination.pageSize + index + 1}
@@ -2092,9 +2348,16 @@ export default function OrdersPage() {
                         {new Date(order.orderedAt).toLocaleString()}
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${status.chip}`}>
-                          {status.label}
-                        </span>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${status.chip}`}>
+                            {status.label}
+                          </span>
+                          {hasBackInStockSignal && order.backInStockStatus && (
+                            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${getStockStatusChip(order.backInStockStatus)}`}>
+                              {formatStockStatus(order.backInStockStatus)}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="hidden sm:table-cell px-4 py-3 text-sm text-gray-600">
                         {order.itemsCount} item{order.itemsCount !== 1 ? 's' : ''}
@@ -2247,9 +2510,8 @@ export default function OrdersPage() {
                       <tr>
                         <td colSpan={10} className="p-0">
                           <div className="relative bg-blue-50 border-b border-blue-100 p-5">
-                            {order.fulfillmentItems.confirmations.length > 0 && (
-                              <div className="absolute top-3 right-4">
-                                {fulfillmentViewOrderId === order.id ? (
+                            <div className="absolute top-3 right-4">
+                              {fulfillmentViewOrderId === order.id ? (
                                   <button
                                     onClick={() => setFulfillmentViewOrderId(null)}
                                     className="flex items-center gap-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50 cursor-pointer"
@@ -2260,18 +2522,32 @@ export default function OrdersPage() {
                                     Back
                                   </button>
                                 ) : (
-                                  <button
-                                    onClick={() => setFulfillmentViewOrderId(order.id)}
-                                    className="flex items-center gap-1.5 text-xs font-medium text-blue-600 bg-white border border-blue-300 rounded-lg px-3 py-1.5 hover:bg-blue-50 cursor-pointer"
-                                  >
-                                    Fulfillments
-                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                    </svg>
-                                  </button>
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      onClick={() => void openStockModal(order)}
+                                      className="relative flex items-center gap-1.5 text-xs font-medium text-amber-700 bg-white border border-amber-300 rounded-lg px-3 py-1.5 hover:bg-amber-50 cursor-pointer"
+                                    >
+                                      Request Stock
+                                      {order.stockRequestCount > 0 && (
+                                        <span className="inline-flex min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-semibold leading-4 text-white">
+                                          {order.stockRequestCount > 99 ? '99+' : order.stockRequestCount}
+                                        </span>
+                                      )}
+                                    </button>
+                                    {order.fulfillmentItems.confirmations.length > 0 && (
+                                      <button
+                                        onClick={() => setFulfillmentViewOrderId(order.id)}
+                                        className="flex items-center gap-1.5 text-xs font-medium text-blue-600 bg-white border border-blue-300 rounded-lg px-3 py-1.5 hover:bg-blue-50 cursor-pointer"
+                                      >
+                                        Fulfillments
+                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                        </svg>
+                                      </button>
+                                    )}
+                                  </div>
                                 )}
                               </div>
-                            )}
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
                               <div>
                                 <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">Customer &amp; Order</h4>
@@ -2545,15 +2821,19 @@ export default function OrdersPage() {
               Prev
             </button>
 
-            {pageNumbers.map((pageNumber) => (
-              <button
-                key={pageNumber}
-                onClick={() => goToPage(pageNumber)}
-                disabled={loading}
-                className={`px-2.5 py-1.5 text-xs border rounded-lg ${pagination.page === pageNumber ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-100'}`}
-              >
-                {pageNumber}
-              </button>
+            {pageNumbers.map((pageNumber, index) => (
+              pageNumber === 'ellipsis' ? (
+                <span key={`ellipsis-${index}`} className="px-1.5 text-xs text-gray-400">...</span>
+              ) : (
+                <button
+                  key={pageNumber}
+                  onClick={() => goToPage(pageNumber)}
+                  disabled={loading}
+                  className={`px-2.5 py-1.5 text-xs border rounded-lg ${pagination.page === pageNumber ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-100'}`}
+                >
+                  {pageNumber}
+                </button>
+              )
             ))}
 
             <button
@@ -2566,6 +2846,183 @@ export default function OrdersPage() {
           </div>
         </div>
       </div>
+
+      {stockModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 px-4 py-6">
+          <div className="max-h-[90vh] w-full max-w-3xl overflow-hidden rounded-xl bg-white shadow-xl">
+            <div className="flex items-start justify-between border-b border-gray-200 px-5 py-4">
+              <div>
+                <h3 className="text-base font-semibold text-gray-900">Request stock</h3>
+                <p className="mt-0.5 text-xs text-gray-500">Order {stockModal.order.number} - {stockModal.order.customer}</p>
+              </div>
+              <button
+                onClick={closeStockModal}
+                disabled={stockModal.saving}
+                className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-50"
+                aria-label="Close stock request modal"
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18 18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="max-h-[calc(90vh-132px)] overflow-y-auto px-5 py-4">
+              {stockModal.loading ? (
+                <div className="py-12 text-center text-sm text-gray-400">Loading stock request...</div>
+              ) : stockModal.requests.length > 0 ? (
+                <div className="space-y-4">
+                  {stockModal.requests.map((request) => (
+                    <div key={request.id} className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900">{formatStockStatus(request.status)}</p>
+                          <p className="text-xs text-gray-500">Requested by {request.requesterName} on {new Date(request.createdAt).toLocaleString()}</p>
+                        </div>
+                        {request.unreadUpdateCount > 0 && (
+                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                            {request.unreadUpdateCount} update{request.unreadUpdateCount === 1 ? '' : 's'}
+                          </span>
+                        )}
+                      </div>
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="border-b border-gray-200 text-gray-500">
+                            <th className="py-1 text-left font-medium">Item</th>
+                            <th className="py-1 text-left font-medium">Supplier</th>
+                              <th className="py-1 text-center font-medium">Qty</th>
+                              <th className="py-1 text-center font-medium">Restocked</th>
+                              <th className="py-1 text-left font-medium">Due</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {request.items.map((item, index) => (
+                            <tr key={`${request.id}-${index}`} className="border-b border-gray-100">
+                              <td className="py-1.5 pr-2 text-gray-700">{item.item}</td>
+                              <td className="py-1.5 pr-2 text-gray-600">{item.supplierName}</td>
+                              <td className="py-1.5 text-center text-gray-700">{item.quantity}</td>
+                              <td className="py-1.5 text-center text-gray-700">{item.restockedQuantity ?? 0}</td>
+                              <td className="py-1.5 text-gray-600">{item.dueDate}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      {request.requestMessage && (
+                        <p className="mt-3 whitespace-pre-wrap rounded-lg border border-gray-200 bg-white p-3 text-sm text-gray-700">{request.requestMessage}</p>
+                      )}
+                      <div className="mt-4 space-y-2">
+                        {request.messages.length === 0 ? (
+                          <p className="text-xs text-gray-400">No updates yet.</p>
+                        ) : request.messages.map((message) => (
+                          <div key={message.id} className="rounded-lg bg-white px-3 py-2 text-sm">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <span className="font-medium text-gray-800">{message.senderName}</span>
+                              <span className="text-xs text-gray-400">{new Date(message.createdAt).toLocaleString()}</span>
+                            </div>
+                            <p className="mt-1 whitespace-pre-wrap text-gray-700">{message.message}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : getBackInStockEligibleItems(stockModal.order).length === 0 ? (
+                <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-500">
+                  No product to request back in stock.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {stockModal.items.map((item, index) => {
+                    const eligibleItems = getAvailableStockItemsForRow(stockModal.order, stockModal.items, index);
+                    const selected = eligibleItems.find((eligible) => eligible.lineItemId === item.lineItemId);
+                    return (
+                      <div key={index} className="grid grid-cols-1 gap-2 rounded-lg border border-gray-200 p-2.5 sm:grid-cols-[minmax(0,1.3fr)_minmax(0,0.9fr)_70px_160px_34px]">
+                        <select
+                          value={item.lineItemId}
+                          onChange={(e) => updateStockItem(index, 'lineItemId', e.target.value)}
+                          className="min-w-0 rounded-md border border-gray-300 px-2.5 py-1.5 text-xs"
+                        >
+                          {eligibleItems.map((eligible) => (
+                            <option key={eligible.lineItemId} value={eligible.lineItemId}>
+                              {eligible.name}{eligible.sku ? ` - ${eligible.sku}` : ''} ({eligible.remainingQty} left)
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          value={item.supplierName}
+                          onChange={(e) => updateStockItem(index, 'supplierName', e.target.value)}
+                          className="min-w-0 rounded-md border border-gray-300 px-2.5 py-1.5 text-xs"
+                          placeholder="Supplier"
+                        />
+                        <input
+                          type="number"
+                          min={1}
+                          max={selected?.remainingQty ?? 1}
+                          value={item.quantity}
+                          onChange={(e) => updateStockItem(index, 'quantity', e.target.value)}
+                          className="rounded-md border border-gray-300 px-2 py-1.5 text-xs"
+                          placeholder="Qty"
+                        />
+                        <label className="flex min-w-0 items-center overflow-hidden rounded-md border border-gray-300 bg-white">
+                          <span className="border-r border-gray-200 bg-gray-50 px-2 py-1.5 text-[11px] font-medium text-gray-500">
+                            Due date
+                          </span>
+                          <input
+                            type="date"
+                            value={item.dueDate}
+                            onChange={(e) => updateStockItem(index, 'dueDate', e.target.value)}
+                            className="min-w-0 flex-1 px-2 py-1.5 text-xs outline-none"
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => removeStockItem(index)}
+                          disabled={stockModal.items.length === 1}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 text-gray-500 hover:bg-gray-50 disabled:opacity-40"
+                          aria-label="Remove product detail"
+                        >
+                          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18 18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    );
+                  })}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={addStockItem}
+                      disabled={!hasStockItemAvailableToAdd(stockModal.order, stockModal.items)}
+                      className="rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      Add Product
+                    </button>
+                  </div>
+                  <textarea
+                    value={stockModal.message}
+                    onChange={(e) => setStockModal((prev) => prev ? { ...prev, message: e.target.value, error: '' } : prev)}
+                    className="min-h-20 w-full rounded-md border border-gray-300 px-2.5 py-2 text-xs"
+                    placeholder="Message (optional)"
+                  />
+                </div>
+              )}
+              {stockModal.error && <p className="mt-3 text-sm text-red-600">{stockModal.error}</p>}
+            </div>
+            {!stockModal.loading && stockModal.requests.length === 0 && getBackInStockEligibleItems(stockModal.order).length > 0 && (
+              <div className="flex justify-end border-t border-gray-200 px-5 py-3">
+                <button
+                  type="button"
+                  onClick={() => void submitStockRequest()}
+                  disabled={stockModal.saving}
+                  className="rounded-md bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700 disabled:opacity-50"
+                >
+                  {stockModal.saving ? 'Submitting...' : 'Submit Request'}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {messageModal && (
         <div

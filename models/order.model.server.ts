@@ -48,8 +48,10 @@ export type ShopifyOrderPayload = {
   } | null;
   line_items?: Array<{
     id: string | number;
+    product_id?: string | number | null;
     name?: string | null;
     sku?: string | null;
+    vendor?: string | null;
     quantity?: number | null;
     fulfillable_quantity?: number | null;
     price?: string | number | null;
@@ -146,6 +148,7 @@ export class OrderModel {
     dateFrom?: string;
     dateTo?: string;
     fulfillmentStatuses?: string[];
+    viewerId?: string;
     page: number;
     pageSize: number;
   }) {
@@ -236,6 +239,20 @@ export class OrderModel {
             select: {
               messages: true,
               notes: true,
+              backInStockRequests: true,
+            },
+          },
+          backInStockRequests: {
+            select: {
+              status: true,
+              requesterId: true,
+              requesterViewedAt: true,
+              messages: {
+                select: {
+                  senderRole: true,
+                  createdAt: true,
+                },
+              },
             },
           },
         },
@@ -277,6 +294,19 @@ export class OrderModel {
             id: true,
             storeDomain: true,
             accessToken: true,
+          },
+        },
+        backInStockRequests: {
+          select: {
+            status: true,
+            requesterId: true,
+            requesterViewedAt: true,
+            messages: {
+              select: {
+                senderRole: true,
+                createdAt: true,
+              },
+            },
           },
         },
       },
@@ -324,6 +354,20 @@ export class OrderModel {
           select: {
             messages: true,
             notes: true,
+            backInStockRequests: true,
+          },
+        },
+        backInStockRequests: {
+          select: {
+            status: true,
+            requesterId: true,
+            requesterViewedAt: true,
+            messages: {
+              select: {
+                senderRole: true,
+                createdAt: true,
+              },
+            },
           },
         },
       },
@@ -858,7 +902,14 @@ function toOrderRow(row: {
   _count: {
     messages: number;
     notes: number;
+    backInStockRequests: number;
   };
+  backInStockRequests?: Array<{
+    status: string;
+    requesterId: string;
+    requesterViewedAt: Date | null;
+    messages: Array<{ senderRole: string; createdAt: Date }>;
+  }>;
 }) {
   const lineItems = toLineItems(row.lineItems);
   const itemCount = lineItems.reduce((sum, item) => sum + Math.max(0, item.qty), 0);
@@ -888,7 +939,23 @@ function toOrderRow(row: {
     itemsCount: itemCount,
     messageCount: row._count.messages,
     noteCount: row._count.notes,
+    stockRequestCount: getStockRequestBadgeCount(row),
+    backInStockStatus: getBackInStockStatus(row.backInStockRequests ?? []),
   };
+}
+
+function getStockRequestBadgeCount(row: {
+  _count: { backInStockRequests: number };
+}) {
+  return row._count.backInStockRequests;
+}
+
+function getBackInStockStatus(requests: Array<{ status: string }>) {
+  if (requests.length === 0) return null;
+  if (requests.some((request) => request.status === 'pending')) return 'pending';
+  if (requests.some((request) => request.status === 'partially_back_in_stock')) return 'partially_back_in_stock';
+  if (requests.some((request) => request.status === 'back_in_stock')) return 'back_in_stock';
+  return null;
 }
 
 function toOrderMessageRow(message: {
@@ -937,8 +1004,10 @@ function buildOrderWriteData(
   const fulfilledQuantityByLineItem = getFulfilledQuantityByLineItem(syncedFulfillmentConfirmations);
   const lineItems = (payload.line_items ?? []).map((item) => ({
     id: item.id,
+    productId: item.product_id ? String(item.product_id) : null,
     name: item.name ?? '',
     sku: item.sku ?? '',
+    vendor: item.vendor ?? '',
     qty: resolveLineItemQuantity(item, fulfilledQuantityByLineItem),
     price: Number(item.price_set?.shop_money?.amount ?? item.price ?? 0),
     currencyCode: item.price_set?.shop_money?.currency_code ?? null,
@@ -1339,19 +1408,21 @@ function getPeriodStartDate(period: 'all' | 'week' | 'month' | 'year') {
   return weekStart;
 }
 
-function toLineItems(value: Prisma.JsonValue): Array<{ id: string; name: string; sku: string; qty: number }> {
+function toLineItems(value: Prisma.JsonValue): Array<{ id: string; productId: string | null; name: string; sku: string; vendor: string; qty: number }> {
   if (!Array.isArray(value)) return [];
 
   return value.map((item) => {
     if (!item || typeof item !== 'object') {
-      return { id: '', name: '', sku: '', qty: 0 };
+      return { id: '', productId: null, name: '', sku: '', vendor: '', qty: 0 };
     }
 
     const obj = item as Record<string, unknown>;
     return {
       id: typeof obj.id === 'string' ? obj.id : String(obj.id ?? ''),
+      productId: typeof obj.productId === 'string' ? obj.productId : (obj.productId ? String(obj.productId) : null),
       name: typeof obj.name === 'string' ? obj.name : '',
       sku: typeof obj.sku === 'string' ? obj.sku : '',
+      vendor: typeof obj.vendor === 'string' ? obj.vendor : '',
       qty: typeof obj.qty === 'number' ? obj.qty : Number(obj.qty ?? 0),
     };
   });

@@ -168,6 +168,11 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
       adminOnly: false,
     },
     {
+      id: "back-in-stock", label: "Back In Stock", href: "/back-in-stock",
+      icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7h-9m0 0 3-3m-3 3 3 3M4 17h9m0 0-3-3m3 3-3 3M5 7h2m10 10h2" />,
+      adminOnly: false,
+    },
+    {
       id: "stores", label: "Stores", href: "/stores",
       icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/>,
       adminOnly: true,
@@ -189,7 +194,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
     },
   ];
 
-  const pageTitles: Record<string, string> = { orders: "Orders", stores: "Stores", users: "Users", profile: "Profile", settings: "Settings" };
+  const pageTitles: Record<string, string> = { orders: "Orders", "back-in-stock": "Back In Stock", stores: "Stores", users: "Users", profile: "Profile", settings: "Settings" };
   const activeId = pathname.split("/")[1] || "";
 
   const sidebarWidth = sidebarCollapsed ? "64px" : "240px";

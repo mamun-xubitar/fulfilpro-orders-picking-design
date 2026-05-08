@@ -5,7 +5,7 @@ const model = new OrderModel();
 type Period = 'all' | 'week' | 'month' | 'year';
 
 export class OrderController {
-  async list(searchParams: URLSearchParams) {
+  async list(searchParams: URLSearchParams, viewerId?: string) {
     const search = searchParams.get('search')?.trim() ?? '';
     const storeIds = searchParams.getAll('storeId').map((s) => s.trim()).filter(Boolean);
     const period = normalizePeriod(searchParams.get('period'));
@@ -23,6 +23,7 @@ export class OrderController {
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
         fulfillmentStatuses,
+        viewerId,
         page,
         pageSize,
       }),
