@@ -455,6 +455,7 @@ export default function OrdersPage() {
   const [lastSynced, setLastSynced] = useState('');
   const [refreshRotation, setRefreshRotation] = useState(0);
   const [refreshToken, setRefreshToken] = useState(0);
+  const [syncRefreshNeeded, setSyncRefreshNeeded] = useState(false);
   const [refreshingOrderIds, setRefreshingOrderIds] = useState<Record<string, boolean>>({});
   const [fullChecks, setFullChecks] = useState<Record<string, boolean>>({});
   const [partialValues, setPartialValues] = useState<Record<string, number>>({});
@@ -603,7 +604,9 @@ export default function OrdersPage() {
       ) {
         completedSyncJobIdRef.current = completedJobId;
         activeSyncJobIdRef.current = null;
-        setRefreshToken((prev) => prev + 1);
+        setSyncRefreshNeeded(
+          json.data.lastSuccessfulJob.totalCreated > 0 || json.data.lastSuccessfulJob.totalUpdated > 0
+        );
       }
     }
 
@@ -692,6 +695,7 @@ export default function OrdersPage() {
 
   const handleRefresh = () => {
     setRefreshRotation((prev) => prev + 360);
+    setSyncRefreshNeeded(false);
     setRefreshToken((prev) => prev + 1);
   };
 
@@ -750,6 +754,7 @@ export default function OrdersPage() {
 
       setSyncJob(json.data.job);
       activeSyncJobIdRef.current = json.data.job.id;
+      setSyncRefreshNeeded(false);
       if (json.data.alreadyRunning) {
         toast.info('A Shopify order sync is already running.');
       } else {
@@ -2008,7 +2013,11 @@ export default function OrdersPage() {
           <button
             onClick={handleRefresh}
             disabled={syncing}
-            className="flex items-center gap-1.5 bg-white border border-gray-300 text-gray-600 text-sm px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors duration-150 cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            className={`flex items-center gap-1.5 border text-sm px-3 py-2 rounded-lg transition-colors duration-150 cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed ${
+              syncRefreshNeeded
+                ? 'bg-amber-50 border-amber-300 text-amber-800 hover:bg-amber-100'
+                : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
+            }`}
           >
             <svg
               className="w-4 h-4"
