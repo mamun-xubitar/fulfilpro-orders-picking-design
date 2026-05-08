@@ -1019,10 +1019,18 @@ export default function OrdersPage() {
 
     const { order, lines, notifyCustomer, barcodeInput, trackingNumber, trackingUrl, trackingCompany } = pendingFulfillment;
     const barcodes = parseBarcodes(barcodeInput);
+    const trimmedTrackingNumber = trackingNumber.trim();
+    const trimmedTrackingCompany = trackingCompany.trim();
+
+    if (trimmedTrackingCompany && !trimmedTrackingNumber) {
+      toast.error('Tracking number is required when a shipping carrier is selected.');
+      return;
+    }
+
     const trackingInfo = {
-      number: trackingNumber.trim(),
+      number: trimmedTrackingNumber,
       url: trackingUrl.trim(),
-      company: trackingCompany.trim(),
+      company: trimmedTrackingCompany,
     };
     setFulSaving((prev) => ({ ...prev, [order.id]: true }));
     try {
@@ -3419,10 +3427,13 @@ export default function OrdersPage() {
                 </div>
 
                 <label className="text-sm text-gray-700">
-                  <span className="block text-xs font-semibold uppercase text-gray-500 mb-1">Tracking number</span>
+                  <span className="block text-xs font-semibold uppercase text-gray-500 mb-1">
+                    Tracking number{pendingFulfillment.trackingCompany.trim() ? ' *' : ''}
+                  </span>
                   <input
                     type="text"
                     value={pendingFulfillment.trackingNumber}
+                    required={Boolean(pendingFulfillment.trackingCompany.trim())}
                     onChange={(event) => {
                       setPendingFulfillment((prev) => (
                         prev ? { ...prev, trackingNumber: event.target.value } : prev

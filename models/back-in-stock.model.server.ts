@@ -52,9 +52,9 @@ export class BackInStockModel {
     const where: Prisma.BackInStockRequestWhereInput = {};
     const search = params.search?.trim();
 
-    if (params.requesterId) {
-      where.requesterId = params.requesterId;
-    }
+    // if (params.requesterId) {
+    //   where.requesterId = params.requesterId;
+    // }
 
     if (isBackInStockStatus(params.status)) {
       where.status = params.status;
@@ -84,7 +84,10 @@ export class BackInStockModel {
 
   async listForOrder(orderId: string, viewerId: string, isAdmin: boolean) {
     const rows = await prisma.backInStockRequest.findMany({
-      where: { orderId, ...(isAdmin ? {} : { requesterId: viewerId }) },
+      where: {
+        orderId,
+        // ...(isAdmin ? {} : { requesterId: viewerId })
+      },
       include: { messages: { orderBy: { createdAt: 'desc' } } },
       orderBy: { createdAt: 'desc' },
     });
@@ -92,7 +95,7 @@ export class BackInStockModel {
     await prisma.backInStockRequest.updateMany({
       where: {
         orderId,
-        requesterId: viewerId,
+        // requesterId: viewerId,
         OR: [
           { requesterViewedAt: null },
           { requesterViewedAt: { lt: new Date() } },
@@ -102,7 +105,7 @@ export class BackInStockModel {
     });
 
     return rows.map((row) => (
-      row.requesterId === viewerId ? toRow({ ...row, requesterViewedAt: new Date() }) : toRow(row)
+      toRow(row)
     ));
   }
 
@@ -122,7 +125,7 @@ export class BackInStockModel {
     const existing = await prisma.backInStockRequest.findFirst({
       where: {
         orderId: order.id,
-        requesterId: params.requester.id,
+        // requesterId: params.requester.id,
         status: { in: ['pending', 'partially_back_in_stock'] },
       },
       include: { messages: { orderBy: { createdAt: 'desc' } } },
@@ -141,15 +144,15 @@ export class BackInStockModel {
         requesterViewedAt: new Date(),
         messages: params.message
           ? {
-              create: {
-                senderId: params.requester.id,
-                senderName: params.requester.name,
-                senderEmail: params.requester.email,
-                senderRole: 'requester',
-                message: params.message,
-                status: 'pending',
-              },
-            }
+            create: {
+              senderId: params.requester.id,
+              senderName: params.requester.name,
+              senderEmail: params.requester.email,
+              senderRole: 'requester',
+              message: params.message,
+              status: 'pending',
+            },
+          }
           : undefined,
       },
       include: { messages: { orderBy: { createdAt: 'desc' } } },

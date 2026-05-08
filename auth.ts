@@ -5,6 +5,9 @@ import prisma from '@/lib/prisma.server';
 import { evaluateStaffAccess, getAuthPolicy } from '@/lib/auth-policy.server';
 import { isStaffLikeRole } from '@/lib/roles';
 
+const appUrl = process.env.AUTH_URL ?? process.env.NEXTAUTH_URL ?? process.env.APP_URL;
+const authRedirectBaseUrl = appUrl?.replace(/\/$/, '');
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
   pages: {
     signIn: '/',
@@ -88,6 +91,23 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     }),
   ],
   callbacks: {
+    redirect({ url, baseUrl }) {
+      const redirectBaseUrl = authRedirectBaseUrl ?? baseUrl;
+
+      if (url.startsWith('/')) {
+        return `${redirectBaseUrl}${url}`;
+      }
+
+      try {
+        if (new URL(url).origin === redirectBaseUrl) {
+          return url;
+        }
+      } catch {
+        return redirectBaseUrl;
+      }
+
+      return redirectBaseUrl;
+    },
     jwt({ token, user }) {
       if (user) {
         token.id = user.id;
