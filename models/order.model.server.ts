@@ -234,6 +234,7 @@ export class OrderModel {
           _count: {
             select: {
               messages: true,
+              notes: true,
             },
           },
         },
@@ -271,6 +272,7 @@ export class OrderModel {
         fulfillmentItems: toFulfillmentItems(row.fulfillmentItems),
         itemsCount: itemCount,
         messageCount: row._count.messages,
+        noteCount: row._count.notes,
       };
     });
 
@@ -662,6 +664,132 @@ export class OrderModel {
 
     return toOrderMessageRow(savedMessage);
   }
+
+  async listOrderNotes(orderId: string) {
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      select: { id: true },
+    });
+
+    if (!order) {
+      throw new Error('Order not found');
+    }
+
+    const notes = await prisma.orderNote.findMany({
+      where: { orderId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return notes.map(toOrderNoteRow);
+  }
+
+  async createOrderNote(params: {
+    orderId: string;
+    note: string;
+    user?: {
+      id?: string | null;
+      name?: string | null;
+      email?: string | null;
+    } | null;
+  }) {
+    const order = await prisma.order.findUnique({
+      where: { id: params.orderId },
+      select: { id: true },
+    });
+
+    if (!order) {
+      throw new Error('Order not found');
+    }
+
+    const savedNote = await prisma.orderNote.create({
+      data: {
+        orderId: order.id,
+        note: params.note,
+        authorId: params.user?.id ?? null,
+        authorName: params.user?.name?.trim() || null,
+        authorEmail: params.user?.email?.trim() || null,
+      },
+    });
+
+    return toOrderNoteRow(savedNote);
+  }
+
+  async updateOrderNote(params: {
+    orderId: string;
+    noteId: string;
+    note: string;
+    user?: {
+      id?: string | null;
+      name?: string | null;
+      email?: string | null;
+    } | null;
+  }) {
+    const existing = await prisma.orderNote.findFirst({
+      where: {
+        id: params.noteId,
+        orderId: params.orderId,
+      },
+      select: { id: true },
+    });
+
+    if (!existing) {
+      throw new Error('Note not found');
+    }
+
+    const savedNote = await prisma.orderNote.update({
+      where: { id: existing.id },
+      data: {
+        note: params.note,
+        editorId: params.user?.id ?? null,
+        editorName: params.user?.name?.trim() || null,
+        editorEmail: params.user?.email?.trim() || null,
+      },
+    });
+
+    return toOrderNoteRow(savedNote);
+  }
+
+  async deleteOrderNote(orderId: string, noteId: string) {
+    const existing = await prisma.orderNote.findFirst({
+      where: {
+        id: noteId,
+        orderId,
+      },
+      select: { id: true },
+    });
+
+    if (!existing) {
+      throw new Error('Note not found');
+    }
+
+    await prisma.orderNote.delete({
+      where: { id: existing.id },
+    });
+
+    return { id: existing.id };
+  }
+}
+
+function toOrderNoteRow(note: {
+  id: string;
+  note: string;
+  authorName: string | null;
+  authorEmail: string | null;
+  editorName: string | null;
+  editorEmail: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}) {
+  return {
+    id: note.id,
+    note: note.note,
+    authorName: note.authorName,
+    authorEmail: note.authorEmail,
+    editorName: note.editorName,
+    editorEmail: note.editorEmail,
+    createdAt: note.createdAt.toISOString(),
+    updatedAt: note.updatedAt.toISOString(),
+  };
 }
 
 function toOrderMessageRow(message: {

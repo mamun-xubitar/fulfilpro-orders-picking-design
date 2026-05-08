@@ -84,10 +84,29 @@ model Order {
   orderedAt         DateTime?
   store             Store     @relation(fields: [storeId], references: [id])
   messages          OrderMessage[]
+  notes             OrderNote[]
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
   @@unique([storeId, number])
+}
+
+model OrderNote {
+  id          String   @id @default(uuid())
+  orderId     String
+  note        String
+  authorId    String?
+  authorName  String?
+  authorEmail String?
+  editorId    String?
+  editorName  String?
+  editorEmail String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+  @@index([authorEmail])
 }
 
 model OrderMessage {

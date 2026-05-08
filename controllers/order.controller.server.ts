@@ -119,6 +119,80 @@ export class OrderController {
       message: 'Message sent',
     };
   }
+
+  async listOrderNotes(orderId: string) {
+    const result = await model.listOrderNotes(orderId);
+
+    return {
+      data: result,
+      message: 'Order notes retrieved',
+    };
+  }
+
+  async createOrderNote(
+    orderId: string,
+    body: unknown,
+    user?: {
+      id?: string | null;
+      name?: string | null;
+      email?: string | null;
+    } | null
+  ) {
+    const note = parseOrderNote(body);
+    const result = await model.createOrderNote({ orderId, note, user });
+
+    return {
+      data: result,
+      message: 'Note added',
+    };
+  }
+
+  async updateOrderNote(
+    orderId: string,
+    noteId: string,
+    body: unknown,
+    user?: {
+      id?: string | null;
+      name?: string | null;
+      email?: string | null;
+    } | null
+  ) {
+    const note = parseOrderNote(body);
+    const result = await model.updateOrderNote({ orderId, noteId, note, user });
+
+    return {
+      data: result,
+      message: 'Note updated',
+    };
+  }
+
+  async deleteOrderNote(orderId: string, noteId: string) {
+    const result = await model.deleteOrderNote(orderId, noteId);
+
+    return {
+      data: result,
+      message: 'Note deleted',
+    };
+  }
+}
+
+function parseOrderNote(body: unknown) {
+  if (!body || typeof body !== 'object') {
+    throw new Error('Note data is required');
+  }
+
+  const value = body as Record<string, unknown>;
+  const note = typeof value.note === 'string' ? value.note.trim() : '';
+
+  if (!note) {
+    throw new Error('Note is required');
+  }
+
+  if (note.length > 5000) {
+    throw new Error('Note must be 5000 characters or fewer');
+  }
+
+  return note;
 }
 
 function parseAdminOrderMessage(body: unknown) {

@@ -33,6 +33,7 @@ type OrderRow = {
   };
   itemsCount: number;
   messageCount: number;
+  noteCount: number;
 };
 
 type StoreOption = { id: string; name: string; storeDomain: string };
@@ -45,6 +46,16 @@ type OrderAdminMessage = {
   senderEmail: string | null;
   message: string;
   createdAt: string;
+};
+type OrderNote = {
+  id: string;
+  note: string;
+  authorName: string | null;
+  authorEmail: string | null;
+  editorName: string | null;
+  editorEmail: string | null;
+  createdAt: string;
+  updatedAt: string;
 };
 type PackingSlipLabel = {
   id: string;
@@ -467,6 +478,16 @@ export default function OrdersPage() {
     message: string;
     loading: boolean;
     sending: boolean;
+    error: string;
+  } | null>(null);
+  const [noteModal, setNoteModal] = useState<{
+    order: OrderRow;
+    notes: OrderNote[];
+    note: string;
+    editingNoteId: string | null;
+    loading: boolean;
+    saving: boolean;
+    deletingId: string | null;
     error: string;
   } | null>(null);
   const [printingOrderId, setPrintingOrderId] = useState<string | null>(null);
@@ -1224,6 +1245,156 @@ export default function OrdersPage() {
     }
   };
 
+  const openNoteModal = async (order: OrderRow) => {
+    setNoteModal({
+      order,
+      notes: [],
+      note: '',
+      editingNoteId: null,
+      loading: true,
+      saving: false,
+      deletingId: null,
+      error: '',
+    });
+
+    try {
+      const res = await fetch(`/api/orders/${encodeURIComponent(order.id)}/notes`);
+      const json = (await res.json()) as ApiResponse<OrderNote[]>;
+
+      if (!res.ok || !json.success) {
+        throw new Error(getApiErrorMessage(json, 'Failed to load order notes'));
+      }
+
+      setNoteModal((prev) => {
+        if (!prev || prev.order.id !== order.id) return prev;
+        return {
+          ...prev,
+          notes: json.data,
+          loading: false,
+        };
+      });
+      setOrders((prev) => prev.map((item) => (
+        item.id === order.id ? { ...item, noteCount: json.data.length } : item
+      )));
+    } catch (err) {
+      setNoteModal((prev) => (
+        prev && prev.order.id === order.id
+          ? { ...prev, loading: false, error: err instanceof Error ? err.message : 'Failed to load order notes.' }
+          : prev
+      ));
+    }
+  };
+
+  const closeNoteModal = () => {
+    if (noteModal?.saving || noteModal?.deletingId) return;
+    setNoteModal(null);
+  };
+
+  const startEditNote = (note: OrderNote) => {
+    setNoteModal((prev) => prev ? { ...prev, note: note.note, editingNoteId: note.id, error: '' } : prev);
+  };
+
+  const cancelEditNote = () => {
+    setNoteModal((prev) => prev ? { ...prev, note: '', editingNoteId: null, error: '' } : prev);
+  };
+
+  const submitOrderNote = async () => {
+    if (!noteModal || noteModal.saving) return;
+    if (blockTestModeAction()) return;
+
+    const note = noteModal.note.trim();
+    if (!note) {
+      setNoteModal((prev) => prev ? { ...prev, error: 'Note is required.' } : prev);
+      return;
+    }
+
+    const editingNoteId = noteModal.editingNoteId;
+    const orderId = noteModal.order.id;
+    setNoteModal((prev) => prev ? { ...prev, saving: true, error: '' } : prev);
+
+    try {
+      const res = await fetch(
+        editingNoteId
+          ? `/api/orders/${encodeURIComponent(orderId)}/notes/${encodeURIComponent(editingNoteId)}`
+          : `/api/orders/${encodeURIComponent(orderId)}/notes`,
+        {
+          method: editingNoteId ? 'PATCH' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ note }),
+        }
+      );
+      const json = (await res.json()) as ApiResponse<OrderNote>;
+
+      if (!res.ok || !json.success) {
+        throw new Error(getApiErrorMessage(json, editingNoteId ? 'Failed to update note' : 'Failed to add note'));
+      }
+
+      setNoteModal((prev) => {
+        if (!prev || prev.order.id !== orderId) return prev;
+        const notes = editingNoteId
+          ? prev.notes.map((item) => item.id === editingNoteId ? json.data : item)
+          : [json.data, ...prev.notes];
+        return {
+          ...prev,
+          notes,
+          note: '',
+          editingNoteId: null,
+          saving: false,
+        };
+      });
+      setOrders((prev) => prev.map((item) => (
+        item.id === orderId
+          ? { ...item, noteCount: editingNoteId ? item.noteCount : item.noteCount + 1 }
+          : item
+      )));
+      toast.success(editingNoteId ? 'Note updated.' : 'Note added.');
+    } catch (err) {
+      setNoteModal((prev) => (
+        prev ? { ...prev, saving: false, error: err instanceof Error ? err.message : 'Failed to save note.' } : prev
+      ));
+    }
+  };
+
+  const deleteOrderNote = async (noteId: string) => {
+    if (!noteModal || noteModal.deletingId) return;
+    if (blockTestModeAction()) return;
+    if (!window.confirm('Delete this note?')) return;
+
+    const orderId = noteModal.order.id;
+    setNoteModal((prev) => prev ? { ...prev, deletingId: noteId, error: '' } : prev);
+
+    try {
+      const res = await fetch(`/api/orders/${encodeURIComponent(orderId)}/notes/${encodeURIComponent(noteId)}`, {
+        method: 'DELETE',
+      });
+      const json = (await res.json()) as ApiResponse<{ id: string }>;
+
+      if (!res.ok || !json.success) {
+        throw new Error(getApiErrorMessage(json, 'Failed to delete note'));
+      }
+
+      setNoteModal((prev) => {
+        if (!prev || prev.order.id !== orderId) return prev;
+        const notes = prev.notes.filter((item) => item.id !== noteId);
+        return {
+          ...prev,
+          notes,
+          note: prev.editingNoteId === noteId ? '' : prev.note,
+          editingNoteId: prev.editingNoteId === noteId ? null : prev.editingNoteId,
+          deletingId: null,
+        };
+      });
+      setOrders((prev) => prev.map((item) => (
+        item.id === orderId ? { ...item, noteCount: Math.max(0, item.noteCount - 1) } : item
+      )));
+      toast.info('Note deleted.');
+    } catch (err) {
+      setNoteModal((prev) => (
+        prev ? { ...prev, deletingId: null, error: err instanceof Error ? err.message : 'Failed to delete note.' } : prev
+      ));
+    }
+  };
+
   const writePrintDocument = (printWindow: Window, documentHtml: string) => {
     printWindow.document.open();
     printWindow.document.write(documentHtml);
@@ -1829,7 +2000,7 @@ export default function OrdersPage() {
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-[820px] w-full text-sm">
+          <table className="min-w-[900px] w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="hidden sm:table-cell px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-10">#</th>
@@ -1840,25 +2011,26 @@ export default function OrdersPage() {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
                 <th className="hidden sm:table-cell px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Items</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Fulfillment</th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide w-20">Note</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading && (
                 <tr>
-                  <td colSpan={9} className="text-center text-gray-400 py-12 text-sm">Loading orders...</td>
+                  <td colSpan={10} className="text-center text-gray-400 py-12 text-sm">Loading orders...</td>
                 </tr>
               )}
 
               {!loading && error && (
                 <tr>
-                  <td colSpan={9} className="text-center text-red-500 py-12 text-sm">{error}</td>
+                  <td colSpan={10} className="text-center text-red-500 py-12 text-sm">{error}</td>
                 </tr>
               )}
 
               {!loading && !error && orders.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="text-center text-gray-400 py-16 text-sm">No orders found.</td>
+                  <td colSpan={10} className="text-center text-gray-400 py-16 text-sm">No orders found.</td>
                 </tr>
               )}
 
@@ -1928,6 +2100,29 @@ export default function OrdersPage() {
                           <span className="text-gray-400">-</span>
                         )}
                       </td>
+                      <td className="px-4 py-3 text-center">
+                        <div className="tooltip inline-flex">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void openNoteModal(order);
+                            }}
+                            className="relative inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 transition-colors duration-150 hover:bg-gray-100 hover:text-blue-600 cursor-pointer"
+                            aria-label={`Order ${order.number} notes`}
+                          >
+                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4h10a2 2 0 012 2v14l-4-3H7a2 2 0 01-2-2V6a2 2 0 012-2z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 8h8M8 12h5" />
+                            </svg>
+                            {order.noteCount > 0 && (
+                              <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-blue-600 px-1 text-[10px] font-semibold leading-4 text-white">
+                                {order.noteCount > 99 ? '99+' : order.noteCount}
+                              </span>
+                            )}
+                          </button>
+                          <span className="tt">Order Notes</span>
+                        </div>
+                      </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1">
                           <div className="tooltip">
@@ -1994,7 +2189,7 @@ export default function OrdersPage() {
                     </tr>
                     {isExpanded && (
                       <tr>
-                        <td colSpan={9} className="p-0">
+                        <td colSpan={10} className="p-0">
                           <div className="relative bg-blue-50 border-b border-blue-100 p-5">
                             {order.fulfillmentItems.confirmations.length > 0 && (
                               <div className="absolute top-3 right-4">
@@ -2434,6 +2629,147 @@ export default function OrdersPage() {
                             <p className="mt-2 whitespace-pre-wrap break-words text-sm text-gray-700">{item.message}</p>
                           </div>
                         ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {noteModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-gray-900/50 px-4 pb-4 sm:items-center sm:pb-0"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="order-notes-title"
+          onClick={closeNoteModal}
+        >
+          <div
+            className="w-full max-w-2xl max-h-[calc(100dvh-2rem)] overflow-hidden rounded-lg bg-white shadow-xl border border-gray-200"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-gray-200">
+              <div>
+                <h3 id="order-notes-title" className="text-base font-semibold text-gray-900">
+                  Order notes
+                </h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  Order {noteModal.order.number} · {noteModal.order.customer}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeNoteModal}
+                disabled={noteModal.saving || Boolean(noteModal.deletingId)}
+                className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                aria-label="Close"
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="max-h-[calc(100dvh-10rem)] overflow-y-auto px-5 py-4">
+              {noteModal.loading ? (
+                <div className="py-12 text-center text-sm text-gray-400">Loading notes...</div>
+              ) : (
+                <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.2fr)]">
+                  <div className="space-y-3">
+                    <label className="block text-sm text-gray-700">
+                      <span className="block text-xs font-semibold uppercase text-gray-500 mb-1">
+                        {noteModal.editingNoteId ? 'Update note' : 'Add note'}
+                      </span>
+                      <textarea
+                        value={noteModal.note}
+                        onChange={(event) => {
+                          setNoteModal((prev) => prev ? { ...prev, note: event.target.value, error: '' } : prev);
+                        }}
+                        rows={8}
+                        maxLength={5000}
+                        disabled={noteModal.saving}
+                        placeholder="Write a note for this order"
+                        className="w-full resize-none border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:bg-gray-100"
+                      />
+                    </label>
+
+                    {noteModal.error && (
+                      <p className="text-sm text-red-600">{noteModal.error}</p>
+                    )}
+
+                    <div className="flex items-center gap-2">
+                      {noteModal.editingNoteId && (
+                        <button
+                          type="button"
+                          onClick={cancelEditNote}
+                          disabled={noteModal.saving}
+                          className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          Cancel
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={submitOrderNote}
+                        disabled={noteModal.saving}
+                        className="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {noteModal.saving ? 'Saving...' : noteModal.editingNoteId ? 'Update Note' : 'Add Note'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 className="mb-2 text-xs font-semibold uppercase text-gray-500">Notes</h4>
+                    {noteModal.notes.length === 0 ? (
+                      <div className="rounded-lg border border-dashed border-gray-300 px-4 py-8 text-center text-sm text-gray-400">
+                        No notes added yet.
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {noteModal.notes.map((item) => {
+                          const wasEdited = item.updatedAt !== item.createdAt;
+                          return (
+                            <div key={item.id} className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                <div className="min-w-0">
+                                  <p className="text-sm font-semibold text-gray-800 truncate">
+                                    {item.authorName || item.authorEmail || 'Unknown user'}
+                                  </p>
+                                  {item.authorEmail && item.authorName && (
+                                    <p className="text-xs text-gray-500 truncate">{item.authorEmail}</p>
+                                  )}
+                                </div>
+                                <div className="flex shrink-0 items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => startEditNote(item)}
+                                    disabled={noteModal.saving || Boolean(noteModal.deletingId)}
+                                    className="rounded-lg px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => void deleteOrderNote(item.id)}
+                                    disabled={noteModal.saving || Boolean(noteModal.deletingId)}
+                                    className="rounded-lg px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                  >
+                                    {noteModal.deletingId === item.id ? 'Deleting...' : 'Delete'}
+                                  </button>
+                                </div>
+                              </div>
+                              <p className="mt-2 whitespace-pre-wrap break-words text-sm text-gray-700">{item.note}</p>
+                              <p className="mt-2 text-xs text-gray-400">
+                                {new Date(item.createdAt).toLocaleString()}
+                                {wasEdited && ` · Edited ${new Date(item.updatedAt).toLocaleString()}`}
+                              </p>
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
