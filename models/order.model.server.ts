@@ -6,6 +6,7 @@ import {
   type FulfillmentRequestLine,
   type FulfillmentTrackingInput,
 } from '@/lib/shopify-fulfillment.server';
+import { fetchShopifyOrderById } from '@/lib/shopify-order-fetch.server';
 import { sendGoogleMail } from '@/lib/google-mail.server';
 import { Prisma } from '@prisma/client';
 
@@ -244,37 +245,7 @@ export class OrderModel {
       }),
     ]);
 
-    const orders = rows.map((row) => {
-      const lineItems = toLineItems(row.lineItems);
-      const itemCount = lineItems.reduce((sum, item) => sum + Math.max(0, item.qty), 0);
-      return {
-        id: row.id,
-        number: row.number,
-        customer: row.cusName,
-        note: row.note,
-        // customerEmail: row.cusEmail,
-        barcodes: parseBarcodeList(row.boarcode),
-        address: row.address,
-        address2: row.address2,
-        city: row.city,
-        state: row.state,
-        country: row.country,
-        closed: row.closed,
-        closedAt: row.closedAt?.toISOString() ?? null,
-        canceled: row.canceled,
-        canceledAt: row.canceledAt?.toISOString() ?? null,
-        status: getDisplayStatus(row),
-        orderedAt: row.orderedAt?.toISOString(),
-        storeId: row.store.id,
-        storeName: row.store.name ?? row.store.storeDomain,
-        storeDomain: row.store.storeDomain,
-        items: lineItems,
-        fulfillmentItems: toFulfillmentItems(row.fulfillmentItems),
-        itemsCount: itemCount,
-        messageCount: row._count.messages,
-        noteCount: row._count.notes,
-      };
-    });
+    const orders = rows.map(toOrderRow);
 
     return { total, orders };
   }
@@ -295,6 +266,74 @@ export class OrderModel {
       name: store.name ?? store.storeDomain,
       storeDomain: store.storeDomain,
     }));
+  }
+
+  async refreshFromShopify(orderId: string) {
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        store: {
+          select: {
+            id: true,
+            storeDomain: true,
+            accessToken: true,
+          },
+        },
+      },
+    });
+
+    if (!order) {
+      throw new Error('Order not found');
+    }
+
+    if (!order.store.accessToken) {
+      throw new Error('Store is missing a Shopify access token');
+    }
+
+    const shopifyOrderId = toFulfillmentItems(order.fulfillmentItems).shopifyOrderId;
+    if (!shopifyOrderId) {
+      throw new Error('Order is missing a Shopify order id');
+    }
+
+    const payload = await fetchShopifyOrderById({
+      shop: order.store.storeDomain,
+      accessToken: order.store.accessToken,
+      orderId: shopifyOrderId,
+    });
+
+    await this.upsertFromShopifyOrder({
+      payload,
+      storeId: order.store.id,
+    });
+
+    return this.getOrderRow(orderId);
+  }
+
+  async getOrderRow(orderId: string) {
+    const row = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        store: {
+          select: {
+            id: true,
+            name: true,
+            storeDomain: true,
+          },
+        },
+        _count: {
+          select: {
+            messages: true,
+            notes: true,
+          },
+        },
+      },
+    });
+
+    if (!row) {
+      throw new Error('Order not found');
+    }
+
+    return toOrderRow(row);
   }
 
   async confirmFulfillment(
@@ -789,6 +828,66 @@ function toOrderNoteRow(note: {
     editorEmail: note.editorEmail,
     createdAt: note.createdAt.toISOString(),
     updatedAt: note.updatedAt.toISOString(),
+  };
+}
+
+function toOrderRow(row: {
+  id: string;
+  number: string;
+  cusName: string;
+  note: string | null;
+  boarcode: string | null;
+  address: string | null;
+  address2: string | null;
+  city: string | null;
+  state: string | null;
+  country: string | null;
+  closed: boolean;
+  closedAt: Date | null;
+  canceled: boolean;
+  canceledAt: Date | null;
+  orderedAt: Date | null;
+  lineItems: Prisma.JsonValue;
+  fulfillmentItems: Prisma.JsonValue | null;
+  fulfillmentStatus: string | null;
+  store: {
+    id: string;
+    name: string | null;
+    storeDomain: string;
+  };
+  _count: {
+    messages: number;
+    notes: number;
+  };
+}) {
+  const lineItems = toLineItems(row.lineItems);
+  const itemCount = lineItems.reduce((sum, item) => sum + Math.max(0, item.qty), 0);
+
+  return {
+    id: row.id,
+    number: row.number,
+    customer: row.cusName,
+    note: row.note,
+    barcodes: parseBarcodeList(row.boarcode),
+    address: row.address,
+    address2: row.address2,
+    city: row.city,
+    state: row.state,
+    country: row.country,
+    closed: row.closed,
+    closedAt: row.closedAt?.toISOString() ?? null,
+    canceled: row.canceled,
+    canceledAt: row.canceledAt?.toISOString() ?? null,
+    status: getDisplayStatus(row),
+    orderedAt: row.orderedAt?.toISOString(),
+    storeId: row.store.id,
+    storeName: row.store.name ?? row.store.storeDomain,
+    storeDomain: row.store.storeDomain,
+    items: lineItems,
+    fulfillmentItems: toFulfillmentItems(row.fulfillmentItems),
+    itemsCount: itemCount,
+    messageCount: row._count.messages,
+    noteCount: row._count.notes,
   };
 }
 

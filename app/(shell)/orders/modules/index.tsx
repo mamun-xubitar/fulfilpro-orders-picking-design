@@ -455,6 +455,7 @@ export default function OrdersPage() {
   const [lastSynced, setLastSynced] = useState('');
   const [refreshRotation, setRefreshRotation] = useState(0);
   const [refreshToken, setRefreshToken] = useState(0);
+  const [refreshingOrderIds, setRefreshingOrderIds] = useState<Record<string, boolean>>({});
   const [fullChecks, setFullChecks] = useState<Record<string, boolean>>({});
   const [partialValues, setPartialValues] = useState<Record<string, number>>({});
   const [fulMessages, setFulMessages] = useState<Record<string, string>>({});
@@ -698,6 +699,32 @@ export default function OrdersPage() {
     if (!userIsTest) return false;
     toast.error('This action is not allowed in test mode.');
     return true;
+  };
+
+  const refreshSingleOrder = async (order: OrderRow) => {
+    if (blockTestModeAction()) return;
+    if (refreshingOrderIds[order.id]) return;
+
+    setRefreshingOrderIds((prev) => ({ ...prev, [order.id]: true }));
+    try {
+      const res = await fetch(`/api/orders/${encodeURIComponent(order.id)}/refresh`, {
+        method: 'POST',
+      });
+      const json = (await res.json()) as ApiResponse<OrderRow>;
+
+      if (!res.ok || !json.success) {
+        throw new Error(getApiErrorMessage(json, 'Failed to refresh order'));
+      }
+
+      setOrders((prev) => prev.map((item) => (
+        item.id === order.id ? json.data : item
+      )));
+      toast.success(`Order ${order.number} refreshed.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to refresh order.');
+    } finally {
+      setRefreshingOrderIds((prev) => ({ ...prev, [order.id]: false }));
+    }
   };
 
   const handleSync = async () => {
@@ -2136,6 +2163,26 @@ export default function OrdersPage() {
                               {isExpanded ? '▲' : '▼'}
                             </button>
                             <span className="tt">View Details</span>
+                          </div>
+                          <div className="tooltip">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void refreshSingleOrder(order);
+                              }}
+                              disabled={refreshingOrderIds[order.id]}
+                              className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-blue-600 transition-colors duration-150 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              <svg
+                                className={`w-4 h-4 ${refreshingOrderIds[order.id] ? 'animate-spin' : ''}`}
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                              </svg>
+                            </button>
+                            <span className="tt">Refresh Order</span>
                           </div>
                           <div className="tooltip">
                             <button

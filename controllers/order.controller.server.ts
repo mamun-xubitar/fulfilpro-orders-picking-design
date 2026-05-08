@@ -78,6 +78,15 @@ export class OrderController {
     };
   }
 
+  async refreshOrder(orderId: string) {
+    const result = await model.refreshFromShopify(orderId);
+
+    return {
+      data: result,
+      message: 'Order refreshed',
+    };
+  }
+
   async saveBarcodes(orderId: string, body: unknown) {
     const barcodes = parseBarcodes(body);
     const result = await model.saveBarcodes(orderId, barcodes);
