@@ -1,6 +1,7 @@
 import { auth } from '@/auth';
 import { apiError, apiSuccess } from '@/lib/api-response.server';
 import { evaluateStaffAccess, getAuthPolicy } from '@/lib/auth-policy.server';
+import { isStaffLikeRole } from '@/lib/roles';
 import prisma from '@/lib/prisma.server';
 
 export async function GET() {
@@ -28,14 +29,15 @@ export async function GET() {
   }
 
   const policy = await getAuthPolicy();
-  const staffAccess = session.user.role === 'staff' ? evaluateStaffAccess(policy) : null;
+  const isStaffLike = isStaffLikeRole(session.user.role);
+  const staffAccess = isStaffLike ? evaluateStaffAccess(policy) : null;
 
   return apiSuccess({
     message: 'Session policy retrieved',
     data: {
       forceLogout: false,
-      sessionTimeoutMinutes: session.user.role === 'staff' ? policy.sessionTimeoutMinutes : null,
-      inactivityTimeoutMinutes: session.user.role === 'staff' ? policy.inactivityTimeoutMinutes : null,
+      sessionTimeoutMinutes: isStaffLike ? policy.sessionTimeoutMinutes : null,
+      inactivityTimeoutMinutes: isStaffLike ? policy.inactivityTimeoutMinutes : null,
       staffAccess,
     },
   });

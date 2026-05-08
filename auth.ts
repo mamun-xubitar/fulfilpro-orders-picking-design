@@ -3,6 +3,7 @@ import Credentials from 'next-auth/providers/credentials';
 import { verifyPassword } from '@/lib/password';
 import prisma from '@/lib/prisma.server';
 import { evaluateStaffAccess, getAuthPolicy } from '@/lib/auth-policy.server';
+import { isStaffLikeRole } from '@/lib/roles';
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   pages: {
@@ -34,7 +35,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           throw new Error('Invalid credentials.');
         }
 
-        if (user.role === 'staff') {
+        if (isStaffLikeRole(user.role)) {
           const policy = await getAuthPolicy();
           const access = evaluateStaffAccess(policy);
           if (!access.allowed) {

@@ -3,6 +3,7 @@ import { apiError, apiSuccess } from '@/lib/api-response.server';
 import { evaluateStaffAccess, getAuthPolicy } from '@/lib/auth-policy.server';
 import { verifyPassword } from '@/lib/password';
 import { createStaffLoginApproval } from '@/lib/staff-login-approval.server';
+import { isStaffLikeRole } from '@/lib/roles';
 import prisma from '@/lib/prisma.server';
 
 export async function POST(request: NextRequest) {
@@ -20,7 +21,7 @@ export async function POST(request: NextRequest) {
     return apiError({ message: 'Invalid email or password', status: 401 });
   }
 
-  if (user.role !== 'staff') {
+  if (!isStaffLikeRole(user.role)) {
     return apiSuccess({ message: 'Login can continue', data: { mode: 'direct' as const } });
   }
 

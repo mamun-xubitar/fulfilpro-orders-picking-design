@@ -1,5 +1,6 @@
 import { auth } from '@/auth';
 import { evaluateStaffAccess, getAuthPolicy, getSessionExpiresAt } from '@/lib/auth-policy.server';
+import { isStaffLikeRole, isTestUserRole } from '@/lib/roles';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
@@ -30,11 +31,15 @@ const STAFF_ALLOWED_API_ROUTES = [
   '/api/orders/.*',
   '/api/uploads/logos',
   '/api/profile',
+  '/api/profile/.*',
   '/api/auth/.*',
   '/api/fulfillment-requests',
+  '/api/fulfillment-requests/.*',
 ];
 const STAFF_RESTRICTED_API_ROUTES = ['/api/auth/.*'];
 const STAFF_EXPIRED_API_ROUTES = ['/api/auth/.*'];
+const TEST_USER_MUTATION_BLOCKED_API_ROUTES = ['/api/orders', '/api/orders/.*', '/api/fulfillment-requests', '/api/fulfillment-requests/.*'];
+const TEST_MODE_MESSAGE = 'This action is not allowed in test mode.';
 
 function matchesRoute(pathname: string, routes: string[]) {
   return routes.some((route) => {
@@ -73,9 +78,11 @@ function expireStaffSession(request: NextRequest) {
 export const proxy = auth(async (request) => {
   const { pathname } = request.nextUrl;
   const isLoggedIn = Boolean(request.auth);
-  const isStaff = request.auth?.user?.role === 'staff';
+  const userRole = request.auth?.user?.role;
+  const isStaffLike = isStaffLikeRole(userRole);
+  const isTestUser = isTestUserRole(userRole);
 
-  if (isLoggedIn && isStaff) {
+  if (isLoggedIn && isStaffLike) {
     const policy = await getAuthPolicy();
     const loginAt = request.auth?.user?.loginAt;
 
@@ -132,7 +139,7 @@ export const proxy = auth(async (request) => {
     return NextResponse.redirect(loginUrl);
   }
 
-  if (isStaff) {
+  if (isStaffLike) {
     if (isApiRoute(pathname)) {
       if (!matchesRoute(pathname, STAFF_ALLOWED_API_ROUTES)) {
         return NextResponse.json(
@@ -140,6 +147,18 @@ export const proxy = auth(async (request) => {
           { status: 403 }
         );
       }
+
+      if (
+        isTestUser &&
+        request.method !== 'GET' &&
+        matchesRoute(pathname, TEST_USER_MUTATION_BLOCKED_API_ROUTES)
+      ) {
+        return NextResponse.json(
+          { error: 'Forbidden', message: TEST_MODE_MESSAGE },
+          { status: 403 }
+        );
+      }
+
       return NextResponse.next();
     }
 

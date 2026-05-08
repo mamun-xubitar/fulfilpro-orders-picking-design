@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
+import { isStaffLikeRole } from "@/lib/roles";
 
 type SessionPolicy = {
   forceLogout: boolean;
@@ -194,7 +195,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
   const sidebarWidth = sidebarCollapsed ? "64px" : "240px";
   const user = session?.user;
   const initials = getInitials(user?.name ?? user?.email ?? "");
-  const isStaff = user?.role === "staff";
+  const isStaff = isStaffLikeRole(user?.role);
   const loginAt = user?.loginAt ?? now;
   const timeoutMinutes = isStaff ? policy?.sessionTimeoutMinutes ?? null : null;
   const expiresAt = timeoutMinutes ? loginAt + timeoutMinutes * 60 * 1000 : null;

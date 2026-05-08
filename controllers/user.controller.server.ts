@@ -1,9 +1,10 @@
 import { Prisma } from '@prisma/client';
 import { UserModel, type CreateUserData, type UpdateUserData } from '@/models/user.model.server';
+import { VALID_USER_ROLES } from '@/lib/roles';
 
 const model = new UserModel();
 
-const ROLES = new Set(['admin', 'staff']);
+const ROLES = new Set<string>(VALID_USER_ROLES);
 
 export class UserController {
   async list() {

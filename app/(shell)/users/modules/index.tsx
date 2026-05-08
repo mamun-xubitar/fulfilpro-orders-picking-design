@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { UserRow } from "@/models/user.model.server";
+import { getRoleLabel } from "@/lib/roles";
 
 type ApiResponse<T> = { success: boolean; message: string; data: T; errors?: string[] };
 
@@ -214,6 +215,7 @@ export default function UsersPage() {
               <select value={form.role} onChange={(e) => updateForm("role", e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer">
                 <option value="admin">Admin - 24/7 access</option>
                 <option value="staff">Staff - restricted hours</option>
+                <option value="test">Test User - orders view only</option>
               </select>
             </div>
 
@@ -277,7 +279,7 @@ export default function UsersPage() {
                     <td className="px-4 py-3 text-sm text-gray-500">{user.email}</td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${user.role === "admin" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-600"}`}>
-                        {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
+                        {getRoleLabel(user.role)}
                       </span>
                     </td>
                     <td className="px-4 py-3">

@@ -3,6 +3,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { toast } from 'react-toastify';
+import { isStaffLikeRole, isTestUserRole } from '@/lib/roles';
 
 type OrderItem = { id: string; name: string; sku: string; qty: number };
 type OrderRow = {
@@ -473,7 +474,8 @@ export default function OrdersPage() {
   const { data: session } = useSession();
   const userRole = (session?.user?.role as string) ?? '';
   const userIsAdmin = userRole === 'admin';
-  const userIsStaff = userRole === 'staff';
+  const userIsStaff = isStaffLikeRole(userRole);
+  const userIsTest = isTestUserRole(userRole);
   const [orderFulfillmentRequests, setOrderFulfillmentRequests] = useState<Record<string, FulfillmentEditRequestRow[]>>({});
   const [pendingRequests, setPendingRequests] = useState<FulfillmentEditRequestRow[]>([]);
   const [pendingRequestsPanelOpen, setPendingRequestsPanelOpen] = useState(false);
@@ -671,7 +673,14 @@ export default function OrdersPage() {
     setRefreshToken((prev) => prev + 1);
   };
 
+  const blockTestModeAction = () => {
+    if (!userIsTest) return false;
+    toast.error('This action is not allowed in test mode.');
+    return true;
+  };
+
   const handleSync = async () => {
+    if (blockTestModeAction()) return;
     if (syncJob && (syncJob.status === 'queued' || syncJob.status === 'running')) return;
 
     setSyncing(true);
@@ -825,6 +834,8 @@ export default function OrdersPage() {
   };
 
   const openFulfillmentConfirmation = (order: OrderRow) => {
+    if (blockTestModeAction()) return;
+
     if (isOrderFulfillmentLocked(order)) {
       toast.error(`${order.status === 'closed' ? 'Closed' : 'Canceled'} orders cannot be fulfilled.`);
       return;
@@ -859,6 +870,7 @@ export default function OrdersPage() {
 
   const confirmFul = async () => {
     if (!pendingFulfillment) return;
+    if (blockTestModeAction()) return;
 
     const { order, lines, notifyCustomer, barcodeInput, trackingNumber, trackingUrl, trackingCompany } = pendingFulfillment;
     const barcodes = parseBarcodes(barcodeInput);
@@ -937,6 +949,8 @@ export default function OrdersPage() {
   };
 
   const openEditFulModal = (order: OrderRow, conf: FulfillmentConfirmation, confId: string) => {
+    if (blockTestModeAction()) return;
+
     setEditFulModal({
       order, conf, confId,
       barcodes: conf.barcodes?.join(' ') ?? '',
@@ -950,6 +964,7 @@ export default function OrdersPage() {
 
   const submitEditFulfillment = async () => {
     if (!editFulModal) return;
+    if (blockTestModeAction()) return;
     const { order, confId, barcodes, fulfillmentDate, carrier, trackingNumber, trackingUrl } = editFulModal;
     setEditFulModal((prev) => prev ? { ...prev, saving: true, error: '' } : null);
     try {
@@ -980,11 +995,14 @@ export default function OrdersPage() {
   };
 
   const openCancelFulModal = (order: OrderRow, conf: FulfillmentConfirmation, confId: string) => {
+    if (blockTestModeAction()) return;
+
     setCancelFulModal({ order, conf, confId, saving: false, error: '' });
   };
 
   const submitCancelFulfillment = async () => {
     if (!cancelFulModal) return;
+    if (blockTestModeAction()) return;
     const { order, confId } = cancelFulModal;
     setCancelFulModal((prev) => prev ? { ...prev, saving: true, error: '' } : null);
     try {
@@ -1007,6 +1025,8 @@ export default function OrdersPage() {
   };
 
   const openRequestPermModal = async (order: OrderRow, conf: FulfillmentConfirmation, confId: string, requestType: 'edit' | 'cancel') => {
+    if (blockTestModeAction()) return;
+
     setRequestPermModal({ order, conf, confId, requestType, availableAdmins: [], selectedAdminIds: [], reason: '', loadingAdmins: true, saving: false, error: '' });
     try {
       const res = await fetch(`/api/orders/${encodeURIComponent(order.id)}/messages`);
@@ -1023,6 +1043,7 @@ export default function OrdersPage() {
 
   const submitPermissionRequest = async () => {
     if (!requestPermModal) return;
+    if (blockTestModeAction()) return;
     const { order, confId, requestType, selectedAdminIds, reason } = requestPermModal;
     if (!reason.trim()) { setRequestPermModal((prev) => prev ? { ...prev, error: 'Reason is required' } : null); return; }
     if (selectedAdminIds.length === 0) { setRequestPermModal((prev) => prev ? { ...prev, error: 'Select at least one admin' } : null); return; }
@@ -1159,6 +1180,7 @@ export default function OrdersPage() {
 
   const submitAdminMessage = async () => {
     if (!messageModal || messageModal.sending) return;
+    if (blockTestModeAction()) return;
 
     const message = messageModal.message.trim();
     if (!messageModal.selectedAdminId || !message) {

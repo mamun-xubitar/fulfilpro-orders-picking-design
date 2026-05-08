@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
+import { isStaffLikeRole } from "@/lib/roles";
 
 type StaffAccessInfo = {
   allowed: boolean;
@@ -47,13 +48,13 @@ export default function RestrictedPage() {
       return;
     }
 
-    if (status === "authenticated" && role !== "staff") {
+    if (status === "authenticated" && !isStaffLikeRole(role)) {
       router.push("/orders");
     }
   }, [role, router, status]);
 
   useEffect(() => {
-    if (status !== "authenticated" || role !== "staff") return;
+    if (status !== "authenticated" || !isStaffLikeRole(role)) return;
     let cancelled = false;
 
     async function loadPolicy() {

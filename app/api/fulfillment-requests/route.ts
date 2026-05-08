@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { auth } from '@/auth';
 import { FulfillmentRequestController } from '@/controllers/fulfillment-request.controller.server';
 import { apiError, apiSuccess } from '@/lib/api-response.server';
+import { isStaffLikeRole } from '@/lib/roles';
 
 const controller = new FulfillmentRequestController();
 
@@ -26,13 +27,13 @@ export async function GET(request: NextRequest) {
       const result = role === 'admin'
         ? await controller.listForOrder(orderId)
         : await controller.listForStaff(userId);
-      const filtered = role === 'staff'
+      const filtered = isStaffLikeRole(role)
         ? { ...result, data: result.data.filter((r) => r.orderId === orderId) }
         : result;
       return apiSuccess({ message: filtered.message, data: filtered.data });
     }
 
-    if (role === 'staff') {
+    if (isStaffLikeRole(role)) {
       const result = await controller.listForStaff(userId);
       return apiSuccess({ message: result.message, data: result.data });
     }

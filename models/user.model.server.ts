@@ -1,6 +1,7 @@
 import prisma from '@/lib/prisma.server';
 import { saltAndHashPassword } from '@/lib/password';
 import { evaluateStaffAccess, getAuthPolicy, getSessionExpiresAt } from '@/lib/auth-policy.server';
+import { isStaffLikeRole } from '@/lib/roles';
 
 type SessionStatus = 'logged_in' | 'logout' | 'access_restricted' | 'session_timeout';
 
@@ -138,7 +139,7 @@ function getSessionStatus(user: {
     return { status: 'logout', label: 'Logout', detail: 'User is logged out' };
   }
 
-  if (user.role === 'staff' && context) {
+  if (isStaffLikeRole(user.role) && context) {
     const loginAt = user.lastLoginAt.getTime();
     const expiresAt = getSessionExpiresAt(loginAt, context.policy.sessionTimeoutMinutes);
 
