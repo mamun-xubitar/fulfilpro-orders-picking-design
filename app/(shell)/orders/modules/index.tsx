@@ -490,8 +490,8 @@ function formatSyncDate(value: string) {
 }
 
 function formatStockStatus(status: BackInStockStatus) {
-  if (status === 'back_in_stock') return 'Back in stock';
-  if (status === 'partially_back_in_stock') return 'Partially back in stock';
+  if (status === 'back_in_stock') return 'Restocked';
+  if (status === 'partially_back_in_stock') return 'Partially Restocked';
   return 'Pending';
 }
 

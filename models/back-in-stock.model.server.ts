@@ -473,8 +473,8 @@ function buildRequestHtml(request: { orderNumber: string; requesterName: string;
 }
 
 function formatStatus(status: string) {
-  if (status === 'back_in_stock') return 'Back in stock';
-  if (status === 'partially_back_in_stock') return 'Partially back in stock';
+  if (status === 'back_in_stock') return 'Restocked';
+  if (status === 'partially_back_in_stock') return 'Partially Restocked';
   return 'Pending';
 }
 

@@ -37,8 +37,8 @@ type PaginationItem = number | 'ellipsis';
 const STATUSES: Array<{ value: '' | BackInStockStatus; label: string }> = [
   { value: '', label: 'All Statuses' },
   { value: 'pending', label: 'Pending' },
-  { value: 'partially_back_in_stock', label: 'Partially back in stock' },
-  { value: 'back_in_stock', label: 'Back in stock' },
+  { value: 'partially_back_in_stock', label: 'Partially restocked' },
+  { value: 'back_in_stock', label: 'Restocked' },
 ];
 
 export default function BackInStockPage() {
@@ -332,8 +332,8 @@ export default function BackInStockPage() {
 }
 
 function formatStatus(status: BackInStockStatus) {
-  if (status === 'back_in_stock') return 'Back in stock';
-  if (status === 'partially_back_in_stock') return 'Partially back in stock';
+  if (status === 'back_in_stock') return 'Restocked';
+  if (status === 'partially_back_in_stock') return 'Partially Restocked';
   return 'Pending';
 }
 
