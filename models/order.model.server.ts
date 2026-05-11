@@ -153,6 +153,9 @@ export class OrderModel {
     pageSize: number;
   }) {
     const { search, storeIds = [], period = 'all', dateFrom, dateTo, fulfillmentStatuses = [], page, pageSize } = params;
+    const tokens = (search?.trim() ?? '').split(/\s+/).filter(Boolean);
+    let orderedAtFrom: Date | undefined;
+    let orderedAtTo: Date | undefined;
     const where: Prisma.OrderWhereInput = {
       store: {
         is: {
@@ -162,52 +165,19 @@ export class OrderModel {
       },
     };
 
-    const tokens = (search?.trim() ?? '').split(/\s+/).filter(Boolean);
     const andConditions: Prisma.OrderWhereInput[] = [];
 
-    if (tokens.length > 0) {
-      const tokenLineItemIds = await Promise.all(
-        tokens.map(async (token) => {
-          const raw = await prisma.$queryRaw<{ id: string }[]>(
-            Prisma.sql`SELECT id FROM "Order" WHERE "lineItems"::text ILIKE ${`%${token}%`}`
-          );
-          return raw.map((r) => r.id);
-        })
-      );
-
-      for (let i = 0; i < tokens.length; i++) {
-        const token = tokens[i];
-        const lineItemIds = tokenLineItemIds[i];
-        andConditions.push({
-          OR: [
-            { number: { contains: token, mode: 'insensitive' } },
-            { cusName: { contains: token, mode: 'insensitive' } },
-            { cusEmail: { contains: token, mode: 'insensitive' } },
-            { boarcode: { contains: token, mode: 'insensitive' } },
-            { address: { contains: token, mode: 'insensitive' } },
-            { address2: { contains: token, mode: 'insensitive' } },
-            { city: { contains: token, mode: 'insensitive' } },
-            { state: { contains: token, mode: 'insensitive' } },
-            { country: { contains: token, mode: 'insensitive' } },
-            { store: { is: { name: { contains: token, mode: 'insensitive' } } } },
-            { store: { is: { storeDomain: { contains: token, mode: 'insensitive' } } } },
-            ...(lineItemIds.length > 0 ? [{ id: { in: lineItemIds } }] : []),
-            ...getStatusConditionsForToken(token),
-          ],
-        });
-      }
-    }
-
     if (dateFrom || dateTo) {
-      const fromDate = dateFrom ? new Date(`${dateFrom}T00:00:00.000Z`) : undefined;
-      const toDate = dateTo ? new Date(`${dateTo}T23:59:59.999Z`) : undefined;
+      orderedAtFrom = dateFrom ? new Date(`${dateFrom}T00:00:00.000Z`) : undefined;
+      orderedAtTo = dateTo ? new Date(`${dateTo}T23:59:59.999Z`) : undefined;
       where.orderedAt = {
-        ...(fromDate ? { gte: fromDate } : {}),
-        ...(toDate ? { lte: toDate } : {}),
+        ...(orderedAtFrom ? { gte: orderedAtFrom } : {}),
+        ...(orderedAtTo ? { lte: orderedAtTo } : {}),
       };
     } else {
       const periodDate = getPeriodStartDate(period);
       if (periodDate) {
+        orderedAtFrom = periodDate;
         where.orderedAt = { gte: periodDate };
       }
     }
@@ -223,39 +193,65 @@ export class OrderModel {
       where.AND = andConditions;
     }
 
+    const listInclude = {
+      store: {
+        select: {
+          id: true,
+          name: true,
+          storeDomain: true,
+        },
+      },
+      _count: {
+        select: {
+          messages: true,
+          notes: true,
+          backInStockRequests: true,
+        },
+      },
+      backInStockRequests: {
+        select: {
+          status: true,
+          requesterId: true,
+          requesterViewedAt: true,
+          messages: {
+            select: {
+              senderRole: true,
+              createdAt: true,
+            },
+          },
+        },
+      },
+    } satisfies Prisma.OrderInclude;
+
+    if (tokens.length > 0) {
+      const searchPage = await getRankedOrderSearchPage({
+        tokens,
+        storeIds,
+        orderedAtFrom,
+        orderedAtTo,
+        fulfillmentStatuses,
+        page,
+        pageSize,
+      });
+
+      const rows = searchPage.ids.length > 0
+        ? await prisma.order.findMany({
+            where: { id: { in: searchPage.ids } },
+            include: listInclude,
+          })
+        : [];
+
+      const idOrder = new Map(searchPage.ids.map((id, index) => [id, index]));
+      rows.sort((a, b) => (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0));
+
+      return { total: searchPage.total, orders: rows.map(toOrderRow) };
+    }
+
     const [total, rows] = await Promise.all([
       prisma.order.count({ where }),
       prisma.order.findMany({
         where,
-        include: {
-          store: {
-            select: {
-              id: true,
-              name: true,
-              storeDomain: true,
-            },
-          },
-          _count: {
-            select: {
-              messages: true,
-              notes: true,
-              backInStockRequests: true,
-            },
-          },
-          backInStockRequests: {
-            select: {
-              status: true,
-              requesterId: true,
-              requesterViewedAt: true,
-              messages: {
-                select: {
-                  senderRole: true,
-                  createdAt: true,
-                },
-              },
-            },
-          },
-        },
+        include: listInclude,
         orderBy: { orderedAt: 'desc' },
         skip: (page - 1) * pageSize,
         take: pageSize,
@@ -1280,60 +1276,6 @@ function escapeHtml(value: string | number | null | undefined) {
     .replace(/'/g, '&#039;');
 }
 
-const STATUS_SEARCH_KEYWORDS: { keywords: string[]; condition: Prisma.OrderWhereInput }[] = [
-  {
-    keywords: ['unfulfilled', 'pending'],
-    condition: {
-      canceled: false,
-      closed: false,
-      OR: [
-        { fulfillmentStatus: null },
-        { fulfillmentStatus: 'unfulfilled' },
-        { fulfillmentStatus: 'pending' },
-        { fulfillmentStatus: '' },
-      ],
-    },
-  },
-  {
-    keywords: ['partial', 'partially'],
-    condition: {
-      canceled: false,
-      closed: false,
-      OR: [{ fulfillmentStatus: 'partial' }, { fulfillmentStatus: 'partially_fulfilled' }],
-    },
-  },
-  {
-    keywords: ['fulfilled'],
-    condition: {
-      canceled: false,
-      OR: [
-        { closed: false, fulfillmentStatus: { in: ['fulfilled', 'shipped'] } },
-        { closed: true, fulfillmentStatus: { in: ['fulfilled', 'shipped', 'partially_fulfilled'] } },
-      ],
-    },
-  },
-  {
-    keywords: ['closed'],
-    condition: {
-      canceled: false,
-      closed: true,
-      AND: [{ OR: [{ fulfillmentStatus: null }, { fulfillmentStatus: { notIn: ['fulfilled', 'shipped', 'partially_fulfilled'] } }] }],
-    },
-  },
-  {
-    keywords: ['canceled', 'cancelled'],
-    condition: { canceled: true },
-  },
-];
-
-function getStatusConditionsForToken(token: string): Prisma.OrderWhereInput[] {
-  if (token.length < 3) return [];
-  const lower = token.toLowerCase();
-  return STATUS_SEARCH_KEYWORDS
-    .filter(({ keywords }) => keywords.some((kw) => kw.startsWith(lower)))
-    .map(({ condition }) => condition);
-}
-
 function buildFulfillmentStatusConditions(statuses: string[]): Prisma.OrderWhereInput[] {
   const conditions: Prisma.OrderWhereInput[] = [];
   for (const status of statuses) {
@@ -1387,6 +1329,252 @@ function buildFulfillmentStatusConditions(statuses: string[]): Prisma.OrderWhere
     }
   }
   return conditions;
+}
+
+async function getRankedOrderSearchPage(params: {
+  tokens: string[];
+  storeIds: string[];
+  orderedAtFrom?: Date;
+  orderedAtTo?: Date;
+  fulfillmentStatuses: string[];
+  page: number;
+  pageSize: number;
+}) {
+  const whereSql = buildRankedOrderSearchWhereSql(params);
+  const rankSql = buildOrderSearchRankSql(params.tokens);
+  const skip = (params.page - 1) * params.pageSize;
+  const rows = await prisma.$queryRaw<{ total: number; ids: string[] }[]>(Prisma.sql`
+    WITH filtered AS (
+      SELECT
+        o.id,
+        o."orderedAt",
+        o."createdAt",
+        ${rankSql} AS "searchRank"
+      FROM "Order" o
+      INNER JOIN "Store" s ON s.id = o."storeId"
+      WHERE ${whereSql}
+    ),
+    paged AS (
+      SELECT id, "searchRank", "orderedAt", "createdAt"
+      FROM filtered
+      ORDER BY "searchRank" ASC, "orderedAt" DESC NULLS LAST, "createdAt" DESC, id ASC
+      OFFSET ${skip}
+      LIMIT ${params.pageSize}
+    )
+    SELECT
+      (SELECT COUNT(*)::integer FROM filtered) AS total,
+      COALESCE(
+        array_agg(paged.id ORDER BY paged."searchRank" ASC, paged."orderedAt" DESC NULLS LAST, paged."createdAt" DESC, paged.id ASC)
+          FILTER (WHERE paged.id IS NOT NULL),
+        ARRAY[]::text[]
+      ) AS ids
+    FROM paged
+  `);
+
+  const row = rows[0];
+  return {
+    total: row?.total ?? 0,
+    ids: row?.ids ?? [],
+  };
+}
+
+function buildRankedOrderSearchWhereSql(params: {
+  tokens: string[];
+  storeIds: string[];
+  orderedAtFrom?: Date;
+  orderedAtTo?: Date;
+  fulfillmentStatuses: string[];
+}) {
+  const whereParts: Prisma.Sql[] = [Prisma.sql`s.status = 'connected'`];
+
+  if (params.storeIds.length > 0) {
+    whereParts.push(Prisma.sql`s.id IN (${Prisma.join(params.storeIds)})`);
+  }
+
+  if (params.orderedAtFrom) {
+    whereParts.push(Prisma.sql`o."orderedAt" >= ${params.orderedAtFrom}`);
+  }
+
+  if (params.orderedAtTo) {
+    whereParts.push(Prisma.sql`o."orderedAt" <= ${params.orderedAtTo}`);
+  }
+
+  const fulfillmentStatusSql = buildFulfillmentStatusFilterSql(params.fulfillmentStatuses);
+  if (fulfillmentStatusSql) {
+    whereParts.push(fulfillmentStatusSql);
+  }
+
+  whereParts.push(buildTokenSearchSql(params.tokens));
+
+  return Prisma.join(whereParts, ' AND ');
+}
+
+function buildTokenSearchSql(tokens: string[]) {
+  const tokenConditions = tokens.map((token) => {
+    const conditions: Prisma.Sql[] = [
+      ilikeContains(Prisma.sql`o."number"`, token),
+      ilikeContains(Prisma.sql`o."cusName"`, token),
+      ilikeContains(Prisma.sql`o."cusEmail"`, token),
+      ilikeContains(Prisma.sql`o."boarcode"`, token),
+      ilikeContains(Prisma.sql`o."address"`, token),
+      ilikeContains(Prisma.sql`o."address2"`, token),
+      ilikeContains(Prisma.sql`o."city"`, token),
+      ilikeContains(Prisma.sql`o."state"`, token),
+      ilikeContains(Prisma.sql`o."country"`, token),
+      ilikeContains(Prisma.sql`s.name`, token),
+      ilikeContains(Prisma.sql`s."storeDomain"`, token),
+      ilikeContains(Prisma.sql`o."lineItems"::text`, token),
+      ...getStatusSqlConditionsForToken(token),
+    ];
+
+    return Prisma.sql`(${Prisma.join(conditions, ' OR ')})`;
+  });
+
+  return Prisma.sql`(${Prisma.join(tokenConditions, ' AND ')})`;
+}
+
+function buildOrderSearchRankSql(tokens: string[]) {
+  const terms = uniqueSearchTerms(tokens);
+  return Prisma.sql`CASE
+    WHEN ${anyTerm(terms, (term) => Prisma.sql`o."number" = ${term}`)} THEN 0
+    WHEN ${anyTerm(terms, (term) => ilikeStartsWith(Prisma.sql`o."number"`, term))} THEN 1
+    WHEN ${anyTerm(terms, (term) => ilikeExact(Prisma.sql`o."boarcode"`, term))} THEN 2
+    WHEN ${anyTerm(terms, (term) => ilikeStartsWith(Prisma.sql`o."boarcode"`, term))} THEN 3
+    WHEN ${anyTerm(terms, (term) => ilikeContains(Prisma.sql`o."number"`, term))} THEN 4
+    WHEN ${anyTerm(terms, (term) => ilikeContains(Prisma.sql`o."boarcode"`, term))} THEN 5
+    WHEN ${anyTerm(terms, (term) => Prisma.sql`(${ilikeExact(Prisma.sql`o."cusName"`, term)} OR ${ilikeExact(Prisma.sql`o."cusEmail"`, term)})`)} THEN 6
+    WHEN ${anyTerm(terms, (term) => Prisma.sql`(${ilikeStartsWith(Prisma.sql`o."cusName"`, term)} OR ${ilikeStartsWith(Prisma.sql`o."cusEmail"`, term)})`)} THEN 7
+    WHEN ${anyTerm(terms, (term) => Prisma.sql`(${ilikeContains(Prisma.sql`o."cusName"`, term)} OR ${ilikeContains(Prisma.sql`o."cusEmail"`, term)})`)} THEN 8
+    WHEN ${anyTerm(terms, (term) => Prisma.sql`(${ilikeStartsWith(Prisma.sql`s.name`, term)} OR ${ilikeStartsWith(Prisma.sql`s."storeDomain"`, term)})`)} THEN 9
+    WHEN ${anyTerm(terms, (term) => Prisma.sql`(${ilikeContains(Prisma.sql`s.name`, term)} OR ${ilikeContains(Prisma.sql`s."storeDomain"`, term)})`)} THEN 10
+    WHEN ${anyTerm(terms, (term) => Prisma.sql`(
+      ${ilikeContains(Prisma.sql`o."address"`, term)}
+      OR ${ilikeContains(Prisma.sql`o."address2"`, term)}
+      OR ${ilikeContains(Prisma.sql`o."city"`, term)}
+      OR ${ilikeContains(Prisma.sql`o."state"`, term)}
+      OR ${ilikeContains(Prisma.sql`o."country"`, term)}
+    )`)} THEN 11
+    WHEN ${anyTerm(terms, (term) => ilikeContains(Prisma.sql`o."lineItems"::text`, term))} THEN 12
+    ELSE 20
+  END`;
+}
+
+function buildFulfillmentStatusFilterSql(statuses: string[]) {
+  const conditions: Prisma.Sql[] = [];
+  for (const status of statuses) {
+    const condition = getFulfillmentStatusSqlCondition(status);
+    if (condition) conditions.push(condition);
+  }
+
+  if (conditions.length === 0) return null;
+  return Prisma.sql`(${Prisma.join(conditions, ' OR ')})`;
+}
+
+function getStatusSqlConditionsForToken(token: string) {
+  if (token.length < 3) return [];
+  const lower = token.toLowerCase();
+  const conditions: Prisma.Sql[] = [];
+
+  if (['unfulfilled', 'pending'].some((keyword) => keyword.startsWith(lower))) {
+    conditions.push(getUnfulfilledSqlCondition());
+  }
+
+  if (['partial', 'partially'].some((keyword) => keyword.startsWith(lower))) {
+    conditions.push(getPartialSqlCondition());
+  }
+
+  if ('fulfilled'.startsWith(lower)) {
+    conditions.push(getFulfilledSqlCondition());
+  }
+
+  if ('closed'.startsWith(lower)) {
+    conditions.push(getClosedSqlCondition());
+  }
+
+  if (['canceled', 'cancelled'].some((keyword) => keyword.startsWith(lower))) {
+    conditions.push(Prisma.sql`o."canceled" = true`);
+  }
+
+  return conditions;
+}
+
+function getFulfillmentStatusSqlCondition(status: string) {
+  switch (status) {
+    case 'unfulfilled':
+      return getUnfulfilledSqlCondition();
+    case 'partial':
+      return getPartialSqlCondition();
+    case 'fulfilled':
+      return getFulfilledSqlCondition();
+    case 'closed':
+      return getClosedSqlCondition();
+    case 'canceled':
+      return Prisma.sql`o."canceled" = true`;
+    default:
+      return null;
+  }
+}
+
+function getUnfulfilledSqlCondition() {
+  return Prisma.sql`(
+    o."canceled" = false
+    AND o."closed" = false
+    AND (o."fulfillmentStatus" IS NULL OR o."fulfillmentStatus" IN ('unfulfilled', 'pending', ''))
+  )`;
+}
+
+function getPartialSqlCondition() {
+  return Prisma.sql`(
+    o."canceled" = false
+    AND o."closed" = false
+    AND o."fulfillmentStatus" IN ('partial', 'partially_fulfilled')
+  )`;
+}
+
+function getFulfilledSqlCondition() {
+  return Prisma.sql`(
+    o."canceled" = false
+    AND (
+      (o."closed" = false AND o."fulfillmentStatus" IN ('fulfilled', 'shipped'))
+      OR (o."closed" = true AND o."fulfillmentStatus" IN ('fulfilled', 'shipped', 'partially_fulfilled'))
+    )
+  )`;
+}
+
+function getClosedSqlCondition() {
+  return Prisma.sql`(
+    o."canceled" = false
+    AND o."closed" = true
+    AND (o."fulfillmentStatus" IS NULL OR o."fulfillmentStatus" NOT IN ('fulfilled', 'shipped', 'partially_fulfilled'))
+  )`;
+}
+
+function uniqueSearchTerms(tokens: string[]) {
+  const terms = [tokens.join(' '), ...tokens]
+    .map((term) => term.trim())
+    .filter(Boolean);
+  return Array.from(new Set(terms));
+}
+
+function anyTerm(terms: string[], build: (term: string) => Prisma.Sql) {
+  return Prisma.sql`(${Prisma.join(terms.map(build), ' OR ')})`;
+}
+
+function ilikeExact(field: Prisma.Sql, value: string) {
+  return Prisma.sql`LOWER(COALESCE(${field}, '')) = LOWER(${value})`;
+}
+
+function ilikeStartsWith(field: Prisma.Sql, value: string) {
+  return Prisma.sql`COALESCE(${field}, '') ILIKE ${buildLikePattern(value, 'startsWith')} ESCAPE '\\'`;
+}
+
+function ilikeContains(field: Prisma.Sql, value: string) {
+  return Prisma.sql`COALESCE(${field}, '') ILIKE ${buildLikePattern(value, 'contains')} ESCAPE '\\'`;
+}
+
+function buildLikePattern(value: string, mode: 'startsWith' | 'contains') {
+  const escaped = value.replace(/[\\%_]/g, (char) => `\\${char}`);
+  return mode === 'startsWith' ? `${escaped}%` : `%${escaped}%`;
 }
 
 function getPeriodStartDate(period: 'all' | 'week' | 'month' | 'year') {
