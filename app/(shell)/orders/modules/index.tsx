@@ -452,8 +452,8 @@ function formatShippingMoney(value: number | null, currencyCode: string | null) 
 
 function getShippingDiscountCodes(line: ShippingLine) {
   return Array.from(new Set([
-    ...line.discountCodes,
-    ...line.discountAllocations
+    ...(line.discountCodes || []),
+    ...(line.discountAllocations || [])
       .map((allocation) => allocation.code)
       .filter((code): code is string => Boolean(code)),
   ]));
@@ -2609,8 +2609,8 @@ export default function OrdersPage() {
                                   </div>
                                 )}
                               </div>
-                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-                              <div>
+                            <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,300px)_minmax(0,1fr)_minmax(0,400px)]">
+                              <div className="w-full lg:max-w-[300px]">
                                 <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">Customer &amp; Order</h4>
                                 <p className="text-sm font-semibold text-gray-800">{order.customer}</p>
                                 {orderAddressLines.length > 0 && (
@@ -2653,7 +2653,7 @@ export default function OrdersPage() {
                               </div>
 
                               {fulfillmentViewOrderId === order.id ? (
-                                <div className="lg:col-span-2">
+                                <div className="min-w-0 lg:col-span-2">
                                   <h4 className="text-xs font-semibold text-gray-500 uppercase mb-3">Fulfillment Details</h4>
                                   <div className="space-y-3">
                                     {order.fulfillmentItems.confirmations.map((conf, confIndex) => (
@@ -2761,7 +2761,7 @@ export default function OrdersPage() {
                                 </div>
                               ) : (
                                 <>
-                                  <div>
+                                  <div className="min-w-0">
                                     <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">Product Fulfilment</h4>
                                     <table className="w-full text-xs">
                                       <thead>
@@ -2824,14 +2824,14 @@ export default function OrdersPage() {
                                     </table>
                                   </div>
 
-                                  <div>
+                                  <div className="w-full lg:max-w-[400px]">
                                     {(() => {
                                       const lockedFulfillment = isOrderFulfillmentLocked(order);
                                       const canConfirmFulfillment = !lockedFulfillment && getFulfillmentLines(order).length > 0;
                                       const isConfirmDisabled = fulSaving[order.id] || !canConfirmFulfillment;
                                       return (
                                         <>
-                                          <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">Actions</h4>
+                                          <h4 className="text-xs font-semibold text-gray-500 uppercase mb-3">Actions</h4>
                                           <button
                                             onClick={() => openFulfillmentConfirmation(order)}
                                             disabled={isConfirmDisabled}
