@@ -350,6 +350,34 @@ export default function OrdersPage() {
     return isLineFullyFulfilled(order, item) || (fullChecks[rowItemKey(order.id, itemIndex)] ?? false);
   };
 
+  const getFulfillmentRowClass = (
+    fulfilledQty: number,
+    itemQty: number,
+    remainingQty: number,
+    isFull: boolean,
+    partialValue: number,
+  ) => {
+    const baseClass = 'border-b border-blue-100 transition-colors duration-150';
+
+    if (itemQty > 0 && fulfilledQty >= itemQty) {
+      return `${baseClass} bg-emerald-100`;
+    }
+
+    if ((isFull || partialValue >= remainingQty) && remainingQty > 0) {
+      return `${baseClass} bg-blue-100`;
+    }
+
+    if (partialValue > 0) {
+      return `${baseClass} bg-pink-100`;
+    }
+
+    if (fulfilledQty > 0) {
+      return `${baseClass} bg-purple-100`;
+    }
+
+    return baseClass;
+  };
+
   const toggleFull = (orderId: string, itemIndex: number, remainingQty: number) => {
     const key = rowItemKey(orderId, itemIndex);
     const nextChecked = !(fullChecks[key] ?? false);
@@ -1968,7 +1996,10 @@ export default function OrdersPage() {
                                           const isFull = isLineFullChecked(order, item, itemIndex);
                                           const partialValue = Math.min(remainingQty, Math.max(0, partialValues[key] ?? 0));
                                           return (
-                                            <tr key={`${order.id}-${itemIndex}`} className="border-b border-blue-100">
+                                            <tr
+                                              key={`${order.id}-${itemIndex}`}
+                                              className={getFulfillmentRowClass(fulfilledQty, item.qty, remainingQty, isFull, partialValue)}
+                                            >
                                               <td className="py-1.5 pr-2 text-gray-700">{item.name}</td>
                                               <td className="py-1.5 pr-2 font-mono text-gray-500">{item.sku || '-'}</td>
                                               <td className="py-1.5 text-center text-gray-700">
