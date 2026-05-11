@@ -519,7 +519,7 @@ function getMonthDays(year: number, month: number): (string | null)[] {
 function fmtCalDate(iso: string): string {
   const [y, m, d] = iso.split('-').map(Number);
   const yr = new Date().getFullYear() !== y ? ` ${y}` : '';
-  return `${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m - 1]} ${d}${yr}`;
+  return `${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][m - 1]} ${d}${yr}`;
 }
 
 export default function OrdersPage() {
@@ -911,9 +911,9 @@ export default function OrdersPage() {
       return updated;
     });
 
-    if(!allChecked){
+    if (!allChecked) {
       setTimeout(() => {
-      fullSelectBtnRef.current?.click()
+        fullSelectBtnRef.current?.click()
       }, 100);
     }
   };
@@ -1634,23 +1634,23 @@ export default function OrdersPage() {
       const items = prev.items.map((item, itemIndex) => (
         itemIndex === index
           ? (() => {
-              if (field === 'lineItemId') {
-                const selected = eligibleItems.find((eligible) => eligible.lineItemId === value);
-                return {
-                  ...item,
-                  lineItemId: value,
-                  item: selected?.name ?? '',
-                  supplierName: selected?.vendor ?? '',
-                  quantity: selected?.remainingQty ?? 1,
-                };
-              }
-              if (field === 'quantity') {
-                const selected = eligibleItems.find((eligible) => eligible.lineItemId === item.lineItemId);
-                const maxQty = selected?.remainingQty ?? 1;
-                return { ...item, quantity: Math.min(Math.max(1, Number(value) || 1), maxQty) };
-              }
-              return { ...item, [field]: value };
-            })()
+            if (field === 'lineItemId') {
+              const selected = eligibleItems.find((eligible) => eligible.lineItemId === value);
+              return {
+                ...item,
+                lineItemId: value,
+                item: selected?.name ?? '',
+                supplierName: selected?.vendor ?? '',
+                quantity: selected?.remainingQty ?? 1,
+              };
+            }
+            if (field === 'quantity') {
+              const selected = eligibleItems.find((eligible) => eligible.lineItemId === item.lineItemId);
+              const maxQty = selected?.remainingQty ?? 1;
+              return { ...item, quantity: Math.min(Math.max(1, Number(value) || 1), maxQty) };
+            }
+            return { ...item, [field]: value };
+          })()
           : item
       ));
       return { ...prev, items, error: '' };
@@ -1762,9 +1762,9 @@ export default function OrdersPage() {
         image.complete
           ? Promise.resolve()
           : new Promise<void>((resolve) => {
-              image.addEventListener('load', () => resolve(), { once: true });
-              image.addEventListener('error', () => resolve(), { once: true });
-            })
+            image.addEventListener('load', () => resolve(), { once: true });
+            image.addEventListener('error', () => resolve(), { once: true });
+          })
       ))),
       new Promise<void>((resolve) => window.setTimeout(resolve, 1500)),
     ]);
@@ -2105,8 +2105,8 @@ export default function OrdersPage() {
               ? dateFrom && dateTo
                 ? `${fmtCalDate(dateFrom)} – ${fmtCalDate(dateTo)}`
                 : dateFrom
-                ? `From ${fmtCalDate(dateFrom)}`
-                : 'Custom Range'
+                  ? `From ${fmtCalDate(dateFrom)}`
+                  : 'Custom Range'
               : PERIODS.find((p) => p.value === period)?.label ?? 'All Time'}
             <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -2340,11 +2340,10 @@ export default function OrdersPage() {
           <button
             onClick={handleRefresh}
             disabled={syncing}
-            className={`flex items-center gap-1.5 border text-sm px-3 py-2 rounded-lg transition-colors duration-150 cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed ${
-              syncRefreshNeeded
+            className={`flex items-center gap-1.5 border text-sm px-3 py-2 rounded-lg transition-colors duration-150 cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed ${syncRefreshNeeded
                 ? 'bg-amber-50 border-amber-300 text-amber-800 hover:bg-amber-100'
                 : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
-            }`}
+              }`}
           >
             <svg
               className="w-4 h-4"
@@ -2535,11 +2534,10 @@ export default function OrdersPage() {
                                 void printPackingSlipLabel(order);
                               }}
                               disabled={printingOrderId === order.id || isFullyFulfilled}
-                              className={`p-1.5 rounded-lg transition-colors duration-150 ${
-                                printingOrderId === order.id || isFullyFulfilled
+                              className={`p-1.5 rounded-lg transition-colors duration-150 ${printingOrderId === order.id || isFullyFulfilled
                                   ? 'text-gray-300 cursor-not-allowed'
                                   : 'hover:bg-gray-100 text-gray-500 hover:text-gray-700 cursor-pointer'
-                              }`}
+                                }`}
                             >
                               {printingOrderId === order.id ? (
                                 <span className="block h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-gray-700" aria-label="Loading label" />
@@ -2558,11 +2556,10 @@ export default function OrdersPage() {
                                 void openMessageModal(order);
                               }}
                               disabled={isFullyFulfilled}
-                              className={`relative p-1.5 rounded-lg transition-colors duration-150 ${
-                                isFullyFulfilled
+                              className={`relative p-1.5 rounded-lg transition-colors duration-150 ${isFullyFulfilled
                                   ? 'text-gray-300 cursor-not-allowed'
                                   : 'hover:bg-gray-100 text-gray-500 hover:text-blue-600 cursor-pointer'
-                              }`}
+                                }`}
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.77 9.77 0 01-4-.8L3 20l1.4-3.5A7.5 7.5 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
@@ -2584,42 +2581,42 @@ export default function OrdersPage() {
                           <div className="relative bg-blue-50 border-b border-blue-100 p-5">
                             <div className="absolute top-3 right-4">
                               {fulfillmentViewOrderId === order.id ? (
+                                <button
+                                  onClick={() => setFulfillmentViewOrderId(null)}
+                                  className="flex items-center gap-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50 cursor-pointer"
+                                >
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                  </svg>
+                                  Back
+                                </button>
+                              ) : (
+                                <div className="flex items-center gap-2">
                                   <button
-                                    onClick={() => setFulfillmentViewOrderId(null)}
-                                    className="flex items-center gap-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50 cursor-pointer"
+                                    onClick={() => void openStockModal(order)}
+                                    className="relative flex items-center gap-1.5 text-xs font-medium text-amber-700 bg-white border border-amber-300 rounded-lg px-3 py-1.5 hover:bg-amber-50 cursor-pointer"
                                   >
-                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                                    </svg>
-                                    Back
-                                  </button>
-                                ) : (
-                                  <div className="flex items-center gap-2">
-                                    <button
-                                      onClick={() => void openStockModal(order)}
-                                      className="relative flex items-center gap-1.5 text-xs font-medium text-amber-700 bg-white border border-amber-300 rounded-lg px-3 py-1.5 hover:bg-amber-50 cursor-pointer"
-                                    >
-                                      Request Stock
-                                      {order.stockRequestCount > 0 && (
-                                        <span className="inline-flex min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-semibold leading-4 text-white">
-                                          {order.stockRequestCount > 99 ? '99+' : order.stockRequestCount}
-                                        </span>
-                                      )}
-                                    </button>
-                                    {order.fulfillmentItems.confirmations.length > 0 && (
-                                      <button
-                                        onClick={() => setFulfillmentViewOrderId(order.id)}
-                                        className="flex items-center gap-1.5 text-xs font-medium text-blue-600 bg-white border border-blue-300 rounded-lg px-3 py-1.5 hover:bg-blue-50 cursor-pointer"
-                                      >
-                                        Fulfillments
-                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                        </svg>
-                                      </button>
+                                    Request Stock
+                                    {order.stockRequestCount > 0 && (
+                                      <span className="inline-flex min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-semibold leading-4 text-white">
+                                        {order.stockRequestCount > 99 ? '99+' : order.stockRequestCount}
+                                      </span>
                                     )}
-                                  </div>
-                                )}
-                              </div>
+                                  </button>
+                                  {order.fulfillmentItems.confirmations.length > 0 && (
+                                    <button
+                                      onClick={() => setFulfillmentViewOrderId(order.id)}
+                                      className="flex items-center gap-1.5 text-xs font-medium text-blue-600 bg-white border border-blue-300 rounded-lg px-3 py-1.5 hover:bg-blue-50 cursor-pointer"
+                                    >
+                                      Fulfillments
+                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                      </svg>
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                             <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,300px)_minmax(0,1fr)_minmax(0,400px)]">
                               <div className="w-full lg:max-w-[300px]">
                                 <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">Customer &amp; Order</h4>
@@ -2843,18 +2840,29 @@ export default function OrdersPage() {
                                       return (
                                         <>
                                           <h4 className="text-xs font-semibold text-gray-500 uppercase mb-3">Actions</h4>
-                                          <button
-                                            ref={fullSelectBtnRef}
-                                            onClick={() => openFulfillmentConfirmation(order)}
-                                            disabled={isConfirmDisabled}
-                                            className={`w-full py-2 rounded-lg text-xs font-semibold transition-colors duration-150 mb-2 ${
-                                              isConfirmDisabled
-                                                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                                                : 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer'
-                                            }`}
-                                          >
-                                            {lockedFulfillment ? 'Fulfilment Locked' : fulSaving[order.id] ? 'Confirming...' : 'Confirm Fulfilment'}
-                                          </button>
+                                          <div className="flex items-center gap-2">
+                                            <button
+                                              ref={fullSelectBtnRef}
+                                              onClick={() => openFulfillmentConfirmation(order)}
+                                              disabled={isConfirmDisabled}
+                                              className={`w-full py-2 rounded-lg text-xs font-semibold transition-colors duration-150 mb-2 ${isConfirmDisabled
+                                                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                                  : 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer'
+                                                }`}
+                                            >
+                                              {lockedFulfillment ? 'Fulfilment Locked' : fulSaving[order.id] ? 'Confirming...' : 'Confirm Fulfilment'}
+                                            </button>
+                                            <button
+                                              onClick={() => {openFulfillmentConfirmation(order);printPackingSlipLabel(order)}}
+                                              disabled={isConfirmDisabled}
+                                              className={`w-full py-2 rounded-lg text-xs font-semibold transition-colors duration-150 mb-2 ${isConfirmDisabled
+                                                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                                  : 'bg-sky-600 text-white hover:bg-sky-700 cursor-pointer'
+                                                }`}
+                                            >
+                                              {lockedFulfillment ? 'Fulfilment Locked' : fulSaving[order.id] ? 'Confirming...' : 'Confirm & Print'}
+                                            </button>
+                                          </div>
                                         </>
                                       );
                                     })()}
@@ -2862,22 +2870,20 @@ export default function OrdersPage() {
                                       <button
                                         onClick={() => void printPackingSlipLabel(order)}
                                         disabled={printingOrderId === order.id || isFullyFulfilled}
-                                        className={`flex-1 border py-1.5 rounded-lg text-xs font-medium transition-colors duration-150 ${
-                                          printingOrderId === order.id || isFullyFulfilled
+                                        className={`flex-1 border py-1.5 rounded-lg text-xs font-medium transition-colors duration-150 ${printingOrderId === order.id || isFullyFulfilled
                                             ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
                                             : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-50 cursor-pointer'
-                                        }`}
+                                          }`}
                                       >
                                         {printingOrderId === order.id ? 'Loading label...' : 'Print Label'}
                                       </button>
                                       <button
                                         onClick={() => void openMessageModal(order)}
                                         disabled={isFullyFulfilled}
-                                        className={`relative flex-1 border py-1.5 rounded-lg text-xs font-medium transition-colors duration-150 ${
-                                          isFullyFulfilled
+                                        className={`relative flex-1 border py-1.5 rounded-lg text-xs font-medium transition-colors duration-150 ${isFullyFulfilled
                                             ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
                                             : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-50 cursor-pointer'
-                                        }`}
+                                          }`}
                                       >
                                         Message
                                         {order.messageCount > 0 && (
@@ -2995,9 +3001,9 @@ export default function OrdersPage() {
                           <tr className="border-b border-gray-200 text-gray-500">
                             <th className="py-1 text-left font-medium">Item</th>
                             <th className="py-1 text-left font-medium">Supplier</th>
-                              <th className="py-1 text-center font-medium">Qty</th>
-                              <th className="py-1 text-center font-medium">Restocked</th>
-                              <th className="py-1 text-left font-medium">Due</th>
+                            <th className="py-1 text-center font-medium">Qty</th>
+                            <th className="py-1 text-center font-medium">Restocked</th>
+                            <th className="py-1 text-left font-medium">Due</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -3507,9 +3513,8 @@ export default function OrdersPage() {
                                   setCarrierDropdownOpen(false);
                                   setCarrierSearch('');
                                 }}
-                                className={`w-full px-3 py-2 text-left text-sm hover:bg-blue-50 cursor-pointer ${
-                                  pendingFulfillment.trackingCompany === carrier ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'
-                                }`}
+                                className={`w-full px-3 py-2 text-left text-sm hover:bg-blue-50 cursor-pointer ${pendingFulfillment.trackingCompany === carrier ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'
+                                  }`}
                               >
                                 {carrier}
                               </button>
@@ -3645,7 +3650,7 @@ export default function OrdersPage() {
               <div className="flex items-start gap-3 text-sm text-gray-700">
                 <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center shrink-0">
                   <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
                   </svg>
                 </div>
                 <div>
