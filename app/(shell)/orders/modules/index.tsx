@@ -645,6 +645,8 @@ export default function OrdersPage() {
   const messageTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const activeSyncJobIdRef = useRef<string | null>(null);
   const completedSyncJobIdRef = useRef<string | null>(null);
+  const fullSelectBtnRef = useRef<HTMLButtonElement>(null);
+  const trackingNumInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -908,6 +910,12 @@ export default function OrdersPage() {
       });
       return updated;
     });
+
+    if(!allChecked){
+      setTimeout(() => {
+      fullSelectBtnRef.current?.click()
+      }, 100);
+    }
   };
 
   const validPartial = (orderId: string, itemIndex: number, maxQty: number, value: string) => {
@@ -1053,10 +1061,13 @@ export default function OrdersPage() {
       barcodeInput: '',
       trackingNumber: '',
       trackingUrl: '',
-      trackingCompany: '',
+      trackingCompany: 'Australia Post',
     });
     setCarrierDropdownOpen(false);
     setCarrierSearch('');
+    setTimeout(() => {
+      trackingNumInputRef.current?.focus();
+    }, 100);
   };
 
   const closeFulfillmentConfirmation = () => {
@@ -2833,6 +2844,7 @@ export default function OrdersPage() {
                                         <>
                                           <h4 className="text-xs font-semibold text-gray-500 uppercase mb-3">Actions</h4>
                                           <button
+                                            ref={fullSelectBtnRef}
                                             onClick={() => openFulfillmentConfirmation(order)}
                                             disabled={isConfirmDisabled}
                                             className={`w-full py-2 rounded-lg text-xs font-semibold transition-colors duration-150 mb-2 ${
@@ -3403,7 +3415,7 @@ export default function OrdersPage() {
                 Confirm fulfilment
               </h3>
               <p className="mt-1 text-sm text-gray-500">
-                Order {pendingFulfillment.order.number} will be fulfilled in Shopify.
+                Order {pendingFulfillment.order.number} will be fulfilled.
               </p>
             </div>
 
@@ -3518,6 +3530,7 @@ export default function OrdersPage() {
                   <input
                     type="text"
                     value={pendingFulfillment.trackingNumber}
+                    ref={trackingNumInputRef}
                     required={Boolean(pendingFulfillment.trackingCompany.trim())}
                     onChange={(event) => {
                       setPendingFulfillment((prev) => (
@@ -3637,7 +3650,7 @@ export default function OrdersPage() {
                 </div>
                 <div>
                   <p className="font-semibold text-gray-800 mb-1">Are you sure?</p>
-                  <p className="text-gray-600 text-xs">This will cancel the fulfillment in Shopify and remove it from this order. This cannot be undone.</p>
+                  <p className="text-gray-600 text-xs">This will cancel the fulfillment and remove it from this order. This cannot be undone.</p>
                 </div>
               </div>
             </div>
