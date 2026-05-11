@@ -77,6 +77,7 @@ model Order {
   currencyCode      String?
   note              String?
   lineItems         Json
+  shippingLines     Json?
   fulfillmentItems  Json?
   price             Float
   country           String?

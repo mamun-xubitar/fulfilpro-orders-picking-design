@@ -93,7 +93,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   callbacks: {
     redirect({ url, baseUrl }) {
       const redirectBaseUrl = process.env.NODE_ENV === "production" ? authRedirectBaseUrl ?? baseUrl : baseUrl;
-      console.log("redirectBaseUrl", redirectBaseUrl, "url", url, baseUrl)
+
       if (url.startsWith('/')) {
         return `${redirectBaseUrl}${url}`;
       }

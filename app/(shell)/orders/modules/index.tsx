@@ -6,6 +6,28 @@ import { toast } from 'react-toastify';
 import { isStaffLikeRole, isTestUserRole } from '@/lib/roles';
 
 type OrderItem = { id: string; productId: string | null; name: string; sku: string; vendor: string; qty: number };
+type ShippingLine = {
+  id: string;
+  title: string;
+  code: string | null;
+  source: string | null;
+  price: number;
+  discountedPrice: number | null;
+  currencyCode: string | null;
+  carrierIdentifier: string | null;
+  requestedFulfillmentServiceId: string | null;
+  phone: string | null;
+  deliveryCategory: string | null;
+  discountCodes: string[];
+  discountAllocations: Array<{
+    amount: number;
+    currencyCode: string | null;
+    code: string | null;
+    title: string | null;
+    type: string | null;
+    discountApplicationIndex: number | null;
+  }>;
+};
 type OrderRow = {
   id: string;
   number: string;
@@ -27,6 +49,7 @@ type OrderRow = {
   storeDomain: string;
   barcodes: string[];
   items: OrderItem[];
+  shippingLines: ShippingLine[];
   fulfillmentItems: {
     shopifyOrderId: string | null;
     confirmations: FulfillmentConfirmation[];
@@ -408,6 +431,36 @@ function getPackingSlipAddressLines(label: Pick<PackingSlipLabel, 'address' | 'a
     compactAddressParts([label.city, label.state, label.zip]),
     compactAddressParts([label.country]),
   ].filter(Boolean);
+}
+
+function formatShippingMoney(value: number | null, currencyCode: string | null) {
+  if (value === null || !Number.isFinite(value)) return '-';
+
+  if (!currencyCode) {
+    return value.toFixed(2);
+  }
+
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: 'currency',
+      currency: currencyCode,
+    }).format(value);
+  } catch {
+    return `${value.toFixed(2)} ${currencyCode}`;
+  }
+}
+
+function getShippingDiscountCodes(line: ShippingLine) {
+  return Array.from(new Set([
+    ...line.discountCodes,
+    ...line.discountAllocations
+      .map((allocation) => allocation.code)
+      .filter((code): code is string => Boolean(code)),
+  ]));
+}
+
+function getShippingLineFinalPrice(line: ShippingLine) {
+  return line.discountedPrice ?? Math.max(0, line.price - line.discountAllocations.reduce((sum, item) => sum + item.amount, 0));
 }
 
 function getApiErrorMessage(response: ApiResponse<unknown>, fallback: string) {
@@ -2567,10 +2620,36 @@ export default function OrdersPage() {
                                     ))}
                                   </div>
                                 )}
-                                <p className="text-xs text-gray-400 mt-2">{order.storeName} · {order.number}</p>
-                                {order.note && (
-                                  <p className="text-xs text-gray-600 mt-2 whitespace-pre-wrap">{order.note}</p>
+                                {order.shippingLines.length > 0 && (
+                                  <div className="mt-3 space-y-1.5">
+                                    <h5 className="text-[11px] font-semibold uppercase text-gray-400">Shipping</h5>
+                                    {order.shippingLines.map((line, lineIndex) => {
+                                      const finalPrice = getShippingLineFinalPrice(line);
+                                      const isFree = finalPrice <= 0;
+                                      const discountCodes = getShippingDiscountCodes(line);
+                                      return (
+                                        <div key={line.id || `${order.id}-shipping-${lineIndex}`} className="rounded-md border border-blue-100 bg-white/70 px-2.5 py-2 text-xs text-gray-600">
+                                          <div className="flex flex-wrap items-center gap-1.5">
+                                            <span className="font-medium text-gray-800">{line.title || line.code || 'Shipping'}</span>
+                                            <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${isFree ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                                              {isFree ? 'Free' : 'Paid'}
+                                            </span>
+                                            {discountCodes.map((code) => (
+                                              <span key={code} className="rounded-full bg-amber-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-amber-700">
+                                                {code}
+                                              </span>
+                                            ))}
+                                          </div>
+                                          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-gray-500">
+                                            <span>Price: {formatShippingMoney(line.price, line.currencyCode)}</span>
+                                            <span>Discounted: {formatShippingMoney(finalPrice, line.currencyCode)}</span>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
                                 )}
+                                <p className="text-xs text-gray-400 mt-2">{order.storeName} · {order.number}</p>
                               </div>
 
                               {fulfillmentViewOrderId === order.id ? (
@@ -2798,6 +2877,12 @@ export default function OrdersPage() {
                                     </div>
                                     {fulMessages[order.id] && (
                                       <div className="mt-2 text-xs text-center text-green-600 font-medium">{fulMessages[order.id]}</div>
+                                    )}
+                                    {order.note && (
+                                      <div className="mt-3 rounded-md border border-blue-100 bg-white/70 px-3 py-2">
+                                        <h4 className="text-[11px] font-semibold uppercase text-gray-400">Note</h4>
+                                        <p className="mt-1 whitespace-pre-wrap break-words text-xs text-gray-600">{order.note}</p>
+                                      </div>
                                     )}
                                   </div>
                                 </>

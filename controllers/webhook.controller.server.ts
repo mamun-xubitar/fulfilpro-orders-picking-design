@@ -9,11 +9,19 @@ export class WebhookController {
     payload: ShopifyOrderPayload;
     storeId: string;
     storeDomain: string;
+    accessToken?: string | null;
   }) {
-    const { payload, storeId, storeDomain } = params;
+    const { payload, storeId, storeDomain, accessToken } = params;
+    const order = payload.id && accessToken
+      ? await fetchShopifyOrderById({
+          shop: storeDomain,
+          accessToken,
+          orderId: payload.id,
+        })
+      : payload;
 
     const result = await orderModel.createIfMissingFromOrderCreateWebhook({
-      payload,
+      payload: order,
       storeId,
       storeDomain,
     });

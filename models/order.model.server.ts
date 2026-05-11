@@ -30,6 +30,17 @@ export type ShopifyOrderPayload = {
       currency_code?: string | null;
     };
   };
+  discount_codes?: Array<{
+    code?: string | null;
+    amount?: string | number | null;
+    type?: string | null;
+  }> | null;
+  discount_applications?: Array<{
+    code?: string | null;
+    title?: string | null;
+    type?: string | null;
+    target_type?: string | null;
+  }> | null;
   customer?: {
     first_name?: string | null;
     last_name?: string | null;
@@ -46,6 +57,52 @@ export type ShopifyOrderPayload = {
     phone?: string | null;
     name?: string | null;
   } | null;
+  shipping_lines?: Array<{
+    id?: string | number | null;
+    title?: string | null;
+    code?: string | null;
+    source?: string | null;
+    price?: string | number | null;
+    discounted_price?: string | number | null;
+    carrier_identifier?: string | null;
+    requested_fulfillment_service_id?: string | number | null;
+    phone?: string | null;
+    delivery_category?: string | null;
+    price_set?: {
+      shop_money?: {
+        amount?: string | number | null;
+        currency_code?: string | null;
+      };
+    };
+    discounted_price_set?: {
+      shop_money?: {
+        amount?: string | number | null;
+        currency_code?: string | null;
+      };
+    };
+    discount_allocations?: Array<{
+      amount?: string | number | null;
+      amount_set?: {
+        shop_money?: {
+          amount?: string | number | null;
+          currency_code?: string | null;
+        };
+      };
+      discount_application_index?: number | null;
+      code?: string | null;
+      title?: string | null;
+      type?: string | null;
+    }> | null;
+    discountCodes?: string[];
+    discountAllocations?: Array<{
+      amount: number;
+      currencyCode: string | null;
+      code: string | null;
+      title: string | null;
+      type: string | null;
+      discountApplicationIndex: number | null;
+    }>;
+  }> | null;
   line_items?: Array<{
     id: string | number;
     product_id?: string | number | null;
@@ -126,7 +183,7 @@ export class OrderModel {
       },
     });
 
-    console.log("exisint", !!existing, storeId)
+    // console.log("exisint", !!existing, storeId)
     if (!existing) {
       await prisma.order.create({
         data: buildOrderCreateData(payload, storeId),
@@ -888,6 +945,7 @@ function toOrderRow(row: {
   canceledAt: Date | null;
   orderedAt: Date | null;
   lineItems: Prisma.JsonValue;
+  shippingLines: Prisma.JsonValue | null;
   fulfillmentItems: Prisma.JsonValue | null;
   fulfillmentStatus: string | null;
   store: {
@@ -931,6 +989,7 @@ function toOrderRow(row: {
     storeName: row.store.name ?? row.store.storeDomain,
     storeDomain: row.store.storeDomain,
     items: lineItems,
+    shippingLines: toShippingLines(row.shippingLines),
     fulfillmentItems: toFulfillmentItems(row.fulfillmentItems),
     itemsCount: itemCount,
     messageCount: row._count.messages,
@@ -1008,6 +1067,10 @@ function buildOrderWriteData(
     price: Number(item.price_set?.shop_money?.amount ?? item.price ?? 0),
     currencyCode: item.price_set?.shop_money?.currency_code ?? null,
   }));
+  const shippingLines = toShippingLines(
+    payload.shipping_lines ?? null,
+    payload.discount_applications ?? null
+  );
 
   const shippingAddress = payload.shipping_address;
   const customerName =
@@ -1049,6 +1112,7 @@ function buildOrderWriteData(
     closedAt,
     boarcode: extractBarcode(lineItems),
     lineItems,
+    shippingLines,
     fulfillmentItems,
     price: Number.isFinite(price) ? price : 0,
     currencyCode,
@@ -1612,6 +1676,121 @@ function toLineItems(value: Prisma.JsonValue): Array<{ id: string; productId: st
       sku: typeof obj.sku === 'string' ? obj.sku : '',
       vendor: typeof obj.vendor === 'string' ? obj.vendor : '',
       qty: typeof obj.qty === 'number' ? obj.qty : Number(obj.qty ?? 0),
+    };
+  });
+}
+
+function toShippingLines(
+  value: Prisma.JsonValue | ShopifyOrderPayload['shipping_lines'] | null,
+  discountApplications: ShopifyOrderPayload['discount_applications'] = null
+) {
+  if (!Array.isArray(value)) return [];
+
+  const applications = Array.isArray(discountApplications) ? discountApplications : [];
+
+  return value.map((item) => {
+    if (!item || typeof item !== 'object') {
+      return {
+        id: '',
+        title: '',
+        code: null,
+        source: null,
+        price: 0,
+        discountedPrice: null,
+        currencyCode: null,
+        carrierIdentifier: null,
+        requestedFulfillmentServiceId: null,
+        phone: null,
+        deliveryCategory: null,
+        discountCodes: [],
+        discountAllocations: [],
+      };
+    }
+
+    const obj = item as Record<string, unknown>;
+    const priceSet = obj.price_set as { shop_money?: { amount?: unknown; currency_code?: unknown } } | undefined;
+    const discountedPriceSet = obj.discounted_price_set as { shop_money?: { amount?: unknown; currency_code?: unknown } } | undefined;
+    const price = priceSet?.shop_money?.amount ?? obj.price ?? 0;
+    const discountedPrice = discountedPriceSet?.shop_money?.amount ?? obj.discounted_price ?? obj.discountedPrice ?? null;
+    const currencyCode = priceSet?.shop_money?.currency_code ?? discountedPriceSet?.shop_money?.currency_code ?? obj.currencyCode ?? null;
+    const discountAllocations = normalizeShippingDiscountAllocations(obj, applications);
+    const discountCodes = normalizeStringArray(obj.discountCodes).concat(
+      discountAllocations
+        .map((allocation) => allocation.code)
+        .filter((code): code is string => Boolean(code))
+    );
+
+    return {
+      id: typeof obj.id === 'string' ? obj.id : String(obj.id ?? ''),
+      title: typeof obj.title === 'string' ? obj.title : '',
+      code: typeof obj.code === 'string' ? obj.code : null,
+      source: typeof obj.source === 'string' ? obj.source : null,
+      price: toJsonNumber(price, 0),
+      discountedPrice: discountedPrice === null ? null : toJsonNumber(discountedPrice, 0),
+      currencyCode: typeof currencyCode === 'string' ? currencyCode : null,
+      carrierIdentifier: typeof obj.carrier_identifier === 'string'
+        ? obj.carrier_identifier
+        : (typeof obj.carrierIdentifier === 'string' ? obj.carrierIdentifier : null),
+      requestedFulfillmentServiceId: obj.requested_fulfillment_service_id
+        ? String(obj.requested_fulfillment_service_id)
+        : (obj.requestedFulfillmentServiceId ? String(obj.requestedFulfillmentServiceId) : null),
+      phone: typeof obj.phone === 'string' ? obj.phone : null,
+      deliveryCategory: typeof obj.delivery_category === 'string'
+        ? obj.delivery_category
+        : (typeof obj.deliveryCategory === 'string' ? obj.deliveryCategory : null),
+      discountCodes: Array.from(new Set(discountCodes)),
+      discountAllocations,
+    };
+  });
+}
+
+function toJsonNumber(value: unknown, fallback: number) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function normalizeStringArray(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => typeof item === 'string' ? item.trim() : '')
+    .filter(Boolean);
+}
+
+function normalizeShippingDiscountAllocations(
+  shippingLine: Record<string, unknown>,
+  discountApplications: NonNullable<ShopifyOrderPayload['discount_applications']>
+) {
+  const allocations = shippingLine.discount_allocations ?? shippingLine.discountAllocations;
+  if (!Array.isArray(allocations)) return [];
+
+  return allocations.map((allocation) => {
+    if (!allocation || typeof allocation !== 'object') {
+      return {
+        amount: 0,
+        currencyCode: null,
+        code: null,
+        title: null,
+        type: null,
+        discountApplicationIndex: null,
+      };
+    }
+
+    const obj = allocation as Record<string, unknown>;
+    const amountSet = obj.amount_set as { shop_money?: { amount?: unknown; currency_code?: unknown } } | undefined;
+    const amount = amountSet?.shop_money?.amount ?? obj.amount ?? 0;
+    const currencyCode = amountSet?.shop_money?.currency_code ?? obj.currencyCode ?? null;
+    const index = typeof obj.discount_application_index === 'number'
+      ? obj.discount_application_index
+      : (typeof obj.discountApplicationIndex === 'number' ? obj.discountApplicationIndex : null);
+    const application = index === null ? null : discountApplications[index] ?? null;
+
+    return {
+      amount: toJsonNumber(amount, 0),
+      currencyCode: typeof currencyCode === 'string' ? currencyCode : null,
+      code: typeof obj.code === 'string' ? obj.code : application?.code ?? null,
+      title: typeof obj.title === 'string' ? obj.title : application?.title ?? null,
+      type: typeof obj.type === 'string' ? obj.type : application?.type ?? null,
+      discountApplicationIndex: index,
     };
   });
 }

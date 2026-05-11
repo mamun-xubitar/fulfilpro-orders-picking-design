@@ -45,6 +45,7 @@ type ShopifyGraphQLOrder = {
       currencyCode: string;
     };
   } | null;
+  discountCodes: string[];
   customer: {
     firstName: string | null;
     lastName: string | null;
@@ -61,6 +62,42 @@ type ShopifyGraphQLOrder = {
     phone: string | null;
     name: string | null;
   } | null;
+  shippingLines: {
+    nodes: Array<{
+      id: string;
+      title: string | null;
+      code: string | null;
+      source: string | null;
+      originalPriceSet: {
+        shopMoney: {
+          amount: string;
+          currencyCode: string;
+        };
+      } | null;
+      discountedPriceSet: {
+        shopMoney: {
+          amount: string;
+          currencyCode: string;
+        };
+      } | null;
+      discountAllocations: Array<{
+        allocatedAmountSet: {
+          shopMoney: {
+            amount: string;
+            currencyCode: string;
+          };
+        };
+        discountApplication: {
+          __typename: string;
+          allocationMethod: string;
+          index: number;
+          targetSelection: string;
+          code?: string | null;
+          title?: string | null;
+        };
+      }>;
+    }>;
+  };
   lineItems: {
     nodes: Array<{
       id: string;
@@ -120,6 +157,7 @@ const ORDERS_QUERY = `
             currencyCode
           }
         }
+        discountCodes
         customer {
           firstName
           lastName
@@ -135,6 +173,52 @@ const ORDERS_QUERY = `
           country
           phone
           name
+        }
+        shippingLines(first: 50) {
+          nodes {
+            id
+            title
+            code
+            source
+            originalPriceSet {
+              shopMoney {
+                amount
+                currencyCode
+              }
+            }
+            discountedPriceSet {
+              shopMoney {
+                amount
+                currencyCode
+              }
+            }
+            discountAllocations {
+              allocatedAmountSet {
+                shopMoney {
+                  amount
+                  currencyCode
+                }
+              }
+              discountApplication {
+                __typename
+                allocationMethod
+                index
+                targetSelection
+                ... on DiscountCodeApplication {
+                  code
+                }
+                ... on AutomaticDiscountApplication {
+                  title
+                }
+                ... on ManualDiscountApplication {
+                  title
+                }
+                ... on ScriptDiscountApplication {
+                  title
+                }
+              }
+            }
+          }
         }
         lineItems(first: 100) {
           nodes {
@@ -351,6 +435,7 @@ function toShopifyOrderPayload(order: ShopifyGraphQLOrder): ShopifyOrderPayload 
         },
       }
       : undefined,
+    discount_codes: order.discountCodes.map((code) => ({ code })),
     customer: order.customer
       ? {
         first_name: order.customer.firstName,
@@ -388,6 +473,43 @@ function toShopifyOrderPayload(order: ShopifyGraphQLOrder): ShopifyOrderPayload 
           },
         }
         : undefined,
+    })),
+    shipping_lines: order.shippingLines.nodes.map((shippingLine) => ({
+      id: getLegacyId(shippingLine.id),
+      title: shippingLine.title,
+      code: shippingLine.code,
+      source: shippingLine.source,
+      price: shippingLine.originalPriceSet?.shopMoney.amount ?? null,
+      price_set: shippingLine.originalPriceSet
+        ? {
+          shop_money: {
+            amount: shippingLine.originalPriceSet.shopMoney.amount,
+            currency_code: shippingLine.originalPriceSet.shopMoney.currencyCode,
+          },
+        }
+        : undefined,
+      discounted_price: shippingLine.discountedPriceSet?.shopMoney.amount ?? null,
+      discounted_price_set: shippingLine.discountedPriceSet
+        ? {
+          shop_money: {
+            amount: shippingLine.discountedPriceSet.shopMoney.amount,
+            currency_code: shippingLine.discountedPriceSet.shopMoney.currencyCode,
+          },
+        }
+        : undefined,
+      discount_allocations: shippingLine.discountAllocations.map((allocation) => ({
+        amount: allocation.allocatedAmountSet.shopMoney.amount,
+        amount_set: {
+          shop_money: {
+            amount: allocation.allocatedAmountSet.shopMoney.amount,
+            currency_code: allocation.allocatedAmountSet.shopMoney.currencyCode,
+          },
+        },
+        discount_application_index: allocation.discountApplication.index,
+        code: 'code' in allocation.discountApplication ? allocation.discountApplication.code ?? null : null,
+        title: 'title' in allocation.discountApplication ? allocation.discountApplication.title ?? null : null,
+        type: allocation.discountApplication.__typename,
+      })),
     })),
     fulfillments: order.fulfillments.map((fulfillment) => {
       const tracking = fulfillment.trackingInfo[0];

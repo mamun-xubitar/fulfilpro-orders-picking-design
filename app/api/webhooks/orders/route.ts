@@ -58,6 +58,7 @@ export async function POST(request: NextRequest) {
           payload: payload as ShopifyOrderPayload,
           storeId: store.id,
           storeDomain: normalizedShop,
+          accessToken: store.accessToken,
         })
         break;
       case "orders/updated":
