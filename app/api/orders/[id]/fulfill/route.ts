@@ -12,7 +12,7 @@ export async function POST(
   const body = await request.json() as unknown;
 
   try {
-    const result = await controller.confirmFulfillment(id, body);
+    const result = await controller.confirmFulfillment(id, body, request.nextUrl.origin);
     return apiSuccess({ message: result.message, data: result.data });
   } catch (error) {
     return apiError({

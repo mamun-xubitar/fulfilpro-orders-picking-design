@@ -8,9 +8,11 @@ import type {
   EditFulfillmentModalState,
   MessageModalState,
   NoteModalState,
+  OrderStockAdjustment,
   OrderRow,
   PendingFulfillmentModalState,
   RequestPermissionModalState,
+  StockAdjustmentModalState,
   StockModalState,
 } from './types';
 
@@ -59,6 +61,11 @@ type OrderModalsProps = {
   requestPermModal: RequestPermissionModalState | null;
   setRequestPermModal: Dispatch<SetStateAction<RequestPermissionModalState | null>>;
   submitPermissionRequest: () => Promise<void>;
+  stockAdjustmentModal: StockAdjustmentModalState | null;
+  setStockAdjustmentModal: Dispatch<SetStateAction<StockAdjustmentModalState | null>>;
+  closeStockAdjustmentModal: () => void;
+  toggleManagedStockAdjustmentItem: (lineItemId: string) => void;
+  submitStockAdjustment: () => Promise<void>;
 };
 
 export default function OrderModals({
@@ -104,9 +111,146 @@ export default function OrderModals({
   requestPermModal,
   setRequestPermModal,
   submitPermissionRequest,
+  stockAdjustmentModal,
+  setStockAdjustmentModal,
+  closeStockAdjustmentModal,
+  toggleManagedStockAdjustmentItem,
+  submitStockAdjustment,
 }: OrderModalsProps) {
   return (
     <>
+  {stockAdjustmentModal && (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-gray-900/50 px-4 pb-4 sm:items-center sm:pb-0"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="stock-adjustment-title"
+      onClick={closeStockAdjustmentModal}
+    >
+      <div
+        className="w-full max-w-3xl max-h-[calc(100dvh-2rem)] overflow-hidden rounded-lg bg-white shadow-xl border border-gray-200"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-gray-200">
+          <div>
+            <h3 id="stock-adjustment-title" className="text-base font-semibold text-gray-900">
+              Manage stock adjustment
+            </h3>
+            <p className="mt-1 text-sm text-gray-500">
+              Order {stockAdjustmentModal.order.number} - {stockAdjustmentModal.order.customer}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={closeStockAdjustmentModal}
+            disabled={stockAdjustmentModal.saving}
+            className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-50"
+            aria-label="Close"
+          >
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="max-h-[calc(100dvh-11rem)] overflow-y-auto px-5 py-4">
+          {stockAdjustmentModal.loading ? (
+            <div className="py-12 text-center text-sm text-gray-400">Loading stock adjustment...</div>
+          ) : !stockAdjustmentModal.adjustment ? (
+            <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-500">
+              No stock adjustment is pending for this order.
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">
+                <span>
+                  {stockAdjustmentModal.adjustment.managedCount}/{stockAdjustmentModal.adjustment.totalCount} products managed
+                </span>
+                <span>
+                  Last event: {formatStockAdjustmentEventLabel(stockAdjustmentModal.adjustment.lastEventType)} on {new Date(stockAdjustmentModal.adjustment.lastEventAt).toLocaleString()}
+                </span>
+              </div>
+
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-gray-200 text-gray-500">
+                    <th className="py-2 pr-2 text-left font-medium">Managed</th>
+                    <th className="py-2 pr-2 text-left font-medium">Product</th>
+                    <th className="py-2 pr-2 text-left font-medium">SKU</th>
+                    <th className="py-2 pr-2 text-left font-medium">Action</th>
+                    <th className="py-2 text-center font-medium">Qty</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stockAdjustmentModal.adjustment.items.map((item) => (
+                    <tr key={item.lineItemId} className="border-b border-gray-100">
+                      <td className="py-2 pr-2">
+                        <input
+                          type="checkbox"
+                          checked={stockAdjustmentModal.managedLineItemIds.includes(item.lineItemId)}
+                          onChange={() => toggleManagedStockAdjustmentItem(item.lineItemId)}
+                          disabled={stockAdjustmentModal.saving}
+                          className="rounded border-gray-300 text-blue-600 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                        />
+                      </td>
+                      <td className="py-2 pr-2 text-gray-800">
+                        <div className="font-medium">{item.name}</div>
+                        {item.vendor && <div className="text-[11px] text-gray-400">{item.vendor}</div>}
+                      </td>
+                      <td className="py-2 pr-2 font-mono text-gray-500">{item.sku || '-'}</td>
+                      <td className="py-2 pr-2">
+                        <span className={`rounded-full px-2 py-0.5 font-semibold ${item.action === 'restore' ? 'bg-sky-100 text-sky-700' : 'bg-amber-100 text-amber-800'}`}>
+                          {item.action === 'restore' ? 'Restore' : 'Decrease'}
+                        </span>
+                      </td>
+                      <td className="py-2 text-center text-gray-700">{item.quantity}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              {/* <label className="block text-sm text-gray-700">
+                <span className="mb-1 block text-xs font-semibold uppercase text-gray-500">Note</span>
+                <textarea
+                  value={stockAdjustmentModal.note}
+                  onChange={(event) => setStockAdjustmentModal((prev) => prev ? { ...prev, note: event.target.value, error: '' } : prev)}
+                  rows={3}
+                  maxLength={2000}
+                  disabled={stockAdjustmentModal.saving}
+                  className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:bg-gray-100"
+                  placeholder="Optional stock management note"
+                />
+              </label> */}
+
+              {stockAdjustmentModal.error && (
+                <p className="text-sm text-red-600">{stockAdjustmentModal.error}</p>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-col-reverse gap-2 border-t border-gray-200 bg-gray-50 px-5 py-4 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            onClick={closeStockAdjustmentModal}
+            disabled={stockAdjustmentModal.saving}
+            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+          >
+            Close
+          </button>
+          <button
+            type="button"
+            onClick={() => void submitStockAdjustment()}
+            disabled={stockAdjustmentModal.saving || stockAdjustmentModal.loading || !stockAdjustmentModal.adjustment}
+            className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {stockAdjustmentModal.saving ? 'Saving...' : 'Save stock status'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )}
+
   {stockModal && (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 px-4 py-6">
       <div className="max-h-[90vh] w-full max-w-3xl overflow-hidden rounded-xl bg-white shadow-xl">
@@ -875,4 +1019,10 @@ export default function OrderModals({
 
     </>
   );
+}
+
+function formatStockAdjustmentEventLabel(value: OrderStockAdjustment['lastEventType']) {
+  if (value === 'fulfillment_canceled') return 'Fulfillment canceled';
+  if (value === 'partially_fulfilled') return 'Partially fulfilled';
+  return 'Fulfilled';
 }

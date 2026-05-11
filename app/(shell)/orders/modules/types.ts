@@ -52,6 +52,7 @@ export type OrderRow = {
   noteCount: number;
   stockRequestCount: number;
   backInStockStatus: BackInStockStatus | null;
+  stockAdjustment: OrderStockAdjustment | null;
 };
 
 export type StoreOption = { id: string; name: string; storeDomain: string };
@@ -76,6 +77,35 @@ export type OrderNote = {
   updatedAt: string;
 };
 export type BackInStockStatus = 'pending' | 'partially_back_in_stock' | 'back_in_stock';
+export type OrderStockAdjustmentStatus = 'pending' | 'partial' | 'managed';
+export type OrderStockAdjustmentItem = {
+  lineItemId: string;
+  productId: string | null;
+  name: string;
+  sku: string;
+  vendor: string;
+  quantity: number;
+  action: 'decrease' | 'restore';
+  managed: boolean;
+  managedAt: string | null;
+  lastEventType: 'fulfilled' | 'partially_fulfilled' | 'fulfillment_canceled';
+  lastEventAt: string;
+};
+export type OrderStockAdjustment = {
+  id: string;
+  orderId: string;
+  status: OrderStockAdjustmentStatus;
+  items: OrderStockAdjustmentItem[];
+  managedCount: number;
+  totalCount: number;
+  lastEventType: 'fulfilled' | 'partially_fulfilled' | 'fulfillment_canceled';
+  lastEventAt: string;
+  managedByName: string | null;
+  managedByEmail: string | null;
+  note: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
 export type BackInStockItem = { lineItemId: string; dueDate: string; supplierName: string; quantity: number; item: string; restockedQuantity?: number };
 export type BackInStockMessage = {
   id: string;
@@ -223,6 +253,16 @@ export type StockModalState = {
   requests: BackInStockRequest[];
   items: BackInStockItem[];
   message: string;
+  loading: boolean;
+  saving: boolean;
+  error: string;
+};
+
+export type StockAdjustmentModalState = {
+  order: OrderRow;
+  adjustment: OrderStockAdjustment | null;
+  managedLineItemIds: string[];
+  note: string;
   loading: boolean;
   saving: boolean;
   error: string;

@@ -278,6 +278,7 @@ export class OrderModel {
           },
         },
       },
+      stockAdjustment: true,
     } satisfies Prisma.OrderInclude;
 
     if (tokens.length > 0) {
@@ -362,6 +363,7 @@ export class OrderModel {
             },
           },
         },
+        stockAdjustment: true,
       },
     });
 
@@ -439,13 +441,15 @@ export class OrderModel {
     notifyCustomer: boolean,
     trackingInfo: FulfillmentTrackingInput | null,
     barcodes: string[] = [],
-    fulfillmentDate: string | null = null
+    fulfillmentDate: string | null = null,
+    originUrl?: string
   ) {
     const order = await prisma.order.findUnique({
       where: { id: orderId },
       include: {
         store: {
           select: {
+            name: true,
             storeDomain: true,
             accessToken: true,
           },
@@ -489,13 +493,13 @@ export class OrderModel {
     const fulfillment = shopifyResult.fulfillments[0];
     const fulfillmentDate2 = (new Date(fulfillment?.estimatedDeliveryAt || fulfillment?.deliveredAt || new Date().toISOString()).toISOString()).split("T")[0];
     const confirmation = {
-      id: crypto.randomUUID(),
+      id: shopifyResult.fulfillmentId ?? crypto.randomUUID(),
       confirmedAt: new Date().toISOString(),
       shopifyFulfillmentId: shopifyResult.fulfillmentId,
       shopifyFulfillmentStatus: shopifyResult.fulfillmentStatus,
       notifyCustomer,
       barcodes: fulfillmentBarcodes,
-      fulfillmentDate: fulfillmentDate2,
+      fulfillmentDate: fulfillmentDate ?? fulfillmentDate2,
       trackingInfo: fulfillment?.trackingInfo?.[0] || trackingInfo,
       lines: fulfillableLines,
     };
@@ -519,10 +523,26 @@ export class OrderModel {
       },
     });
 
+    const stockAdjustment = await upsertStockAdjustmentTask({
+      order,
+      lineItems,
+      lines: fulfillableLines,
+      eventType: fulfillmentStatus === 'fulfilled' ? 'fulfilled' : 'partially_fulfilled',
+    });
+    if (stockAdjustment) {
+      notifyAdminsAboutStockAdjustment({
+        order,
+        adjustment: stockAdjustment,
+        eventType: fulfillmentStatus === 'fulfilled' ? 'fulfilled' : 'partially_fulfilled',
+        originUrl,
+      }).catch(() => undefined);
+    }
+
     return {
       orderId: order.id,
       status: fulfillmentStatus,
       fulfillmentItems: nextFulfillmentItems,
+      stockAdjustment: stockAdjustment ? toStockAdjustmentRow(stockAdjustment) : null,
     };
   }
 
@@ -537,7 +557,7 @@ export class OrderModel {
   ) {
     const order = await prisma.order.findUnique({
       where: { id: orderId },
-      include: { store: { select: { storeDomain: true, accessToken: true } } },
+      include: { store: { select: { name: true, storeDomain: true, accessToken: true } } },
     });
 
     if (!order) throw new Error('Order not found');
@@ -589,10 +609,10 @@ export class OrderModel {
     return { orderId: order.id, fulfillmentItems: nextFulfillmentItems };
   }
 
-  async cancelFulfillmentConfirmation(orderId: string, fulfillmentId: string) {
+  async cancelFulfillmentConfirmation(orderId: string, fulfillmentId: string, originUrl?: string) {
     const order = await prisma.order.findUnique({
       where: { id: orderId },
-      include: { store: { select: { storeDomain: true, accessToken: true } } },
+      include: { store: { select: { name: true, storeDomain: true, accessToken: true } } },
     });
 
     if (!order) throw new Error('Order not found');
@@ -638,7 +658,69 @@ export class OrderModel {
       },
     });
 
-    return { orderId: order.id, status: fulfillmentStatus, fulfillmentItems: nextFulfillmentItems };
+    const canceledLines = Array.isArray(conf.lines) ? conf.lines as FulfillmentRequestLine[] : [];
+    const stockAdjustment = await upsertStockAdjustmentTask({
+      order,
+      lineItems,
+      lines: canceledLines,
+      eventType: 'fulfillment_canceled',
+    });
+    if (stockAdjustment) {
+      void notifyAdminsAboutStockAdjustment({
+        order,
+        adjustment: stockAdjustment,
+        eventType: 'fulfillment_canceled',
+        originUrl,
+      }).catch(() => undefined);
+    }
+
+    return { orderId: order.id, status: fulfillmentStatus, fulfillmentItems: nextFulfillmentItems, stockAdjustment: stockAdjustment ? toStockAdjustmentRow(stockAdjustment) : null };
+  }
+
+  async getStockAdjustment(orderId: string) {
+    const adjustment = await prisma.orderStockAdjustment.findUnique({
+      where: { orderId },
+    });
+
+    return adjustment ? toStockAdjustmentRow(adjustment) : null;
+  }
+
+  async updateStockAdjustment(params: {
+    orderId: string;
+    managedLineItemIds: string[];
+    note?: string;
+    admin: {
+      id?: string | null;
+      name?: string | null;
+      email?: string | null;
+    };
+  }) {
+    const existing = await prisma.orderStockAdjustment.findUnique({
+      where: { orderId: params.orderId },
+    });
+    if (!existing) throw new Error('Stock adjustment task not found');
+
+    const managedIds = new Set(params.managedLineItemIds.map((id) => id.trim()).filter(Boolean));
+    const items = toStockAdjustmentItems(existing.items).map((item) => ({
+      ...item,
+      managed: managedIds.has(item.lineItemId),
+      managedAt: managedIds.has(item.lineItemId) ? item.managedAt ?? new Date().toISOString() : null,
+    }));
+    const status = getStockAdjustmentStatus(items);
+
+    const updated = await prisma.orderStockAdjustment.update({
+      where: { id: existing.id },
+      data: {
+        items: items as unknown as Prisma.InputJsonValue,
+        status,
+        note: params.note?.trim() || null,
+        managedById: params.admin.id ?? null,
+        managedByName: params.admin.name?.trim() || null,
+        managedByEmail: params.admin.email?.trim() || null,
+      },
+    });
+
+    return toStockAdjustmentRow(updated);
   }
 
   async getPackingSlipLabel(orderId: string) {
@@ -964,6 +1046,19 @@ function toOrderRow(row: {
     requesterViewedAt: Date | null;
     messages: Array<{ senderRole: string; createdAt: Date }>;
   }>;
+  stockAdjustment?: {
+    id: string;
+    orderId: string;
+    status: string;
+    items: Prisma.JsonValue;
+    lastEventType: string;
+    lastEventAt: Date;
+    managedByName: string | null;
+    managedByEmail: string | null;
+    note: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+  } | null;
 }) {
   const lineItems = toLineItems(row.lineItems);
   const itemCount = lineItems.reduce((sum, item) => sum + Math.max(0, item.qty), 0);
@@ -996,6 +1091,7 @@ function toOrderRow(row: {
     noteCount: row._count.notes,
     stockRequestCount: getStockRequestBadgeCount(row),
     backInStockStatus: getBackInStockStatus(row.backInStockRequests ?? []),
+    stockAdjustment: row.stockAdjustment ? toStockAdjustmentRow(row.stockAdjustment) : null,
   };
 }
 
@@ -1310,7 +1406,257 @@ function buildOrderMessageEmailHtml({
   `;
 }
 
+type StockAdjustmentEventType = 'fulfilled' | 'partially_fulfilled' | 'fulfillment_canceled';
+
+type StockAdjustmentItem = {
+  lineItemId: string;
+  productId: string | null;
+  name: string;
+  sku: string;
+  vendor: string;
+  quantity: number;
+  action: 'decrease' | 'restore';
+  managed: boolean;
+  managedAt: string | null;
+  lastEventType: StockAdjustmentEventType;
+  lastEventAt: string;
+};
+
+async function upsertStockAdjustmentTask(params: {
+  order: {
+    id: string;
+    number: string;
+  };
+  lineItems: ReturnType<typeof toLineItems>;
+  lines: Array<{ lineItemId: string; quantity: number }>;
+  eventType: StockAdjustmentEventType;
+}) {
+  const existing = await prisma.orderStockAdjustment.findUnique({
+    where: { orderId: params.order.id },
+  });
+  const existingItems = existing ? toStockAdjustmentItems(existing.items) : [];
+  const itemByLineId = new Map(existingItems.map((item) => [item.lineItemId, item]));
+  const eventAt = new Date();
+  const action = params.eventType === 'fulfillment_canceled' ? 'restore' : 'decrease';
+
+  for (const line of params.lines) {
+    const lineItem = params.lineItems.find((item) => item.id === line.lineItemId);
+    if (!lineItem || line.quantity <= 0) continue;
+    const existingItem = itemByLineId.get(line.lineItemId);
+
+    if (params.eventType === 'fulfillment_canceled' && existingItem?.action === 'decrease' && !existingItem.managed) {
+      itemByLineId.delete(line.lineItemId);
+      continue;
+    }
+
+    if (params.eventType === 'fulfillment_canceled' && !existingItem?.managed) {
+      continue;
+    }
+
+    itemByLineId.set(line.lineItemId, {
+      lineItemId: line.lineItemId,
+      productId: lineItem.productId,
+      name: lineItem.name,
+      sku: lineItem.sku,
+      vendor: lineItem.vendor,
+      quantity: line.quantity,
+      action,
+      managed: false,
+      managedAt: null,
+      lastEventType: params.eventType,
+      lastEventAt: eventAt.toISOString(),
+    });
+  }
+
+  const items = Array.from(itemByLineId.values());
+  const status = getStockAdjustmentStatus(items);
+
+  if (items.length === 0) {
+    if (existing) {
+      await prisma.orderStockAdjustment.delete({ where: { id: existing.id } });
+    }
+    return null;
+  }
+
+  if (existing) {
+    return prisma.orderStockAdjustment.update({
+      where: { id: existing.id },
+      data: {
+        orderNumber: params.order.number,
+        status,
+        items: items as unknown as Prisma.InputJsonValue,
+        lastEventType: params.eventType,
+        lastEventAt: eventAt,
+      },
+    });
+  }
+
+  return prisma.orderStockAdjustment.create({
+    data: {
+      orderId: params.order.id,
+      orderNumber: params.order.number,
+      status,
+      items: items as unknown as Prisma.InputJsonValue,
+      lastEventType: params.eventType,
+      lastEventAt: eventAt,
+    },
+  });
+}
+
+function toStockAdjustmentItems(value: Prisma.JsonValue): StockAdjustmentItem[] {
+  if (!Array.isArray(value)) return [];
+
+  return value.flatMap((item) => {
+    if (!item || typeof item !== 'object') return [];
+    const row = item as Record<string, unknown>;
+    const lineItemId = typeof row.lineItemId === 'string' ? row.lineItemId : '';
+    if (!lineItemId) return [];
+
+    return [{
+      lineItemId,
+      productId: typeof row.productId === 'string' ? row.productId : null,
+      name: typeof row.name === 'string' ? row.name : '',
+      sku: typeof row.sku === 'string' ? row.sku : '',
+      vendor: typeof row.vendor === 'string' ? row.vendor : '',
+      quantity: Math.max(0, Number(row.quantity ?? 0)),
+      action: row.action === 'restore' ? 'restore' : 'decrease',
+      managed: Boolean(row.managed),
+      managedAt: typeof row.managedAt === 'string' ? row.managedAt : null,
+      lastEventType: isStockAdjustmentEventType(row.lastEventType) ? row.lastEventType : 'fulfilled',
+      lastEventAt: typeof row.lastEventAt === 'string' ? row.lastEventAt : new Date().toISOString(),
+    }];
+  });
+}
+
+function toStockAdjustmentRow(adjustment: {
+  id: string;
+  orderId: string;
+  status: string;
+  items: Prisma.JsonValue;
+  lastEventType: string;
+  lastEventAt: Date;
+  managedByName: string | null;
+  managedByEmail: string | null;
+  note: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}) {
+  const items = toStockAdjustmentItems(adjustment.items);
+  return {
+    id: adjustment.id,
+    orderId: adjustment.orderId,
+    status: isStockAdjustmentStatus(adjustment.status) ? adjustment.status : getStockAdjustmentStatus(items),
+    items,
+    managedCount: items.filter((item) => item.managed).length,
+    totalCount: items.length,
+    lastEventType: isStockAdjustmentEventType(adjustment.lastEventType) ? adjustment.lastEventType : 'fulfilled',
+    lastEventAt: adjustment.lastEventAt.toISOString(),
+    managedByName: adjustment.managedByName,
+    managedByEmail: adjustment.managedByEmail,
+    note: adjustment.note,
+    createdAt: adjustment.createdAt.toISOString(),
+    updatedAt: adjustment.updatedAt.toISOString(),
+  };
+}
+
+function getStockAdjustmentStatus(items: StockAdjustmentItem[]) {
+  if (items.length === 0 || items.every((item) => item.managed)) return 'managed';
+  if (items.some((item) => item.managed)) return 'partial';
+  return 'pending';
+}
+
+function isStockAdjustmentStatus(value: string): value is 'pending' | 'partial' | 'managed' {
+  return value === 'pending' || value === 'partial' || value === 'managed';
+}
+
+function isStockAdjustmentEventType(value: unknown): value is StockAdjustmentEventType {
+  return value === 'fulfilled' || value === 'partially_fulfilled' || value === 'fulfillment_canceled';
+}
+
+async function notifyAdminsAboutStockAdjustment(params: {
+  order: OrderEmailDetails & { id: string };
+  adjustment: {
+    items: Prisma.JsonValue;
+  };
+  eventType: StockAdjustmentEventType;
+  originUrl?: string;
+}) {
+  const admins = await prisma.user.findMany({
+    where: { role: 'admin', active: true },
+    select: { email: true },
+  });
+  if (admins.length === 0) return;
+
+  const items = toStockAdjustmentItems(params.adjustment.items).filter((item) => !item.managed);
+  if (items.length === 0) return;
+
+  await sendGoogleMail({
+    to: admins.map((admin) => admin.email),
+    subject: `Stock adjustment needed for Order #${params.order.number}`,
+    text: buildStockAdjustmentEmailText(params.order, items, params.eventType, params.originUrl),
+    html: buildStockAdjustmentEmailHtml(params.order, items, params.eventType, params.originUrl),
+  });
+}
+
+function buildStockAdjustmentEmailText(order: OrderEmailDetails & { id: string }, items: StockAdjustmentItem[], eventType: StockAdjustmentEventType, originUrl?: string) {
+  const orderUrl = buildOrderSearchUrl(order.number, originUrl);
+  const address = [order.address, order.address2, order.city, order.state, order.zip, order.country].filter(Boolean).join(', ');
+
+  return [
+    'Stock adjustment needed',
+    '',
+    `Event: ${formatStockAdjustmentEvent(eventType)}`,
+    `Order: #${order.number}`,
+    `Order link: ${orderUrl}`,
+    `Store: ${order.store.name ?? order.store.storeDomain}`,
+    `Customer: ${order.cusName}`,
+    order.cusEmail ? `Customer email: ${order.cusEmail}` : null,
+    order.phone ? `Phone: ${order.phone}` : null,
+    address ? `Address: ${address}` : null,
+    '',
+    'Products:',
+    ...items.map((item, index) => `${index + 1}. ${item.name}${item.sku ? ` (${item.sku})` : ''} - ${item.action === 'restore' ? 'restore' : 'decrease'} ${item.quantity}`),
+  ].filter((line): line is string => line !== null).join('\n');
+}
+
+function buildStockAdjustmentEmailHtml(order: OrderEmailDetails & { id: string }, items: StockAdjustmentItem[], eventType: StockAdjustmentEventType, originUrl?: string) {
+  const orderUrl = buildOrderSearchUrl(order.number, originUrl);
+  const address = [order.address, order.address2, order.city, order.state, order.zip, order.country].filter(Boolean).join(', ');
+
+  return `
+    <div style="font-family:Arial,sans-serif;line-height:1.5;color:#111827;max-width:720px">
+      <h2 style="margin:0 0 12px">Stock adjustment needed</h2>
+      <table style="border-collapse:collapse;margin-bottom:16px">
+        <tr><td style="padding:3px 12px 3px 0;color:#6b7280">Event</td><td style="padding:3px 0">${escapeHtml(formatStockAdjustmentEvent(eventType))}</td></tr>
+        <tr><td style="padding:3px 12px 3px 0;color:#6b7280">Order</td><td style="padding:3px 0">#${escapeHtml(order.number)}</td></tr>
+        <tr><td style="padding:3px 12px 3px 0;color:#6b7280">Store</td><td style="padding:3px 0">${escapeHtml(order.store.name ?? order.store.storeDomain)}</td></tr>
+        <tr><td style="padding:3px 12px 3px 0;color:#6b7280">Customer</td><td style="padding:3px 0">${escapeHtml(order.cusName)}</td></tr>
+        ${order.cusEmail ? `<tr><td style="padding:3px 12px 3px 0;color:#6b7280">Customer email</td><td style="padding:3px 0">${escapeHtml(order.cusEmail)}</td></tr>` : ''}
+        ${order.phone ? `<tr><td style="padding:3px 12px 3px 0;color:#6b7280">Phone</td><td style="padding:3px 0">${escapeHtml(order.phone)}</td></tr>` : ''}
+        ${address ? `<tr><td style="padding:3px 12px 3px 0;color:#6b7280">Address</td><td style="padding:3px 0">${escapeHtml(address)}</td></tr>` : ''}
+      </table>
+      <p style="margin:0 0 16px"><a href="${escapeHtml(orderUrl)}" style="color:#2563eb">Open order search</a></p>
+      <table style="border-collapse:collapse;width:100%;font-size:14px">
+        <thead><tr><th align="left" style="border-bottom:1px solid #e5e7eb;padding:6px">Product</th><th align="left" style="border-bottom:1px solid #e5e7eb;padding:6px">SKU</th><th align="left" style="border-bottom:1px solid #e5e7eb;padding:6px">Action</th><th align="center" style="border-bottom:1px solid #e5e7eb;padding:6px">Qty</th></tr></thead>
+        <tbody>${items.map((item) => `<tr><td style="border-bottom:1px solid #f3f4f6;padding:6px">${escapeHtml(item.name)}</td><td style="border-bottom:1px solid #f3f4f6;padding:6px">${escapeHtml(item.sku || '-')}</td><td style="border-bottom:1px solid #f3f4f6;padding:6px">${escapeHtml(item.action === 'restore' ? 'Restore stock' : 'Decrease stock')}</td><td align="center" style="border-bottom:1px solid #f3f4f6;padding:6px">${item.quantity}</td></tr>`).join('')}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+function formatStockAdjustmentEvent(eventType: StockAdjustmentEventType) {
+  if (eventType === 'fulfillment_canceled') return 'Fulfillment canceled';
+  if (eventType === 'partially_fulfilled') return 'Order partially fulfilled';
+  return 'Order fulfilled';
+}
+
+function buildOrderSearchUrl(orderNumber: string, originUrl?: string) {
+  const origin = originUrl || process.env.NEXTAUTH_URL || process.env.AUTH_URL || '';
+  return origin ? `${origin.replace(/\/$/, '')}/orders?search=${encodeURIComponent(orderNumber)}` : `/orders?search=${encodeURIComponent(orderNumber)}`;
+}
+
 type OrderEmailDetails = {
+  id?: string;
   number: string;
   cusName: string;
   cusEmail: string | null;

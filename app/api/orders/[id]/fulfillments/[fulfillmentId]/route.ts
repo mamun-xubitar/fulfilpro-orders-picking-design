@@ -24,7 +24,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   }
 }
 
-export async function DELETE(_request: NextRequest, { params }: RouteParams) {
+export async function DELETE(request: NextRequest, { params }: RouteParams) {
   const session = await auth();
   if (!session?.user?.id) return apiError({ message: 'Unauthorized', status: 401 });
 
@@ -33,7 +33,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   const userId = session.user.id;
 
   try {
-    const result = await controller.cancelFulfillment(orderId, fulfillmentId, role, userId);
+    const result = await controller.cancelFulfillment(orderId, fulfillmentId, role, userId, request.nextUrl.origin);
     return apiSuccess({ message: result.message, data: result.data });
   } catch (error) {
     return apiError({ message: error instanceof Error ? error.message : 'Failed to cancel fulfillment', status: 400 });

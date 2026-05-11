@@ -85,14 +85,15 @@ export class FulfillmentRequestController {
     orderId: string,
     fulfillmentId: string,
     role: string,
-    userId: string
+    userId: string,
+    originUrl?: string
   ) {
     if (role !== 'admin') {
       const req = await requestModel.getActiveApprovedRequest(fulfillmentId, 'cancel', userId);
       if (!req) throw new Error('You do not have permission to cancel this fulfillment');
     }
 
-    const result = await orderModel.cancelFulfillmentConfirmation(orderId, fulfillmentId);
+    const result = await orderModel.cancelFulfillmentConfirmation(orderId, fulfillmentId, originUrl);
 
     if (role !== 'admin') {
       const req = await requestModel.getActiveApprovedRequest(fulfillmentId, 'cancel', userId);

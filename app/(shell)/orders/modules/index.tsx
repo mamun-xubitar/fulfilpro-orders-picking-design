@@ -16,6 +16,7 @@ import type {
   MessageModalState,
   NoteModalState,
   StockModalState,
+  StockAdjustmentModalState,
   EditFulfillmentModalState,
   CancelFulfillmentModalState,
   RequestPermissionModalState,
@@ -48,10 +49,15 @@ import {
 } from './utils';
 
 export default function OrdersPage() {
+  const getInitialSearch = () => {
+    if (typeof window === 'undefined') return '';
+    return new URLSearchParams(window.location.search).get('search')?.trim() ?? '';
+  };
+  const initialSearch = getInitialSearch();
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [stores, setStores] = useState<StoreOption[]>([]);
-  const [searchInput, setSearchInput] = useState('');
-  const [search, setSearch] = useState('');
+  const [searchInput, setSearchInput] = useState(initialSearch);
+  const [search, setSearch] = useState(initialSearch);
   const [storeIds, setStoreIds] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -86,6 +92,7 @@ export default function OrdersPage() {
   const [messageModal, setMessageModal] = useState<MessageModalState | null>(null);
   const [noteModal, setNoteModal] = useState<NoteModalState | null>(null);
   const [stockModal, setStockModal] = useState<StockModalState | null>(null);
+  const [stockAdjustmentModal, setStockAdjustmentModal] = useState<StockAdjustmentModalState | null>(null);
   const [printingOrderId, setPrintingOrderId] = useState<string | null>(null);
   const [fulfillmentViewOrderId, setFulfillmentViewOrderId] = useState<string | null>(null);
   const { data: session } = useSession();
@@ -575,6 +582,7 @@ export default function OrdersPage() {
         orderId: string;
         status: string;
         fulfillmentItems: OrderRow['fulfillmentItems'];
+        stockAdjustment: OrderRow['stockAdjustment'];
       }>;
 
       if (!res.ok || !json.success) {
@@ -583,7 +591,7 @@ export default function OrdersPage() {
 
       setOrders((prev) => prev.map((item) => (
         item.id === order.id
-          ? { ...item, status: json.data.status, fulfillmentItems: json.data.fulfillmentItems }
+          ? { ...item, status: json.data.status, fulfillmentItems: json.data.fulfillmentItems, stockAdjustment: json.data.stockAdjustment }
           : item
       )));
       setFulfillmentMessage(order.id, 'Fulfilment confirmed!');
@@ -687,9 +695,9 @@ export default function OrdersPage() {
     setCancelFulModal((prev) => prev ? { ...prev, saving: true, error: '' } : null);
     try {
       const res = await fetch(`/api/orders/${order.id}/fulfillments/${encodeURIComponent(confId)}`, { method: 'DELETE' });
-      const json = (await res.json()) as ApiResponse<{ orderId: string; status: string; fulfillmentItems: OrderRow['fulfillmentItems'] }>;
+      const json = (await res.json()) as ApiResponse<{ orderId: string; status: string; fulfillmentItems: OrderRow['fulfillmentItems']; stockAdjustment: OrderRow['stockAdjustment'] }>;
       if (!res.ok || !json.success) throw new Error(getApiErrorMessage(json, 'Failed to cancel fulfillment'));
-      setOrders((prev) => prev.map((o) => o.id === order.id ? { ...o, status: json.data.status, fulfillmentItems: json.data.fulfillmentItems } : o));
+      setOrders((prev) => prev.map((o) => o.id === order.id ? { ...o, status: json.data.status, fulfillmentItems: json.data.fulfillmentItems, stockAdjustment: json.data.stockAdjustment } : o));
       setOrderFulfillmentRequests((prev) => {
         const updated = (prev[order.id] ?? []).map((r) =>
           r.fulfillmentId === confId && r.requestType === 'cancel' && r.status === 'approved'
@@ -1210,6 +1218,109 @@ export default function OrdersPage() {
     }
   };
 
+  const openStockAdjustmentModal = async (order: OrderRow) => {
+    if (!userIsAdmin) return;
+
+    setStockAdjustmentModal({
+      order,
+      adjustment: order.stockAdjustment,
+      managedLineItemIds: order.stockAdjustment?.items.filter((item) => item.managed).map((item) => item.lineItemId) ?? [],
+      note: order.stockAdjustment?.note ?? '',
+      loading: true,
+      saving: false,
+      error: '',
+    });
+
+    try {
+      const res = await fetch(`/api/orders/${encodeURIComponent(order.id)}/stock-adjustment`);
+      const json = (await res.json()) as ApiResponse<OrderRow['stockAdjustment']>;
+
+      if (!res.ok || !json.success) {
+        throw new Error(getApiErrorMessage(json, 'Failed to load stock adjustment'));
+      }
+
+      setStockAdjustmentModal((prev) => (
+        prev && prev.order.id === order.id
+          ? {
+            ...prev,
+            adjustment: json.data,
+            managedLineItemIds: json.data?.items.filter((item) => item.managed).map((item) => item.lineItemId) ?? [],
+            note: json.data?.note ?? '',
+            loading: false,
+          }
+          : prev
+      ));
+      setOrders((prev) => prev.map((item) => (
+        item.id === order.id ? { ...item, stockAdjustment: json.data } : item
+      )));
+    } catch (err) {
+      setStockAdjustmentModal((prev) => (
+        prev && prev.order.id === order.id
+          ? { ...prev, loading: false, error: err instanceof Error ? err.message : 'Failed to load stock adjustment.' }
+          : prev
+      ));
+    }
+  };
+
+  const closeStockAdjustmentModal = () => {
+    if (stockAdjustmentModal?.saving) return;
+    setStockAdjustmentModal(null);
+  };
+
+  const toggleManagedStockAdjustmentItem = (lineItemId: string) => {
+    setStockAdjustmentModal((prev) => {
+      if (!prev) return prev;
+      const exists = prev.managedLineItemIds.includes(lineItemId);
+      return {
+        ...prev,
+        managedLineItemIds: exists
+          ? prev.managedLineItemIds.filter((id) => id !== lineItemId)
+          : [...prev.managedLineItemIds, lineItemId],
+        error: '',
+      };
+    });
+  };
+
+  const submitStockAdjustment = async () => {
+    if (!stockAdjustmentModal || stockAdjustmentModal.saving || !stockAdjustmentModal.adjustment) return;
+    if (blockTestModeAction()) return;
+
+    const orderId = stockAdjustmentModal.order.id;
+    setStockAdjustmentModal((prev) => prev ? { ...prev, saving: true, error: '' } : prev);
+
+    try {
+      const res = await fetch(`/api/orders/${encodeURIComponent(orderId)}/stock-adjustment`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          managedLineItemIds: stockAdjustmentModal.managedLineItemIds,
+          note: stockAdjustmentModal.note.trim(),
+        }),
+      });
+      const json = (await res.json()) as ApiResponse<NonNullable<OrderRow['stockAdjustment']>>;
+
+      if (!res.ok || !json.success) {
+        throw new Error(getApiErrorMessage(json, 'Failed to update stock adjustment'));
+      }
+
+      setStockAdjustmentModal((prev) => prev ? {
+        ...prev,
+        adjustment: json.data,
+        managedLineItemIds: json.data.items.filter((item) => item.managed).map((item) => item.lineItemId),
+        note: json.data.note ?? '',
+        saving: false,
+      } : prev);
+      setOrders((prev) => prev.map((item) => (
+        item.id === orderId ? { ...item, stockAdjustment: json.data } : item
+      )));
+      toast.success('Stock adjustment updated.');
+    } catch (err) {
+      setStockAdjustmentModal((prev) => (
+        prev ? { ...prev, saving: false, error: err instanceof Error ? err.message : 'Failed to update stock adjustment.' } : prev
+      ));
+    }
+  };
+
   const handleStoreToggle = (id: string) => {
     setStoreIds((prev) => (prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]));
     setPagination((prev) => ({ ...prev, page: 1 }));
@@ -1401,6 +1512,9 @@ export default function OrdersPage() {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Customer</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Ordered At</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
+                {userIsAdmin && (
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Stock Adjustment</th>
+                )}
                 <th className="hidden sm:table-cell px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Items</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Fulfillment</th>
                 <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide w-20">Note</th>
@@ -1410,19 +1524,19 @@ export default function OrdersPage() {
             <tbody>
               {loading && (
                 <tr>
-                  <td colSpan={10} className="text-center text-gray-400 py-12 text-sm">Loading orders...</td>
+                  <td colSpan={userIsAdmin ? 11 : 10} className="text-center text-gray-400 py-12 text-sm">Loading orders...</td>
                 </tr>
               )}
 
               {!loading && error && (
                 <tr>
-                  <td colSpan={10} className="text-center text-red-500 py-12 text-sm">{error}</td>
+                  <td colSpan={userIsAdmin ? 11 : 10} className="text-center text-red-500 py-12 text-sm">{error}</td>
                 </tr>
               )}
 
               {!loading && !error && orders.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="text-center text-gray-400 py-16 text-sm">No orders found.</td>
+                  <td colSpan={userIsAdmin ? 11 : 10} className="text-center text-gray-400 py-16 text-sm">No orders found.</td>
                 </tr>
               )}
 
@@ -1449,7 +1563,7 @@ export default function OrdersPage() {
                         {new Date(order.orderedAt).toLocaleString()}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex flex-wrap items-center gap-1.5">
+                        <div className="flex flex-col flex-wrap items-center gap-1.5">
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${status.chip}`}>
                             {status.label}
                           </span>
@@ -1460,6 +1574,31 @@ export default function OrdersPage() {
                           )}
                         </div>
                       </td>
+                      {userIsAdmin && (
+                        <td className="px-4 py-3 text-center">
+                          {order.stockAdjustment ? (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void openStockAdjustmentModal(order);
+                              }}
+                              className={`inline-flex min-w-14 items-center justify-center rounded-full px-2.5 py-1 text-xs font-semibold transition-colors ${
+                                order.stockAdjustment.status === 'managed'
+                                  ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                  : order.stockAdjustment.status === 'partial'
+                                    ? 'bg-amber-100 text-amber-800 hover:bg-amber-200'
+                                    : 'bg-red-100 text-red-700 hover:bg-red-200'
+                              }`}
+                              aria-label={`Manage stock adjustment for order ${order.number}`}
+                            >
+                              {order.stockAdjustment.managedCount}/{order.stockAdjustment.totalCount}
+                            </button>
+                          ) : (
+                            <span className="text-xs text-gray-300">-</span>
+                          )}
+                        </td>
+                      )}
                       <td className="hidden sm:table-cell px-4 py-3 text-sm text-gray-600">
                         {order.itemsCount} item{order.itemsCount !== 1 ? 's' : ''}
                       </td>
@@ -1607,8 +1746,8 @@ export default function OrdersPage() {
                     </tr>
                     {isExpanded && (
                       <tr>
-                        <td colSpan={10} className="p-0">
-                          <div className="relative bg-blue-50 border-b border-blue-100 p-5">
+                        <td colSpan={userIsAdmin ? 11 : 10} className="p-0">
+                          <div className="relative bg-gray-100 border-b border-gray-200 p-5">
                             <div className="absolute top-3 right-4">
                               {fulfillmentViewOrderId === order.id ? (
                                 <button
@@ -1998,6 +2137,11 @@ export default function OrdersPage() {
         requestPermModal={requestPermModal}
         setRequestPermModal={setRequestPermModal}
         submitPermissionRequest={submitPermissionRequest}
+        stockAdjustmentModal={stockAdjustmentModal}
+        setStockAdjustmentModal={setStockAdjustmentModal}
+        closeStockAdjustmentModal={closeStockAdjustmentModal}
+        toggleManagedStockAdjustmentItem={toggleManagedStockAdjustmentItem}
+        submitStockAdjustment={submitStockAdjustment}
       />
     </main>
   );

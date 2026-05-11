@@ -56,17 +56,49 @@ export class OrderController {
     };
   }
 
-  async confirmFulfillment(orderId: string, body: unknown) {
+  async confirmFulfillment(orderId: string, body: unknown, originUrl?: string) {
     const lines = parseFulfillmentLines(body);
     const notifyCustomer = parseNotifyCustomer(body);
     const trackingInfo = parseTrackingInfo(body);
     const barcodes = parseFulfillmentBarcodes(body);
     const fulfillmentDate = parseFulfillmentDate(body);
-    const result = await model.confirmFulfillment(orderId, lines, notifyCustomer, trackingInfo, barcodes, fulfillmentDate);
+    const result = await model.confirmFulfillment(orderId, lines, notifyCustomer, trackingInfo, barcodes, fulfillmentDate, originUrl);
 
     return {
       data: result,
       message: 'Fulfillment confirmed',
+    };
+  }
+
+  async getStockAdjustment(orderId: string) {
+    const result = await model.getStockAdjustment(orderId);
+
+    return {
+      data: result,
+      message: 'Stock adjustment retrieved',
+    };
+  }
+
+  async updateStockAdjustment(
+    orderId: string,
+    body: unknown,
+    admin: {
+      id?: string | null;
+      name?: string | null;
+      email?: string | null;
+    }
+  ) {
+    const parsed = parseStockAdjustmentUpdate(body);
+    const result = await model.updateStockAdjustment({
+      orderId,
+      managedLineItemIds: parsed.managedLineItemIds,
+      note: parsed.note,
+      admin,
+    });
+
+    return {
+      data: result,
+      message: 'Stock adjustment updated',
     };
   }
 
@@ -287,6 +319,24 @@ function parseNotifyCustomer(body: unknown) {
   if (!body || typeof body !== 'object') return true;
   const value = (body as { notifyCustomer?: unknown }).notifyCustomer;
   return typeof value === 'boolean' ? value : true;
+}
+
+function parseStockAdjustmentUpdate(body: unknown) {
+  if (!body || typeof body !== 'object') {
+    throw new Error('Stock adjustment data is required');
+  }
+
+  const value = body as Record<string, unknown>;
+  const managedLineItemIds = Array.isArray(value.managedLineItemIds)
+    ? value.managedLineItemIds.map((id) => String(id ?? '').trim()).filter(Boolean)
+    : [];
+  const note = typeof value.note === 'string' ? value.note.trim() : '';
+
+  if (note.length > 2000) {
+    throw new Error('Note must be 2000 characters or fewer');
+  }
+
+  return { managedLineItemIds, note };
 }
 
 function parseFulfillmentLines(body: unknown): FulfillmentLineInput[] {

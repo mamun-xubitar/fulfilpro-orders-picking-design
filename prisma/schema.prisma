@@ -87,10 +87,31 @@ model Order {
   messages          OrderMessage[]
   notes             OrderNote[]
   backInStockRequests BackInStockRequest[]
+  stockAdjustment   OrderStockAdjustment?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
   @@unique([storeId, number])
+}
+
+model OrderStockAdjustment {
+  id                String   @id @default(uuid())
+  orderId           String   @unique
+  orderNumber       String
+  status            String   @default("pending")
+  items             Json
+  lastEventType     String
+  lastEventAt       DateTime @default(now())
+  managedById       String?
+  managedByName     String?
+  managedByEmail    String?
+  note              String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  order             Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([lastEventAt])
 }
 
 model BackInStockRequest {
