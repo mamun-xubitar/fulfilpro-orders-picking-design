@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
-import { isStaffLikeRole } from "@/lib/roles";
+import { isOrderPickerRole, isRestrictedSessionRole } from "@/lib/roles";
 
 type SessionPolicy = {
   forceLogout: boolean;
@@ -34,12 +34,13 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
   const [now, setNow] = useState(() => Date.now());
   const [sessionWarningDismissed, setSessionWarningDismissed] = useState(false);
   const [blockedActionMessage, setBlockedActionMessage] = useState("");
-  const lastActivityAt = useRef(Date.now());
+  const [lastActivityAt, setLastActivityAt] = useState(() => Date.now());
   const inactivityWarningActiveRef = useRef(false);
   const inactivityLogoutTriggeredRef = useRef(false);
   const blockedActionWarningAt = useRef(0);
   const blockedActionTimer = useRef<number | null>(null);
   const isOrdersPath = pathname === "/orders" || pathname.startsWith("/orders/");
+  const userIsOrderPicker = isOrderPickerRole(session?.user?.role);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -166,21 +167,31 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
       id: "orders", label: "Orders", href: "/orders",
       icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>,
       adminOnly: false,
+      pickerHidden: true,
+    },
+    {
+      id: "picking-list", label: "Picking List", href: "/picking-list",
+      icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m-6 4h6m-6 4h4M7 3h10a2 2 0 012 2v14l-3-2-3 2-3-2-3 2V5a2 2 0 012-2z" />,
+      adminOnly: false,
+      pickerOnly: true,
     },
     {
       id: "back-in-stock", label: "Back In Stock", href: "/back-in-stock",
       icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7h-9m0 0 3-3m-3 3 3 3M4 17h9m0 0-3-3m3 3-3 3M5 7h2m10 10h2" />,
       adminOnly: false,
+      pickerHidden: true,
     },
     {
       id: "stores", label: "Stores", href: "/stores",
       icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/>,
       adminOnly: true,
+      pickerHidden: true,
     },
     {
       id: "users", label: "Users", href: "/users",
       icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>,
       adminOnly: true,
+      pickerHidden: true,
     },
     {
       id: "settings", label: "Settings", href: "/settings",
@@ -191,16 +202,17 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
         </>
       ),
       adminOnly: true,
+      pickerHidden: true,
     },
   ];
 
-  const pageTitles: Record<string, string> = { orders: "Orders", "back-in-stock": "Back In Stock", stores: "Stores", users: "Users", profile: "Profile", settings: "Settings" };
+  const pageTitles: Record<string, string> = { orders: "Orders", "picking-list": "Picking List", "back-in-stock": "Back In Stock", stores: "Stores", users: "Users", profile: "Profile", settings: "Settings" };
   const activeId = pathname.split("/")[1] || "";
 
   const sidebarWidth = sidebarCollapsed ? "64px" : "240px";
   const user = session?.user;
   const initials = getInitials(user?.name ?? user?.email ?? "");
-  const isStaff = isStaffLikeRole(user?.role);
+  const isStaff = isRestrictedSessionRole(user?.role);
   const loginAt = user?.loginAt ?? now;
   const timeoutMinutes = isStaff ? policy?.sessionTimeoutMinutes ?? null : null;
   const expiresAt = timeoutMinutes ? loginAt + timeoutMinutes * 60 * 1000 : null;
@@ -214,7 +226,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
   const inactivityThresholdMs = isStaff && policy?.inactivityTimeoutMinutes
     ? policy.inactivityTimeoutMinutes * 60 * 1000
     : null;
-  const inactiveForMs = now - lastActivityAt.current;
+  const inactiveForMs = now - lastActivityAt;
   const inactivityCountdownMs = inactivityThresholdMs !== null
     ? Math.max(0, inactivityThresholdMs - inactiveForMs)
     : null;
@@ -238,7 +250,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
 
     function handleActivity() {
       if (inactivityWarningActiveRef.current) return;
-      lastActivityAt.current = Date.now();
+      setLastActivityAt(Date.now());
     }
 
     const events = ["mousemove", "mousedown", "keydown", "scroll", "touchstart", "click"] as const;
@@ -294,7 +306,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
               onClick={() => {
                 inactivityWarningActiveRef.current = false;
                 inactivityLogoutTriggeredRef.current = false;
-                lastActivityAt.current = Date.now();
+                setLastActivityAt(Date.now());
               }}
               className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-semibold text-sm hover:bg-blue-700 transition-colors duration-150 cursor-pointer"
             >
@@ -385,6 +397,8 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
         <nav className="flex-1 py-4 space-y-1 px-2">
           {navItems.map((item) => {
             if (item.adminOnly && user?.role !== "admin") return null;
+            if (item.pickerHidden && userIsOrderPicker) return null;
+            if (item.pickerOnly && user?.role !== "admin" && !userIsOrderPicker) return null;
             const isActive = activeId === item.id;
             return (
               <Link

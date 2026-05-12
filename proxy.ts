@@ -1,6 +1,6 @@
 import { auth } from '@/auth';
 import { evaluateStaffAccess, getAuthPolicy, getSessionExpiresAt } from '@/lib/auth-policy.server';
-import { isStaffLikeRole, isTestUserRole } from '@/lib/roles';
+import { isOrderPickerRole, isRestrictedSessionRole, isStaffLikeRole, isTestUserRole } from '@/lib/roles';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
@@ -22,6 +22,7 @@ const PUBLIC_ROUTES = [
 
 const AUTH_ONLY_ROUTES = ['/'];
 const DASHBOARD_ROUTE = '/orders';
+const PICKER_DASHBOARD_ROUTE = '/picking-list';
 const LOGIN_ROUTE = '/';
 const RESTRICTED_ROUTE = '/restricted';
 const SESSION_EXPIRED_ROUTE = '/session-expired';
@@ -41,6 +42,22 @@ const STAFF_ALLOWED_API_ROUTES = [
 const STAFF_RESTRICTED_API_ROUTES = ['/api/auth/.*'];
 const STAFF_EXPIRED_API_ROUTES = ['/api/auth/.*'];
 const TEST_USER_MUTATION_BLOCKED_API_ROUTES = ['/api/orders', '/api/orders/.*', '/api/back-in-stock', '/api/back-in-stock/.*', '/api/fulfillment-requests', '/api/fulfillment-requests/.*'];
+const PICKER_ALLOWED_PAGE_ROUTES = ['/picking-list', '/profile'];
+const PICKER_ALLOWED_API_ROUTES = [
+  '/api/picking-list',
+  '/api/picking-list/.*',
+  '/api/orders/sync',
+  '^/api/orders/[^/]+/refresh$',
+  '^/api/orders/[^/]+/notes$',
+  '^/api/orders/[^/]+/notes/.*$',
+  '^/api/orders/[^/]+/messages$',
+  '^/api/orders/[^/]+/packing-confirmations$',
+  '^/api/orders/[^/]+/packing-confirmations/.*$',
+  '/api/uploads/logos',
+  '/api/profile',
+  '/api/profile/.*',
+  '/api/auth/.*',
+];
 const TEST_MODE_MESSAGE = 'This action is not allowed in test mode.';
 
 function matchesRoute(pathname: string, routes: string[]) {
@@ -82,9 +99,11 @@ export const proxy = auth(async (request) => {
   const isLoggedIn = Boolean(request.auth);
   const userRole = request.auth?.user?.role;
   const isStaffLike = isStaffLikeRole(userRole);
+  const isOrderPicker = isOrderPickerRole(userRole);
+  const isRestrictedSession = isRestrictedSessionRole(userRole);
   const isTestUser = isTestUserRole(userRole);
 
-  if (isLoggedIn && isStaffLike) {
+  if (isLoggedIn && isRestrictedSession) {
     const policy = await getAuthPolicy();
     const loginAt = request.auth?.user?.loginAt;
 
@@ -113,7 +132,7 @@ export const proxy = auth(async (request) => {
     }
 
     if (pathname === RESTRICTED_ROUTE || pathname === SESSION_EXPIRED_ROUTE) {
-      return NextResponse.redirect(new URL(DASHBOARD_ROUTE, request.url));
+      return NextResponse.redirect(new URL(isOrderPicker ? PICKER_DASHBOARD_ROUTE : DASHBOARD_ROUTE, request.url));
     }
   }
 
@@ -123,7 +142,7 @@ export const proxy = auth(async (request) => {
 
   if (matchesRoute(pathname, AUTH_ONLY_ROUTES)) {
     if (isLoggedIn) {
-      return NextResponse.redirect(new URL(DASHBOARD_ROUTE, request.url));
+      return NextResponse.redirect(new URL(isOrderPicker ? PICKER_DASHBOARD_ROUTE : DASHBOARD_ROUTE, request.url));
     }
     return NextResponse.next();
   }
@@ -141,7 +160,22 @@ export const proxy = auth(async (request) => {
     return NextResponse.redirect(loginUrl);
   }
 
-  if (isStaffLike) {
+  if (isOrderPicker) {
+    if (isApiRoute(pathname)) {
+      if (!matchesRoute(pathname, PICKER_ALLOWED_API_ROUTES)) {
+        return NextResponse.json(
+          { error: 'Forbidden', message: 'Order pickers do not have access to this API' },
+          { status: 403 }
+        );
+      }
+
+      return NextResponse.next();
+    }
+
+    if (!matchesRoute(pathname, PICKER_ALLOWED_PAGE_ROUTES)) {
+      return NextResponse.redirect(new URL(PICKER_DASHBOARD_ROUTE, request.url));
+    }
+  } else if (isStaffLike) {
     if (isApiRoute(pathname)) {
       if (!matchesRoute(pathname, STAFF_ALLOWED_API_ROUTES)) {
         return NextResponse.json(
@@ -170,7 +204,7 @@ export const proxy = auth(async (request) => {
   }
 
   if (pathname === RESTRICTED_ROUTE || pathname === SESSION_EXPIRED_ROUTE) {
-    return NextResponse.redirect(new URL(DASHBOARD_ROUTE, request.url));
+    return NextResponse.redirect(new URL(isOrderPicker ? PICKER_DASHBOARD_ROUTE : DASHBOARD_ROUTE, request.url));
   }
 
   return NextResponse.next();

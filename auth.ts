@@ -3,7 +3,7 @@ import Credentials from 'next-auth/providers/credentials';
 import { verifyPassword } from '@/lib/password';
 import prisma from '@/lib/prisma.server';
 import { evaluateStaffAccess, getAuthPolicy } from '@/lib/auth-policy.server';
-import { isStaffLikeRole } from '@/lib/roles';
+import { isRestrictedSessionRole } from '@/lib/roles';
 
 const appUrl = process.env.AUTH_URL ?? process.env.NEXTAUTH_URL ?? process.env.APP_URL;
 const authRedirectBaseUrl = appUrl?.replace(/\/$/, '');
@@ -38,7 +38,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           throw new Error('Invalid credentials.');
         }
 
-        if (isStaffLikeRole(user.role)) {
+        if (isRestrictedSessionRole(user.role)) {
           const policy = await getAuthPolicy();
           const access = evaluateStaffAccess(policy);
           if (!access.allowed) {

@@ -106,11 +106,16 @@ export type ShopifyOrderPayload = {
   line_items?: Array<{
     id: string | number;
     product_id?: string | number | null;
+    variant_id?: string | number | null;
     name?: string | null;
+    title?: string | null;
+    variant_title?: string | null;
     sku?: string | null;
     vendor?: string | null;
     quantity?: number | null;
     fulfillable_quantity?: number | null;
+    properties?: Array<{ name?: string | null; value?: string | number | null }> | null;
+    image?: { src?: string | null; url?: string | null } | null;
     price?: string | number | null;
     price_set?: {
       shop_money?: {
@@ -781,14 +786,13 @@ export class OrderModel {
   }
 
   async getOrderMessageCenter(orderId: string) {
-    const [order, admins, messages] = await Promise.all([
+    const [order, users, messages] = await Promise.all([
       prisma.order.findUnique({
         where: { id: orderId },
         select: { id: true },
       }),
       prisma.user.findMany({
         where: {
-          role: 'admin',
           active: true,
         },
         select: {
@@ -809,7 +813,7 @@ export class OrderModel {
     }
 
     return {
-      admins,
+      admins: users,
       messages: messages.map(toOrderMessageRow),
     };
   }
@@ -824,7 +828,7 @@ export class OrderModel {
       email?: string | null;
     } | null;
   }) {
-    const [order, admin] = await Promise.all([
+    const [order, recipient] = await Promise.all([
       prisma.order.findUnique({
         where: { id: params.orderId },
         include: {
@@ -839,7 +843,6 @@ export class OrderModel {
       prisma.user.findFirst({
         where: {
           id: params.adminId,
-          role: 'admin',
           active: true,
         },
         select: {
@@ -854,14 +857,14 @@ export class OrderModel {
       throw new Error('Order not found');
     }
 
-    if (!admin) {
-      throw new Error('Selected admin was not found');
+    if (!recipient) {
+      throw new Error('Selected recipient was not found');
     }
 
     const senderName = params.sender?.name?.trim() || null;
     const senderEmail = params.sender?.email?.trim() || null;
     await sendGoogleMail({
-      to: [admin.email],
+      to: [recipient.email],
       subject: `Order ${order.number} message`,
       text: buildOrderMessageEmailText({ order, message: params.message, senderName, senderEmail }),
       html: buildOrderMessageEmailHtml({ order, message: params.message, senderName, senderEmail }),
@@ -870,9 +873,9 @@ export class OrderModel {
     const savedMessage = await prisma.orderMessage.create({
       data: {
         orderId: order.id,
-        adminId: admin.id,
-        adminName: admin.name,
-        adminEmail: admin.email,
+        adminId: recipient.id,
+        adminName: recipient.name,
+        adminEmail: recipient.email,
         senderId: params.sender?.id ?? null,
         senderName,
         senderEmail,
@@ -1156,7 +1159,12 @@ function buildOrderWriteData(
   const lineItems = (payload.line_items ?? []).map((item) => ({
     id: item.id,
     productId: item.product_id ? String(item.product_id) : null,
+    variantId: item.variant_id ? String(item.variant_id) : null,
     name: item.name ?? '',
+    title: item.title ?? item.name ?? '',
+    variantTitle: item.variant_title ?? '',
+    variantOptions: normalizeLineItemProperties(item.properties ?? null),
+    imageUrl: item.image?.src ?? item.image?.url ?? null,
     sku: item.sku ?? '',
     vendor: item.vendor ?? '',
     qty: resolveLineItemQuantity(item, fulfilledQuantityByLineItem),
@@ -2006,24 +2014,64 @@ function getPeriodStartDate(period: 'all' | 'week' | 'month' | 'year') {
   return weekStart;
 }
 
-function toLineItems(value: Prisma.JsonValue): Array<{ id: string; productId: string | null; name: string; sku: string; vendor: string; qty: number }> {
+function toLineItems(value: Prisma.JsonValue): Array<{
+  id: string;
+  productId: string | null;
+  variantId: string | null;
+  name: string;
+  title: string;
+  variantTitle: string;
+  variantOptions: Array<{ name: string; value: string }>;
+  imageUrl: string | null;
+  sku: string;
+  vendor: string;
+  qty: number;
+}> {
   if (!Array.isArray(value)) return [];
 
   return value.map((item) => {
     if (!item || typeof item !== 'object') {
-      return { id: '', productId: null, name: '', sku: '', vendor: '', qty: 0 };
+      return { id: '', productId: null, variantId: null, name: '', title: '', variantTitle: '', variantOptions: [], imageUrl: null, sku: '', vendor: '', qty: 0 };
     }
 
     const obj = item as Record<string, unknown>;
     return {
       id: typeof obj.id === 'string' ? obj.id : String(obj.id ?? ''),
       productId: typeof obj.productId === 'string' ? obj.productId : (obj.productId ? String(obj.productId) : null),
+      variantId: typeof obj.variantId === 'string' ? obj.variantId : (obj.variantId ? String(obj.variantId) : null),
       name: typeof obj.name === 'string' ? obj.name : '',
+      title: typeof obj.title === 'string' ? obj.title : (typeof obj.name === 'string' ? obj.name : ''),
+      variantTitle: typeof obj.variantTitle === 'string' ? obj.variantTitle : '',
+      variantOptions: normalizeStoredVariantOptions(obj.variantOptions),
+      imageUrl: typeof obj.imageUrl === 'string' && obj.imageUrl.trim() ? obj.imageUrl : null,
       sku: typeof obj.sku === 'string' ? obj.sku : '',
       vendor: typeof obj.vendor === 'string' ? obj.vendor : '',
       qty: typeof obj.qty === 'number' ? obj.qty : Number(obj.qty ?? 0),
     };
   });
+}
+
+function normalizeLineItemProperties(properties: unknown) {
+  if (!Array.isArray(properties)) return [];
+  return properties
+    .map((property) => ({
+      name: typeof property?.name === 'string' ? property.name.trim() : '',
+      value: property?.value === null || property?.value === undefined ? '' : String(property.value).trim(),
+    }))
+    .filter((property) => property.name && property.value);
+}
+
+function normalizeStoredVariantOptions(value: unknown): Array<{ name: string; value: string }> {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((option) => {
+      if (!option || typeof option !== 'object') return null;
+      const obj = option as Record<string, unknown>;
+      const name = typeof obj.name === 'string' ? obj.name.trim() : '';
+      const optionValue = typeof obj.value === 'string' ? obj.value.trim() : '';
+      return name && optionValue ? { name, value: optionValue } : null;
+    })
+    .filter((option): option is { name: string; value: string } => Boolean(option));
 }
 
 function toShippingLines(

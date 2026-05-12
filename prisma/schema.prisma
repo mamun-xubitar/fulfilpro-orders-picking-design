@@ -86,12 +86,71 @@ model Order {
   store             Store     @relation(fields: [storeId], references: [id])
   messages          OrderMessage[]
   notes             OrderNote[]
+  packingConfirmations OrderPackingConfirmation[]
+  pickingSlipPrints OrderPickingSlipPrint[]
   backInStockRequests BackInStockRequest[]
   stockAdjustment   OrderStockAdjustment?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
   @@unique([storeId, number])
+}
+
+model OrderPackingConfirmation {
+  id                 String    @id @default(uuid())
+  orderId            String
+  orderNumber        String
+  lines              Json
+  notifyRecipients   Json?
+  notifyMessage      String?
+  pickerId           String?
+  pickerName         String?
+  pickerEmail        String?
+  confirmedAt        DateTime  @default(now())
+  canceledAt         DateTime?
+  canceledById       String?
+  canceledByName     String?
+  canceledByEmail    String?
+  cancelNotifyRecipients Json?
+  cancelNotifyMessage String?
+  order              Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([confirmedAt])
+  @@index([canceledAt])
+}
+
+model OrderPickingSlipPrint {
+  id          String   @id @default(uuid())
+  orderId     String
+  orderNumber String
+  items       Json
+  pickerId    String?
+  pickerName  String?
+  pickerEmail String?
+  printedAt   DateTime @default(now())
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([printedAt])
+}
+
+model OrderItemPickingMetadata {
+  id        String   @id @default(uuid())
+  storeId   String
+  productId String?
+  variantId String?
+  sku       String?
+  location  String?
+  remark    String?
+  note      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([storeId])
+  @@index([productId])
+  @@index([variantId])
+  @@index([sku])
 }
 
 model OrderStockAdjustment {

@@ -1,4 +1,16 @@
-export type OrderItem = { id: string; productId: string | null; name: string; sku: string; vendor: string; qty: number };
+export type OrderItem = {
+  id: string;
+  productId: string | null;
+  variantId?: string | null;
+  name: string;
+  title?: string;
+  variantTitle?: string;
+  variantOptions?: Array<{ name: string; value: string }>;
+  imageUrl?: string | null;
+  sku: string;
+  vendor: string;
+  qty: number;
+};
 export type ShippingLine = {
   id: string;
   title: string;
