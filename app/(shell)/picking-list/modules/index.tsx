@@ -491,7 +491,7 @@ export default function PickingListPage() {
       toast.error('Select Full or enter a partial quantity before confirming packed.');
       return;
     }
-    setNotifyModal({ type: 'confirm', order, lines, selectedUserIds: [], message: '', saving: false });
+    setNotifyModal({ type: 'confirm', order, lines, selectedUserIds: recipients.filter((r) => r.role === 'admin').map((r) => r.id), message: '', saving: false });
   }
 
   function openCancelPacked(order: PickingOrder, confirmationId?: string) {
@@ -502,7 +502,7 @@ export default function PickingListPage() {
       toast.error('This order has no active packed confirmation to cancel.');
       return;
     }
-    setNotifyModal({ type: 'cancel', order, confirmationId: active.id, selectedUserIds: [], message: '', saving: false });
+    setNotifyModal({ type: 'cancel', order, confirmationId: active.id, selectedUserIds: recipients.filter((r) => r.role === 'admin').map((r) => r.id), message: '', saving: false });
   }
 
   async function submitNotifyAction() {
@@ -1132,24 +1132,22 @@ export default function PickingListPage() {
                               <h3 className="mb-3 text-xs font-semibold uppercase text-gray-500">Actions</h3>
                               <button onClick={() => openConfirmPacked(order)} disabled={!canConfirmPacked} className="w-full rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:bg-gray-200 disabled:text-gray-400">Confirm packed</button>
                               <div className="mt-4 space-y-2 text-xs text-gray-500">
-                                {order.packingConfirmations.length === 0 ? <p>No packing history.</p> : order.packingConfirmations.slice(0, 5).map((confirmation) => (
+                                {order.packingConfirmations.filter((c) => !c.canceledAt).length === 0 ? <p>No packing history.</p> : order.packingConfirmations.filter((c) => !c.canceledAt).slice(0, 5).map((confirmation) => (
                                   <div key={confirmation.id} className="flex items-start justify-between gap-2 rounded border border-gray-200 p-2">
                                     <div>
-                                      <div className="font-medium text-gray-700">{confirmation.canceledAt ? 'Canceled' : 'Packed'} {formatDateTime(confirmation.confirmedAt)}</div>
+                                      <div className="font-medium text-gray-700">Packed {formatDateTime(confirmation.confirmedAt)}</div>
                                       <div>{confirmation.lines.reduce((sum, line) => sum + line.quantity, 0)} item(s)</div>
                                     </div>
-                                    {!confirmation.canceledAt && (
-                                      <button
-                                        type="button"
-                                        onClick={() => openCancelPacked(order, confirmation.id)}
-                                        className="rounded p-1.5 text-red-500 hover:bg-red-50 hover:text-red-700"
-                                        aria-label={`Cancel packed confirmation from ${formatDateTime(confirmation.confirmedAt)}`}
-                                      >
-                                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 7h12M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2m-7 4v6m4-6v6m5-10l-1 13a1 1 0 01-1 .9H8a1 1 0 01-1-.9L6 7" />
-                                        </svg>
-                                      </button>
-                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() => openCancelPacked(order, confirmation.id)}
+                                      className="rounded p-1.5 text-red-500 hover:bg-red-50 hover:text-red-700"
+                                      aria-label={`Cancel packed confirmation from ${formatDateTime(confirmation.confirmedAt)}`}
+                                    >
+                                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 7h12M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2m-7 4v6m4-6v6m5-10l-1 13a1 1 0 01-1 .9H8a1 1 0 01-1-.9L6 7" />
+                                      </svg>
+                                    </button>
                                   </div>
                                 ))}
                               </div>
@@ -1184,13 +1182,23 @@ export default function PickingListPage() {
               <div>
                 <span className="mb-2 block text-xs font-semibold uppercase text-gray-500">Notify users</span>
                 <div className="max-h-44 space-y-1 overflow-y-auto rounded-lg border border-gray-200 p-2">
-                  {recipients.map((recipient) => (
-                    <label key={recipient.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-gray-50">
-                      <input type="checkbox" checked={notifyModal.selectedUserIds.includes(recipient.id)} onChange={() => setNotifyModal((prev) => prev ? { ...prev, selectedUserIds: prev.selectedUserIds.includes(recipient.id) ? prev.selectedUserIds.filter((id) => id !== recipient.id) : [...prev.selectedUserIds, recipient.id] } : prev)} className="rounded border-gray-300 text-blue-600" />
-                      <span>{recipient.name}</span>
-                      <span className="text-xs text-gray-400">{recipient.email}</span>
-                    </label>
-                  ))}
+                  {recipients.map((recipient) => {
+                    const isAdmin = recipient.role === 'admin';
+                    return (
+                      <label key={recipient.id} className={`flex items-center gap-2 rounded px-2 py-1 text-sm ${isAdmin ? 'cursor-default' : 'cursor-pointer hover:bg-gray-50'}`}>
+                        <input
+                          type="checkbox"
+                          checked={notifyModal.selectedUserIds.includes(recipient.id)}
+                          readOnly={isAdmin}
+                          disabled={isAdmin}
+                          onChange={isAdmin ? undefined : () => setNotifyModal((prev) => prev ? { ...prev, selectedUserIds: prev.selectedUserIds.includes(recipient.id) ? prev.selectedUserIds.filter((id) => id !== recipient.id) : [...prev.selectedUserIds, recipient.id] } : prev)}
+                          className={`rounded border-gray-300 text-blue-600 ${isAdmin ? 'cursor-default' : 'cursor-pointer'}`}
+                        />
+                        <span>{recipient.name}</span>
+                        <span className="text-xs text-gray-400">{recipient.email}</span>
+                      </label>
+                    );
+                  })}
                 </div>
               </div>
               <label className="block text-sm text-gray-700">
