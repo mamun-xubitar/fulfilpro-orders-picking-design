@@ -81,10 +81,15 @@ type ShopifyOrderByIdResult = {
       nodes: Array<{
         id: string;
         name: string;
+        title: string;
+        variantTitle: string | null;
         sku: string | null;
         vendor: string | null;
         quantity: number;
         fulfillableQuantity: number;
+        image: {
+          url: string;
+        } | null;
         product: {
           id: string;
         } | null;
@@ -203,10 +208,15 @@ const ORDER_BY_ID_QUERY = `
         nodes {
           id
           name
+          title
+          variantTitle
           sku
           vendor
           quantity
           fulfillableQuantity
+          image {
+            url
+          }
           product {
             id
           }
@@ -338,24 +348,29 @@ function toShopifyOrderPayload(order: NonNullable<ShopifyOrderByIdResult['order'
           name: order.shippingAddress.name,
         }
       : null,
-    line_items: order.lineItems.nodes.map((lineItem) => ({
-      id: getLegacyId(lineItem.id),
-      name: lineItem.name,
-      sku: lineItem.sku,
-      product_id: lineItem.product?.id ? getLegacyId(lineItem.product.id) : null,
-      vendor: lineItem.vendor,
-      quantity: lineItem.quantity,
-      fulfillable_quantity: lineItem.fulfillableQuantity,
-      price: lineItem.discountedUnitPriceSet?.shopMoney.amount ?? null,
-      price_set: lineItem.discountedUnitPriceSet
-        ? {
-            shop_money: {
-              amount: lineItem.discountedUnitPriceSet.shopMoney.amount,
-              currency_code: lineItem.discountedUnitPriceSet.shopMoney.currencyCode,
-            },
-          }
-        : undefined,
-    })),
+    line_items: order.lineItems.nodes.map((lineItem) => {
+      return {
+        id: getLegacyId(lineItem.id),
+        name: lineItem.name,
+        title: lineItem.title,
+        sku: lineItem.sku,
+        product_id: lineItem.product?.id ? getLegacyId(lineItem.product.id) : null,
+        variant_title: lineItem.variantTitle,
+        image: lineItem.image?.url ? { src: lineItem.image.url, url: lineItem.image.url } : null,
+        vendor: lineItem.vendor,
+        quantity: lineItem.quantity,
+        fulfillable_quantity: lineItem.fulfillableQuantity,
+        price: lineItem.discountedUnitPriceSet?.shopMoney.amount ?? null,
+        price_set: lineItem.discountedUnitPriceSet
+          ? {
+              shop_money: {
+                amount: lineItem.discountedUnitPriceSet.shopMoney.amount,
+                currency_code: lineItem.discountedUnitPriceSet.shopMoney.currencyCode,
+              },
+            }
+          : undefined,
+      };
+    }),
     shipping_lines: order.shippingLines.nodes.map((shippingLine) => ({
       id: getLegacyId(shippingLine.id),
       title: shippingLine.title,

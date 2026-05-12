@@ -36,6 +36,29 @@ type OrderItem = {
   qty: number;
 };
 
+type ShippingLine = {
+  id: string;
+  title: string;
+  code: string | null;
+  source: string | null;
+  price: number;
+  discountedPrice: number | null;
+  currencyCode: string | null;
+  carrierIdentifier: string | null;
+  requestedFulfillmentServiceId: string | null;
+  phone: string | null;
+  deliveryCategory: string | null;
+  discountCodes: string[];
+  discountAllocations: Array<{
+    amount: number;
+    currencyCode: string | null;
+    code: string | null;
+    title: string | null;
+    type: string | null;
+    discountApplicationIndex: number | null;
+  }>;
+};
+
 export class PickingListModel {
   private readonly orderModel = new OrderModel();
 
@@ -326,6 +349,7 @@ function toPickingOrderRow(order: {
   closed: boolean;
   orderedAt: Date | null;
   lineItems: Prisma.JsonValue;
+  shippingLines: Prisma.JsonValue | null;
   store: { id: string; name: string | null; storeDomain: string };
   packingConfirmations: Array<{ id: string; lines: Prisma.JsonValue; confirmedAt: Date; canceledAt: Date | null }>;
   pickingSlipPrints: Array<{ printedAt: Date }>;
@@ -364,6 +388,7 @@ function toPickingOrderRow(order: {
     storeId: order.store.id,
     storeName: order.store.name ?? order.store.storeDomain,
     storeDomain: order.store.storeDomain,
+    shippingLines: toShippingLines(order.shippingLines),
     items: items.map((item) => ({
       ...item,
       packedQuantity: packedByLine.get(item.id) ?? 0,
@@ -407,6 +432,77 @@ function toLineItems(value: Prisma.JsonValue): OrderItem[] {
       qty: typeof obj.qty === 'number' ? obj.qty : Number(obj.qty ?? 0),
     };
   });
+}
+
+function toShippingLines(value: Prisma.JsonValue | null): ShippingLine[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((item) => {
+    const obj = item && typeof item === 'object' ? item as Record<string, unknown> : {};
+    const priceSet = obj.price_set as { shop_money?: { amount?: unknown; currency_code?: unknown } } | undefined;
+    const discountedPriceSet = obj.discounted_price_set as { shop_money?: { amount?: unknown; currency_code?: unknown } } | undefined;
+    const price = obj.price ?? priceSet?.shop_money?.amount ?? 0;
+    const discountedPrice = obj.discountedPrice ?? obj.discounted_price ?? discountedPriceSet?.shop_money?.amount ?? null;
+    const currencyCode = obj.currencyCode ?? priceSet?.shop_money?.currency_code ?? discountedPriceSet?.shop_money?.currency_code ?? null;
+    const discountAllocations = normalizeShippingDiscountAllocations(obj.discountAllocations ?? obj.discount_allocations);
+    const discountCodes = normalizeStringArray(obj.discountCodes).concat(
+      discountAllocations
+        .map((allocation) => allocation.code)
+        .filter((code): code is string => Boolean(code))
+    );
+
+    return {
+      id: typeof obj.id === 'string' ? obj.id : String(obj.id ?? ''),
+      title: typeof obj.title === 'string' ? obj.title : '',
+      code: typeof obj.code === 'string' ? obj.code : null,
+      source: typeof obj.source === 'string' ? obj.source : null,
+      price: toJsonNumber(price, 0),
+      discountedPrice: discountedPrice === null ? null : toJsonNumber(discountedPrice, 0),
+      currencyCode: typeof currencyCode === 'string' ? currencyCode : null,
+      carrierIdentifier: typeof obj.carrierIdentifier === 'string'
+        ? obj.carrierIdentifier
+        : (typeof obj.carrier_identifier === 'string' ? obj.carrier_identifier : null),
+      requestedFulfillmentServiceId: obj.requestedFulfillmentServiceId
+        ? String(obj.requestedFulfillmentServiceId)
+        : (obj.requested_fulfillment_service_id ? String(obj.requested_fulfillment_service_id) : null),
+      phone: typeof obj.phone === 'string' ? obj.phone : null,
+      deliveryCategory: typeof obj.deliveryCategory === 'string'
+        ? obj.deliveryCategory
+        : (typeof obj.delivery_category === 'string' ? obj.delivery_category : null),
+      discountCodes: Array.from(new Set(discountCodes)),
+      discountAllocations,
+    };
+  });
+}
+
+function normalizeShippingDiscountAllocations(value: unknown): ShippingLine['discountAllocations'] {
+  if (!Array.isArray(value)) return [];
+  return value.map((item) => {
+    const obj = item && typeof item === 'object' ? item as Record<string, unknown> : {};
+    const amountSet = obj.amount_set as { shop_money?: { amount?: unknown; currency_code?: unknown } } | undefined;
+    const amount = obj.amount ?? amountSet?.shop_money?.amount ?? 0;
+    const currencyCode = obj.currencyCode ?? amountSet?.shop_money?.currency_code ?? null;
+    const discountApplicationIndex = obj.discountApplicationIndex ?? obj.discount_application_index ?? null;
+    return {
+      amount: toJsonNumber(amount, 0),
+      currencyCode: typeof currencyCode === 'string' ? currencyCode : null,
+      code: typeof obj.code === 'string' ? obj.code : null,
+      title: typeof obj.title === 'string' ? obj.title : null,
+      type: typeof obj.type === 'string' ? obj.type : null,
+      discountApplicationIndex: discountApplicationIndex === null ? null : toJsonNumber(discountApplicationIndex, 0),
+    };
+  });
+}
+
+function normalizeStringArray(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => typeof item === 'string' ? item.trim() : '')
+    .filter(Boolean);
+}
+
+function toJsonNumber(value: unknown, fallback: number) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
 }
 
 function normalizeVariantOptions(value: unknown): Array<{ name: string; value: string }> {

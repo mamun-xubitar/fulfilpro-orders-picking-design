@@ -6,6 +6,8 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import type { Dispatch, RefObject, SetStateAction } from 'react';
 import { toast } from 'react-toastify';
 import OrdersPagination from '../../orders/modules/OrdersPagination';
+import type { ShippingLine } from '../../orders/modules/types';
+import { formatShippingMoney, getShippingDiscountCodes, getShippingLineFinalPrice } from '../../orders/modules/utils';
 
 type ApiResponse<T> = { success: boolean; message: string; data: T; errors?: string[] };
 type Pagination = { page: number; pageSize: number; total: number; totalPages: number; hasPrev: boolean; hasNext: boolean };
@@ -55,6 +57,7 @@ type PickingOrder = {
   storeId: string;
   storeName: string;
   storeDomain: string;
+  shippingLines: ShippingLine[];
   items: PickingItem[];
   vendors: string[];
   printed: boolean;
@@ -85,7 +88,7 @@ type Message = {
   message: string;
   createdAt: string;
 };
-type PrintItem = PickingItem & { printQuantity: number; removed: boolean; printNote: string };
+type PrintItem = PickingItem & { printQuantity: number; removed: boolean; printLocation: string; printRemark: string; printNote: string };
 type PrintOrder = PickingOrder & { printItems: PrintItem[] };
 type NoteModalState = { order: PickingOrder; notes: Note[]; note: string; editingNoteId: string | null; loading: boolean; saving: boolean; deletingId: string | null; error: string };
 type MessageModalState = { order: PickingOrder; messages: Message[]; selectedUserId: string; message: string; loading: boolean; sending: boolean; error: string };
@@ -332,6 +335,25 @@ export default function PickingListPage() {
     }).filter((line): line is PickingLine => Boolean(line));
   }
 
+  function setOrderFullChecks(order: PickingOrder, checked: boolean) {
+    setFullChecks((prev) => {
+      const next = { ...prev };
+      order.items.forEach((item, index) => {
+        const remaining = getRemaining(item);
+        if (remaining > 0) next[rowItemKey(order.id, index)] = checked;
+      });
+      return next;
+    });
+    setPartialValues((prev) => {
+      const next = { ...prev };
+      order.items.forEach((item, index) => {
+        const remaining = getRemaining(item);
+        if (remaining > 0) next[rowItemKey(order.id, index)] = checked ? remaining : 0;
+      });
+      return next;
+    });
+  }
+
   function toggleAllPage() {
     if (allPageSelected) {
       setSelectedIds((prev) => prev.filter((id) => !orders.some((order) => order.id === id)));
@@ -472,8 +494,10 @@ export default function PickingListPage() {
     setNotifyModal({ type: 'confirm', order, lines, selectedUserIds: [], message: '', saving: false });
   }
 
-  function openCancelPacked(order: PickingOrder) {
-    const active = order.packingConfirmations.find((confirmation) => !confirmation.canceledAt);
+  function openCancelPacked(order: PickingOrder, confirmationId?: string) {
+    const active = confirmationId
+      ? order.packingConfirmations.find((confirmation) => confirmation.id === confirmationId && !confirmation.canceledAt)
+      : order.packingConfirmations.find((confirmation) => !confirmation.canceledAt);
     if (!active) {
       toast.error('This order has no active packed confirmation to cancel.');
       return;
@@ -520,7 +544,14 @@ export default function PickingListPage() {
       ...order,
       printItems: order.items
         .filter((item) => getRemaining(item) > 0)
-        .map((item) => ({ ...item, printQuantity: getRemaining(item), removed: false, printNote: item.metadata.note })),
+        .map((item) => ({
+          ...item,
+          printQuantity: getRemaining(item),
+          removed: false,
+          printLocation: item.metadata.location,
+          printRemark: item.metadata.remark,
+          printNote: item.metadata.note,
+        })),
     })));
   }
 
@@ -558,8 +589,8 @@ export default function PickingListPage() {
               sku: item.sku,
               variant: getVariantText(item),
               quantity: item.printQuantity,
-              location: item.metadata.location,
-              remark: item.metadata.remark,
+              location: item.printLocation,
+              remark: item.printRemark,
               note: item.printNote,
             })),
           })),
@@ -889,6 +920,7 @@ export default function PickingListPage() {
               {!loading && !error && orders.length === 0 && <tr><td colSpan={11} className="py-16 text-center text-gray-400">No picking orders found.</td></tr>}
               {!loading && !error && orders.map((order) => {
                 const isExpanded = expandedId === order.id;
+                const canConfirmPacked = !order.closed && !order.canceled && order.packedQuantity < order.totalQuantity && getPickingLines(order).length > 0;
                 return (
                   <Fragment key={order.id}>
                     <tr className="border-b border-gray-100 hover:bg-gray-50">
@@ -1001,9 +1033,36 @@ export default function PickingListPage() {
                               <h3 className="mb-3 text-xs font-semibold uppercase text-gray-500">Customer Details</h3>
                               <div className="space-y-1 text-sm text-gray-700">
                                 <p className="font-semibold text-gray-900">{order.customer}</p>
-                                {order.customerEmail && <p>{order.customerEmail}</p>}
-                                {order.phone && <p>{order.phone}</p>}
                                 {[order.address, order.address2, order.city, order.state, order.zip, order.country].filter(Boolean).map((line) => <p key={line}>{line}</p>)}
+                                {order.shippingLines.length > 0 && (
+                                  <div className="mt-3 space-y-1.5">
+                                    <h4 className="text-[11px] font-semibold uppercase text-gray-400">Delivery Method</h4>
+                                    {order.shippingLines.map((line, lineIndex) => {
+                                      const finalPrice = getShippingLineFinalPrice(line);
+                                      const isFree = finalPrice <= 0;
+                                      const discountCodes = getShippingDiscountCodes(line);
+                                      return (
+                                        <div key={line.id || `${order.id}-shipping-${lineIndex}`} className="rounded-md border border-blue-100 bg-white/70 px-2.5 py-2 text-xs text-gray-600">
+                                          <div className="flex flex-wrap items-center gap-1.5">
+                                            <span className="font-medium text-gray-800">{line.title || line.code || 'Shipping'}</span>
+                                            <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${isFree ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                                              {isFree ? 'Free' : 'Paid'}
+                                            </span>
+                                            {discountCodes.map((code) => (
+                                              <span key={code} className="rounded-full bg-amber-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-amber-700">
+                                                {code}
+                                              </span>
+                                            ))}
+                                          </div>
+                                          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-gray-500">
+                                            <span>Price: {formatShippingMoney(line.price, line.currencyCode)}</span>
+                                            <span>Discounted: {formatShippingMoney(finalPrice, line.currencyCode)}</span>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
                                 {order.note && <p className="mt-3 whitespace-pre-wrap rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">{order.note}</p>}
                               </div>
                             </section>
@@ -1019,8 +1078,18 @@ export default function PickingListPage() {
                                       <th className="py-2 text-center font-medium">Qty</th>
                                       <th className="py-2 text-center font-medium">Packed</th>
                                       <th className="py-2 text-left font-medium">Packed Date</th>
-                                      <th className="py-2 text-left font-medium">Last Update</th>
-                                      <th className="py-2 text-center font-medium">Full</th>
+                                      <th className="py-2 text-left font-medium">
+                                        <label className="inline-flex cursor-pointer items-center justify-start gap-1.5">
+                                          <input
+                                            type="checkbox"
+                                            checked={order.items.some((item) => getRemaining(item) > 0) && order.items.every((item, itemIndex) => getRemaining(item) === 0 || Boolean(fullChecks[rowItemKey(order.id, itemIndex)]))}
+                                            disabled={!order.items.some((item) => getRemaining(item) > 0)}
+                                            onChange={(event) => setOrderFullChecks(order, event.target.checked)}
+                                            className="cursor-pointer rounded border-gray-300 text-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+                                          />
+                                          <span>Full</span>
+                                        </label>
+                                      </th>
                                       <th className="py-2 text-center font-medium">Partial</th>
                                     </tr>
                                   </thead>
@@ -1045,9 +1114,8 @@ export default function PickingListPage() {
                                           <td className="py-2 text-center text-gray-700">{item.qty}</td>
                                           <td className="py-2 text-center text-gray-700">{item.packedQuantity}/{item.qty}</td>
                                           <td className="py-2 text-gray-600">{item.packedDate ? formatDateTime(item.packedDate) : '-'}</td>
-                                          <td className="py-2 text-gray-600">{item.lastPackedUpdate ? formatDateTime(item.lastPackedUpdate) : '-'}</td>
-                                          <td className="py-2 text-center">
-                                            <input type="checkbox" checked={Boolean(fullChecks[key])} disabled={remaining === 0} onChange={(event) => { setFullChecks((prev) => ({ ...prev, [key]: event.target.checked })); setPartialValues((prev) => ({ ...prev, [key]: event.target.checked ? remaining : 0 })); }} className="rounded border-gray-300 text-blue-600 disabled:opacity-50" />
+                                          <td className="py-2 text-left">
+                                            <input type="checkbox" checked={Boolean(fullChecks[key])} disabled={remaining === 0} onChange={(event) => { setFullChecks((prev) => ({ ...prev, [key]: event.target.checked })); setPartialValues((prev) => ({ ...prev, [key]: event.target.checked ? remaining : 0 })); }} className="cursor-pointer rounded border-gray-300 text-blue-600 disabled:cursor-not-allowed disabled:opacity-50" />
                                           </td>
                                           <td className="py-2 text-center">
                                             <input type="number" min={0} max={remaining} value={Math.min(remaining, partialValues[key] ?? 0)} disabled={remaining === 0 || Boolean(fullChecks[key])} onChange={(event) => setPartialValues((prev) => ({ ...prev, [key]: clampNumber(event.target.value, remaining) }))} className="w-16 rounded border border-gray-300 px-2 py-1 text-center disabled:bg-gray-100" />
@@ -1062,13 +1130,26 @@ export default function PickingListPage() {
 
                             <section className="rounded-lg border border-gray-200 bg-white p-4">
                               <h3 className="mb-3 text-xs font-semibold uppercase text-gray-500">Actions</h3>
-                              <button onClick={() => openConfirmPacked(order)} disabled={order.closed || order.canceled || order.packedQuantity >= order.totalQuantity} className="mb-2 w-full rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:bg-gray-200 disabled:text-gray-400">Confirm packed</button>
-                              <button onClick={() => openCancelPacked(order)} disabled={!order.packingConfirmations.some((confirmation) => !confirmation.canceledAt)} className="w-full rounded-lg border border-red-300 bg-white px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:border-gray-200 disabled:text-gray-400">Cancel packed</button>
+                              <button onClick={() => openConfirmPacked(order)} disabled={!canConfirmPacked} className="w-full rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:bg-gray-200 disabled:text-gray-400">Confirm packed</button>
                               <div className="mt-4 space-y-2 text-xs text-gray-500">
                                 {order.packingConfirmations.length === 0 ? <p>No packing history.</p> : order.packingConfirmations.slice(0, 5).map((confirmation) => (
-                                  <div key={confirmation.id} className="rounded border border-gray-200 p-2">
-                                    <div className="font-medium text-gray-700">{confirmation.canceledAt ? 'Canceled' : 'Packed'} {formatDateTime(confirmation.confirmedAt)}</div>
-                                    <div>{confirmation.lines.reduce((sum, line) => sum + line.quantity, 0)} item(s)</div>
+                                  <div key={confirmation.id} className="flex items-start justify-between gap-2 rounded border border-gray-200 p-2">
+                                    <div>
+                                      <div className="font-medium text-gray-700">{confirmation.canceledAt ? 'Canceled' : 'Packed'} {formatDateTime(confirmation.confirmedAt)}</div>
+                                      <div>{confirmation.lines.reduce((sum, line) => sum + line.quantity, 0)} item(s)</div>
+                                    </div>
+                                    {!confirmation.canceledAt && (
+                                      <button
+                                        type="button"
+                                        onClick={() => openCancelPacked(order, confirmation.id)}
+                                        className="rounded p-1.5 text-red-500 hover:bg-red-50 hover:text-red-700"
+                                        aria-label={`Cancel packed confirmation from ${formatDateTime(confirmation.confirmedAt)}`}
+                                      >
+                                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 7h12M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2m-7 4v6m4-6v6m5-10l-1 13a1 1 0 01-1 .9H8a1 1 0 01-1-.9L6 7" />
+                                        </svg>
+                                      </button>
+                                    )}
                                   </div>
                                 ))}
                               </div>
@@ -1290,34 +1371,70 @@ function PrintModal({ orders, setOrders, onClose, onPrint }: { orders: PrintOrde
                   <div className="font-semibold text-gray-900">{order.storeName}</div>
                   <div className="text-sm text-gray-500">Order {order.number}</div>
                 </div>
-                <div className="text-sm text-gray-500">Print date: {new Date().toLocaleString()}</div>
+                <div className="text-sm text-gray-500">
+                  <div>Print date: {new Date().toLocaleString()}</div>
+                  <div>{order.customer}</div>
+                </div>
               </div>
               <div className="overflow-x-auto p-4">
-                <table className="w-full min-w-[820px] text-xs">
+                <table className="w-full min-w-[760px] text-xs">
                   <thead>
                     <tr className="border-b border-gray-200 text-gray-500">
-                      <th className="py-2 text-left font-medium">Item</th>
-                      <th className="py-2 text-left font-medium">SKU</th>
-                      <th className="py-2 text-left font-medium">Variant</th>
-                      <th className="py-2 text-center font-medium">Qty</th>
-                      <th className="py-2 text-left font-medium">Location</th>
-                      <th className="py-2 text-left font-medium">Remark</th>
-                      <th className="py-2 text-left font-medium">Note</th>
-                      <th className="py-2 text-center font-medium">Remove</th>
+                      <th className="w-[34%] py-2 pr-4 text-left font-medium">Item</th>
+                      <th className="py-2 text-left font-medium">Others</th>
                     </tr>
                   </thead>
                   <tbody>
                     {order.printItems.map((item) => (
-                      <tr key={item.id} className={`border-b border-gray-100 ${item.removed ? 'opacity-40' : ''}`}>
-                        <td className="py-2 pr-2 text-gray-800">{item.name}</td>
-                        <td className="py-2 pr-2 font-mono text-gray-500">{item.sku || '-'}</td>
-                        <td className="py-2 pr-2 text-gray-600">{getVariantText(item) || '-'}</td>
-                        <td className="py-2 text-center"><input type="number" min={1} max={getRemainingForPrint(item)} value={item.printQuantity} disabled={item.removed} onChange={(event) => updatePrintItem(setOrders, order.id, item.id, { printQuantity: clampNumber(event.target.value, getRemainingForPrint(item), 1) })} className="w-16 rounded border border-gray-300 px-2 py-1 text-center" /></td>
-                        <td className="py-2 pr-2 text-gray-600">{item.metadata.location || '-'}</td>
-                        <td className="py-2 pr-2 text-gray-600">{item.metadata.remark || '-'}</td>
-                        <td className="py-2 pr-2"><input value={item.printNote} disabled={item.removed} onChange={(event) => updatePrintItem(setOrders, order.id, item.id, { printNote: event.target.value })} className="w-full rounded border border-gray-300 px-2 py-1" /></td>
-                        <td className="py-2 text-center"><input type="checkbox" checked={item.removed} onChange={(event) => updatePrintItem(setOrders, order.id, item.id, { removed: event.target.checked })} /></td>
-                      </tr>
+                      <Fragment key={item.id}>
+                        <tr className={`align-top ${item.removed ? 'opacity-40' : ''}`}>
+                          <td className="py-3 pr-4 text-gray-800">
+                            <div className="text-sm font-semibold text-gray-900">{item.title || item.name}</div>
+                            <div className="mt-1 text-gray-500"><span className="font-semibold uppercase">SKU:</span> <span className="font-mono">{item.sku || '-'}</span></div>
+                          </td>
+                          <td className="py-3">
+                            <div className="grid grid-cols-[minmax(0,1fr)_5rem_2rem] items-end gap-3">
+                              <label className="min-w-0">
+                                <span className="mb-1 block text-xs font-semibold uppercase text-gray-500">Variant</span>
+                                <div className="truncate text-gray-700">{getVariantText(item) || '-'}</div>
+                              </label>
+                              <label>
+                                <span className="mb-1 block text-xs font-semibold uppercase text-gray-500">Qty</span>
+                                <input type="number" min={1} max={getRemainingForPrint(item)} value={item.printQuantity} disabled={item.removed} onChange={(event) => updatePrintItem(setOrders, order.id, item.id, { printQuantity: clampNumber(event.target.value, getRemainingForPrint(item), 1) })} className="w-full rounded border border-gray-300 px-2 py-1 text-center disabled:bg-gray-100" />
+                              </label>
+                              <button type="button" onClick={() => updatePrintItem(setOrders, order.id, item.id, { removed: !item.removed })} className={`flex h-8 w-8 items-center justify-center rounded border ${item.removed ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-gray-300 text-gray-500 hover:bg-red-50 hover:text-red-600'}`} aria-label={item.removed ? 'Restore item' : 'Remove item'}>
+                                {item.removed ? (
+                                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v6h6M20 20v-6h-6M20 9A8 8 0 0 0 6.3 3.7L4 10M4 15a8 8 0 0 0 13.7 5.3L20 14" />
+                                  </svg>
+                                ) : (
+                                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 6 6 18M6 6l12 12" />
+                                  </svg>
+                                )}
+                              </button>
+                            </div>
+                            <div className="mt-3 grid grid-cols-2 gap-3">
+                              <label>
+                                <span className="mb-1 block text-xs font-semibold uppercase text-gray-500">Location</span>
+                                <input value={item.printLocation} disabled={item.removed} onChange={(event) => updatePrintItem(setOrders, order.id, item.id, { printLocation: event.target.value })} className="w-full rounded border border-gray-300 px-2 py-1 disabled:bg-gray-100" />
+                              </label>
+                              <label>
+                                <span className="mb-1 block text-xs font-semibold uppercase text-gray-500">Remark</span>
+                                <input value={item.printRemark} disabled={item.removed} onChange={(event) => updatePrintItem(setOrders, order.id, item.id, { printRemark: event.target.value })} className="w-full rounded border border-gray-300 px-2 py-1 disabled:bg-gray-100" />
+                              </label>
+                            </div>
+                          </td>
+                        </tr>
+                        <tr className={`border-b border-gray-100 ${item.removed ? 'opacity-40' : ''}`}>
+                          <td colSpan={2} className="pb-3 pt-0">
+                            <label>
+                              <span className="mb-1 block text-xs font-semibold uppercase text-gray-500">Note</span>
+                              <textarea value={item.printNote} rows={3} disabled={item.removed} onChange={(event) => updatePrintItem(setOrders, order.id, item.id, { printNote: event.target.value })} className="w-full resize-none rounded border border-gray-300 px-2 py-1 disabled:bg-gray-100" />
+                            </label>
+                          </td>
+                        </tr>
+                      </Fragment>
                     ))}
                   </tbody>
                 </table>
@@ -1502,12 +1619,21 @@ function buildPickingSlipDocument(orders: PrintOrder[]) {
     * { box-sizing: border-box; }
     body { margin: 0; color: #111; background: #fff; font-family: Arial, Helvetica, sans-serif; }
     .page { min-height: 100vh; padding: 24px; page-break-after: always; }
-    .header { display: flex; justify-content: space-between; gap: 16px; border-bottom: 2px solid #111; padding-bottom: 12px; margin-bottom: 18px; }
-    .store { font-size: 20px; font-weight: 800; }
-    .meta { font-size: 12px; color: #444; line-height: 1.5; text-align: right; }
+    .slip { border: 1px solid #d1d5db; border-radius: 8px; overflow: hidden; }
+    .header { display: flex; justify-content: space-between; gap: 16px; border-bottom: 1px solid #d1d5db; background: #f9fafb; padding: 12px 16px; }
+    .store { font-size: 14px; font-weight: 700; color: #111827; }
+    .order { margin-top: 4px; font-size: 12px; color: #6b7280; }
+    .meta { font-size: 12px; color: #6b7280; line-height: 1.5; text-align: right; }
+    .content { padding: 16px; }
     table { width: 100%; border-collapse: collapse; font-size: 12px; }
-    th { text-align: left; border-bottom: 1px solid #111; padding: 8px 6px; }
-    td { border-bottom: 1px solid #ddd; padding: 8px 6px; vertical-align: top; }
+    th { text-align: left; border-bottom: 1px solid #e5e7eb; padding: 8px 6px; color: #6b7280; font-weight: 600; }
+    td { border-bottom: 1px solid #f3f4f6; padding: 10px 6px; vertical-align: top; }
+    tr.item-main td { border-bottom: 0; padding-bottom: 4px; }
+    tr.item-note td { padding-top: 0; }
+    .title { font-size: 14px; font-weight: 700; color: #111827; }
+    .sku { margin-top: 4px; color: #6b7280; }
+    .sku code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+    .label { font-weight: 700; text-transform: uppercase; color: #4b5563; }
     .qty { text-align: center; font-size: 16px; font-weight: 800; }
     .note { white-space: pre-wrap; }
     @media print { .page { min-height: auto; page-break-after: always; } .page:last-child { page-break-after: auto; } }
@@ -1516,34 +1642,42 @@ function buildPickingSlipDocument(orders: PrintOrder[]) {
 <body>
   ${orders.map((order) => `
     <section class="page">
-      <div class="header">
-        <div>
-          <div class="store">${escapeHtml(order.storeName)}</div>
-          <div>Order #${escapeHtml(order.number)}</div>
+      <div class="slip">
+        <div class="header">
+          <div>
+            <div class="store">${escapeHtml(order.storeName)}</div>
+            <div class="order">Order ${escapeHtml(order.number)}</div>
+          </div>
+          <div class="meta">
+            <div>Print date: ${escapeHtml(new Date().toLocaleString())}</div>
+            <div>${escapeHtml(order.customer)}</div>
+          </div>
         </div>
-        <div class="meta">
-          <div>Print date: ${escapeHtml(new Date().toLocaleString())}</div>
-          <div>${escapeHtml(order.customer)}</div>
+        <div class="content">
+          <table>
+            <thead>
+              <tr><th style="width:34%">Item</th><th>Others</th></tr>
+            </thead>
+            <tbody>
+              ${order.printItems.map((item) => `
+                <tr class="item-main">
+                  <td>
+                    <div class="title">${escapeHtml(item.title || item.name)}</div>
+                    <div class="sku"><span class="label">SKU:</span> <code>${escapeHtml(item.sku || '-')}</code></div>
+                  </td>
+                  <td>
+                    <div><span class="label">Variant:</span> ${escapeHtml(getVariantText(item) || '-')} <span class="label">Qty:</span> <span class="qty">${escapeHtml(item.printQuantity)}</span></div>
+                    <div><span class="label">Location:</span> ${escapeHtml(item.printLocation || '-')} <span class="label">Remark:</span> ${escapeHtml(item.printRemark || '-')}</div>
+                  </td>
+                </tr>
+                <tr class="item-note">
+                  <td colspan="2" class="note"><span class="label">Note:</span> ${escapeHtml(item.printNote || '-')}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
         </div>
       </div>
-      <table>
-        <thead>
-          <tr><th>Item</th><th>SKU</th><th>Variant</th><th>Qty</th><th>Location</th><th>Remark</th><th>Note</th></tr>
-        </thead>
-        <tbody>
-          ${order.printItems.map((item) => `
-            <tr>
-              <td>${escapeHtml(item.name)}</td>
-              <td>${escapeHtml(item.sku || '-')}</td>
-              <td>${escapeHtml(getVariantText(item) || '-')}</td>
-              <td class="qty">${escapeHtml(item.printQuantity)}</td>
-              <td>${escapeHtml(item.metadata.location || '-')}</td>
-              <td>${escapeHtml(item.metadata.remark || '-')}</td>
-              <td class="note">${escapeHtml(item.printNote || '-')}</td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
     </section>
   `).join('')}
 </body>

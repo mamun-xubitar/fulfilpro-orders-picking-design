@@ -1825,7 +1825,7 @@ export default function OrdersPage() {
                                     ))}
                                   </div>
                                 )}
-                                {order.shippingLines.length > 0 && (
+                                {order.shippingLines?.length > 0 && (
                                   <div className="mt-3 space-y-1.5">
                                     <h5 className="text-[11px] font-semibold uppercase text-gray-400">Shipping</h5>
                                     {order.shippingLines.map((line, lineIndex) => {
