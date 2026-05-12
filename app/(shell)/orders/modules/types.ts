@@ -10,6 +10,7 @@ export type OrderItem = {
   sku: string;
   vendor: string;
   qty: number;
+  packedQuantity?: number;
 };
 export type ShippingLine = {
   id: string;
@@ -65,6 +66,9 @@ export type OrderRow = {
   stockRequestCount: number;
   backInStockStatus: BackInStockStatus | null;
   stockAdjustment: OrderStockAdjustment | null;
+  packingStatus: 'packed' | 'partially_packed' | 'not_packed';
+  packedQuantity: number;
+  totalQuantity: number;
 };
 
 export type StoreOption = { id: string; name: string; storeDomain: string };

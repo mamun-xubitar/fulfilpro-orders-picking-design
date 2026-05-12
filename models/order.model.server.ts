@@ -210,12 +210,14 @@ export class OrderModel {
     dateFrom?: string;
     dateTo?: string;
     fulfillmentStatuses?: string[];
+    packingStatuses?: string[];
     viewerId?: string;
     page: number;
     pageSize: number;
   }) {
-    const { search, storeIds = [], period = 'all', dateFrom, dateTo, fulfillmentStatuses = [], page, pageSize } = params;
+    const { search, storeIds = [], period = 'all', dateFrom, dateTo, fulfillmentStatuses = [], packingStatuses = [], page, pageSize } = params;
     const tokens = (search?.trim() ?? '').split(/\s+/).filter(Boolean);
+    const filterByPacking = packingStatuses.length > 0;
     let orderedAtFrom: Date | undefined;
     let orderedAtTo: Date | undefined;
     const where: Prisma.OrderWhereInput = {
@@ -284,6 +286,7 @@ export class OrderModel {
         },
       },
       stockAdjustment: true,
+      packingConfirmations: { select: { id: true, lines: true, confirmedAt: true, canceledAt: true }, orderBy: { confirmedAt: 'desc' as const } },
     } satisfies Prisma.OrderInclude;
 
     if (tokens.length > 0) {
@@ -293,8 +296,8 @@ export class OrderModel {
         orderedAtFrom,
         orderedAtTo,
         fulfillmentStatuses,
-        page,
-        pageSize,
+        page: filterByPacking ? 1 : page,
+        pageSize: filterByPacking ? 10000 : pageSize,
       });
 
       const rows = searchPage.ids.length > 0
@@ -307,7 +310,30 @@ export class OrderModel {
       const idOrder = new Map(searchPage.ids.map((id, index) => [id, index]));
       rows.sort((a, b) => (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0));
 
-      return { total: searchPage.total, orders: rows.map(toOrderRow) };
+      const allOrders = rows.map(toOrderRow);
+
+      if (filterByPacking) {
+        const packingSet = new Set(packingStatuses);
+        const filtered = allOrders.filter((o) => packingSet.has(o.packingStatus));
+        const total = filtered.length;
+        const sliced = filtered.slice((page - 1) * pageSize, page * pageSize);
+        return { total, orders: sliced };
+      }
+
+      return { total: searchPage.total, orders: allOrders };
+    }
+
+    if (filterByPacking) {
+      const allRows = await prisma.order.findMany({
+        where,
+        include: listInclude,
+        orderBy: { orderedAt: 'desc' },
+      });
+      const packingSet = new Set(packingStatuses);
+      const filtered = allRows.map(toOrderRow).filter((o) => packingSet.has(o.packingStatus));
+      const total = filtered.length;
+      const sliced = filtered.slice((page - 1) * pageSize, page * pageSize);
+      return { total, orders: sliced };
     }
 
     const [total, rows] = await Promise.all([
@@ -430,6 +456,7 @@ export class OrderModel {
             },
           },
         },
+        packingConfirmations: { select: { id: true, lines: true, confirmedAt: true, canceledAt: true }, orderBy: { confirmedAt: 'desc' as const } },
       },
     });
 
@@ -1062,9 +1089,22 @@ function toOrderRow(row: {
     createdAt: Date;
     updatedAt: Date;
   } | null;
+  packingConfirmations?: Array<{ id: string; lines: Prisma.JsonValue; confirmedAt: Date; canceledAt: Date | null }>;
 }) {
   const lineItems = toLineItems(row.lineItems);
   const itemCount = lineItems.reduce((sum, item) => sum + Math.max(0, item.qty), 0);
+
+  const packingConfirmations = row.packingConfirmations ?? [];
+  const activePackingConfirmations = packingConfirmations.filter((c) => !c.canceledAt);
+  const packedByLine = computePackedByLine(activePackingConfirmations);
+  const totalQuantity = lineItems.reduce((sum, item) => sum + Math.max(0, item.qty), 0);
+  const packedQuantity = [...packedByLine.values()].reduce((sum, qty) => sum + qty, 0);
+  const packingStatus: 'packed' | 'partially_packed' | 'not_packed' =
+    packedQuantity >= totalQuantity && totalQuantity > 0
+      ? 'packed'
+      : packedQuantity > 0
+        ? 'partially_packed'
+        : 'not_packed';
 
   return {
     id: row.id,
@@ -1086,7 +1126,10 @@ function toOrderRow(row: {
     storeId: row.store.id,
     storeName: row.store.name ?? row.store.storeDomain,
     storeDomain: row.store.storeDomain,
-    items: lineItems,
+    items: lineItems.map((item) => ({
+      ...item,
+      packedQuantity: packedByLine.get(item.id) ?? 0,
+    })),
     shippingLines: toShippingLines(row.shippingLines),
     fulfillmentItems: toFulfillmentItems(row.fulfillmentItems),
     itemsCount: itemCount,
@@ -1095,7 +1138,27 @@ function toOrderRow(row: {
     stockRequestCount: getStockRequestBadgeCount(row),
     backInStockStatus: getBackInStockStatus(row.backInStockRequests ?? []),
     stockAdjustment: row.stockAdjustment ? toStockAdjustmentRow(row.stockAdjustment) : null,
+    packingStatus,
+    packedQuantity,
+    totalQuantity,
   };
+}
+
+function computePackedByLine(confirmations: Array<{ lines: Prisma.JsonValue }>) {
+  const packed = new Map<string, number>();
+  confirmations.forEach((confirmation) => {
+    const lines = Array.isArray(confirmation.lines) ? confirmation.lines : [];
+    lines.forEach((line) => {
+      if (!line || typeof line !== 'object') return;
+      const obj = line as Record<string, unknown>;
+      const lineItemId = typeof obj.lineItemId === 'string' ? obj.lineItemId : '';
+      const quantity = typeof obj.quantity === 'number' ? obj.quantity : Number(obj.quantity ?? 0);
+      if (lineItemId && quantity > 0) {
+        packed.set(lineItemId, (packed.get(lineItemId) ?? 0) + quantity);
+      }
+    });
+  });
+  return packed;
 }
 
 function getStockRequestBadgeCount(row: {

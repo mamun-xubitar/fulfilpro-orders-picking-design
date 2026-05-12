@@ -920,10 +920,19 @@ export default function PickingListPage() {
               {!loading && !error && orders.length === 0 && <tr><td colSpan={11} className="py-16 text-center text-gray-400">No picking orders found.</td></tr>}
               {!loading && !error && orders.map((order) => {
                 const isExpanded = expandedId === order.id;
+                const isSelected = selectedIds.includes(order.id);
                 const canConfirmPacked = !order.closed && !order.canceled && order.packedQuantity < order.totalQuantity && getPickingLines(order).length > 0;
+                const orderRowClass = (() => {
+                  if (isSelected) return 'border-b border-blue-200 bg-blue-100 hover:bg-blue-200';
+                  if (order.canceled) return 'border-b border-red-200 bg-red-100 hover:bg-red-200';
+                  if (order.closed) return 'border-b border-gray-200 bg-gray-100 hover:bg-gray-200';
+                  if (order.packingStatus === 'packed') return 'border-b border-blue-200 bg-blue-100 hover:bg-blue-200';
+                  if (order.packingStatus === 'partially_packed') return 'border-b border-amber-200 bg-amber-100 hover:bg-amber-200';
+                  return 'border-b border-gray-100 hover:bg-gray-50';
+                })();
                 return (
                   <Fragment key={order.id}>
-                    <tr className="border-b border-gray-100 hover:bg-gray-50">
+                    <tr className={`${orderRowClass} transition-colors duration-100`}>
                       <td className="px-3 py-3"><input type="checkbox" checked={selectedIds.includes(order.id)} onChange={() => setSelectedIds((prev) => prev.includes(order.id) ? prev.filter((id) => id !== order.id) : [...prev, order.id])} className="rounded border-gray-300 text-blue-600" /></td>
                       <td className="px-3 py-3 font-mono font-medium text-gray-900">{order.number}</td>
                       <td className="px-3 py-3 text-gray-600">{order.storeName}</td>
@@ -1097,8 +1106,17 @@ export default function PickingListPage() {
                                     {order.items.map((item, itemIndex) => {
                                       const key = rowItemKey(order.id, itemIndex);
                                       const remaining = getRemaining(item);
+                                      const isFull = Boolean(fullChecks[key]);
+                                      const partialVal = partialValues[key] ?? 0;
+                                      const itemRowClass = (() => {
+                                        if (item.packedQuantity >= item.qty && item.qty > 0) return 'border-b border-emerald-200 bg-emerald-100';
+                                        if ((isFull || partialVal >= remaining) && remaining > 0) return 'border-b border-blue-200 bg-blue-100';
+                                        if (partialVal > 0) return 'border-b border-pink-200 bg-pink-100';
+                                        if (item.packedQuantity > 0) return 'border-b border-purple-200 bg-purple-100';
+                                        return 'border-b border-gray-100';
+                                      })();
                                       return (
-                                        <tr key={item.id || itemIndex} className="border-b border-gray-100">
+                                        <tr key={item.id || itemIndex} className={`${itemRowClass} transition-colors duration-100`}>
                                           <td className="py-2 pr-3">
                                             <div className="flex items-center gap-2">
                                               <div className="h-10 w-10 overflow-hidden rounded border border-gray-200 bg-gray-100">

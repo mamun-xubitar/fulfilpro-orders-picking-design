@@ -1,7 +1,7 @@
 'use client';
 
 import type { Dispatch, RefObject, SetStateAction } from 'react';
-import { FULFILLMENT_STATUSES, PERIODS } from './constants';
+import { FULFILLMENT_STATUSES, PACKING_STATUSES, PERIODS } from './constants';
 import type { Pagination, StoreOption } from './types';
 import { DAY_LABELS, fmtCalDate, getMonthDays, MONTH_LABELS } from './utils';
 
@@ -30,6 +30,11 @@ type OrdersToolbarProps = {
   statusDropdownOpen: boolean;
   setStatusDropdownOpen: Dispatch<SetStateAction<boolean>>;
   statusDropdownRef: RefObject<HTMLDivElement | null>;
+  packingStatuses: string[];
+  packingStatusDropdownOpen: boolean;
+  setPackingStatusDropdownOpen: Dispatch<SetStateAction<boolean>>;
+  packingStatusDropdownRef: RefObject<HTMLDivElement | null>;
+  handlePackingStatusToggle: (status: string) => void;
   hasActiveFilters: boolean;
   handleClearFilters: () => void;
   handleStoreToggle: (id: string) => void;
@@ -80,6 +85,11 @@ export default function OrdersToolbar({
   statusDropdownOpen,
   setStatusDropdownOpen,
   statusDropdownRef,
+  packingStatuses,
+  packingStatusDropdownOpen,
+  setPackingStatusDropdownOpen,
+  packingStatusDropdownRef,
+  handlePackingStatusToggle,
   hasActiveFilters,
   handleClearFilters,
   handleStoreToggle,
@@ -319,6 +329,46 @@ export default function OrdersToolbar({
             >
               <span className={`flex-shrink-0 w-4 h-4 rounded border flex items-center justify-center ${fulfillmentStatuses.includes(item.value) ? 'bg-blue-600 border-blue-600' : 'border-gray-300'}`}>
                 {fulfillmentStatuses.includes(item.value) && (
+                  <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+              </span>
+              <span className="text-gray-700">{item.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+
+    {/* Packing status multi-select */}
+    <div className="relative" ref={packingStatusDropdownRef}>
+      <button
+        onClick={() => setPackingStatusDropdownOpen((prev) => !prev)}
+        className="flex items-center gap-1.5 bg-white border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-600 shadow-sm hover:bg-gray-50 cursor-pointer whitespace-nowrap"
+      >
+        {packingStatuses.length === 0 ? 'All Packed' : `${packingStatuses.length} Packed`}
+        <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {packingStatusDropdownOpen && (
+        <div className="absolute top-full mt-1 left-0 z-20 bg-white border border-gray-200 rounded-xl shadow-lg min-w-44 py-1">
+          <button
+            onClick={() => { setPackingStatusDropdownOpen(false); handlePackingStatusToggle('__clear__'); }}
+            className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2 ${packingStatuses.length === 0 ? 'font-semibold text-blue-600' : 'text-gray-700'}`}
+          >
+            All
+          </button>
+          <div className="border-t border-gray-100 my-1" />
+          {PACKING_STATUSES.map((item) => (
+            <button
+              key={item.value}
+              onClick={() => handlePackingStatusToggle(item.value)}
+              className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2"
+            >
+              <span className={`flex-shrink-0 w-4 h-4 rounded border flex items-center justify-center ${packingStatuses.includes(item.value) ? 'bg-blue-600 border-blue-600' : 'border-gray-300'}`}>
+                {packingStatuses.includes(item.value) && (
                   <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                   </svg>

@@ -62,8 +62,10 @@ export default function OrdersPage() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [fulfillmentStatuses, setFulfillmentStatuses] = useState<string[]>([]);
+  const [packingStatuses, setPackingStatuses] = useState<string[]>([]);
   const [storeDropdownOpen, setStoreDropdownOpen] = useState(false);
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
+  const [packingStatusDropdownOpen, setPackingStatusDropdownOpen] = useState(false);
   const [periodDropdownOpen, setPeriodDropdownOpen] = useState(false);
   const [calendarNav, setCalendarNav] = useState<{ year: number; month: number }>(() => {
     const n = new Date();
@@ -110,6 +112,7 @@ export default function OrdersPage() {
   const [syncStoreDropdownOpen, setSyncStoreDropdownOpen] = useState(false);
   const storeDropdownRef = useRef<HTMLDivElement>(null);
   const statusDropdownRef = useRef<HTMLDivElement>(null);
+  const packingStatusDropdownRef = useRef<HTMLDivElement>(null);
   const periodDropdownRef = useRef<HTMLDivElement>(null);
   const syncStoreDropdownRef = useRef<HTMLDivElement>(null);
   const messageTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -136,8 +139,9 @@ export default function OrdersPage() {
     if (dateFrom) params.set('dateFrom', dateFrom);
     if (dateTo) params.set('dateTo', dateTo);
     fulfillmentStatuses.forEach((s) => params.append('status', s));
+    packingStatuses.forEach((s) => params.append('packingStatus', s));
     return params.toString();
-  }, [pagination.page, pagination.pageSize, period, search, storeIds, dateFrom, dateTo, fulfillmentStatuses]);
+  }, [pagination.page, pagination.pageSize, period, search, storeIds, dateFrom, dateTo, fulfillmentStatuses, packingStatuses]);
 
   const filteredTrackingCarriers = useMemo(() => {
     const query = carrierSearch.trim();
@@ -1374,6 +1378,15 @@ export default function OrdersPage() {
     setPagination((prev) => ({ ...prev, page: 1 }));
   };
 
+  const handlePackingStatusToggle = (status: string) => {
+    if (status === '__clear__') {
+      setPackingStatuses([]);
+    } else {
+      setPackingStatuses((prev) => (prev.includes(status) ? prev.filter((s) => s !== status) : [...prev, status]));
+    }
+    setPagination((prev) => ({ ...prev, page: 1 }));
+  };
+
   const handleCalendarDateClick = (date: string) => {
     if (!dateFrom || (dateFrom && dateTo)) {
       setDateFrom(date);
@@ -1401,6 +1414,7 @@ export default function OrdersPage() {
     setDateTo('');
     setHoverDate(null);
     setFulfillmentStatuses([]);
+    setPackingStatuses([]);
     setPagination((prev) => ({ ...prev, page: 1 }));
   };
 
@@ -1452,6 +1466,9 @@ export default function OrdersPage() {
       if (statusDropdownRef.current && !statusDropdownRef.current.contains(e.target as Node)) {
         setStatusDropdownOpen(false);
       }
+      if (packingStatusDropdownRef.current && !packingStatusDropdownRef.current.contains(e.target as Node)) {
+        setPackingStatusDropdownOpen(false);
+      }
       if (syncStoreDropdownRef.current && !syncStoreDropdownRef.current.contains(e.target as Node)) {
         setSyncStoreDropdownOpen(false);
       }
@@ -1460,7 +1477,7 @@ export default function OrdersPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const hasActiveFilters = searchInput !== '' || storeIds.length > 0 || period !== 'all' || !!dateFrom || !!dateTo || fulfillmentStatuses.length > 0;
+  const hasActiveFilters = searchInput !== '' || storeIds.length > 0 || period !== 'all' || !!dateFrom || !!dateTo || fulfillmentStatuses.length > 0 || packingStatuses.length > 0;
   const syncActive = syncJob?.status === 'queued' || syncJob?.status === 'running';
   const syncMessage = syncActive
     ? syncJob.status === 'queued'
@@ -1504,6 +1521,11 @@ export default function OrdersPage() {
         statusDropdownOpen={statusDropdownOpen}
         setStatusDropdownOpen={setStatusDropdownOpen}
         statusDropdownRef={statusDropdownRef}
+        packingStatuses={packingStatuses}
+        packingStatusDropdownOpen={packingStatusDropdownOpen}
+        setPackingStatusDropdownOpen={setPackingStatusDropdownOpen}
+        packingStatusDropdownRef={packingStatusDropdownRef}
+        handlePackingStatusToggle={handlePackingStatusToggle}
         hasActiveFilters={hasActiveFilters}
         handleClearFilters={handleClearFilters}
         handleStoreToggle={handleStoreToggle}
@@ -1595,6 +1617,16 @@ export default function OrdersPage() {
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${status.chip}`}>
                             {status.label}
                           </span>
+                          {order.packingStatus === 'packed' && (
+                            <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold bg-emerald-100 text-emerald-700">
+                              Packed
+                            </span>
+                          )}
+                          {order.packingStatus === 'partially_packed' && (
+                            <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold bg-amber-100 text-amber-700">
+                              Partial Packed
+                            </span>
+                          )}
                           {hasBackInStockSignal && order.backInStockStatus && (
                             <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${getStockStatusChip(order.backInStockStatus)}`}>
                               {formatStockStatus(order.backInStockStatus)}
@@ -1974,6 +2006,7 @@ export default function OrdersPage() {
                                           <th className="text-left py-1 text-gray-400 font-medium">Product</th>
                                           <th className="text-left py-1 text-gray-400 font-medium">SKU</th>
                                           <th className="text-center py-1 text-gray-400 font-medium">QTY</th>
+                                          <th className="text-center py-1 text-gray-400 font-medium">Packed</th>
                                           <th className="text-start py-1 text-gray-400 font-medium">
                                             <label className="inline-flex items-center gap-1 cursor-pointer justify-start">
                                               <input
@@ -1995,6 +2028,8 @@ export default function OrdersPage() {
                                           const remainingQty = Math.max(0, item.qty - fulfilledQty);
                                           const isFull = isLineFullChecked(order, item, itemIndex);
                                           const partialValue = Math.min(remainingQty, Math.max(0, partialValues[key] ?? 0));
+                                          const packedQty = item.packedQuantity ?? 0;
+                                          const itemPackingStatus = packedQty >= item.qty && item.qty > 0 ? 'packed' : packedQty > 0 ? 'partial' : 'none';
                                           return (
                                             <tr
                                               key={`${order.id}-${itemIndex}`}
@@ -2004,6 +2039,19 @@ export default function OrdersPage() {
                                               <td className="py-1.5 pr-2 font-mono text-gray-500">{item.sku || '-'}</td>
                                               <td className="py-1.5 text-center text-gray-700">
                                                 {fulfilledQty}/{item.qty}
+                                              </td>
+                                              <td className="py-1.5 text-center">
+                                                {itemPackingStatus === 'packed' ? (
+                                                  <span className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold bg-emerald-100 text-emerald-700">
+                                                    {packedQty}/{item.qty}
+                                                  </span>
+                                                ) : itemPackingStatus === 'partial' ? (
+                                                  <span className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold bg-amber-100 text-amber-700">
+                                                    {packedQty}/{item.qty}
+                                                  </span>
+                                                ) : (
+                                                  <span className="text-gray-300">-</span>
+                                                )}
                                               </td>
                                               <td className="py-1.5 flex-inline justify-start items-center">
                                                 <input

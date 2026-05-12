@@ -16,6 +16,12 @@ export const FULFILLMENT_STATUSES = [
   { label: 'Canceled', value: 'canceled' },
 ] as const;
 
+export const PACKING_STATUSES = [
+  { label: 'Not Packed', value: 'not_packed' },
+  { label: 'Partial Packed', value: 'partially_packed' },
+  { label: 'Packed', value: 'packed' },
+] as const;
+
 export const SHOPIFY_TRACKING_CARRIERS = [
   '4PX',
   'AGS',

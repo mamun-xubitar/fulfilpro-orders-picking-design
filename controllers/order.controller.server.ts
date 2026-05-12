@@ -12,6 +12,7 @@ export class OrderController {
     const dateFrom = searchParams.get('dateFrom')?.trim() ?? '';
     const dateTo = searchParams.get('dateTo')?.trim() ?? '';
     const fulfillmentStatuses = searchParams.getAll('status').map((s) => s.trim()).filter(Boolean);
+    const packingStatuses = searchParams.getAll('packingStatus').map((s) => s.trim()).filter(Boolean);
     const page = normalizePositiveInt(searchParams.get('page'), 1);
     const pageSize = clamp(normalizePositiveInt(searchParams.get('pageSize'), 20), 5, 100);
 
@@ -23,6 +24,7 @@ export class OrderController {
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
         fulfillmentStatuses,
+        packingStatuses,
         viewerId,
         page,
         pageSize,
@@ -42,6 +44,7 @@ export class OrderController {
           dateFrom,
           dateTo,
           fulfillmentStatuses,
+          packingStatuses,
         },
         stores,
         pagination: {
