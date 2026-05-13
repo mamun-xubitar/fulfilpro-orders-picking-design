@@ -354,8 +354,8 @@ export class PickingListModel {
     });
 
     if (!order) throw new Error('Order not found');
-    const [row] = await this.attachMetadata([toPickingOrderRow(order)]);
-    return { order: row, savedConfirmationId };
+    // const [row] = await this.attachMetadata([toPickingOrderRow(order)]);
+    return { order: toPickingOrderRow(order), savedConfirmationId };
   }
 
   private async attachMetadata<T extends { storeId: string; items: Array<OrderItem & { metadata: PickingMetadata }> }>(rows: T[]) {

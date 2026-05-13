@@ -1038,13 +1038,13 @@ export default function PickingListPage() {
                     </tr>
                     {isExpanded && (
                       <tr>
-                        <td colSpan={11} className="border-b border-gray-200 bg-gray-50 p-5">
-                          <div className="grid gap-5 lg:grid-cols-[320px_1fr_260px]">
-                            <section className="rounded-lg border border-gray-200 bg-white p-4">
+                        <td colSpan={11} className="border-b border-gray-200 bg-gray-50 p-3 sm:p-5">
+                          <div className="grid w-[calc(100vw-2.5rem)] min-w-0 max-w-full gap-3 sm:w-[calc(100vw-4rem)] sm:gap-5 lg:w-full lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)_minmax(0,260px)]">
+                            <section className="min-w-0 rounded-lg border border-gray-200 bg-white p-3 sm:p-4">
                               <h3 className="mb-3 text-xs font-semibold uppercase text-gray-500">Customer Details</h3>
                               <div className="space-y-1 text-sm text-gray-700">
                                 <p className="font-semibold text-gray-900">{order.customer}</p>
-                                {[order.address, order.address2, order.city, order.state, order.zip, order.country].filter(Boolean).map((line) => <p key={line}>{line}</p>)}
+                                {[order.address, order.address2, order.city, order.state, order.zip, order.country].filter(Boolean).map((line, lineIndex) => <p key={`${order.id}-address-${lineIndex}`}>{line}</p>)}
                                 {order.shippingLines.length > 0 && (
                                   <div className="mt-3 space-y-1.5">
                                     <h4 className="text-[11px] font-semibold uppercase text-gray-400">Delivery Method</h4>
@@ -1053,14 +1053,14 @@ export default function PickingListPage() {
                                       const isFree = finalPrice <= 0;
                                       const discountCodes = getShippingDiscountCodes(line);
                                       return (
-                                        <div key={line.id || `${order.id}-shipping-${lineIndex}`} className="rounded-md border border-blue-100 bg-white/70 px-2.5 py-2 text-xs text-gray-600">
+                                        <div key={`${order.id}-shipping-${line.id || lineIndex}-${lineIndex}`} className="min-w-0 rounded-md border border-blue-100 bg-white/70 px-2.5 py-2 text-xs text-gray-600">
                                           <div className="flex flex-wrap items-center gap-1.5">
                                             <span className="font-medium text-gray-800">{line.title || line.code || 'Shipping'}</span>
                                             <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${isFree ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
                                               {isFree ? 'Free' : 'Paid'}
                                             </span>
-                                            {discountCodes.map((code) => (
-                                              <span key={code} className="rounded-full bg-amber-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-amber-700">
+                                            {discountCodes.map((code, codeIndex) => (
+                                              <span key={`${line.id || lineIndex}-discount-${codeIndex}`} className="rounded-full bg-amber-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-amber-700">
                                                 {code}
                                               </span>
                                             ))}
@@ -1078,10 +1078,10 @@ export default function PickingListPage() {
                               </div>
                             </section>
 
-                            <section className="rounded-lg border border-gray-200 bg-white p-4">
+                            <section className="min-w-0 rounded-lg border border-gray-200 bg-white p-3 sm:p-4">
                               <h3 className="mb-3 text-xs font-semibold uppercase text-gray-500">Order Items</h3>
                               <div className="overflow-x-auto">
-                                <table className="w-full min-w-[760px] text-xs">
+                                <table className="w-full min-w-[640px] text-xs md:min-w-[760px]">
                                   <thead>
                                     <tr className="border-b border-gray-200 text-gray-500">
                                       <th className="py-2 text-left font-medium">Item</th>
@@ -1118,15 +1118,15 @@ export default function PickingListPage() {
                                         return 'border-b border-gray-100';
                                       })();
                                       return (
-                                        <tr key={item.id || itemIndex} className={`${itemRowClass} transition-colors duration-100`}>
+                                        <tr key={`${order.id}-item-${item.id || itemIndex}-${itemIndex}`} className={`${itemRowClass} transition-colors duration-100`}>
                                           <td className="py-2 pr-3">
                                             <div className="flex items-center gap-2">
                                               <div className="h-10 w-10 overflow-hidden rounded border border-gray-200 bg-gray-100">
                                                 {item.imageUrl ? <img src={item.imageUrl} alt="" className="h-full w-full object-cover" /> : null}
                                               </div>
-                                              <div>
-                                                <div className="font-medium text-gray-800">{item.name}</div>
-                                                {getVariantText(item) && <div className="text-gray-400">{getVariantText(item)}</div>}
+                                              <div className="min-w-0">
+                                                <div className="break-words font-medium text-gray-800">{item.name}</div>
+                                                {getVariantText(item) && <div className="break-words text-gray-400">{getVariantText(item)}</div>}
                                               </div>
                                             </div>
                                           </td>
@@ -1148,7 +1148,7 @@ export default function PickingListPage() {
                               </div>
                             </section>
 
-                            <section className="rounded-lg border border-gray-200 bg-white p-4">
+                            <section className="min-w-0 rounded-lg border border-gray-200 bg-white p-3 sm:p-4">
                               <h3 className="mb-3 text-xs font-semibold uppercase text-gray-500">Actions</h3>
                               <button onClick={() => openConfirmPacked(order)} disabled={!canConfirmPacked} className="w-full rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:bg-gray-200 disabled:text-gray-400">Confirm packed</button>
                               <div className="mt-4 space-y-2 text-xs text-gray-500">
@@ -1413,8 +1413,8 @@ function PrintModal({ orders, setOrders, onClose, onPrint }: { orders: PrintOrde
                     </tr>
                   </thead>
                   <tbody>
-                    {order.printItems.map((item) => (
-                      <Fragment key={item.id}>
+                    {order.printItems.map((item, itemIndex) => (
+                      <Fragment key={`${order.id}-print-item-${item.id || itemIndex}-${itemIndex}`}>
                         <tr className={`align-top ${item.removed ? 'opacity-40' : ''}`}>
                           <td className="py-3 pr-4 text-gray-800">
                             <div className="text-sm font-semibold text-gray-900">{item.title || item.name}</div>
