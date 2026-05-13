@@ -74,6 +74,7 @@ export default function LoginPage() {
     });
 
     if (result?.error) {
+      console.log("my error", result.error);
       throw new Error("Unable to sign in. Please try again.");
     }
 

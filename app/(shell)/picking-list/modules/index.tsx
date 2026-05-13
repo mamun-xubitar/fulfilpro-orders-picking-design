@@ -30,7 +30,6 @@ type PickingItem = {
   packedQuantity: number;
   packedDate: string | null;
   lastPackedUpdate: string | null;
-  metadata: { location: string; remark: string; note: string };
 };
 type PackingConfirmation = {
   id: string;
@@ -548,9 +547,9 @@ export default function PickingListPage() {
           ...item,
           printQuantity: getRemaining(item),
           removed: false,
-          printLocation: item.metadata.location,
-          printRemark: item.metadata.remark,
-          printNote: item.metadata.note,
+          printLocation: "",
+          printRemark: "",
+          printNote: "",
         })),
     })));
   }
@@ -921,6 +920,7 @@ export default function PickingListPage() {
               {!loading && !error && orders.map((order) => {
                 const isExpanded = expandedId === order.id;
                 const isSelected = selectedIds.includes(order.id);
+                const isAllPacked = order.packingStatus === 'packed' || (order.totalQuantity > 0 && order.packedQuantity >= order.totalQuantity);
                 const canConfirmPacked = !order.closed && !order.canceled && order.packedQuantity < order.totalQuantity && getPickingLines(order).length > 0;
                 const orderRowClass = (() => {
                   if (isSelected) return 'border-b border-blue-200 bg-blue-100 hover:bg-blue-200';
@@ -986,7 +986,8 @@ export default function PickingListPage() {
                                 event.stopPropagation();
                                 openPrintModal([order]);
                               }}
-                              className="cursor-pointer rounded-lg p-1.5 text-gray-500 transition-colors duration-150 hover:bg-gray-100 hover:text-gray-700"
+                              disabled={isAllPacked}
+                              className="cursor-pointer rounded-lg p-1.5 text-gray-500 transition-colors duration-150 hover:bg-gray-100 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-gray-500"
                               aria-label={`Print picking slip for ${order.number}`}
                             >
                               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1001,7 +1002,8 @@ export default function PickingListPage() {
                                 event.stopPropagation();
                                 void openMessageModal(order);
                               }}
-                              className="relative cursor-pointer rounded-lg p-1.5 text-gray-500 transition-colors duration-150 hover:bg-gray-100 hover:text-blue-600"
+                              disabled={isAllPacked}
+                              className="relative cursor-pointer rounded-lg p-1.5 text-gray-500 transition-colors duration-150 hover:bg-gray-100 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-gray-500"
                               aria-label={`Messages for ${order.number}`}
                             >
                               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1021,8 +1023,8 @@ export default function PickingListPage() {
                                 event.stopPropagation();
                                 void refreshOrder(order);
                               }}
-                              disabled={refreshingIds[order.id]}
-                              className="cursor-pointer rounded-lg p-1.5 text-gray-500 transition-colors duration-150 hover:bg-gray-100 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+                              disabled={isAllPacked || refreshingIds[order.id]}
+                              className="cursor-pointer rounded-lg p-1.5 text-gray-500 transition-colors duration-150 hover:bg-gray-100 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-gray-500"
                               aria-label={`Refresh ${order.number}`}
                             >
                               <svg className={`h-4 w-4 ${refreshingIds[order.id] ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -74,16 +74,21 @@ export class PickingListModel {
     pageSize: number;
   }) {
     const where = buildOrderWhere(params);
-    const [orders, stores] = await Promise.all([
-      prisma.order.findMany({
+    const orderedAtBounds = getOrderedAtBounds(params);
+    const searchTokens = (params.search?.trim() ?? '').split(/\s+/).filter(Boolean);
+    const packedStatuses = new Set(params.packedStatuses ?? []);
+    const filterByPacking = packedStatuses.size > 0;
+    const [ordersResult, stores] = await Promise.all([
+      this.listOrderRows({
         where,
-        include: {
-          store: { select: { id: true, name: true, storeDomain: true } },
-          packingConfirmations: { orderBy: { confirmedAt: 'desc' } },
-          pickingSlipPrints: { orderBy: { printedAt: 'desc' }, take: 1 },
-          _count: { select: { notes: true, messages: true } },
-        },
-        orderBy: { orderedAt: 'desc' },
+        storeIds: params.storeIds ?? [],
+        searchTokens,
+        printStatuses: params.printStatuses ?? [],
+        filterByPacking,
+        orderedAtFrom: orderedAtBounds.from,
+        orderedAtTo: orderedAtBounds.to,
+        page: params.page,
+        pageSize: params.pageSize,
       }),
       prisma.store.findMany({
         where: { status: 'connected' },
@@ -92,20 +97,16 @@ export class PickingListModel {
       }),
     ]);
 
-    const rowsWithMetadata = await this.attachMetadata(orders.map(toPickingOrderRow));
-    const searchTokens = (params.search?.trim() ?? '').split(/\s+/).filter(Boolean);
-    const packedStatuses = new Set(params.packedStatuses ?? []);
-    const printStatuses = new Set(params.printStatuses ?? []);
-    const filtered = rowsWithMetadata.filter((row) => {
-      if (searchTokens.length > 0 && !matchesSearch(row, searchTokens)) return false;
+    const rows = ordersResult.rows.map(toPickingOrderRow);
+    const filtered = rows.filter((row) => {
       if (packedStatuses.size > 0 && !packedStatuses.has(row.packingStatus)) return false;
-      if (printStatuses.size > 0 && !printStatuses.has(row.printed ? 'printed' : 'not_printed')) return false;
       return true;
-    }).sort((a, b) => comparePickingSearchRows(a, b, searchTokens));
+    });
 
-    const total = filtered.length;
+    const total = filterByPacking ? filtered.length : ordersResult.total;
     const start = (params.page - 1) * params.pageSize;
-    const pageRows = filtered.slice(start, start + params.pageSize);
+    const pageRows = filterByPacking ? filtered.slice(start, start + params.pageSize) : filtered;
+    // const rowsWithMetadata = await this.attachMetadata(pageRows);
 
     return {
       orders: pageRows,
@@ -116,6 +117,83 @@ export class PickingListModel {
       })),
       total,
     };
+  }
+
+  private async listOrderRows(params: {
+    where: Prisma.OrderWhereInput;
+    storeIds: string[];
+    searchTokens: string[];
+    printStatuses: string[];
+    filterByPacking: boolean;
+    orderedAtFrom?: Date;
+    orderedAtTo?: Date;
+    page: number;
+    pageSize: number;
+  }) {
+    const include = pickingOrderInclude();
+
+    if (params.searchTokens.length > 0 && !params.filterByPacking) {
+      const searchPage = await getRankedPickingOrderSearchPage({
+        tokens: params.searchTokens,
+        storeIds: params.storeIds,
+        printStatuses: params.printStatuses,
+        orderedAtFrom: params.orderedAtFrom,
+        orderedAtTo: params.orderedAtTo,
+        page: params.page,
+        pageSize: params.pageSize,
+      });
+      const rows = searchPage.ids.length > 0
+        ? await prisma.order.findMany({
+          where: { id: { in: searchPage.ids } },
+          include,
+        })
+        : [];
+      const idOrder = new Map(searchPage.ids.map((id, index) => [id, index]));
+      rows.sort((a, b) => (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0));
+      return { rows, total: searchPage.total };
+    }
+
+    if (!params.filterByPacking) {
+      const [total, rows] = await Promise.all([
+        prisma.order.count({ where: params.where }),
+        prisma.order.findMany({
+          where: params.where,
+          include,
+          orderBy: { orderedAt: 'desc' },
+          skip: (params.page - 1) * params.pageSize,
+          take: params.pageSize,
+        }),
+      ]);
+      return { rows, total };
+    }
+
+    if (params.searchTokens.length > 0) {
+      const searchPage = await getRankedPickingOrderSearchPage({
+        tokens: params.searchTokens,
+        storeIds: params.storeIds,
+        printStatuses: params.printStatuses,
+        orderedAtFrom: params.orderedAtFrom,
+        orderedAtTo: params.orderedAtTo,
+        page: 1,
+        pageSize: 10000,
+      });
+      const rows = searchPage.ids.length > 0
+        ? await prisma.order.findMany({
+          where: { id: { in: searchPage.ids } },
+          include,
+        })
+        : [];
+      const idOrder = new Map(searchPage.ids.map((id, index) => [id, index]));
+      rows.sort((a, b) => (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0));
+      return { rows, total: searchPage.total };
+    }
+
+    const rows = await prisma.order.findMany({
+      where: params.where,
+      include,
+      orderBy: { orderedAt: 'desc' },
+    });
+    return { rows, total: rows.length };
   }
 
   async listRecipients() {
@@ -281,15 +359,7 @@ export class PickingListModel {
   }
 
   private async attachMetadata<T extends { storeId: string; items: Array<OrderItem & { metadata: PickingMetadata }> }>(rows: T[]) {
-    const metadataWhere = rows.flatMap((row) => row.items.flatMap((item) => [
-      item.variantId ? { storeId: row.storeId, variantId: item.variantId } : null,
-      item.productId ? { storeId: row.storeId, productId: item.productId } : null,
-      item.sku ? { storeId: row.storeId, sku: item.sku } : null,
-    ].filter(Boolean) as Prisma.OrderItemPickingMetadataWhereInput[]));
-
-    const metadataRows = await prisma.orderItemPickingMetadata.findMany({
-      where: metadataWhere.length > 0 ? { OR: metadataWhere } : { id: '__none__' },
-    });
+    const metadataRows = await loadPickingMetadataRows(rows);
 
     return rows.map((row) => ({
       ...row,
@@ -308,7 +378,9 @@ function buildOrderWhere(params: {
   period?: 'all' | 'week' | 'month' | 'year';
   dateFrom?: string;
   dateTo?: string;
+  printStatuses?: string[];
 }) {
+  const printStatusConditions = buildPrintStatusWhereConditions(params.printStatuses ?? []);
   const where: Prisma.OrderWhereInput = {
     store: {
       is: {
@@ -316,6 +388,7 @@ function buildOrderWhere(params: {
         ...(params.storeIds && params.storeIds.length > 0 ? { id: { in: params.storeIds } } : {}),
       },
     },
+    ...(printStatusConditions.length > 0 ? { AND: [{ OR: printStatusConditions }] } : {}),
   };
 
   if (params.dateFrom || params.dateTo) {
@@ -329,6 +402,230 @@ function buildOrderWhere(params: {
   }
 
   return where;
+}
+
+function getOrderedAtBounds(params: {
+  period?: 'all' | 'week' | 'month' | 'year';
+  dateFrom?: string;
+  dateTo?: string;
+}) {
+  if (params.dateFrom || params.dateTo) {
+    return {
+      from: params.dateFrom ? new Date(`${params.dateFrom}T00:00:00.000Z`) : undefined,
+      to: params.dateTo ? new Date(`${params.dateTo}T23:59:59.999Z`) : undefined,
+    };
+  }
+
+  return { from: getPeriodStartDate(params.period ?? 'all') ?? undefined, to: undefined };
+}
+
+function pickingOrderInclude() {
+  return {
+    store: { select: { id: true, name: true, storeDomain: true } },
+    packingConfirmations: { orderBy: { confirmedAt: 'desc' as const } },
+    pickingSlipPrints: { orderBy: { printedAt: 'desc' as const }, take: 1 },
+    _count: { select: { notes: true, messages: true } },
+  } satisfies Prisma.OrderInclude;
+}
+
+function buildPrintStatusWhereConditions(printStatuses: string[]) {
+  const statuses = new Set(printStatuses);
+  const conditions: Prisma.OrderWhereInput[] = [];
+  if (statuses.has('printed')) conditions.push({ pickingSlipPrints: { some: {} } });
+  if (statuses.has('not_printed')) conditions.push({ pickingSlipPrints: { none: {} } });
+  return conditions.length === 2 ? [] : conditions;
+}
+
+async function loadPickingMetadataRows(rows: Array<{ storeId: string; items: OrderItem[] }>) {
+  const storeIds = new Set<string>();
+  const productIds = new Set<string>();
+  const variantIds = new Set<string>();
+  const skus = new Set<string>();
+
+  for (const row of rows) {
+    storeIds.add(row.storeId);
+    for (const item of row.items) {
+      if (item.productId) productIds.add(item.productId);
+      if (item.variantId) variantIds.add(item.variantId);
+      if (item.sku) skus.add(item.sku);
+    }
+  }
+
+  if (
+    storeIds.size === 0 ||
+    (productIds.size === 0 && variantIds.size === 0 && skus.size === 0)
+  ) {
+    return [];
+  }
+
+  const identifierConditions: Prisma.OrderItemPickingMetadataWhereInput[] = [];
+  if (variantIds.size > 0) identifierConditions.push({ variantId: { in: [...variantIds] } });
+  if (productIds.size > 0) identifierConditions.push({ productId: { in: [...productIds] } });
+  if (skus.size > 0) identifierConditions.push({ sku: { in: [...skus] } });
+
+  return prisma.orderItemPickingMetadata.findMany({
+    where: {
+      storeId: { in: [...storeIds] },
+      OR: identifierConditions,
+    },
+  });
+}
+
+async function getRankedPickingOrderSearchPage(params: {
+  tokens: string[];
+  storeIds: string[];
+  printStatuses: string[];
+  orderedAtFrom?: Date;
+  orderedAtTo?: Date;
+  page: number;
+  pageSize: number;
+}) {
+  const whereSql = buildRankedPickingOrderSearchWhereSql(params);
+  const rankSql = buildPickingOrderSearchRankSql(params.tokens);
+  const skip = (params.page - 1) * params.pageSize;
+  const rows = await prisma.$queryRaw<{ total: number; ids: string[] }[]>(Prisma.sql`
+    WITH filtered AS (
+      SELECT
+        o.id,
+        o."orderedAt",
+        o."createdAt",
+        ${rankSql} AS "searchRank"
+      FROM "Order" o
+      INNER JOIN "Store" s ON s.id = o."storeId"
+      WHERE ${whereSql}
+    ),
+    paged AS (
+      SELECT id, "searchRank", "orderedAt", "createdAt"
+      FROM filtered
+      ORDER BY "searchRank" ASC, "orderedAt" DESC NULLS LAST, "createdAt" DESC, id ASC
+      OFFSET ${skip}
+      LIMIT ${params.pageSize}
+    )
+    SELECT
+      (SELECT COUNT(*)::integer FROM filtered) AS total,
+      COALESCE(
+        array_agg(paged.id ORDER BY paged."searchRank" ASC, paged."orderedAt" DESC NULLS LAST, paged."createdAt" DESC, paged.id ASC)
+          FILTER (WHERE paged.id IS NOT NULL),
+        ARRAY[]::text[]
+      ) AS ids
+    FROM paged
+  `);
+
+  const row = rows[0];
+  return {
+    total: row?.total ?? 0,
+    ids: row?.ids ?? [],
+  };
+}
+
+function buildRankedPickingOrderSearchWhereSql(params: {
+  tokens: string[];
+  storeIds: string[];
+  printStatuses: string[];
+  orderedAtFrom?: Date;
+  orderedAtTo?: Date;
+}) {
+  const whereParts: Prisma.Sql[] = [Prisma.sql`s.status = 'connected'`];
+
+  if (params.storeIds.length > 0) {
+    whereParts.push(Prisma.sql`s.id IN (${Prisma.join(params.storeIds)})`);
+  }
+
+  if (params.orderedAtFrom) {
+    whereParts.push(Prisma.sql`o."orderedAt" >= ${params.orderedAtFrom}`);
+  }
+
+  if (params.orderedAtTo) {
+    whereParts.push(Prisma.sql`o."orderedAt" <= ${params.orderedAtTo}`);
+  }
+
+  const printStatusSql = buildPrintStatusFilterSql(params.printStatuses);
+  if (printStatusSql) {
+    whereParts.push(printStatusSql);
+  }
+
+  whereParts.push(buildPickingTokenSearchSql(params.tokens));
+
+  return Prisma.join(whereParts, ' AND ');
+}
+
+function buildPickingTokenSearchSql(tokens: string[]) {
+  const tokenConditions = tokens.map((token) => {
+    const conditions: Prisma.Sql[] = [
+      ilikeContains(Prisma.sql`o."number"`, token),
+      ilikeContains(Prisma.sql`o."cusName"`, token),
+      ilikeContains(Prisma.sql`o."cusEmail"`, token),
+      ilikeContains(Prisma.sql`o."boarcode"`, token),
+      ilikeContains(Prisma.sql`o."address"`, token),
+      ilikeContains(Prisma.sql`o."address2"`, token),
+      ilikeContains(Prisma.sql`o."city"`, token),
+      ilikeContains(Prisma.sql`o."state"`, token),
+      ilikeContains(Prisma.sql`o."zip"`, token),
+      ilikeContains(Prisma.sql`o."country"`, token),
+      ilikeContains(Prisma.sql`s.name`, token),
+      ilikeContains(Prisma.sql`s."storeDomain"`, token),
+      ilikeContains(Prisma.sql`o."lineItems"::text`, token),
+    ];
+
+    return Prisma.sql`(${Prisma.join(conditions, ' OR ')})`;
+  });
+
+  return Prisma.sql`(${Prisma.join(tokenConditions, ' AND ')})`;
+}
+
+function buildPickingOrderSearchRankSql(tokens: string[]) {
+  const terms = uniqueSearchTerms(tokens);
+  return Prisma.sql`CASE
+    WHEN ${anyTerm(terms, (term) => Prisma.sql`o."number" = ${term}`)} THEN 0
+    WHEN ${anyTerm(terms, (term) => ilikeStartsWith(Prisma.sql`o."number"`, term))} THEN 1
+    WHEN ${anyTerm(terms, (term) => ilikeExact(Prisma.sql`o."boarcode"`, term))} THEN 2
+    WHEN ${anyTerm(terms, (term) => ilikeStartsWith(Prisma.sql`o."boarcode"`, term))} THEN 3
+    WHEN ${anyTerm(terms, (term) => ilikeContains(Prisma.sql`o."number"`, term))} THEN 4
+    WHEN ${anyTerm(terms, (term) => ilikeContains(Prisma.sql`o."boarcode"`, term))} THEN 5
+    WHEN ${anyTerm(terms, (term) => Prisma.sql`(${ilikeExact(Prisma.sql`o."cusName"`, term)} OR ${ilikeExact(Prisma.sql`o."cusEmail"`, term)})`)} THEN 6
+    WHEN ${anyTerm(terms, (term) => Prisma.sql`(${ilikeStartsWith(Prisma.sql`o."cusName"`, term)} OR ${ilikeStartsWith(Prisma.sql`o."cusEmail"`, term)})`)} THEN 7
+    WHEN ${anyTerm(terms, (term) => Prisma.sql`(${ilikeContains(Prisma.sql`o."cusName"`, term)} OR ${ilikeContains(Prisma.sql`o."cusEmail"`, term)})`)} THEN 8
+    WHEN ${anyTerm(terms, (term) => Prisma.sql`(${ilikeStartsWith(Prisma.sql`s.name`, term)} OR ${ilikeStartsWith(Prisma.sql`s."storeDomain"`, term)})`)} THEN 9
+    WHEN ${anyTerm(terms, (term) => Prisma.sql`(${ilikeContains(Prisma.sql`s.name`, term)} OR ${ilikeContains(Prisma.sql`s."storeDomain"`, term)})`)} THEN 10
+    WHEN ${anyTerm(terms, (term) => Prisma.sql`(
+      ${ilikeContains(Prisma.sql`o."address"`, term)}
+      OR ${ilikeContains(Prisma.sql`o."address2"`, term)}
+      OR ${ilikeContains(Prisma.sql`o."city"`, term)}
+      OR ${ilikeContains(Prisma.sql`o."state"`, term)}
+      OR ${ilikeContains(Prisma.sql`o."country"`, term)}
+    )`)} THEN 11
+    WHEN ${anyTerm(terms, (term) => ilikeContains(Prisma.sql`o."lineItems"::text`, term))} THEN 12
+    ELSE 20
+  END`;
+}
+
+function buildPrintStatusFilterSql(printStatuses: string[]) {
+  const statuses = new Set(printStatuses);
+  const conditions: Prisma.Sql[] = [];
+  if (statuses.has('printed')) conditions.push(Prisma.sql`EXISTS (SELECT 1 FROM "OrderPickingSlipPrint" p WHERE p."orderId" = o.id)`);
+  if (statuses.has('not_printed')) conditions.push(Prisma.sql`NOT EXISTS (SELECT 1 FROM "OrderPickingSlipPrint" p WHERE p."orderId" = o.id)`);
+  return conditions.length === 0 || conditions.length === 2 ? null : Prisma.sql`(${Prisma.join(conditions, ' OR ')})`;
+}
+
+function anyTerm(terms: string[], build: (term: string) => Prisma.Sql) {
+  return Prisma.sql`(${Prisma.join(terms.map(build), ' OR ')})`;
+}
+
+function ilikeExact(field: Prisma.Sql, value: string) {
+  return Prisma.sql`LOWER(COALESCE(${field}, '')) = LOWER(${value})`;
+}
+
+function ilikeStartsWith(field: Prisma.Sql, value: string) {
+  return Prisma.sql`COALESCE(${field}, '') ILIKE ${buildLikePattern(value, 'startsWith')} ESCAPE '\\'`;
+}
+
+function ilikeContains(field: Prisma.Sql, value: string) {
+  return Prisma.sql`COALESCE(${field}, '') ILIKE ${buildLikePattern(value, 'contains')} ESCAPE '\\'`;
+}
+
+function buildLikePattern(value: string, mode: 'startsWith' | 'contains') {
+  const escaped = value.replace(/[\\%_]/g, (char) => `\\${char}`);
+  return mode === 'startsWith' ? `${escaped}%` : `%${escaped}%`;
 }
 
 function toPickingOrderRow(order: {
@@ -585,68 +882,6 @@ function findBestMetadata(storeId: string, item: OrderItem, rows: Array<{
     remark: match?.remark ?? '',
     note: match?.note ?? '',
   };
-}
-
-function matchesSearch(row: ReturnType<typeof toPickingOrderRow>, tokens: string[]) {
-  const haystack = [
-    row.number,
-    row.barcode,
-    row.customer,
-    row.customerEmail,
-    row.address,
-    row.address2,
-    row.city,
-    row.state,
-    row.zip,
-    row.country,
-    row.storeName,
-    row.storeDomain,
-    row.packingStatus.replaceAll('_', ' '),
-    row.printed ? 'printed slip printed' : 'not printed slip not printed',
-    JSON.stringify(row.items),
-  ].join(' ').toLowerCase();
-  return tokens.every((token) => haystack.includes(token.toLowerCase()));
-}
-
-function comparePickingSearchRows(
-  a: ReturnType<typeof toPickingOrderRow>,
-  b: ReturnType<typeof toPickingOrderRow>,
-  tokens: string[]
-) {
-  if (tokens.length === 0) {
-    return compareOrderDatesDesc(a, b);
-  }
-
-  const rankDiff = getPickingSearchRank(a, tokens) - getPickingSearchRank(b, tokens);
-  if (rankDiff !== 0) return rankDiff;
-  return compareOrderDatesDesc(a, b);
-}
-
-function compareOrderDatesDesc(a: ReturnType<typeof toPickingOrderRow>, b: ReturnType<typeof toPickingOrderRow>) {
-  return new Date(b.orderedAt || 0).getTime() - new Date(a.orderedAt || 0).getTime();
-}
-
-function getPickingSearchRank(row: ReturnType<typeof toPickingOrderRow>, tokens: string[]) {
-  const terms = uniqueSearchTerms(tokens);
-  const orderNumber = row.number.toLowerCase();
-  const barcode = (row.barcode ?? '').toLowerCase();
-  const customer = `${row.customer} ${row.customerEmail ?? ''}`.toLowerCase();
-  const store = `${row.storeName} ${row.storeDomain}`.toLowerCase();
-  const address = [row.address, row.address2, row.city, row.state, row.country].join(' ').toLowerCase();
-  const lineItems = JSON.stringify(row.items).toLowerCase();
-
-  if (terms.some((term) => orderNumber === term)) return 0;
-  if (terms.some((term) => orderNumber.startsWith(term))) return 1;
-  if (terms.some((term) => barcode && barcode === term)) return 2;
-  if (terms.some((term) => barcode && barcode.startsWith(term))) return 3;
-  if (terms.some((term) => orderNumber.includes(term))) return 4;
-  if (terms.some((term) => barcode && barcode.includes(term))) return 5;
-  if (terms.some((term) => customer.split(/\s+/).includes(term))) return 6;
-  if (terms.some((term) => customer.includes(term))) return 8;
-  if (terms.some((term) => store.includes(term))) return 10;
-  if (terms.some((term) => address.includes(term))) return 11;
-  if (terms.some((term) => lineItems.includes(term))) return 12;
-  return 20;
 }
 
 function uniqueSearchTerms(tokens: string[]) {

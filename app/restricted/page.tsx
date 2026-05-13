@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import { isStaffLikeRole } from "@/lib/roles";
+import { isOrderPickerRole, isRestrictedSessionRole } from "@/lib/roles";
 
 type StaffAccessInfo = {
   allowed: boolean;
@@ -48,13 +48,13 @@ export default function RestrictedPage() {
       return;
     }
 
-    if (status === "authenticated" && !isStaffLikeRole(role)) {
+    if (status === "authenticated" && !isRestrictedSessionRole(role)) {
       router.push("/orders");
     }
   }, [role, router, status]);
 
   useEffect(() => {
-    if (status !== "authenticated" || !isStaffLikeRole(role)) return;
+    if (status !== "authenticated" || !isRestrictedSessionRole(role)) return;
     let cancelled = false;
 
     async function loadPolicy() {
@@ -64,7 +64,7 @@ export default function RestrictedPage() {
       if (!cancelled) {
         setStaffAccess(json.data.staffAccess);
         if (json.data.staffAccess?.allowed) {
-          router.push("/orders");
+          router.push(isOrderPickerRole(role) ? "/picking-list" : "/orders");
         }
       }
     }

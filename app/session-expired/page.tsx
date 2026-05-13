@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import { isStaffLikeRole } from "@/lib/roles";
+import { isRestrictedSessionRole } from "@/lib/roles";
 
 export default function SessionExpiredPage() {
   const router = useRouter();
@@ -24,7 +24,7 @@ export default function SessionExpiredPage() {
       return;
     }
 
-    if (status === "authenticated" && !isStaffLikeRole(session.user.role)) {
+    if (status === "authenticated" && !isRestrictedSessionRole(session.user.role)) {
       router.push("/orders");
     }
   }, [router, session?.user.role, status]);
