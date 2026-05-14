@@ -72,12 +72,19 @@ export class PickingListModel {
     printStatuses?: string[];
     page: number;
     pageSize: number;
+    allowedStoreIds?: string[] | null;
   }) {
     const where = buildOrderWhere(params);
     const orderedAtBounds = getOrderedAtBounds(params);
     const searchTokens = (params.search?.trim() ?? '').split(/\s+/).filter(Boolean);
     const packedStatuses = new Set(params.packedStatuses ?? []);
     const filterByPacking = packedStatuses.size > 0;
+    
+    const storeWhere: Prisma.StoreWhereInput = { status: 'connected' };
+    if (params.allowedStoreIds !== null && params.allowedStoreIds !== undefined) {
+      storeWhere.id = { in: params.allowedStoreIds };
+    }
+
     const [ordersResult, stores] = await Promise.all([
       this.listOrderRows({
         where,
@@ -91,7 +98,7 @@ export class PickingListModel {
         pageSize: params.pageSize,
       }),
       prisma.store.findMany({
-        where: { status: 'connected' },
+        where: storeWhere,
         select: { id: true, name: true, storeDomain: true },
         orderBy: [{ name: 'asc' }, { storeDomain: 'asc' }],
       }),

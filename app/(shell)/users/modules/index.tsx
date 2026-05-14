@@ -24,6 +24,13 @@ type UserRestrictions = {
   staffAccessEnd: string;
   sessionTimeoutMinutes: number;
   inactivityTimeoutMinutes: number | null;
+  allowedStoreIds: string[];
+};
+
+type StoreOption = {
+  id: string;
+  name: string;
+  storeDomain: string;
 };
 
 export default function UsersPage() {
@@ -45,6 +52,7 @@ export default function UsersPage() {
   const [restrictionsSaving, setRestrictionsSaving] = useState(false);
   const [restrictionsError, setRestrictionsError] = useState("");
   const [timezone, setTimezone] = useState("Australia/Sydney");
+  const [availableStores, setAvailableStores] = useState<StoreOption[]>([]);
 
   const editing = editingId !== null;
   const formTitle = editing ? "Edit User" : "Add New User";
@@ -213,12 +221,14 @@ export default function UsersPage() {
     setRestrictionsError("");
     setRestrictionsLoading(true);
     try {
-      const [restrictions, settings] = await Promise.all([
+      const [restrictions, settings, stores] = await Promise.all([
         getJson<UserRestrictions>(`/api/users/${userId}/restrictions`),
         getJson<{ timezone: string }>(`/api/settings`),
+        getJson<StoreOption[]>(`/api/stores`),
       ]);
       setRestrictions(restrictions);
       setTimezone(settings.timezone);
+      setAvailableStores(stores);
     } catch (error) {
       setRestrictionsError(error instanceof Error ? error.message : "Failed to load restrictions");
     } finally {
@@ -531,6 +541,36 @@ export default function UsersPage() {
                       placeholder="Disabled"
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-2">Allowed Stores</label>
+                    <div className="flex flex-wrap gap-2">
+                      {availableStores.length === 0 ? (
+                        <p className="text-xs text-gray-500">No stores available</p>
+                      ) : (
+                        availableStores.map((store) => {
+                          const isSelected = restrictions.allowedStoreIds.includes(store.id);
+                          return (
+                            <button
+                              key={store.id}
+                              onClick={() => {
+                                setRestrictions((prev) => {
+                                  if (!prev) return prev;
+                                  const storeIds = new Set(prev.allowedStoreIds);
+                                  if (storeIds.has(store.id)) storeIds.delete(store.id);
+                                  else storeIds.add(store.id);
+                                  return { ...prev, allowedStoreIds: Array.from(storeIds) };
+                                });
+                              }}
+                              className={`px-3 py-1.5 rounded-full text-xs font-medium border ${isSelected ? "bg-blue-600 text-white border-blue-600" : "bg-gray-100 text-gray-500 border-gray-200"}`}
+                            >
+                              {store.name || store.storeDomain}
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
                   </div>
                 </div>
               )}

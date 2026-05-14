@@ -93,6 +93,7 @@ export class UserController {
         staffAccessEnd: true,
         sessionTimeoutMinutes: true,
         inactivityTimeoutMinutes: true,
+        allowedStoreIds: true,
       },
     });
 
@@ -111,6 +112,7 @@ export class UserController {
         staffAccessEnd: user.staffAccessEnd,
         sessionTimeoutMinutes: user.sessionTimeoutMinutes,
         inactivityTimeoutMinutes: user.inactivityTimeoutMinutes,
+        allowedStoreIds: normalizeStoreIds(user.allowedStoreIds),
       },
     };
   }
@@ -153,6 +155,9 @@ export class UserController {
       const val = data.inactivityTimeoutMinutes;
       updateData.inactivityTimeoutMinutes = val === null ? null : Number(val) || null;
     }
+    if ('allowedStoreIds' in data) {
+      updateData.allowedStoreIds = Array.isArray(data.allowedStoreIds) ? data.allowedStoreIds : [];
+    }
 
     try {
       const updated = await prisma.user.update({
@@ -167,6 +172,7 @@ export class UserController {
           staffAccessEnd: updated.staffAccessEnd,
           sessionTimeoutMinutes: updated.sessionTimeoutMinutes,
           inactivityTimeoutMinutes: updated.inactivityTimeoutMinutes,
+          allowedStoreIds: normalizeStoreIds(updated.allowedStoreIds),
         },
         message: 'Restrictions updated successfully',
       };
@@ -268,10 +274,23 @@ function validateRestrictions(data: Record<string, unknown>) {
     }
   }
 
+  if ('allowedStoreIds' in data) {
+    if (!Array.isArray(data.allowedStoreIds)) {
+      errors.push('allowedStoreIds: Must be an array');
+    } else if (!data.allowedStoreIds.every((id) => typeof id === 'string')) {
+      errors.push('allowedStoreIds: All store IDs must be strings');
+    }
+  }
+
   return errors;
 }
 
 function normalizeDays(value: unknown) {
   if (!Array.isArray(value)) return ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
   return value.filter((day): day is string => typeof day === 'string');
+}
+
+function normalizeStoreIds(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value.filter((id): id is string => typeof id === 'string');
 }

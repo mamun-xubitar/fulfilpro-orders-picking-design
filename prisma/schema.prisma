@@ -27,6 +27,7 @@ model User {
   staffAccessEnd   String   @default("16:00")
   sessionTimeoutMinutes Int  @default(30)
   inactivityTimeoutMinutes Int?
+  allowedStoreIds Json     @default("[]")
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   staffLoginApprovals StaffLoginApproval[]

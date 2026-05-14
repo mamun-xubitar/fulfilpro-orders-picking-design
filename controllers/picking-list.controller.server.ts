@@ -9,16 +9,47 @@ type Actor = {
 } | null;
 
 export class PickingListController {
-  async list(searchParams: URLSearchParams) {
+  async list(searchParams: URLSearchParams, allowedStoreIds?: string[] | null) {
     const page = normalizePositiveInt(searchParams.get('page'), 1);
     const pageSize = clamp(normalizePositiveInt(searchParams.get('pageSize'), 20), 5, 100);
     const search = searchParams.get('search')?.trim() ?? '';
-    const storeIds = searchParams.getAll('storeId').map((value) => value.trim()).filter(Boolean);
+    let storeIds = searchParams.getAll('storeId').map((value) => value.trim()).filter(Boolean);
     const period = normalizePeriod(searchParams.get('period'));
     const dateFrom = searchParams.get('dateFrom')?.trim() ?? '';
     const dateTo = searchParams.get('dateTo')?.trim() ?? '';
     const packedStatuses = searchParams.getAll('packedStatus').map((value) => value.trim()).filter(Boolean);
     const printStatuses = searchParams.getAll('printStatus').map((value) => value.trim()).filter(Boolean);
+
+    if (allowedStoreIds !== null && allowedStoreIds !== undefined) {
+      if (allowedStoreIds.length === 0) {
+        return {
+          data: {
+            orders: [],
+            filters: {
+              search,
+              storeIds,
+              period,
+              dateFrom,
+              dateTo,
+              packedStatuses,
+              printStatuses,
+            },
+            stores: [],
+            recipients: await model.listRecipients(),
+            pagination: {
+              page,
+              pageSize,
+              total: 0,
+              totalPages: 1,
+              hasPrev: false,
+              hasNext: false,
+            },
+          },
+        };
+      }
+      storeIds = storeIds.length > 0 ? storeIds.filter((id) => allowedStoreIds.includes(id)) : allowedStoreIds;
+    }
+
     const result = await model.list({
       search,
       storeIds,
@@ -29,6 +60,7 @@ export class PickingListController {
       printStatuses,
       page,
       pageSize,
+      allowedStoreIds,
     });
     const totalPages = Math.max(1, Math.ceil(result.total / pageSize));
 

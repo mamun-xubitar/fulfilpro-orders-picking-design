@@ -5,9 +5,9 @@ const model = new OrderModel();
 type Period = 'all' | 'week' | 'month' | 'year';
 
 export class OrderController {
-  async list(searchParams: URLSearchParams, viewerId?: string) {
+  async list(searchParams: URLSearchParams, viewerId?: string, allowedStoreIds?: string[] | null) {
     const search = searchParams.get('search')?.trim() ?? '';
-    const storeIds = searchParams.getAll('storeId').map((s) => s.trim()).filter(Boolean);
+    let storeIds = searchParams.getAll('storeId').map((s) => s.trim()).filter(Boolean);
     const period = normalizePeriod(searchParams.get('period'));
     const dateFrom = searchParams.get('dateFrom')?.trim() ?? '';
     const dateTo = searchParams.get('dateTo')?.trim() ?? '';
@@ -15,6 +15,35 @@ export class OrderController {
     const packingStatuses = searchParams.getAll('packingStatus').map((s) => s.trim()).filter(Boolean);
     const page = normalizePositiveInt(searchParams.get('page'), 1);
     const pageSize = clamp(normalizePositiveInt(searchParams.get('pageSize'), 20), 5, 100);
+
+    if (allowedStoreIds !== null && allowedStoreIds !== undefined) {
+      if (allowedStoreIds.length === 0) {
+        return {
+          data: {
+            orders: [],
+            filters: {
+              search,
+              storeIds,
+              period,
+              dateFrom,
+              dateTo,
+              fulfillmentStatuses,
+              packingStatuses,
+            },
+            stores: [],
+            pagination: {
+              page,
+              pageSize,
+              total: 0,
+              totalPages: 1,
+              hasPrev: false,
+              hasNext: false,
+            },
+          },
+        };
+      }
+      storeIds = storeIds.length > 0 ? storeIds.filter((id) => allowedStoreIds.includes(id)) : allowedStoreIds;
+    }
 
     const [result, stores] = await Promise.all([
       model.listForConnectedStores({
@@ -29,7 +58,7 @@ export class OrderController {
         page,
         pageSize,
       }),
-      model.getConnectedStoreOptions(),
+      model.getConnectedStoreOptions(allowedStoreIds),
     ]);
 
     const totalPages = Math.max(1, Math.ceil(result.total / pageSize));

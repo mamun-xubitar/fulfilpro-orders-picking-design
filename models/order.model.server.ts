@@ -352,9 +352,14 @@ export class OrderModel {
     return { total, orders };
   }
 
-  async getConnectedStoreOptions() {
+  async getConnectedStoreOptions(allowedStoreIds?: string[] | null) {
+    const where: Prisma.StoreWhereInput = { status: 'connected' };
+    if (allowedStoreIds !== null && allowedStoreIds !== undefined) {
+      where.id = { in: allowedStoreIds };
+    }
+
     const stores = await prisma.store.findMany({
-      where: { status: 'connected' },
+      where,
       select: {
         id: true,
         name: true,
