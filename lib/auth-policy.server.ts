@@ -67,8 +67,26 @@ export function evaluateStaffAccess(policy: AuthPolicy, now = new Date()) {
   const minutes = zoned.hours() * 60 + zoned.minutes();
   const start = parseTime(policy.staffAccessStart);
   const end = parseTime(policy.staffAccessEnd);
-  const allowedDay = policy.staffAccessDays.includes(day);
-  const allowedTime = minutes >= start && minutes < end;
+
+  let allowedTime: boolean;
+  let allowedDay = policy.staffAccessDays.includes(day);
+
+  if (end > start) {
+    // Normal window: e.g., 08:00–16:00
+    allowedTime = minutes >= start && minutes < end;
+  } else {
+    // Overnight window: e.g., 20:00–13:00 (wraps around midnight)
+    allowedTime = minutes >= start || minutes < end;
+    // if (minutes >= start) {
+    //   // In the first part (today's portion): check today's day
+    // } else {
+    //   // In the second part (yesterday's portion): check yesterday's day
+    //   const yesterday = moment(zoned).subtract(1, 'day');
+    //   const yesterdayLabel = DAY_LABELS[yesterday.day()];
+    //   allowedDay = policy.staffAccessDays.includes(yesterdayLabel);
+    // }
+  }
+
   return {
     allowed: allowedDay && allowedTime,
     allowedDay,

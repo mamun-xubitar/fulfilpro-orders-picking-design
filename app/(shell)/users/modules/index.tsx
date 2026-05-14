@@ -44,6 +44,7 @@ export default function UsersPage() {
   const [restrictionsLoading, setRestrictionsLoading] = useState(false);
   const [restrictionsSaving, setRestrictionsSaving] = useState(false);
   const [restrictionsError, setRestrictionsError] = useState("");
+  const [timezone, setTimezone] = useState("Australia/Sydney");
 
   const editing = editingId !== null;
   const formTitle = editing ? "Edit User" : "Add New User";
@@ -212,8 +213,12 @@ export default function UsersPage() {
     setRestrictionsError("");
     setRestrictionsLoading(true);
     try {
-      const data = await getJson<UserRestrictions>(`/api/users/${userId}/restrictions`);
-      setRestrictions(data);
+      const [restrictions, settings] = await Promise.all([
+        getJson<UserRestrictions>(`/api/users/${userId}/restrictions`),
+        getJson<{ timezone: string }>(`/api/settings`),
+      ]);
+      setRestrictions(restrictions);
+      setTimezone(settings.timezone);
     } catch (error) {
       setRestrictionsError(error instanceof Error ? error.message : "Failed to load restrictions");
     } finally {
@@ -437,6 +442,7 @@ export default function UsersPage() {
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
             <div className="bg-white rounded-xl shadow-xl border border-gray-200 p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
               <h3 className="text-base font-semibold text-gray-900 mb-4">User Restrictions</h3>
+              <p className="text-xs text-gray-500 mb-4">Timezone: <span className="font-medium text-gray-700">{timezone}</span></p>
               
               {restrictionsError && (
                 <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-700 border border-red-200 text-sm">
@@ -494,6 +500,9 @@ export default function UsersPage() {
                       />
                     </div>
                   </div>
+                  <p className="text-xs text-gray-500">
+                    Tip: If end time is before start time (e.g., 20:00–13:00), the window wraps around midnight, allowing access from 20:00 to 23:59 and 00:00 to 13:00.
+                  </p>
 
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Session Timeout</label>

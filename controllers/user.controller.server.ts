@@ -253,13 +253,6 @@ function validateRestrictions(data: Record<string, unknown>) {
     }
   }
 
-  if ('staffAccessStart' in data && 'staffAccessEnd' in data) {
-    const start = normalizeString(data.staffAccessStart);
-    const end = normalizeString(data.staffAccessEnd);
-    if (start && end && end <= start) {
-      errors.push('staffAccessEnd: End time must be later than start time');
-    }
-  }
 
   if ('sessionTimeoutMinutes' in data) {
     const val = Number(data.sessionTimeoutMinutes);
