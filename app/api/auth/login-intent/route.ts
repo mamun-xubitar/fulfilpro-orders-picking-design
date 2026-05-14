@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { apiError, apiSuccess } from '@/lib/api-response.server';
-import { evaluateStaffAccess, getAuthPolicy } from '@/lib/auth-policy.server';
+import { evaluateStaffAccess, getUserAuthPolicy } from '@/lib/auth-policy.server';
 import { verifyPassword } from '@/lib/password';
 import { createStaffLoginApproval } from '@/lib/staff-login-approval.server';
 import { isRestrictedSessionRole } from '@/lib/roles';
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     return apiSuccess({ message: 'Login can continue', data: { mode: 'direct' as const } });
   }
 
-  const policy = await getAuthPolicy();
+  const policy = await getUserAuthPolicy(user.id);
   const access = evaluateStaffAccess(policy);
 
   if (!access.allowed) {

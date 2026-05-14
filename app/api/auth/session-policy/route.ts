@@ -1,6 +1,6 @@
 import { auth } from '@/auth';
 import { apiError, apiSuccess } from '@/lib/api-response.server';
-import { evaluateStaffAccess, getAuthPolicy } from '@/lib/auth-policy.server';
+import { evaluateStaffAccess, getUserAuthPolicy } from '@/lib/auth-policy.server';
 import { isRestrictedSessionRole } from '@/lib/roles';
 import prisma from '@/lib/prisma.server';
 
@@ -28,16 +28,16 @@ export async function GET() {
     });
   }
 
-  const policy = await getAuthPolicy();
   const isRestrictedSession = isRestrictedSessionRole(session.user.role);
-  const staffAccess = isRestrictedSession ? evaluateStaffAccess(policy) : null;
+  const policy = isRestrictedSession ? await getUserAuthPolicy(session.user.id) : null;
+  const staffAccess = isRestrictedSession && policy ? evaluateStaffAccess(policy) : null;
 
   return apiSuccess({
     message: 'Session policy retrieved',
     data: {
       forceLogout: false,
-      sessionTimeoutMinutes: isRestrictedSession ? policy.sessionTimeoutMinutes : null,
-      inactivityTimeoutMinutes: isRestrictedSession ? policy.inactivityTimeoutMinutes : null,
+      sessionTimeoutMinutes: isRestrictedSession && policy ? policy.sessionTimeoutMinutes : null,
+      inactivityTimeoutMinutes: isRestrictedSession && policy ? policy.inactivityTimeoutMinutes : null,
       staffAccess,
     },
   });

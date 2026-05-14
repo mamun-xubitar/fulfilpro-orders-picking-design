@@ -26,11 +26,38 @@ export async function getAuthPolicy(): Promise<AuthPolicy> {
 
   return {
     timezone: settings?.timezone ?? DEFAULT_POLICY.timezone,
-    staffAccessDays: normalizeDays(settings?.staffAccessDays),
-    staffAccessStart: settings?.staffAccessStart ?? DEFAULT_POLICY.staffAccessStart,
-    staffAccessEnd: settings?.staffAccessEnd ?? DEFAULT_POLICY.staffAccessEnd,
-    sessionTimeoutMinutes: settings?.sessionTimeoutMinutes ?? DEFAULT_POLICY.sessionTimeoutMinutes,
-    inactivityTimeoutMinutes: settings?.inactivityTimeoutMinutes ?? null,
+    staffAccessDays: normalizeDays(DEFAULT_POLICY.staffAccessDays),
+    staffAccessStart: DEFAULT_POLICY.staffAccessStart,
+    staffAccessEnd: DEFAULT_POLICY.staffAccessEnd,
+    sessionTimeoutMinutes: DEFAULT_POLICY.sessionTimeoutMinutes,
+    inactivityTimeoutMinutes: null,
+  };
+}
+
+export async function getUserAuthPolicy(userId: string): Promise<AuthPolicy> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      staffAccessDays: true,
+      staffAccessStart: true,
+      staffAccessEnd: true,
+      sessionTimeoutMinutes: true,
+      inactivityTimeoutMinutes: true,
+    },
+  });
+  const settings = await prisma.appSettings.findUnique({ where: { id: 'default' } });
+
+  if (!user) {
+    return getAuthPolicy();
+  }
+
+  return {
+    timezone: settings?.timezone ?? DEFAULT_POLICY.timezone,
+    staffAccessDays: normalizeDays(user.staffAccessDays),
+    staffAccessStart: user.staffAccessStart ?? DEFAULT_POLICY.staffAccessStart,
+    staffAccessEnd: user.staffAccessEnd ?? DEFAULT_POLICY.staffAccessEnd,
+    sessionTimeoutMinutes: user.sessionTimeoutMinutes ?? DEFAULT_POLICY.sessionTimeoutMinutes,
+    inactivityTimeoutMinutes: user.inactivityTimeoutMinutes ?? null,
   };
 }
 

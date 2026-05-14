@@ -1,8 +1,9 @@
 import { auth } from '@/auth';
-import { evaluateStaffAccess, getAuthPolicy, getSessionExpiresAt } from '@/lib/auth-policy.server';
+import { evaluateStaffAccess, getUserAuthPolicy, getSessionExpiresAt } from '@/lib/auth-policy.server';
 import { isOrderPickerRole, isRestrictedSessionRole, isStaffLikeRole, isTestUserRole } from '@/lib/roles';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import prisma from '@/lib/prisma.server';
 
 export const config = {
   matcher: [
@@ -104,8 +105,14 @@ export const proxy = auth(async (request) => {
   const isTestUser = isTestUserRole(userRole);
 
   if (isLoggedIn && isRestrictedSession) {
-    const policy = await getAuthPolicy();
+    const userId = request.auth?.user?.id;
     const loginAt = request.auth?.user?.loginAt;
+
+    if (!userId) {
+      return NextResponse.redirect(new URL(LOGIN_ROUTE, request.url));
+    }
+
+    const policy = await getUserAuthPolicy(userId);
 
     if (!loginAt || getSessionExpiresAt(loginAt, policy.sessionTimeoutMinutes) <= Date.now()) {
       return expireStaffSession(request);

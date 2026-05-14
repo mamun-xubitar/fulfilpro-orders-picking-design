@@ -18,6 +18,14 @@ function genPwValue() {
   return Array.from({ length: 12 }, () => CHARS[Math.floor(Math.random() * CHARS.length)]).join("");
 }
 
+type UserRestrictions = {
+  staffAccessDays: string[];
+  staffAccessStart: string;
+  staffAccessEnd: string;
+  sessionTimeoutMinutes: number;
+  inactivityTimeoutMinutes: number | null;
+};
+
 export default function UsersPage() {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -31,6 +39,11 @@ export default function UsersPage() {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [restrictionsUserId, setRestrictionsUserId] = useState<string | null>(null);
+  const [restrictions, setRestrictions] = useState<UserRestrictions | null>(null);
+  const [restrictionsLoading, setRestrictionsLoading] = useState(false);
+  const [restrictionsSaving, setRestrictionsSaving] = useState(false);
+  const [restrictionsError, setRestrictionsError] = useState("");
 
   const editing = editingId !== null;
   const formTitle = editing ? "Edit User" : "Add New User";
@@ -193,6 +206,50 @@ export default function UsersPage() {
     return errors;
   }
 
+  async function openRestrictions(userId: string) {
+    setRestrictionsUserId(userId);
+    setRestrictions(null);
+    setRestrictionsError("");
+    setRestrictionsLoading(true);
+    try {
+      const data = await getJson<UserRestrictions>(`/api/users/${userId}/restrictions`);
+      setRestrictions(data);
+    } catch (error) {
+      setRestrictionsError(error instanceof Error ? error.message : "Failed to load restrictions");
+    } finally {
+      setRestrictionsLoading(false);
+    }
+  }
+
+  function closeRestrictions() {
+    setRestrictionsUserId(null);
+    setRestrictions(null);
+    setRestrictionsError("");
+  }
+
+  async function saveRestrictions() {
+    if (!restrictionsUserId || !restrictions) return;
+    setRestrictionsError("");
+    setRestrictionsSaving(true);
+    try {
+      const updated = await getJson<UserRestrictions>(`/api/users/${restrictionsUserId}/restrictions`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(restrictions),
+      });
+      setRestrictions(updated);
+      setTimeout(closeRestrictions, 1500);
+    } catch (error) {
+      setRestrictionsError(error instanceof Error ? error.message : "Failed to save restrictions");
+    } finally {
+      setRestrictionsSaving(false);
+    }
+  }
+
+  function isNonAdminRole(role: string) {
+    return role !== "admin";
+  }
+
   return (
     <main className="flex-1 p-4 md:p-6">
       <div className="flex flex-col gap-6">
@@ -301,6 +358,14 @@ export default function UsersPage() {
                     <td className="px-4 py-3">
                       <div className="flex gap-1">
                         <button onClick={() => editUser(user)} className="px-2.5 py-1 text-xs border border-blue-200 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors duration-150 cursor-pointer">Edit</button>
+                        {isNonAdminRole(user.role) && (
+                          <button
+                            onClick={() => openRestrictions(user.id)}
+                            className="px-2.5 py-1 text-xs border border-purple-200 text-purple-600 rounded-lg hover:bg-purple-50 transition-colors duration-150 cursor-pointer"
+                          >
+                            Restrictions
+                          </button>
+                        )}
                         <button
                           disabled={updatingId === user.id}
                           onClick={() => toggleActive(user)}
@@ -347,6 +412,134 @@ export default function UsersPage() {
                   className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   {deletingId === confirmDeleteId ? "Deleting..." : "Delete"}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {restrictionsUserId && restrictions && (() => {
+        const ALL_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+        const SESSION_TIMEOUT_OPTIONS = [
+          { value: 15, label: "15 min" },
+          { value: 30, label: "30 min" },
+          { value: 60, label: "1 hour" },
+          { value: 120, label: "2 hours" },
+          { value: 240, label: "4 hours" },
+          { value: 480, label: "8 hours" },
+          { value: 720, label: "12 hours" },
+          { value: 1440, label: "1 day" },
+          { value: 2880, label: "2 days" },
+          { value: 10080, label: "7 days" },
+        ];
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+            <div className="bg-white rounded-xl shadow-xl border border-gray-200 p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+              <h3 className="text-base font-semibold text-gray-900 mb-4">User Restrictions</h3>
+              
+              {restrictionsError && (
+                <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-700 border border-red-200 text-sm">
+                  {restrictionsError}
+                </div>
+              )}
+
+              {restrictionsLoading ? (
+                <div className="text-center py-8 text-gray-500">Loading restrictions...</div>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-2">Allowed Days</label>
+                    <div className="flex flex-wrap gap-2">
+                      {ALL_DAYS.map((day) => {
+                        const on = restrictions.staffAccessDays.includes(day);
+                        return (
+                          <button
+                            key={day}
+                            onClick={() => {
+                              setRestrictions((prev) => {
+                                if (!prev) return prev;
+                                const days = new Set(prev.staffAccessDays);
+                                if (days.has(day)) days.delete(day);
+                                else days.add(day);
+                                return { ...prev, staffAccessDays: Array.from(days) };
+                              });
+                            }}
+                            className={`px-3 py-1.5 rounded-full text-xs font-medium border ${on ? "bg-blue-600 text-white border-blue-600" : "bg-gray-100 text-gray-500 border-gray-200"}`}
+                          >
+                            {day}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Access Start Time</label>
+                      <input
+                        type="time"
+                        value={restrictions.staffAccessStart}
+                        onChange={(e) => setRestrictions((prev) => prev ? { ...prev, staffAccessStart: e.target.value } : prev)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Access End Time</label>
+                      <input
+                        type="time"
+                        value={restrictions.staffAccessEnd}
+                        onChange={(e) => setRestrictions((prev) => prev ? { ...prev, staffAccessEnd: e.target.value } : prev)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Session Timeout</label>
+                    <select
+                      value={restrictions.sessionTimeoutMinutes}
+                      onChange={(e) => setRestrictions((prev) => prev ? { ...prev, sessionTimeoutMinutes: Number(e.target.value) } : prev)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    >
+                      {SESSION_TIMEOUT_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Inactivity Timeout (minutes, or empty to disable)</label>
+                    <input
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={restrictions.inactivityTimeoutMinutes ?? ""}
+                      onChange={(e) => {
+                        const val = e.target.value ? Number(e.target.value) : null;
+                        setRestrictions((prev) => prev ? { ...prev, inactivityTimeoutMinutes: val } : prev);
+                      }}
+                      placeholder="Disabled"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-2 justify-end mt-6">
+                <button
+                  onClick={closeRestrictions}
+                  disabled={restrictionsSaving}
+                  className="px-4 py-2 text-sm border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => void saveRestrictions()}
+                  disabled={restrictionsSaving || restrictionsLoading}
+                  className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {restrictionsSaving ? "Saving..." : "Save"}
                 </button>
               </div>
             </div>

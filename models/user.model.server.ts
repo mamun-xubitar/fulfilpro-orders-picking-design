@@ -1,6 +1,6 @@
 import prisma from '@/lib/prisma.server';
 import { saltAndHashPassword } from '@/lib/password';
-import { evaluateStaffAccess, getAuthPolicy, getSessionExpiresAt } from '@/lib/auth-policy.server';
+import { evaluateStaffAccess, getUserAuthPolicy, getSessionExpiresAt } from '@/lib/auth-policy.server';
 import { isRestrictedSessionRole } from '@/lib/roles';
 
 type SessionStatus = 'logged_in' | 'logout' | 'access_restricted' | 'session_timeout';
@@ -44,11 +44,13 @@ export class UserModel {
     const users = await prisma.user.findMany({
       orderBy: { createdAt: 'desc' },
     });
-    const policy = await getAuthPolicy();
-    const staffAccess = evaluateStaffAccess(policy);
     const now = Date.now();
 
-    return users.map((user) => toUserRow(user, { policy, staffAccess, now }));
+    return Promise.all(users.map(async (user) => {
+      const policy = isRestrictedSessionRole(user.role) ? await getUserAuthPolicy(user.id) : null;
+      const staffAccess = policy ? evaluateStaffAccess(policy) : null;
+      return toUserRow(user, { policy, staffAccess, now });
+    }));
   }
 
   async findById(id: string) {
@@ -102,8 +104,8 @@ function toUserRow(user: {
   createdAt: Date;
   updatedAt: Date;
 }, context?: {
-  policy: Awaited<ReturnType<typeof getAuthPolicy>>;
-  staffAccess: ReturnType<typeof evaluateStaffAccess>;
+  policy: Awaited<ReturnType<typeof getUserAuthPolicy>> | null;
+  staffAccess: ReturnType<typeof evaluateStaffAccess> | null;
   now: number;
 }): UserRow {
   const sessionStatus = getSessionStatus(user, context);
@@ -131,15 +133,15 @@ function getSessionStatus(user: {
   isLoggedIn: boolean;
   lastLoginAt: Date | null;
 }, context?: {
-  policy: Awaited<ReturnType<typeof getAuthPolicy>>;
-  staffAccess: ReturnType<typeof evaluateStaffAccess>;
+  policy: Awaited<ReturnType<typeof getUserAuthPolicy>> | null;
+  staffAccess: ReturnType<typeof evaluateStaffAccess> | null;
   now: number;
 }): { status: SessionStatus; label: string; detail: string } {
   if (!user.isLoggedIn || !user.lastLoginAt) {
     return { status: 'logout', label: 'Logout', detail: 'User is logged out' };
   }
 
-  if (isRestrictedSessionRole(user.role) && context) {
+  if (isRestrictedSessionRole(user.role) && context && context.policy && context.staffAccess) {
     const loginAt = user.lastLoginAt.getTime();
     const expiresAt = getSessionExpiresAt(loginAt, context.policy.sessionTimeoutMinutes);
 

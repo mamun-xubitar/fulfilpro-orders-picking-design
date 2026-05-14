@@ -10,48 +10,9 @@ const TIMEZONES = [
   "Asia/Tokyo", "Asia/Singapore", "Asia/Dubai", "UTC",
 ];
 
-const ALL_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const DEFAULT_ON = new Set(["Mon", "Tue", "Wed", "Thu", "Fri"]);
-const SESSION_TIMEOUT_OPTIONS = [
-  { value: 15, label: "15 min" },
-  { value: 30, label: "30 min" },
-  { value: 60, label: "1 hour" },
-  { value: 120, label: "2 hours" },
-  { value: 240, label: "4 hours" },
-  { value: 480, label: "8 hours" },
-  { value: 720, label: "12 hours" },
-  { value: 1440, label: "1 day" },
-  { value: 2880, label: "2 days" },
-  { value: 10080, label: "7 days" },
-];
-
-const INACTIVITY_UNITS = [
-  { value: "minutes", label: "Minutes" },
-  { value: "hours", label: "Hours" },
-  { value: "days", label: "Days" },
-] as const;
-type InactivityUnit = "minutes" | "hours" | "days";
-
-function minutesToUnitValue(minutes: number | null): { value: string; unit: InactivityUnit } {
-  if (!minutes) return { value: "", unit: "minutes" };
-  if (minutes % 1440 === 0) return { value: String(minutes / 1440), unit: "days" };
-  if (minutes % 60 === 0) return { value: String(minutes / 60), unit: "hours" };
-  return { value: String(minutes), unit: "minutes" };
-}
-
-function unitValueToMinutes(value: string, unit: InactivityUnit): number | null {
-  const n = parseInt(value, 10);
-  if (!n || n <= 0) return null;
-  if (unit === "hours") return n * 60;
-  if (unit === "days") return n * 1440;
-  return n;
-}
 
 const SECTION_LABELS: Record<string, string> = {
   timezone: "Timezone",
-  access: "Staff access restrictions",
-  session: "Session settings",
-  inactivity: "Inactivity logout",
 };
 
 type ApiResponse<T> = { success: boolean; message: string; data: T };
@@ -59,12 +20,6 @@ type SettingsSection = keyof typeof SECTION_LABELS;
 
 export default function SettingsPage() {
   const [tz, setTz] = useState("Australia/Sydney");
-  const [selectedDays, setSelectedDays] = useState<Set<string>>(new Set(DEFAULT_ON));
-  const [tStart, setTStart] = useState("08:00");
-  const [tEnd, setTEnd] = useState("16:00");
-  const [session, setSession] = useState(30);
-  const [inactivityValue, setInactivityValue] = useState("");
-  const [inactivityUnit, setInactivityUnit] = useState<InactivityUnit>("minutes");
   const [saveMsg, setSaveMsg] = useState("");
   const [showSaveMsg, setShowSaveMsg] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -76,14 +31,6 @@ export default function SettingsPage() {
   const [googleConnecting, setGoogleConnecting] = useState(false);
   const [googleDisconnecting, setGoogleDisconnecting] = useState(false);
   const [googleStatus, setGoogleStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
-
-  function toggleDay(day: string) {
-    setSelectedDays((prev) => {
-      const next = new Set(prev);
-      if (next.has(day)) next.delete(day); else next.add(day);
-      return next;
-    });
-  }
 
   async function save(section: SettingsSection) {
     setError("");
@@ -112,31 +59,11 @@ export default function SettingsPage() {
     if (section === "timezone") {
       return { timezone: tz };
     }
-
-    if (section === "access") {
-      return {
-        staffAccessDays: ALL_DAYS.filter((day) => selectedDays.has(day)),
-        staffAccessStart: tStart,
-        staffAccessEnd: tEnd,
-      };
-    }
-
-    if (section === "inactivity") {
-      return { inactivityTimeoutMinutes: unitValueToMinutes(inactivityValue, inactivityUnit) };
-    }
-
-    return { sessionTimeoutMinutes: session };
+    return {};
   }
 
   function applySettings(settings: AppSettingsRow) {
     setTz(settings.timezone);
-    setSelectedDays(new Set(settings.staffAccessDays));
-    setTStart(settings.staffAccessStart);
-    setTEnd(settings.staffAccessEnd);
-    setSession(settings.sessionTimeoutMinutes);
-    const { value: iVal, unit: iUnit } = minutesToUnitValue(settings.inactivityTimeoutMinutes);
-    setInactivityValue(iVal);
-    setInactivityUnit(iUnit);
     setGoogleEmail(settings.googleEmail);
     setGoogleConnected(settings.googleConnected);
   }
@@ -264,98 +191,6 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Staff Access Restrictions */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-5">
-          <h2 className="text-sm font-semibold text-gray-900 mb-1">Staff Access Restrictions</h2>
-          <p className="text-xs text-gray-500 mb-4">Staff users can only log in during the selected days and time window. Admin accounts are unaffected.</p>
-          <div className="mb-4">
-            <label className="block text-xs font-medium text-gray-600 mb-2">Allowed Days</label>
-            <div className="flex flex-wrap gap-2">
-              {ALL_DAYS.map((day) => {
-                const on = selectedDays.has(day);
-                return (
-                  <button
-                    key={day}
-                    onClick={() => toggleDay(day)}
-                    className={`day-chip px-3 py-1.5 rounded-full text-xs font-medium border ${on ? "bg-blue-600 text-white border-blue-600" : "bg-gray-100 text-gray-500 border-gray-200"}`}
-                  >
-                    {day}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Access Start Time</label>
-              <input type="time" value={tStart} onChange={(e) => setTStart(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"/>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Access End Time</label>
-              <input type="time" value={tEnd} onChange={(e) => setTEnd(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"/>
-            </div>
-          </div>
-          {tEnd && tStart && tEnd <= tStart ? (
-            <p className="mt-2 mb-2 text-xs text-red-600">End time must be later than start time.</p>
-          ) : (
-            <div className="mb-4" />
-          )}
-          <button disabled={savingSection === "access" || loading || (!!tEnd && !!tStart && tEnd <= tStart)} onClick={() => save("access")} className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed sm:w-auto">{savingSection === "access" ? "Saving..." : "Save Restrictions"}</button>
-        </div>
-
-        {/* Session Settings */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-5">
-          <h2 className="text-sm font-semibold text-gray-900 mb-3">Session Settings</h2>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-            <div className="flex-1">
-              <label className="block text-xs font-medium text-gray-600 mb-1">User session timeout</label>
-              <select value={session} onChange={(e) => setSession(Number(e.target.value))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer">
-                {SESSION_TIMEOUT_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-            </div>
-            <button disabled={savingSection === "session" || loading} onClick={() => save("session")} className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed sm:w-auto">{savingSection === "session" ? "Saving..." : "Save"}</button>
-          </div>
-        </div>
-
-        {/* Inactivity Logout */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-5">
-          <h2 className="text-sm font-semibold text-gray-900 mb-1">Inactivity Logout</h2>
-          <p className="text-xs text-gray-500 mb-4">Automatically log out staff members after a period of inactivity. Admins are not affected. Leave the value empty to disable.</p>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-            <div className="flex-1">
-              <label className="block text-xs font-medium text-gray-600 mb-1">Inactivity timeout</label>
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  min={1}
-                  step={1}
-                  value={inactivityValue}
-                  onChange={(e) => setInactivityValue(e.target.value)}
-                  placeholder="Disabled"
-                  className="w-28 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <select
-                  value={inactivityUnit}
-                  onChange={(e) => setInactivityUnit(e.target.value as InactivityUnit)}
-                  className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer"
-                >
-                  {INACTIVITY_UNITS.map((u) => (
-                    <option key={u.value} value={u.value}>{u.label}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <button
-              disabled={savingSection === "inactivity" || loading}
-              onClick={() => save("inactivity")}
-              className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed sm:w-auto"
-            >
-              {savingSection === "inactivity" ? "Saving..." : "Save"}
-            </button>
-          </div>
-        </div>
 
         {/* Google Account */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-5">

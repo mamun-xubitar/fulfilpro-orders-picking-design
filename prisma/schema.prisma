@@ -22,6 +22,11 @@ model User {
   isLoggedIn     Boolean  @default(false)
   lastLoginAt    DateTime?
   lastLogoutAt   DateTime?
+  staffAccessDays Json     @default("[\"Mon\",\"Tue\",\"Wed\",\"Thu\",\"Fri\"]")
+  staffAccessStart String   @default("08:00")
+  staffAccessEnd   String   @default("16:00")
+  sessionTimeoutMinutes Int  @default(30)
+  inactivityTimeoutMinutes Int?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   staffLoginApprovals StaffLoginApproval[]
