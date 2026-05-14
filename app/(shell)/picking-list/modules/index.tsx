@@ -4,10 +4,12 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Dispatch, RefObject, SetStateAction } from 'react';
+import { useSession } from 'next-auth/react';
 import { toast } from 'react-toastify';
 import OrdersPagination from '../../orders/modules/OrdersPagination';
 import type { ShippingLine } from '../../orders/modules/types';
 import { formatShippingMoney, getShippingDiscountCodes, getShippingLineFinalPrice } from '../../orders/modules/utils';
+import { isOrderPickerRole } from '@/lib/roles';
 
 type ApiResponse<T> = { success: boolean; message: string; data: T; errors?: string[] };
 type Pagination = { page: number; pageSize: number; total: number; totalPages: number; hasPrev: boolean; hasNext: boolean };
@@ -30,6 +32,7 @@ type PickingItem = {
   packedQuantity: number;
   packedDate: string | null;
   lastPackedUpdate: string | null;
+  fulfilledQuantity: number;
 };
 type PackingConfirmation = {
   id: string;
@@ -68,6 +71,7 @@ type PickingOrder = {
   lastPackingUpdateAt: string | null;
   noteCount: number;
   messageCount: number;
+  fulfillmentStatus: string | null;
   packingConfirmations: PackingConfirmation[];
 };
 type Note = {
@@ -122,6 +126,9 @@ const MONTH_LABELS = ['January', 'February', 'March', 'April', 'May', 'June', 'J
 const DAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 
 export default function PickingListPage() {
+  const { data: session } = useSession();
+  const isPicker = isOrderPickerRole(session?.user?.role);
+  const isAdmin = session?.user?.role === 'admin';
   const initialSearch = typeof window === 'undefined' ? '' : new URLSearchParams(window.location.search).get('search')?.trim() ?? '';
   const [orders, setOrders] = useState<PickingOrder[]>([]);
   const [stores, setStores] = useState<StoreOption[]>([]);
@@ -133,7 +140,7 @@ export default function PickingListPage() {
   const [period, setPeriod] = useState<(typeof PERIODS)[number]['value']>('all');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const [packedStatuses, setPackedStatuses] = useState<string[]>([]);
+  const [packedStatuses, setPackedStatuses] = useState<string[]>(['not_packed', 'partially_packed']);
   const [printStatuses, setPrintStatuses] = useState<string[]>([]);
   const [storeDropdownOpen, setStoreDropdownOpen] = useState(false);
   const [packedStatusDropdownOpen, setPackedStatusDropdownOpen] = useState(false);
@@ -291,7 +298,9 @@ export default function PickingListPage() {
 
   const selectedOrders = orders.filter((order) => selectedIds.includes(order.id));
   const allPageSelected = orders.length > 0 && orders.every((order) => selectedIds.includes(order.id));
-  const hasActiveFilters = searchInput !== '' || storeIds.length > 0 || period !== 'all' || !!dateFrom || !!dateTo || packedStatuses.length > 0 || printStatuses.length > 0;
+  const defaultPackedStatuses = ['not_packed', 'partially_packed'];
+  const isPackedStatusDefault = packedStatuses.length === defaultPackedStatuses.length && defaultPackedStatuses.every((status) => packedStatuses.includes(status));
+  const hasActiveFilters = searchInput !== '' || storeIds.length > 0 || period !== 'all' || !!dateFrom || !!dateTo || !isPackedStatusDefault || printStatuses.length > 0;
   const syncActive = syncJob?.status === 'queued' || syncJob?.status === 'running';
   const syncMessage = syncActive
     ? syncJob.status === 'queued'
@@ -413,7 +422,7 @@ export default function PickingListPage() {
     setDateFrom('');
     setDateTo('');
     setHoverDate(null);
-    setPackedStatuses([]);
+    setPackedStatuses(['not_packed', 'partially_packed']);
     setPrintStatuses([]);
     setPagination((prev) => ({ ...prev, page: 1 }));
   }
@@ -742,20 +751,23 @@ export default function PickingListPage() {
           <input value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="name order# SKU address... (space = AND)" className="min-w-0 flex-1 px-2 py-2 text-sm outline-none" />
         </div>
 
-        <MultiSelectDropdown
-          refEl={storeDropdownRef}
-          open={storeDropdownOpen}
-          setOpen={setStoreDropdownOpen}
-          buttonLabel={storeIds.length === 0 ? 'All Stores' : `${storeIds.length} Store${storeIds.length > 1 ? 's' : ''}`}
-          allLabel="All Stores"
-          allActive={storeIds.length === 0}
-          onClear={() => { setStoreIds([]); setPagination((prev) => ({ ...prev, page: 1 })); }}
-          options={stores.map((store) => ({ value: store.id, label: store.name }))}
-          selectedValues={storeIds}
-          onToggle={toggleStore}
-        />
+        {!isPicker && (
+          <MultiSelectDropdown
+            refEl={storeDropdownRef}
+            open={storeDropdownOpen}
+            setOpen={setStoreDropdownOpen}
+            buttonLabel={storeIds.length === 0 ? 'All Stores' : `${storeIds.length} Store${storeIds.length > 1 ? 's' : ''}`}
+            allLabel="All Stores"
+            allActive={storeIds.length === 0}
+            onClear={() => { setStoreIds([]); setPagination((prev) => ({ ...prev, page: 1 })); }}
+            options={stores.map((store) => ({ value: store.id, label: store.name }))}
+            selectedValues={storeIds}
+            onToggle={toggleStore}
+          />
+        )}
 
-        <div className="relative" ref={periodDropdownRef}>
+        {!isPicker && (
+          <div className="relative" ref={periodDropdownRef}>
           <button onClick={() => setPeriodDropdownOpen((prev) => !prev)} className="flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-600 shadow-sm hover:bg-gray-50">
             {period === 'custom'
               ? dateFrom && dateTo
@@ -816,7 +828,8 @@ export default function PickingListPage() {
               )}
             </div>
           )}
-        </div>
+          </div>
+        )}
 
         <MultiSelectDropdown
           refEl={packedStatusDropdownRef}
@@ -853,7 +866,8 @@ export default function PickingListPage() {
               Clear filters
             </button>
           )}
-          <div ref={syncStoreDropdownRef} className="relative">
+          {!isPicker && (
+            <div ref={syncStoreDropdownRef} className="relative">
             <div className="flex items-stretch gap-0">
               <button onClick={() => void syncOrders()} disabled={syncing || loading || syncActive} className="flex items-center gap-1.5 rounded-l-lg border border-r-0 border-gray-300 bg-white px-3 py-2 text-sm text-gray-600 shadow-sm transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50">
                 <svg className={`h-4 w-4 ${syncing || syncActive ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -877,14 +891,15 @@ export default function PickingListPage() {
                 ))}
               </div>
             )}
-          </div>
+            </div>
+          )}
           <button onClick={refreshList} disabled={syncing} className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${syncRefreshNeeded ? 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100' : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-50'}`}>
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ transition: 'transform .6s ease', transform: `rotate(${refreshRotation}deg)` }}>
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
             Refresh
           </button>
-          <span className="min-w-0 flex-1 text-xs text-gray-400 sm:flex-none sm:whitespace-nowrap">{syncMessage}</span>
+          {!isPicker && <span className="min-w-0 flex-1 text-xs text-gray-400 sm:flex-none sm:whitespace-nowrap">{syncMessage}</span>}
         </div>
       </div>
 
@@ -906,7 +921,6 @@ export default function PickingListPage() {
                 <th className="px-3 py-3 text-left text-xs font-semibold uppercase text-gray-500">Customer</th>
                 <th className="px-3 py-3 text-left text-xs font-semibold uppercase text-gray-500">Ordered At</th>
                 <th className="px-3 py-3 text-left text-xs font-semibold uppercase text-gray-500">Status</th>
-                <th className="px-3 py-3 text-left text-xs font-semibold uppercase text-gray-500">Vendor</th>
                 <th className="px-3 py-3 text-left text-xs font-semibold uppercase text-gray-500">Packed Qty</th>
                 <th className="px-3 py-3 text-left text-xs font-semibold uppercase text-gray-500">Packed Date</th>
                 <th className="px-3 py-3 text-center text-xs font-semibold uppercase text-gray-500">Note</th>
@@ -914,9 +928,9 @@ export default function PickingListPage() {
               </tr>
             </thead>
             <tbody>
-              {loading && <tr><td colSpan={11} className="py-12 text-center text-gray-400">Loading picking list...</td></tr>}
-              {!loading && error && <tr><td colSpan={11} className="py-12 text-center text-red-500">{error}</td></tr>}
-              {!loading && !error && orders.length === 0 && <tr><td colSpan={11} className="py-16 text-center text-gray-400">No picking orders found.</td></tr>}
+              {loading && <tr><td colSpan={10} className="py-12 text-center text-gray-400">Loading picking list...</td></tr>}
+              {!loading && error && <tr><td colSpan={10} className="py-12 text-center text-red-500">{error}</td></tr>}
+              {!loading && !error && orders.length === 0 && <tr><td colSpan={10} className="py-16 text-center text-gray-400">No picking orders found.</td></tr>}
               {!loading && !error && orders.map((order) => {
                 const isExpanded = expandedId === order.id;
                 const isSelected = selectedIds.includes(order.id);
@@ -938,8 +952,7 @@ export default function PickingListPage() {
                       <td className="px-3 py-3 text-gray-600">{order.storeName}</td>
                       <td className="px-3 py-3 text-gray-700">{order.customer}</td>
                       <td className="px-3 py-3 text-gray-600">{formatDateTime(order.orderedAt)}</td>
-                      <td className="px-3 py-3"><StatusChips order={order} /></td>
-                      <td className="px-3 py-3 text-gray-600">{order.vendors.join(', ') || '-'}</td>
+                      <td className="px-3 py-3"><StatusChips order={order} isAdmin={isAdmin} /></td>
                       <td className="px-3 py-3 font-medium text-gray-700">{order.packedQuantity}/{order.totalQuantity}</td>
                       <td className="px-3 py-3 text-gray-600">{order.lastPackedAt ? formatDateTime(order.lastPackedAt) : '-'}</td>
                       <td className="px-3 py-3 text-center">
@@ -1038,10 +1051,11 @@ export default function PickingListPage() {
                     </tr>
                     {isExpanded && (
                       <tr>
-                        <td colSpan={11} className="border-b border-gray-200 bg-gray-50 p-3 sm:p-5">
-                          <div className="grid w-[calc(100vw-2.5rem)] min-w-0 max-w-full gap-3 sm:w-[calc(100vw-4rem)] sm:gap-5 lg:w-full lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)_minmax(0,260px)]">
-                            <section className="min-w-0 rounded-lg border border-gray-200 bg-white p-3 sm:p-4">
-                              <h3 className="mb-3 text-xs font-semibold uppercase text-gray-500">Customer Details</h3>
+                        <td colSpan={10} className="border-b border-gray-200 bg-gray-50 p-3 sm:p-5">
+                          <div className={`grid w-[calc(100vw-2.5rem)] min-w-0 max-w-full gap-3 sm:w-[calc(100vw-4rem)] sm:gap-5 lg:w-full ${isPicker ? 'lg:grid-cols-[minmax(0,1fr)_minmax(0,260px)]' : 'lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)_minmax(0,260px)]'}`}>
+                            {!isPicker && (
+                              <section className="min-w-0 rounded-lg border border-gray-200 bg-white p-3 sm:p-4">
+                                <h3 className="mb-3 text-xs font-semibold uppercase text-gray-500">Customer Details</h3>
                               <div className="space-y-1 text-sm text-gray-700">
                                 <p className="font-semibold text-gray-900">{order.customer}</p>
                                 {[order.address, order.address2, order.city, order.state, order.zip, order.country].filter(Boolean).map((line, lineIndex) => <p key={`${order.id}-address-${lineIndex}`}>{line}</p>)}
@@ -1077,6 +1091,7 @@ export default function PickingListPage() {
                                 {order.note && <p className="mt-3 whitespace-pre-wrap rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">{order.note}</p>}
                               </div>
                             </section>
+                            )}
 
                             <section className="min-w-0 rounded-lg border border-gray-200 bg-white p-3 sm:p-4">
                               <h3 className="mb-3 text-xs font-semibold uppercase text-gray-500">Order Items</h3>
@@ -1089,6 +1104,7 @@ export default function PickingListPage() {
                                       <th className="py-2 text-center font-medium">Qty</th>
                                       <th className="py-2 text-center font-medium">Packed</th>
                                       <th className="py-2 text-left font-medium">Packed Date</th>
+                                      {isAdmin && <th className="py-2 text-center font-medium">Fulfilled</th>}
                                       <th className="py-2 text-left font-medium">
                                         <label className="inline-flex cursor-pointer items-center justify-start gap-1.5">
                                           <input
@@ -1105,7 +1121,7 @@ export default function PickingListPage() {
                                     </tr>
                                   </thead>
                                   <tbody>
-                                    {order.items.map((item, itemIndex) => {
+                                    {order.items.filter((item) => item.fulfilledQuantity < item.qty).map((item, itemIndex) => {
                                       const key = rowItemKey(order.id, itemIndex);
                                       const remaining = getRemaining(item);
                                       const isFull = Boolean(fullChecks[key]);
@@ -1134,6 +1150,13 @@ export default function PickingListPage() {
                                           <td className="py-2 text-center text-gray-700">{item.qty}</td>
                                           <td className="py-2 text-center text-gray-700">{item.packedQuantity}/{item.qty}</td>
                                           <td className="py-2 text-gray-600">{item.packedDate ? formatDateTime(item.packedDate) : '-'}</td>
+                                          {isAdmin && (
+                                            <td className="py-2 text-center">
+                                              <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${item.fulfilledQuantity >= item.qty ? 'bg-green-100 text-green-700' : item.fulfilledQuantity > 0 ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-600'}`}>
+                                                {item.fulfilledQuantity}/{item.qty}
+                                              </span>
+                                            </td>
+                                          )}
                                           <td className="py-2 text-left">
                                             <input type="checkbox" checked={Boolean(fullChecks[key])} disabled={remaining === 0} onChange={(event) => { setFullChecks((prev) => ({ ...prev, [key]: event.target.checked })); setPartialValues((prev) => ({ ...prev, [key]: event.target.checked ? remaining : 0 })); }} className="cursor-pointer rounded border-gray-300 text-blue-600 disabled:cursor-not-allowed disabled:opacity-50" />
                                           </td>
@@ -1363,16 +1386,25 @@ function CalendarMonth({
   );
 }
 
-function StatusChips({ order }: { order: PickingOrder }) {
+function StatusChips({ order, isAdmin }: { order: PickingOrder; isAdmin: boolean }) {
   const packClass = order.packingStatus === 'packed'
     ? 'bg-green-100 text-green-700 border-green-200'
     : order.packingStatus === 'partially_packed'
       ? 'bg-amber-100 text-amber-800 border-amber-200'
       : 'bg-gray-100 text-gray-600 border-gray-200';
   const packLabel = order.packingStatus === 'packed' ? 'Packed' : order.packingStatus === 'partially_packed' ? 'Partial Packed' : 'Pending';
+  const fulfillmentClass = order.fulfillmentStatus === 'fulfilled'
+    ? 'bg-green-100 text-green-700 border-green-200'
+    : order.fulfillmentStatus === 'partial'
+      ? 'bg-amber-100 text-amber-800 border-amber-200'
+      : '';
+  const fulfillmentLabel = order.fulfillmentStatus === 'fulfilled' ? 'Fulfilled' : order.fulfillmentStatus === 'partial' ? 'Partial Fulfilled' : '';
   return (
     <div className="flex flex-col items-start gap-1">
       <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${packClass}`}>{packLabel}</span>
+      {isAdmin && fulfillmentLabel && (
+        <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${fulfillmentClass}`}>{fulfillmentLabel}</span>
+      )}
       {order.printed && (
         <span className="rounded-full border border-purple-200 bg-purple-100 px-2 py-0.5 text-xs font-semibold text-purple-700">Slip Printed</span>
       )}

@@ -395,6 +395,7 @@ function buildOrderWhere(params: {
         ...(params.storeIds && params.storeIds.length > 0 ? { id: { in: params.storeIds } } : {}),
       },
     },
+    fulfillmentStatus: { not: 'fulfilled' },
     ...(printStatusConditions.length > 0 ? { AND: [{ OR: printStatusConditions }] } : {}),
   };
 
@@ -532,7 +533,7 @@ function buildRankedPickingOrderSearchWhereSql(params: {
   orderedAtFrom?: Date;
   orderedAtTo?: Date;
 }) {
-  const whereParts: Prisma.Sql[] = [Prisma.sql`s.status = 'connected'`];
+  const whereParts: Prisma.Sql[] = [Prisma.sql`s.status = 'connected'`, Prisma.sql`(o."fulfillmentStatus" IS NULL OR o."fulfillmentStatus" != 'fulfilled')`];
 
   if (params.storeIds.length > 0) {
     whereParts.push(Prisma.sql`s.id IN (${Prisma.join(params.storeIds)})`);
@@ -654,6 +655,8 @@ function toPickingOrderRow(order: {
   orderedAt: Date | null;
   lineItems: Prisma.JsonValue;
   shippingLines: Prisma.JsonValue | null;
+  fulfillmentStatus: string | null;
+  fulfillmentItems: Prisma.JsonValue | null;
   store: { id: string; name: string | null; storeDomain: string };
   packingConfirmations: Array<{ id: string; lines: Prisma.JsonValue; confirmedAt: Date; canceledAt: Date | null }>;
   pickingSlipPrints: Array<{ printedAt: Date }>;
@@ -662,6 +665,7 @@ function toPickingOrderRow(order: {
   const items = toLineItems(order.lineItems).map((item) => ({ ...item, metadata: { location: '', remark: '', note: '' } }));
   const activeConfirmations = order.packingConfirmations.filter((confirmation) => !confirmation.canceledAt);
   const packedByLine = getPackedByLine(activeConfirmations);
+  const fulfilledByLine = getFulfilledByLine(order.fulfillmentItems);
   const totalQuantity = items.reduce((sum, item) => sum + Math.max(0, item.qty), 0);
   const packedQuantity = [...packedByLine.values()].reduce((sum, qty) => sum + qty, 0);
   const lastPackedAt = activeConfirmations[0]?.confirmedAt?.toISOString() ?? null;
@@ -698,6 +702,7 @@ function toPickingOrderRow(order: {
       packedQuantity: packedByLine.get(item.id) ?? 0,
       packedDate: getLinePackedDate(activeConfirmations, item.id),
       lastPackedUpdate: getLinePackedDate(order.packingConfirmations, item.id),
+      fulfilledQuantity: fulfilledByLine.get(item.id) ?? 0,
     })),
     vendors: Array.from(new Set(items.map((item) => item.vendor).filter(Boolean))),
     printed: order.pickingSlipPrints.length > 0,
@@ -709,6 +714,7 @@ function toPickingOrderRow(order: {
     lastPackingUpdateAt,
     noteCount: order._count.notes,
     messageCount: order._count.messages,
+    fulfillmentStatus: order.fulfillmentStatus ?? null,
     packingConfirmations: order.packingConfirmations.map((confirmation) => ({
       id: confirmation.id,
       confirmedAt: confirmation.confirmedAt.toISOString(),
@@ -865,6 +871,21 @@ function getPackedByLine(confirmations: Array<{ lines: Prisma.JsonValue }>) {
     });
   });
   return packed;
+}
+
+function getFulfilledByLine(fulfillmentItems: Prisma.JsonValue | null) {
+  const fulfilled = new Map<string, number>();
+  if (!Array.isArray(fulfillmentItems)) return fulfilled;
+  fulfillmentItems.forEach((item) => {
+    if (!item || typeof item !== 'object') return;
+    const obj = item as Record<string, unknown>;
+    const lineItemId = typeof obj.lineItemId === 'string' ? obj.lineItemId : '';
+    const quantity = typeof obj.quantity === 'number' ? obj.quantity : Number(obj.quantity ?? 0);
+    if (lineItemId && quantity > 0) {
+      fulfilled.set(lineItemId, (fulfilled.get(lineItemId) ?? 0) + quantity);
+    }
+  });
+  return fulfilled;
 }
 
 function getLinePackedDate(confirmations: Array<{ lines: Prisma.JsonValue; confirmedAt: Date }>, lineItemId: string) {
