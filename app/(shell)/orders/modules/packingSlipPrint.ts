@@ -1,12 +1,6 @@
 import type { PackingSlipLabel } from './types';
 import { escapeHtml, getPackingSlipAddressLines } from './utils';
 
-export const writePrintDocument = (printWindow: Window, documentHtml: string) => {
-printWindow.document.open();
-printWindow.document.write(documentHtml);
-printWindow.document.close();
-};
-
 export const waitForPrintAssets = async (printWindow: Window) => {
 const images = Array.from(printWindow.document.images);
 if (images.length === 0) return;
@@ -24,26 +18,66 @@ await Promise.race([
 ]);
 };
 
-export const buildPackingSlipLoadingDocument = (orderNumber: string) => {
-return `
-  <!doctype html>
-  <html>
-    <head>
-      <title>Loading label ${escapeHtml(orderNumber)}</title>
-      <style>
-        body { margin: 0; min-height: 100vh; display: grid; place-items: center; color: #111; background: #fff; font-family: Arial, Helvetica, sans-serif; }
-        .loading { text-align: center; font-size: 14px; line-height: 1.5; }
-        .muted { color: #555; font-size: 11px; }
-      </style>
-    </head>
-    <body>
-      <div class="loading">
-        <div>Loading packing label...</div>
-        <div class="muted">Order #${escapeHtml(orderNumber)}</div>
-      </div>
-    </body>
-  </html>
-`;
+const writePrintDocument = (printWindow: Window, documentHtml: string) => {
+  printWindow.document.open();
+  printWindow.document.write(documentHtml);
+  printWindow.document.close();
+};
+
+const createHiddenPrintFrame = () => {
+  const frame = document.createElement('iframe');
+  frame.setAttribute('aria-hidden', 'true');
+  frame.setAttribute('tabindex', '-1');
+  frame.style.position = 'fixed';
+  frame.style.width = '0';
+  frame.style.height = '0';
+  frame.style.border = '0';
+  frame.style.opacity = '0';
+  frame.style.pointerEvents = 'none';
+  frame.style.right = '0';
+  frame.style.bottom = '0';
+  document.body.appendChild(frame);
+  return frame;
+};
+
+export const printDocumentInHiddenFrame = async (documentHtml: string) => {
+  const frame = createHiddenPrintFrame();
+  const printWindow = frame.contentWindow;
+
+  if (!printWindow) {
+    frame.remove();
+    throw new Error('Unable to start print. Please try again.');
+  }
+
+  const cleanup = () => {
+    if (!frame.isConnected) return;
+    frame.remove();
+  };
+
+  let cleaned = false;
+  const cleanupOnce = () => {
+    if (cleaned) return;
+    cleaned = true;
+    cleanup();
+  };
+
+  const cleanupTimeoutId = window.setTimeout(cleanupOnce, 12_000);
+  printWindow.addEventListener('afterprint', cleanupOnce, { once: true });
+
+  try {
+    writePrintDocument(printWindow, documentHtml);
+    await waitForPrintAssets(printWindow);
+    printWindow.focus();
+    printWindow.print();
+  } catch (error) {
+    cleanupOnce();
+    throw error;
+  } finally {
+    window.setTimeout(() => {
+      window.clearTimeout(cleanupTimeoutId);
+      cleanupOnce();
+    }, 1_000);
+  }
 };
 
 export const buildPackingSlipDocument = (label: PackingSlipLabel, origin: string) => {
@@ -115,4 +149,3 @@ export const formatStoreUrl = (storeUrl: string | null, storeDomain: string) => 
 const value = storeUrl?.trim() || storeDomain.trim();
 return "https://" + value.replace(/^https?:\/\//i, '').replace(/\/$/, '');
 };
-

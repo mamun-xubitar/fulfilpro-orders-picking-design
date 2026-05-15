@@ -30,7 +30,7 @@ import type {
   StoreOption,
 } from './types';
 import { DEFAULT_PAGINATION, PERIODS, SHOPIFY_TRACKING_CARRIERS, STATUS_MAP } from './constants';
-import { buildPackingSlipDocument, buildPackingSlipLoadingDocument, waitForPrintAssets, writePrintDocument } from './packingSlipPrint';
+import { buildPackingSlipDocument, printDocumentInHiddenFrame } from './packingSlipPrint';
 import PendingRequestsPanel from './PendingRequestsPanel';
 import OrdersPagination from './OrdersPagination';
 import OrdersToolbar from './OrdersToolbar';
@@ -817,14 +817,7 @@ export default function OrdersPage() {
   };
 
   const printPackingSlipLabel = async (order: OrderRow) => {
-    const printWindow = window.open('', '_blank', 'width=900,height=700');
-    if (!printWindow) {
-      toast.error('Unable to open print window. Please allow popups for this site.');
-      return;
-    }
-
     setPrintingOrderId(order.id);
-    writePrintDocument(printWindow, buildPackingSlipLoadingDocument(order.number));
 
     try {
       const res = await fetch(`/api/orders/${encodeURIComponent(order.id)}/packing-slip`);
@@ -834,14 +827,9 @@ export default function OrdersPage() {
         throw new Error(getApiErrorMessage(json, 'Failed to load packing slip label'));
       }
 
-      writePrintDocument(printWindow, buildPackingSlipDocument(json.data, window.location.origin));
-      await waitForPrintAssets(printWindow);
-      printWindow.focus();
-      window.setTimeout(() => {
-        printWindow.print();
-      }, 250);
+      const printHtml = buildPackingSlipDocument(json.data, window.location.origin);
+      await printDocumentInHiddenFrame(printHtml);
     } catch (err) {
-      printWindow.close();
       toast.error(err instanceof Error ? err.message : 'Failed to load packing slip label.');
     } finally {
       setPrintingOrderId(null);
