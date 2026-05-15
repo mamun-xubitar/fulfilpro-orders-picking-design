@@ -443,7 +443,7 @@ export default function OrderModals({
         <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-gray-200">
           <div>
             <h3 id="admin-message-title" className="text-base font-semibold text-gray-900">
-              Admin message
+              Direct message
             </h3>
             <p className="mt-1 text-sm text-gray-500">
               Order {messageModal.order.number} · {messageModal.order.customer}
@@ -469,7 +469,7 @@ export default function OrderModals({
             <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
               <div className="space-y-3">
                 <label className="block text-sm text-gray-700">
-                  <span className="block text-xs font-semibold uppercase text-gray-500 mb-1">Admin</span>
+                  <span className="block text-xs font-semibold uppercase text-gray-500 mb-1">Recipient</span>
                   <select
                     value={messageModal.selectedAdminId}
                     onChange={(event) => {
@@ -479,7 +479,7 @@ export default function OrderModals({
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:bg-gray-100 disabled:text-gray-400"
                   >
                     {messageModal.admins.length === 0 ? (
-                      <option value="">No active admins</option>
+                      <option value="">No active recipients</option>
                     ) : (
                       messageModal.admins.map((admin) => (
                         <option key={admin.id} value={admin.id}>
@@ -500,7 +500,7 @@ export default function OrderModals({
                     rows={7}
                     maxLength={5000}
                     disabled={messageModal.sending}
-                    placeholder="Write a message for the admin"
+                    placeholder="Write a message for the selected recipient"
                     className="w-full resize-none border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:bg-gray-100"
                   />
                 </label>

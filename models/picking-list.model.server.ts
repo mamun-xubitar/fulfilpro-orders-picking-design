@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma.server';
 import { sendGoogleMail } from '@/lib/google-mail.server';
 import { OrderModel } from '@/models/order.model.server';
+import { resolvePickerRecipientOptions } from '@/lib/email-rules.server';
 
 export type PickingLineInput = {
   lineItemId: string;
@@ -84,7 +85,7 @@ export class PickingListModel {
     if (params.allowedStoreIds !== null && params.allowedStoreIds !== undefined) {
       storeWhere.id = { in: params.allowedStoreIds };
     }
-
+    
     const [ordersResult, stores] = await Promise.all([
       this.listOrderRows({
         where,
@@ -203,12 +204,18 @@ export class PickingListModel {
     return { rows, total: rows.length };
   }
 
-  async listRecipients() {
-    return prisma.user.findMany({
-      where: { active: true },
-      select: { id: true, name: true, email: true, role: true },
-      orderBy: [{ name: 'asc' }, { email: 'asc' }],
-    });
+  async listRecipientOptions() {
+    const [packingOptions, messageOptions] = await Promise.all([
+      resolvePickerRecipientOptions('picking_packing'),
+      resolvePickerRecipientOptions('direct_message'),
+    ]);
+
+    return {
+      packingRecipients: packingOptions.allowedUsers,
+      packingDefaultRecipientUserIds: packingOptions.defaultUserIds,
+      messageRecipients: messageOptions.allowedUsers,
+      messageDefaultRecipientUserIds: messageOptions.defaultUserIds,
+    };
   }
 
   async refreshFromShopify(orderId: string) {
@@ -241,7 +248,8 @@ export class PickingListModel {
     const normalizedLines = normalizePackingLines(params.lines, items, order.packingConfirmations);
     if (normalizedLines.length === 0) throw new Error('Select at least one item quantity to pack');
 
-    const recipients = await getRecipients(params.notifyUserIds);
+    const recipientOptions = await resolvePickerRecipientOptions('picking_packing');
+    const recipients = toConfiguredRecipients(params.notifyUserIds, recipientOptions.allowedUsers);
     const saved = await prisma.orderPackingConfirmation.create({
       data: {
         orderId: order.id,
@@ -293,7 +301,8 @@ export class PickingListModel {
     if (!confirmation) throw new Error('Packing confirmation not found');
     if (confirmation.canceledAt) throw new Error('Packing confirmation is already canceled');
 
-    const recipients = await getRecipients(params.notifyUserIds);
+    const recipientOptions = await resolvePickerRecipientOptions('picking_packing');
+    const recipients = toConfiguredRecipients(params.notifyUserIds, recipientOptions.allowedUsers);
     await prisma.orderPackingConfirmation.update({
       where: { id: confirmation.id },
       data: {
@@ -380,6 +389,8 @@ export class PickingListModel {
 
 type PickingMetadata = { location: string; remark: string; note: string };
 
+const PICKING_LIST_ORDERED_AT_CUTOFF = new Date('2026-05-01T00:00:00.000Z');
+
 function buildOrderWhere(params: {
   storeIds?: string[];
   period?: 'all' | 'week' | 'month' | 'year';
@@ -388,6 +399,19 @@ function buildOrderWhere(params: {
   printStatuses?: string[];
 }) {
   const printStatusConditions = buildPrintStatusWhereConditions(params.printStatuses ?? []);
+  const andConditions: Prisma.OrderWhereInput[] = [
+    {
+      OR: [
+        { orderedAt: null },
+        { orderedAt: { gt: PICKING_LIST_ORDERED_AT_CUTOFF } },
+      ],
+    },
+  ];
+
+  if (printStatusConditions.length > 0) {
+    andConditions.push({ OR: printStatusConditions });
+  }
+
   const where: Prisma.OrderWhereInput = {
     store: {
       is: {
@@ -396,7 +420,7 @@ function buildOrderWhere(params: {
       },
     },
     fulfillmentStatus: { not: 'fulfilled' },
-    ...(printStatusConditions.length > 0 ? { AND: [{ OR: printStatusConditions }] } : {}),
+    AND: andConditions,
   };
 
   if (params.dateFrom || params.dateTo) {
@@ -533,7 +557,11 @@ function buildRankedPickingOrderSearchWhereSql(params: {
   orderedAtFrom?: Date;
   orderedAtTo?: Date;
 }) {
-  const whereParts: Prisma.Sql[] = [Prisma.sql`s.status = 'connected'`, Prisma.sql`(o."fulfillmentStatus" IS NULL OR o."fulfillmentStatus" != 'fulfilled')`];
+  const whereParts: Prisma.Sql[] = [
+    Prisma.sql`s.status = 'connected'`,
+    Prisma.sql`(o."fulfillmentStatus" IS NULL OR o."fulfillmentStatus" != 'fulfilled')`,
+    Prisma.sql`(o."orderedAt" IS NULL OR o."orderedAt" < ${PICKING_LIST_ORDERED_AT_CUTOFF})`,
+  ];
 
   if (params.storeIds.length > 0) {
     whereParts.push(Prisma.sql`s.id IN (${Prisma.join(params.storeIds)})`);
@@ -931,13 +959,13 @@ function getPeriodStartDate(period: 'all' | 'week' | 'month' | 'year') {
   return weekStart;
 }
 
-async function getRecipients(userIds: string[]): Promise<NotifyRecipient[]> {
+function toConfiguredRecipients(userIds: string[], allowedUsers: NotifyRecipient[]): NotifyRecipient[] {
   const ids = Array.from(new Set(userIds.map((id) => id.trim()).filter(Boolean)));
   if (ids.length === 0) return [];
-  return prisma.user.findMany({
-    where: { id: { in: ids }, active: true },
-    select: { id: true, name: true, email: true, role: true },
-  });
+  const allowedById = new Map(allowedUsers.map((user) => [user.id, user]));
+  return ids
+    .map((id) => allowedById.get(id))
+    .filter((user): user is NotifyRecipient => Boolean(user));
 }
 
 async function sendPackingEmail(params: {

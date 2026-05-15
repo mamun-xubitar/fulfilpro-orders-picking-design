@@ -1,4 +1,10 @@
 import prisma from '@/lib/prisma.server';
+import {
+  getNormalizedEmailRuleSettings,
+  listEmailRuleUsers,
+  normalizeUserIdList,
+  type EmailRuleUser,
+} from '@/lib/email-rules.server';
 
 export type AppSettingsRow = {
   timezone: string;
@@ -10,6 +16,22 @@ export type AppSettingsRow = {
   googleEmail: string | null;
   googleConnected: boolean;
   googleTokenExpiresAt: string | null;
+  emailRules: {
+    loginApprovalRecipientUserIds: string[];
+    backInStockAdminRecipientUserIds: string[];
+    stockAdjustmentRecipientUserIds: string[];
+    fulfillmentRequestAllowedUserIds: string[];
+    fulfillmentRequestDefaultUserIds: string[];
+    pickingPackingAllowedUserIds: string[];
+    pickingPackingDefaultUserIds: string[];
+    directMessageAllowedUserIds: string[];
+    directMessageDefaultUserIds: string[];
+    backInStockRequesterUpdatesEnabled: boolean;
+    eligibleUsers: {
+      activeUsers: EmailRuleUser[];
+      activeAdminUsers: EmailRuleUser[];
+    };
+  };
   updatedAt: string;
 };
 
@@ -20,6 +42,16 @@ export type UpdateAppSettingsData = Partial<{
   staffAccessEnd: string;
   sessionTimeoutMinutes: number;
   inactivityTimeoutMinutes: number | null;
+  loginApprovalRecipientUserIds: string[];
+  backInStockAdminRecipientUserIds: string[];
+  stockAdjustmentRecipientUserIds: string[];
+  fulfillmentRequestAllowedUserIds: string[];
+  fulfillmentRequestDefaultUserIds: string[];
+  pickingPackingAllowedUserIds: string[];
+  pickingPackingDefaultUserIds: string[];
+  directMessageAllowedUserIds: string[];
+  directMessageDefaultUserIds: string[];
+  backInStockRequesterUpdatesEnabled: boolean;
 }>;
 
 const SETTINGS_ID = 'default';
@@ -34,6 +66,16 @@ const DEFAULT_SETTINGS = {
   googleAccessToken: null,
   googleRefreshToken: null,
   googleTokenExpiresAt: null,
+  loginApprovalRecipientUserIds: [] as string[],
+  backInStockAdminRecipientUserIds: [] as string[],
+  stockAdjustmentRecipientUserIds: [] as string[],
+  fulfillmentRequestAllowedUserIds: [] as string[],
+  fulfillmentRequestDefaultUserIds: [] as string[],
+  pickingPackingAllowedUserIds: [] as string[],
+  pickingPackingDefaultUserIds: [] as string[],
+  directMessageAllowedUserIds: [] as string[],
+  directMessageDefaultUserIds: [] as string[],
+  backInStockRequesterUpdatesEnabled: true,
 };
 
 type GoogleTokenData = {
@@ -113,7 +155,7 @@ export class SettingsModel {
   }
 }
 
-function toSettingsRow(settings: {
+async function toSettingsRow(settings: {
   timezone: string;
   staffAccessDays: unknown;
   staffAccessStart: string;
@@ -123,8 +165,21 @@ function toSettingsRow(settings: {
   googleEmail: string | null;
   googleRefreshToken: string | null;
   googleTokenExpiresAt: Date | null;
+  loginApprovalRecipientUserIds: unknown;
+  backInStockAdminRecipientUserIds: unknown;
+  stockAdjustmentRecipientUserIds: unknown;
+  fulfillmentRequestAllowedUserIds: unknown;
+  fulfillmentRequestDefaultUserIds: unknown;
+  pickingPackingAllowedUserIds: unknown;
+  pickingPackingDefaultUserIds: unknown;
+  directMessageAllowedUserIds: unknown;
+  directMessageDefaultUserIds: unknown;
+  backInStockRequesterUpdatesEnabled: boolean;
   updatedAt: Date;
-}): AppSettingsRow {
+}): Promise<AppSettingsRow> {
+  const { activeUsers, activeAdminUsers } = await listEmailRuleUsers();
+  const emailRules = getNormalizedEmailRuleSettings(settings);
+
   return {
     timezone: settings.timezone,
     staffAccessDays: normalizeDays(settings.staffAccessDays),
@@ -135,6 +190,22 @@ function toSettingsRow(settings: {
     googleEmail: settings.googleEmail,
     googleConnected: Boolean(settings.googleEmail && settings.googleRefreshToken),
     googleTokenExpiresAt: settings.googleTokenExpiresAt?.toISOString() ?? null,
+    emailRules: {
+      loginApprovalRecipientUserIds: normalizeUserIdList(emailRules.loginApprovalRecipientUserIds),
+      backInStockAdminRecipientUserIds: normalizeUserIdList(emailRules.backInStockAdminRecipientUserIds),
+      stockAdjustmentRecipientUserIds: normalizeUserIdList(emailRules.stockAdjustmentRecipientUserIds),
+      fulfillmentRequestAllowedUserIds: normalizeUserIdList(emailRules.fulfillmentRequestAllowedUserIds),
+      fulfillmentRequestDefaultUserIds: normalizeUserIdList(emailRules.fulfillmentRequestDefaultUserIds),
+      pickingPackingAllowedUserIds: normalizeUserIdList(emailRules.pickingPackingAllowedUserIds),
+      pickingPackingDefaultUserIds: normalizeUserIdList(emailRules.pickingPackingDefaultUserIds),
+      directMessageAllowedUserIds: normalizeUserIdList(emailRules.directMessageAllowedUserIds),
+      directMessageDefaultUserIds: normalizeUserIdList(emailRules.directMessageDefaultUserIds),
+      backInStockRequesterUpdatesEnabled: emailRules.backInStockRequesterUpdatesEnabled,
+      eligibleUsers: {
+        activeUsers,
+        activeAdminUsers,
+      },
+    },
     updatedAt: settings.updatedAt.toISOString(),
   };
 }

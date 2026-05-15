@@ -284,6 +284,16 @@ model AppSettings {
   googleAccessToken     String?
   googleRefreshToken    String?
   googleTokenExpiresAt  DateTime?
+  loginApprovalRecipientUserIds Json     @default("[]")
+  backInStockAdminRecipientUserIds Json  @default("[]")
+  stockAdjustmentRecipientUserIds Json   @default("[]")
+  fulfillmentRequestAllowedUserIds Json  @default("[]")
+  fulfillmentRequestDefaultUserIds Json  @default("[]")
+  pickingPackingAllowedUserIds Json      @default("[]")
+  pickingPackingDefaultUserIds Json      @default("[]")
+  directMessageAllowedUserIds Json       @default("[]")
+  directMessageDefaultUserIds Json       @default("[]")
+  backInStockRequesterUpdatesEnabled Boolean @default(true)
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 }

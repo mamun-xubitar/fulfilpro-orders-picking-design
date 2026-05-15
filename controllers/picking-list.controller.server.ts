@@ -22,6 +22,7 @@ export class PickingListController {
 
     if (allowedStoreIds !== null && allowedStoreIds !== undefined) {
       if (allowedStoreIds.length === 0) {
+        const recipientOptions = await model.listRecipientOptions();
         return {
           data: {
             orders: [],
@@ -35,7 +36,10 @@ export class PickingListController {
               printStatuses,
             },
             stores: [],
-            recipients: await model.listRecipients(),
+            packingRecipients: recipientOptions.packingRecipients,
+            packingDefaultRecipientUserIds: recipientOptions.packingDefaultRecipientUserIds,
+            messageRecipients: recipientOptions.messageRecipients,
+            messageDefaultRecipientUserIds: recipientOptions.messageDefaultRecipientUserIds,
             pagination: {
               page,
               pageSize,
@@ -62,6 +66,7 @@ export class PickingListController {
       pageSize,
       allowedStoreIds,
     });
+    const recipientOptions = await model.listRecipientOptions();
     const totalPages = Math.max(1, Math.ceil(result.total / pageSize));
 
     return {
@@ -77,7 +82,10 @@ export class PickingListController {
           printStatuses,
         },
         stores: result.stores,
-        recipients: await model.listRecipients(),
+        packingRecipients: recipientOptions.packingRecipients,
+        packingDefaultRecipientUserIds: recipientOptions.packingDefaultRecipientUserIds,
+        messageRecipients: recipientOptions.messageRecipients,
+        messageDefaultRecipientUserIds: recipientOptions.messageDefaultRecipientUserIds,
         pagination: {
           page,
           pageSize,

@@ -279,7 +279,7 @@ function parseAdminOrderMessage(body: unknown) {
   const message = typeof value.message === 'string' ? value.message.trim() : '';
 
   if (!adminId) {
-    throw new Error('Admin is required');
+    throw new Error('Recipient is required');
   }
 
   if (!message) {

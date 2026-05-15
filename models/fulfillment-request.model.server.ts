@@ -1,5 +1,6 @@
 import prisma from '@/lib/prisma.server';
 import { sendGoogleMail } from '@/lib/google-mail.server';
+import { resolvePickerRecipientOptions } from '@/lib/email-rules.server';
 
 export type AdminTarget = { id: string; name: string; email: string };
 
@@ -39,10 +40,9 @@ export class FulfillmentEditRequestModel {
     reason: string;
     originUrl: string;
   }) {
-    const admins = await prisma.user.findMany({
-      where: { id: { in: params.adminIds }, role: 'admin', active: true },
-      select: { id: true, name: true, email: true },
-    });
+    const recipientOptions = await resolvePickerRecipientOptions('fulfillment_request');
+    const selectedIds = new Set(params.adminIds.map((id) => id.trim()).filter(Boolean));
+    const admins = recipientOptions.allowedUsers.filter((user) => selectedIds.has(user.id));
 
     if (admins.length === 0) {
       throw new Error('No valid active admins selected');

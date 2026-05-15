@@ -8,6 +8,10 @@ import {
 } from '@/lib/shopify-fulfillment.server';
 import { fetchShopifyOrderById } from '@/lib/shopify-order-fetch.server';
 import { sendGoogleMail } from '@/lib/google-mail.server';
+import {
+  resolveHiddenRecipientEmails,
+  resolvePickerRecipientOptions,
+} from '@/lib/email-rules.server';
 import { Prisma } from '@prisma/client';
 
 export type ShopifyOrderPayload = {
@@ -818,22 +822,13 @@ export class OrderModel {
   }
 
   async getOrderMessageCenter(orderId: string) {
-    const [order, users, messages] = await Promise.all([
+    const [order, directMessageRecipients, fulfillmentRequestRecipients, messages] = await Promise.all([
       prisma.order.findUnique({
         where: { id: orderId },
         select: { id: true },
       }),
-      prisma.user.findMany({
-        where: {
-          active: true,
-        },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-        orderBy: [{ name: 'asc' }, { email: 'asc' }],
-      }),
+      resolvePickerRecipientOptions('direct_message'),
+      resolvePickerRecipientOptions('fulfillment_request'),
       prisma.orderMessage.findMany({
         where: { orderId },
         orderBy: { createdAt: 'desc' },
@@ -845,7 +840,10 @@ export class OrderModel {
     }
 
     return {
-      admins: users,
+      admins: directMessageRecipients.allowedUsers,
+      defaultAdminIds: directMessageRecipients.defaultUserIds,
+      fulfillmentRequestAdmins: fulfillmentRequestRecipients.allowedUsers,
+      fulfillmentRequestDefaultAdminIds: fulfillmentRequestRecipients.defaultUserIds,
       messages: messages.map(toOrderMessageRow),
     };
   }
@@ -860,7 +858,7 @@ export class OrderModel {
       email?: string | null;
     } | null;
   }) {
-    const [order, recipient] = await Promise.all([
+    const [order, directMessageRecipients] = await Promise.all([
       prisma.order.findUnique({
         where: { id: params.orderId },
         include: {
@@ -872,22 +870,14 @@ export class OrderModel {
           },
         },
       }),
-      prisma.user.findFirst({
-        where: {
-          id: params.adminId,
-          active: true,
-        },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      }),
+      resolvePickerRecipientOptions('direct_message'),
     ]);
 
     if (!order) {
       throw new Error('Order not found');
     }
+
+    const recipient = directMessageRecipients.allowedUsers.find((user) => user.id === params.adminId);
 
     if (!recipient) {
       throw new Error('Selected recipient was not found');
@@ -1657,17 +1647,14 @@ async function notifyAdminsAboutStockAdjustment(params: {
   eventType: StockAdjustmentEventType;
   originUrl?: string;
 }) {
-  const admins = await prisma.user.findMany({
-    where: { role: 'admin', active: true },
-    select: { email: true },
-  });
-  if (admins.length === 0) return;
+  const recipients = await resolveHiddenRecipientEmails('stock_adjustment');
+  if (recipients.length === 0) return;
 
   const items = toStockAdjustmentItems(params.adjustment.items).filter((item) => !item.managed);
   if (items.length === 0) return;
 
   await sendGoogleMail({
-    to: admins.map((admin) => admin.email),
+    to: recipients,
     subject: `Stock adjustment needed for Order #${params.order.number}`,
     text: buildStockAdjustmentEmailText(params.order, items, params.eventType, params.originUrl),
     html: buildStockAdjustmentEmailHtml(params.order, items, params.eventType, params.originUrl),

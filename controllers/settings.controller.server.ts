@@ -1,4 +1,5 @@
 import { SettingsModel, type UpdateAppSettingsData } from '@/models/settings.model.server';
+import { listEmailRuleUsers, normalizeUserIdList } from '@/lib/email-rules.server';
 
 const model = new SettingsModel();
 
@@ -23,6 +24,8 @@ const TIMEZONES = new Set([
 const DAYS = new Set(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
 const SESSION_TIMEOUTS = new Set([15, 30, 60, 120, 240, 480, 720, 1440, 2880, 10080]);
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+type UserScope = 'active_user' | 'active_admin';
 
 export class SettingsController {
   async get() {
@@ -89,11 +92,251 @@ export class SettingsController {
       }
     }
 
+    const hasEmailRulesInput = [
+      'loginApprovalRecipientUserIds',
+      'backInStockAdminRecipientUserIds',
+      'stockAdjustmentRecipientUserIds',
+      'fulfillmentRequestAllowedUserIds',
+      'fulfillmentRequestDefaultUserIds',
+      'pickingPackingAllowedUserIds',
+      'pickingPackingDefaultUserIds',
+      'directMessageAllowedUserIds',
+      'directMessageDefaultUserIds',
+      'backInStockRequesterUpdatesEnabled',
+    ].some((key) => key in data);
+
+    if (hasEmailRulesInput) {
+      const [currentSettings, users] = await Promise.all([
+        model.get(),
+        listEmailRuleUsers(),
+      ]);
+
+      const activeUserIds = new Set(users.activeUsers.map((user) => user.id));
+      const activeAdminIds = new Set(users.activeAdminUsers.map((user) => user.id));
+
+      const next = {
+        loginApprovalRecipientUserIds: currentSettings.emailRules.loginApprovalRecipientUserIds,
+        backInStockAdminRecipientUserIds: currentSettings.emailRules.backInStockAdminRecipientUserIds,
+        stockAdjustmentRecipientUserIds: currentSettings.emailRules.stockAdjustmentRecipientUserIds,
+        fulfillmentRequestAllowedUserIds: currentSettings.emailRules.fulfillmentRequestAllowedUserIds,
+        fulfillmentRequestDefaultUserIds: currentSettings.emailRules.fulfillmentRequestDefaultUserIds,
+        pickingPackingAllowedUserIds: currentSettings.emailRules.pickingPackingAllowedUserIds,
+        pickingPackingDefaultUserIds: currentSettings.emailRules.pickingPackingDefaultUserIds,
+        directMessageAllowedUserIds: currentSettings.emailRules.directMessageAllowedUserIds,
+        directMessageDefaultUserIds: currentSettings.emailRules.directMessageDefaultUserIds,
+      };
+
+      applyRecipientIdList({
+        data,
+        key: 'loginApprovalRecipientUserIds',
+        label: 'loginApprovalRecipientUserIds',
+        scope: 'active_admin',
+        activeUserIds,
+        activeAdminIds,
+        target: next,
+        updateData,
+        errors,
+      });
+
+      applyRecipientIdList({
+        data,
+        key: 'backInStockAdminRecipientUserIds',
+        label: 'backInStockAdminRecipientUserIds',
+        scope: 'active_user',
+        activeUserIds,
+        activeAdminIds,
+        target: next,
+        updateData,
+        errors,
+      });
+
+      applyRecipientIdList({
+        data,
+        key: 'stockAdjustmentRecipientUserIds',
+        label: 'stockAdjustmentRecipientUserIds',
+        scope: 'active_user',
+        activeUserIds,
+        activeAdminIds,
+        target: next,
+        updateData,
+        errors,
+      });
+
+      applyRecipientIdList({
+        data,
+        key: 'fulfillmentRequestAllowedUserIds',
+        label: 'fulfillmentRequestAllowedUserIds',
+        scope: 'active_admin',
+        activeUserIds,
+        activeAdminIds,
+        target: next,
+        updateData,
+        errors,
+      });
+
+      applyRecipientIdList({
+        data,
+        key: 'fulfillmentRequestDefaultUserIds',
+        label: 'fulfillmentRequestDefaultUserIds',
+        scope: 'active_admin',
+        activeUserIds,
+        activeAdminIds,
+        target: next,
+        updateData,
+        errors,
+      });
+
+      applyRecipientIdList({
+        data,
+        key: 'pickingPackingAllowedUserIds',
+        label: 'pickingPackingAllowedUserIds',
+        scope: 'active_user',
+        activeUserIds,
+        activeAdminIds,
+        target: next,
+        updateData,
+        errors,
+      });
+
+      applyRecipientIdList({
+        data,
+        key: 'pickingPackingDefaultUserIds',
+        label: 'pickingPackingDefaultUserIds',
+        scope: 'active_user',
+        activeUserIds,
+        activeAdminIds,
+        target: next,
+        updateData,
+        errors,
+      });
+
+      applyRecipientIdList({
+        data,
+        key: 'directMessageAllowedUserIds',
+        label: 'directMessageAllowedUserIds',
+        scope: 'active_user',
+        activeUserIds,
+        activeAdminIds,
+        target: next,
+        updateData,
+        errors,
+      });
+
+      applyRecipientIdList({
+        data,
+        key: 'directMessageDefaultUserIds',
+        label: 'directMessageDefaultUserIds',
+        scope: 'active_user',
+        activeUserIds,
+        activeAdminIds,
+        target: next,
+        updateData,
+        errors,
+      });
+
+      validateDefaultSubset({
+        data,
+        defaultsKey: 'fulfillmentRequestDefaultUserIds',
+        allowedKey: 'fulfillmentRequestAllowedUserIds',
+        defaults: next.fulfillmentRequestDefaultUserIds,
+        allowed: next.fulfillmentRequestAllowedUserIds,
+        errors,
+      });
+
+      validateDefaultSubset({
+        data,
+        defaultsKey: 'pickingPackingDefaultUserIds',
+        allowedKey: 'pickingPackingAllowedUserIds',
+        defaults: next.pickingPackingDefaultUserIds,
+        allowed: next.pickingPackingAllowedUserIds,
+        errors,
+      });
+
+      validateDefaultSubset({
+        data,
+        defaultsKey: 'directMessageDefaultUserIds',
+        allowedKey: 'directMessageAllowedUserIds',
+        defaults: next.directMessageDefaultUserIds,
+        allowed: next.directMessageAllowedUserIds,
+        errors,
+      });
+
+      if ('backInStockRequesterUpdatesEnabled' in data) {
+        if (typeof data.backInStockRequesterUpdatesEnabled !== 'boolean') {
+          errors.push('backInStockRequesterUpdatesEnabled: Must be true or false');
+        } else {
+          updateData.backInStockRequesterUpdatesEnabled = data.backInStockRequesterUpdatesEnabled;
+        }
+      }
+    }
+
     if (errors.length) {
       return { error: { message: 'Validation failed', errors, status: 400 } };
     }
 
     const settings = await model.update(updateData);
     return { data: settings, message: 'Settings saved' };
+  }
+}
+
+function applyRecipientIdList(params: {
+  data: Record<string, unknown>;
+  key: keyof Pick<UpdateAppSettingsData,
+    'loginApprovalRecipientUserIds'
+    | 'backInStockAdminRecipientUserIds'
+    | 'stockAdjustmentRecipientUserIds'
+    | 'fulfillmentRequestAllowedUserIds'
+    | 'fulfillmentRequestDefaultUserIds'
+    | 'pickingPackingAllowedUserIds'
+    | 'pickingPackingDefaultUserIds'
+    | 'directMessageAllowedUserIds'
+    | 'directMessageDefaultUserIds'
+  >;
+  label: string;
+  scope: UserScope;
+  activeUserIds: Set<string>;
+  activeAdminIds: Set<string>;
+  target: Record<string, string[]>;
+  updateData: UpdateAppSettingsData;
+  errors: string[];
+}) {
+  if (!(params.key in params.data)) return;
+
+  const value = params.data[params.key];
+  if (!Array.isArray(value)) {
+    params.errors.push(`${params.label}: Must be an array of user IDs`);
+    return;
+  }
+
+  const ids = normalizeUserIdList(value);
+  const allowedSet = params.scope === 'active_admin' ? params.activeAdminIds : params.activeUserIds;
+
+  const invalidIds = ids.filter((id) => !allowedSet.has(id));
+  if (invalidIds.length > 0) {
+    const scopeLabel = params.scope === 'active_admin' ? 'active admins' : 'active users';
+    params.errors.push(`${params.label}: Contains invalid IDs (must be ${scopeLabel})`);
+    return;
+  }
+
+  params.target[params.key] = ids;
+  params.updateData[params.key] = ids;
+}
+
+function validateDefaultSubset(params: {
+  data: Record<string, unknown>;
+  defaultsKey: string;
+  allowedKey: string;
+  defaults: string[];
+  allowed: string[];
+  errors: string[];
+}) {
+  if (!(params.defaultsKey in params.data) && !(params.allowedKey in params.data)) {
+    return;
+  }
+
+  const allowedSet = new Set(params.allowed);
+  const invalid = params.defaults.filter((id) => !allowedSet.has(id));
+  if (invalid.length > 0) {
+    params.errors.push(`${params.defaultsKey}: Default recipients must be included in ${params.allowedKey}`);
   }
 }

@@ -133,7 +133,9 @@ export default function PickingListPage() {
   const initialSearch = typeof window === 'undefined' ? '' : new URLSearchParams(window.location.search).get('search')?.trim() ?? '';
   const [orders, setOrders] = useState<PickingOrder[]>([]);
   const [stores, setStores] = useState<StoreOption[]>([]);
-  const [recipients, setRecipients] = useState<Recipient[]>([]);
+  const [packingRecipients, setPackingRecipients] = useState<Recipient[]>([]);
+  const [packingDefaultRecipientUserIds, setPackingDefaultRecipientUserIds] = useState<string[]>([]);
+  const [messageRecipients, setMessageRecipients] = useState<Recipient[]>([]);
   const [pagination, setPagination] = useState(DEFAULT_PAGINATION);
   const [searchInput, setSearchInput] = useState(initialSearch);
   const [search, setSearch] = useState(initialSearch);
@@ -277,12 +279,22 @@ export default function PickingListPage() {
       setError('');
       try {
         const res = await fetch(`/api/picking-list?${queryString}`);
-        const json = (await res.json()) as ApiResponse<{ orders: PickingOrder[]; stores: StoreOption[]; recipients: Recipient[]; pagination: Pagination }>;
+        const json = (await res.json()) as ApiResponse<{
+          orders: PickingOrder[];
+          stores: StoreOption[];
+          packingRecipients: Recipient[];
+          packingDefaultRecipientUserIds: string[];
+          messageRecipients: Recipient[];
+          messageDefaultRecipientUserIds: string[];
+          pagination: Pagination;
+        }>;
         if (!res.ok || !json.success) throw new Error(getApiErrorMessage(json, 'Failed to load picking list'));
         if (cancelled) return;
         setOrders(json.data.orders);
         setStores(json.data.stores);
-        setRecipients(json.data.recipients);
+        setPackingRecipients(json.data.packingRecipients);
+        setPackingDefaultRecipientUserIds(json.data.packingDefaultRecipientUserIds);
+        setMessageRecipients(json.data.messageRecipients);
         setPagination(json.data.pagination);
         setSelectedIds((prev) => prev.filter((id) => json.data.orders.some((order) => order.id === id)));
         setExpandedIds((prev) => prev.filter((id) => json.data.orders.some((order) => order.id === id)));
@@ -518,7 +530,7 @@ export default function PickingListPage() {
       toast.error('Select Full or enter a partial quantity before confirming packed.');
       return;
     }
-    setNotifyModal({ type: 'confirm', order, lines, selectedUserIds: recipients.filter((r) => r.role === 'admin').map((r) => r.id), message: '', saving: false });
+    setNotifyModal({ type: 'confirm', order, lines, selectedUserIds: packingDefaultRecipientUserIds, message: '', saving: false });
   }
 
   function openCancelPacked(order: PickingOrder, confirmationId?: string) {
@@ -529,7 +541,7 @@ export default function PickingListPage() {
       toast.error('This order has no active packed confirmation to cancel.');
       return;
     }
-    setNotifyModal({ type: 'cancel', order, confirmationId: active.id, selectedUserIds: recipients.filter((r) => r.role === 'admin').map((r) => r.id), message: '', saving: false });
+    setNotifyModal({ type: 'cancel', order, confirmationId: active.id, selectedUserIds: packingDefaultRecipientUserIds, message: '', saving: false });
   }
 
   async function submitNotifyAction() {
@@ -723,10 +735,18 @@ export default function PickingListPage() {
     setMessageModal({ order, messages: [], selectedUserId: '', message: '', loading: true, sending: false, error: '' });
     try {
       const res = await fetch(`/api/orders/${order.id}/messages`);
-      const json = (await res.json()) as ApiResponse<{ admins: Recipient[]; messages: Message[] }>;
+      const json = (await res.json()) as ApiResponse<{
+        admins: Recipient[];
+        defaultAdminIds: string[];
+        fulfillmentRequestAdmins: Recipient[];
+        fulfillmentRequestDefaultAdminIds: string[];
+        messages: Message[];
+      }>;
       if (!res.ok || !json.success) throw new Error(getApiErrorMessage(json, 'Failed to load messages'));
-      setRecipients(json.data.admins);
-      setMessageModal((prev) => prev && prev.order.id === order.id ? { ...prev, messages: json.data.messages, selectedUserId: json.data.admins[0]?.id ?? '', loading: false } : prev);
+      setMessageRecipients(json.data.admins);
+      const allowedIds = new Set(json.data.admins.map((admin) => admin.id));
+      const defaultId = json.data.defaultAdminIds.find((id) => allowedIds.has(id)) ?? json.data.admins[0]?.id ?? '';
+      setMessageModal((prev) => prev && prev.order.id === order.id ? { ...prev, messages: json.data.messages, selectedUserId: defaultId, loading: false } : prev);
       setOrders((prev) => prev.map((item) => item.id === order.id ? { ...item, messageCount: json.data.messages.length } : item));
     } catch (err) {
       setMessageModal((prev) => prev && prev.order.id === order.id ? { ...prev, error: err instanceof Error ? err.message : 'Failed to load messages', loading: false } : prev);
@@ -1244,17 +1264,14 @@ export default function PickingListPage() {
               <div>
                 <span className="mb-2 block text-xs font-semibold uppercase text-gray-500">Notify users</span>
                 <div className="max-h-44 space-y-1 overflow-y-auto rounded-lg border border-gray-200 p-2">
-                  {recipients.map((recipient) => {
-                    const isAdmin = recipient.role === 'admin';
+                  {packingRecipients.map((recipient) => {
                     return (
-                      <label key={recipient.id} className={`flex items-center gap-2 rounded px-2 py-1 text-sm ${isAdmin ? 'cursor-default' : 'cursor-pointer hover:bg-gray-50'}`}>
+                      <label key={recipient.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-gray-50">
                         <input
                           type="checkbox"
                           checked={notifyModal.selectedUserIds.includes(recipient.id)}
-                          readOnly={isAdmin}
-                          disabled={isAdmin}
-                          onChange={isAdmin ? undefined : () => setNotifyModal((prev) => prev ? { ...prev, selectedUserIds: prev.selectedUserIds.includes(recipient.id) ? prev.selectedUserIds.filter((id) => id !== recipient.id) : [...prev.selectedUserIds, recipient.id] } : prev)}
-                          className={`rounded border-gray-300 text-blue-600 ${isAdmin ? 'cursor-default' : 'cursor-pointer'}`}
+                          onChange={() => setNotifyModal((prev) => prev ? { ...prev, selectedUserIds: prev.selectedUserIds.includes(recipient.id) ? prev.selectedUserIds.filter((id) => id !== recipient.id) : [...prev.selectedUserIds, recipient.id] } : prev)}
+                          className="cursor-pointer rounded border-gray-300 text-blue-600"
                         />
                         <span>{recipient.name}</span>
                         <span className="text-xs text-gray-400">{recipient.email}</span>
@@ -1286,7 +1303,7 @@ export default function PickingListPage() {
           onDelete={(noteId) => void deleteNote(noteId)}
         />
       )}
-      {messageModal && <MessageModal state={messageModal} setState={setMessageModal} recipients={recipients} onClose={() => !messageModal.sending && setMessageModal(null)} onSubmit={() => void submitMessage()} />}
+      {messageModal && <MessageModal state={messageModal} setState={setMessageModal} recipients={messageRecipients} onClose={() => !messageModal.sending && setMessageModal(null)} onSubmit={() => void submitMessage()} />}
     </main>
   );
 }
@@ -1623,7 +1640,7 @@ function MessageModal({ state, setState, recipients, onClose, onSubmit }: { stat
       <div className="max-h-[calc(100dvh-2rem)] w-full max-w-2xl overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl" onClick={(event) => event.stopPropagation()}>
         <div className="flex items-start justify-between gap-4 border-b border-gray-200 px-5 py-4">
           <div>
-            <h3 id="picking-message-title" className="text-base font-semibold text-gray-900">Admin message</h3>
+            <h3 id="picking-message-title" className="text-base font-semibold text-gray-900">Direct message</h3>
             <p className="mt-1 text-sm text-gray-500">Order {state.order.number} · {state.order.customer}</p>
           </div>
           <button type="button" onClick={onClose} disabled={state.sending} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-50" aria-label="Close">
@@ -1641,7 +1658,7 @@ function MessageModal({ state, setState, recipients, onClose, onSubmit }: { stat
                 <label className="block text-sm text-gray-700">
                   <span className="mb-1 block text-xs font-semibold uppercase text-gray-500">Recipient</span>
                   <select value={state.selectedUserId} onChange={(event) => setState((prev) => prev ? { ...prev, selectedUserId: event.target.value } : prev)} disabled={state.sending || recipients.length === 0} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400 disabled:bg-gray-100 disabled:text-gray-400">
-                    {recipients.length === 0 ? <option value="">No active users</option> : recipients.map((recipient) => <option key={recipient.id} value={recipient.id}>{recipient.name} - {recipient.email}</option>)}
+                    {recipients.length === 0 ? <option value="">No active recipients</option> : recipients.map((recipient) => <option key={recipient.id} value={recipient.id}>{recipient.name} - {recipient.email}</option>)}
                   </select>
                 </label>
                 <label className="block text-sm text-gray-700">

@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import prisma from '@/lib/prisma.server';
 import { sendGoogleMail } from '@/lib/google-mail.server';
+import { resolveHiddenRecipientEmails } from '@/lib/email-rules.server';
 
 export async function createStaffLoginApproval(user: {
   id: string;
@@ -105,18 +106,8 @@ async function sendApprovalEmail({
   approveToken: string;
   rejectToken: string;
 }) {
-  const admins = await prisma.user.findMany({
-    where: {
-      role: 'admin',
-      active: true,
-    },
-    select: { email: true },
-  });
-  const recipients = admins.map((admin) => admin.email).filter(Boolean);
-
-  if (recipients.length === 0) {
-    throw new Error('No active admin email addresses are configured.');
-  }
+  const recipients = await resolveHiddenRecipientEmails('login_approval');
+  if (recipients.length === 0) return;
 
   const appUrl = process.env.APP_URL?.replace(/\/$/, '') || 'http://localhost:3000';
   const approveUrl = `${appUrl}/api/auth/staff-login-approvals/${approvalId}/approve?token=${approveToken}`;

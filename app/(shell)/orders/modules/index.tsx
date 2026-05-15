@@ -750,9 +750,22 @@ export default function OrdersPage() {
     setRequestPermModal({ order, conf, confId, requestType, availableAdmins: [], selectedAdminIds: [], reason: '', loadingAdmins: true, saving: false, error: '' });
     try {
       const res = await fetch(`/api/orders/${encodeURIComponent(order.id)}/messages`);
-      const json = (await res.json()) as ApiResponse<{ admins: AdminOption[]; messages: unknown[] }>;
+      const json = (await res.json()) as ApiResponse<{
+        admins: AdminOption[];
+        defaultAdminIds: string[];
+        fulfillmentRequestAdmins: AdminOption[];
+        fulfillmentRequestDefaultAdminIds: string[];
+        messages: unknown[];
+      }>;
       if (res.ok && json.success) {
-        setRequestPermModal((prev) => prev ? { ...prev, availableAdmins: json.data.admins, loadingAdmins: false } : null);
+        const allowedIds = new Set(json.data.fulfillmentRequestAdmins.map((admin) => admin.id));
+        const defaultSelection = json.data.fulfillmentRequestDefaultAdminIds.filter((id) => allowedIds.has(id));
+        setRequestPermModal((prev) => prev ? {
+          ...prev,
+          availableAdmins: json.data.fulfillmentRequestAdmins,
+          selectedAdminIds: defaultSelection,
+          loadingAdmins: false,
+        } : null);
       } else {
         setRequestPermModal((prev) => prev ? { ...prev, loadingAdmins: false, error: 'Failed to load admin list' } : null);
       }
@@ -852,6 +865,9 @@ export default function OrdersPage() {
       const res = await fetch(`/api/orders/${encodeURIComponent(order.id)}/messages`);
       const json = (await res.json()) as ApiResponse<{
         admins: AdminOption[];
+        defaultAdminIds: string[];
+        fulfillmentRequestAdmins: AdminOption[];
+        fulfillmentRequestDefaultAdminIds: string[];
         messages: OrderAdminMessage[];
       }>;
 
@@ -861,11 +877,13 @@ export default function OrdersPage() {
 
       setMessageModal((prev) => {
         if (!prev || prev.order.id !== order.id) return prev;
+        const allowedIds = new Set(json.data.admins.map((admin) => admin.id));
+        const defaultId = json.data.defaultAdminIds.find((id) => allowedIds.has(id)) ?? json.data.admins[0]?.id ?? '';
         return {
           ...prev,
           admins: json.data.admins,
           messages: json.data.messages,
-          selectedAdminId: json.data.admins[0]?.id ?? '',
+          selectedAdminId: defaultId,
           loading: false,
         };
       });
@@ -892,7 +910,7 @@ export default function OrdersPage() {
 
     const message = messageModal.message.trim();
     if (!messageModal.selectedAdminId || !message) {
-      setMessageModal((prev) => prev ? { ...prev, error: 'Select an admin and enter a message.' } : prev);
+      setMessageModal((prev) => prev ? { ...prev, error: 'Select a recipient and enter a message.' } : prev);
       return;
     }
 

@@ -1,5 +1,9 @@
 import prisma from '@/lib/prisma.server';
 import { sendGoogleMail } from '@/lib/google-mail.server';
+import {
+  isBackInStockRequesterUpdatesEnabled,
+  resolveHiddenRecipientEmails,
+} from '@/lib/email-rules.server';
 import { Prisma } from '@prisma/client';
 
 export type BackInStockStatus = 'pending' | 'partially_back_in_stock' | 'back_in_stock';
@@ -399,14 +403,11 @@ function toQuantitySnapshot(item: BackInStockItemInput) {
 }
 
 async function notifyAdmins(request: { orderNumber: string; requesterName: string; requesterEmail: string; items: Prisma.JsonValue; requestMessage: string | null }) {
-  const admins = await prisma.user.findMany({
-    where: { role: 'admin', active: true },
-    select: { email: true },
-  });
-  if (admins.length === 0) return;
+  const recipients = await resolveHiddenRecipientEmails('back_in_stock_admin');
+  if (recipients.length === 0) return;
   const row = { ...request, items: toItems(request.items) };
   await sendGoogleMail({
-    to: admins.map((admin) => admin.email),
+    to: recipients,
     subject: `Back in stock request for Order #${request.orderNumber}`,
     text: buildRequestText(row),
     html: buildRequestHtml(row),
@@ -414,6 +415,9 @@ async function notifyAdmins(request: { orderNumber: string; requesterName: strin
 }
 
 async function notifyRequester(request: { orderNumber: string; requesterEmail: string; status: string; items: Prisma.JsonValue }, message: string) {
+  const requesterUpdatesEnabled = await isBackInStockRequesterUpdatesEnabled();
+  if (!requesterUpdatesEnabled) return;
+
   const items = toItems(request.items);
   await sendGoogleMail({
     to: [request.requesterEmail],
