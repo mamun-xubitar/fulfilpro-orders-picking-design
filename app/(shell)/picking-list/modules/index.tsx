@@ -7,6 +7,7 @@ import type { Dispatch, RefObject, SetStateAction } from 'react';
 import { useSession } from 'next-auth/react';
 import { toast } from 'react-toastify';
 import OrdersPagination from '../../orders/modules/OrdersPagination';
+import { printDocumentInHiddenFrame } from '../../orders/modules/packingSlipPrint';
 import type { ShippingLine } from '../../orders/modules/types';
 import { formatShippingMoney, getShippingDiscountCodes, getShippingLineFinalPrice } from '../../orders/modules/utils';
 import { isOrderPickerRole } from '@/lib/roles';
@@ -573,16 +574,13 @@ export default function PickingListPage() {
       toast.error('At least one item must remain on the picking slip.');
       return;
     }
-    const printWindow = window.open('', '_blank', 'width=1000,height=800');
-    if (!printWindow) {
-      toast.error('Unable to open print window. Please allow popups for this site.');
+    const printHtml = buildPickingSlipDocument(printableOrders);
+    try {
+      await printDocumentInHiddenFrame(printHtml);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Unable to start print. Please try again.');
       return;
     }
-    printWindow.document.open();
-    printWindow.document.write(buildPickingSlipDocument(printableOrders));
-    printWindow.document.close();
-    printWindow.focus();
-    setTimeout(() => printWindow.print(), 250);
 
     try {
       const res = await fetch('/api/picking-list/prints', {
