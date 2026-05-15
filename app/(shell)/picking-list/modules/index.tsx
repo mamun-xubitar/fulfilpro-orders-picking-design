@@ -154,7 +154,7 @@ export default function PickingListPage() {
     return { year: now.getFullYear(), month: now.getMonth() };
   });
   const [hoverDate, setHoverDate] = useState<string | null>(null);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expandedIds, setExpandedIds] = useState<string[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [fullChecks, setFullChecks] = useState<Record<string, boolean>>({});
   const [partialValues, setPartialValues] = useState<Record<string, number>>({});
@@ -285,6 +285,7 @@ export default function PickingListPage() {
         setRecipients(json.data.recipients);
         setPagination(json.data.pagination);
         setSelectedIds((prev) => prev.filter((id) => json.data.orders.some((order) => order.id === id)));
+        setExpandedIds((prev) => prev.filter((id) => json.data.orders.some((order) => order.id === id)));
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load picking list');
       } finally {
@@ -299,6 +300,7 @@ export default function PickingListPage() {
 
   const selectedOrders = orders.filter((order) => selectedIds.includes(order.id));
   const allPageSelected = orders.length > 0 && orders.every((order) => selectedIds.includes(order.id));
+  const allSelectedExpanded = selectedIds.length > 0 && selectedIds.every((id) => expandedIds.includes(id));
   const defaultPackedStatuses = ['not_packed', 'partially_packed'];
   const isPackedStatusDefault = packedStatuses.length === defaultPackedStatuses.length && defaultPackedStatuses.every((status) => packedStatuses.includes(status));
   const hasActiveFilters = searchInput !== '' || storeIds.length > 0 || period !== 'all' || !!dateFrom || !!dateTo || !isPackedStatusDefault || printStatuses.length > 0;
@@ -369,6 +371,22 @@ export default function PickingListPage() {
     } else {
       setSelectedIds((prev) => Array.from(new Set([...prev, ...orders.map((order) => order.id)])));
     }
+  }
+
+  function toggleBulkView(targetIds: string[]) {
+    if (targetIds.length === 0) return;
+    setExpandedIds((prev) => {
+      const targetSet = new Set(targetIds);
+      const allExpanded = targetIds.every((id) => prev.includes(id));
+      if (allExpanded) {
+        return prev.filter((id) => !targetSet.has(id));
+      }
+      const next = [...prev];
+      for (const id of targetIds) {
+        if (!next.includes(id)) next.push(id);
+      }
+      return next;
+    });
   }
 
   function toggleStore(id: string) {
@@ -904,7 +922,10 @@ export default function PickingListPage() {
       {selectedIds.length > 0 && (
         <div className="mb-3 flex items-center justify-between rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
           <span className="text-sm font-medium text-blue-900">{selectedIds.length} order{selectedIds.length === 1 ? '' : 's'} selected</span>
-          <button onClick={() => openPrintModal(selectedOrders)} className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700">Print picking slip</button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => toggleBulkView(selectedIds)} className="rounded-lg border border-blue-300 bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100">{allSelectedExpanded ? 'Collapse' : 'Expand'}</button>
+            <button onClick={() => openPrintModal(selectedOrders)} className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700">Print picking slip</button>
+          </div>
         </div>
       )}
 
@@ -930,7 +951,7 @@ export default function PickingListPage() {
               {!loading && error && <tr><td colSpan={10} className="py-12 text-center text-red-500">{error}</td></tr>}
               {!loading && !error && orders.length === 0 && <tr><td colSpan={10} className="py-16 text-center text-gray-400">No picking orders found.</td></tr>}
               {!loading && !error && orders.map((order) => {
-                const isExpanded = expandedId === order.id;
+                const isExpanded = expandedIds.includes(order.id);
                 const isSelected = selectedIds.includes(order.id);
                 const isAllPacked = order.packingStatus === 'packed' || (order.totalQuantity > 0 && order.packedQuantity >= order.totalQuantity);
                 const canConfirmPacked = !order.closed && !order.canceled && order.packedQuantity < order.totalQuantity && getPickingLines(order).length > 0;
@@ -982,7 +1003,7 @@ export default function PickingListPage() {
                             <button
                               onClick={(event) => {
                                 event.stopPropagation();
-                                setExpandedId((prev) => prev === order.id ? null : order.id);
+                                setExpandedIds((prev) => prev.includes(order.id) ? prev.filter((id) => id !== order.id) : [...prev, order.id]);
                               }}
                               className="cursor-pointer rounded-lg p-1.5 text-xs font-medium text-gray-500 transition-colors duration-150 hover:bg-gray-100 hover:text-blue-600"
                               aria-label={`${isExpanded ? 'Hide' : 'View'} details for ${order.number}`}
