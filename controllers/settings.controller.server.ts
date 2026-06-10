@@ -19,6 +19,7 @@ const TIMEZONES = new Set([
   'Asia/Tokyo',
   'Asia/Singapore',
   'Asia/Dubai',
+  'Asia/Dhaka',
   'UTC',
 ]);
 const DAYS = new Set(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);

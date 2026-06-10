@@ -749,7 +749,7 @@ export default function OrdersPage() {
 
     setRequestPermModal({ order, conf, confId, requestType, availableAdmins: [], selectedAdminIds: [], reason: '', loadingAdmins: true, saving: false, error: '' });
     try {
-      const res = await fetch(`/api/orders/${encodeURIComponent(order.id)}/messages`);
+      const res = await fetch(`/api/orders/${encodeURIComponent(order.id)}/messages?type=orders`);
       const json = (await res.json()) as ApiResponse<{
         admins: AdminOption[];
         defaultAdminIds: string[];
@@ -922,6 +922,7 @@ export default function OrdersPage() {
         body: JSON.stringify({
           adminId: messageModal.selectedAdminId,
           message,
+          type: 'orders',
         }),
       });
       const json = (await res.json()) as ApiResponse<OrderAdminMessage>;

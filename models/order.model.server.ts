@@ -13,6 +13,7 @@ import {
   resolvePickerRecipientOptions,
 } from '@/lib/email-rules.server';
 import { Prisma } from '@prisma/client';
+type OrderMessageTypeInput = 'orders' | 'picker';
 
 export type ShopifyOrderPayload = {
   id?: string | number;
@@ -271,7 +272,6 @@ export class OrderModel {
       },
       _count: {
         select: {
-          messages: true,
           notes: true,
           backInStockRequests: true,
         },
@@ -314,7 +314,8 @@ export class OrderModel {
       const idOrder = new Map(searchPage.ids.map((id, index) => [id, index]));
       rows.sort((a, b) => (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0));
 
-      const allOrders = rows.map(toOrderRow);
+      const messageCounts = await getOrderMessageCounts(rows.map((row) => row.id), 'orders');
+      const allOrders = rows.map((row) => toOrderRow(row, messageCounts.get(row.id) ?? 0));
 
       if (filterByPacking) {
         const packingSet = new Set(packingStatuses);
@@ -334,7 +335,10 @@ export class OrderModel {
         orderBy: { orderedAt: 'desc' },
       });
       const packingSet = new Set(packingStatuses);
-      const filtered = allRows.map(toOrderRow).filter((o) => packingSet.has(o.packingStatus));
+      const messageCounts = await getOrderMessageCounts(allRows.map((row) => row.id), 'orders');
+      const filtered = allRows
+        .map((row) => toOrderRow(row, messageCounts.get(row.id) ?? 0))
+        .filter((o) => packingSet.has(o.packingStatus));
       const total = filtered.length;
       const sliced = filtered.slice((page - 1) * pageSize, page * pageSize);
       return { total, orders: sliced };
@@ -351,7 +355,8 @@ export class OrderModel {
       }),
     ]);
 
-    const orders = rows.map(toOrderRow);
+    const messageCounts = await getOrderMessageCounts(rows.map((row) => row.id), 'orders');
+    const orders = rows.map((row) => toOrderRow(row, messageCounts.get(row.id) ?? 0));
 
     return { total, orders };
   }
@@ -447,7 +452,6 @@ export class OrderModel {
         },
         _count: {
           select: {
-            messages: true,
             notes: true,
             backInStockRequests: true,
           },
@@ -473,7 +477,11 @@ export class OrderModel {
       throw new Error('Order not found');
     }
 
-    return toOrderRow(row);
+    const messageCount = await prisma.orderMessage.count({
+      where: { orderId: row.id, type: 'orders' },
+    });
+
+    return toOrderRow(row, messageCount);
   }
 
   async confirmFulfillment(
@@ -821,7 +829,7 @@ export class OrderModel {
     };
   }
 
-  async getOrderMessageCenter(orderId: string) {
+  async getOrderMessageCenter(orderId: string, type: OrderMessageTypeInput) {
     const [order, directMessageRecipients, fulfillmentRequestRecipients, messages] = await Promise.all([
       prisma.order.findUnique({
         where: { id: orderId },
@@ -830,7 +838,7 @@ export class OrderModel {
       resolvePickerRecipientOptions('direct_message'),
       resolvePickerRecipientOptions('fulfillment_request'),
       prisma.orderMessage.findMany({
-        where: { orderId },
+        where: { orderId, type },
         orderBy: { createdAt: 'desc' },
       }),
     ]);
@@ -852,6 +860,7 @@ export class OrderModel {
     orderId: string;
     adminId: string;
     message: string;
+    type: OrderMessageTypeInput;
     sender?: {
       id?: string | null;
       name?: string | null;
@@ -901,6 +910,7 @@ export class OrderModel {
         senderId: params.sender?.id ?? null,
         senderName,
         senderEmail,
+        type: params.type,
         message: params.message,
       },
     });
@@ -1061,7 +1071,6 @@ function toOrderRow(row: {
     storeDomain: string;
   };
   _count: {
-    messages: number;
     notes: number;
     backInStockRequests: number;
   };
@@ -1085,7 +1094,7 @@ function toOrderRow(row: {
     updatedAt: Date;
   } | null;
   packingConfirmations?: Array<{ id: string; lines: Prisma.JsonValue; confirmedAt: Date; canceledAt: Date | null }>;
-}) {
+}, messageCount: number) {
   const lineItems = toLineItems(row.lineItems);
   const itemCount = lineItems.reduce((sum, item) => sum + Math.max(0, item.qty), 0);
 
@@ -1128,7 +1137,7 @@ function toOrderRow(row: {
     shippingLines: toShippingLines(row.shippingLines),
     fulfillmentItems: toFulfillmentItems(row.fulfillmentItems),
     itemsCount: itemCount,
-    messageCount: row._count.messages,
+    messageCount,
     noteCount: row._count.notes,
     stockRequestCount: getStockRequestBadgeCount(row),
     backInStockStatus: getBackInStockStatus(row.backInStockRequests ?? []),
@@ -1137,6 +1146,21 @@ function toOrderRow(row: {
     packedQuantity,
     totalQuantity,
   };
+}
+
+async function getOrderMessageCounts(orderIds: string[], type: OrderMessageTypeInput) {
+  if (orderIds.length === 0) return new Map<string, number>();
+
+  const rows = await prisma.orderMessage.groupBy({
+    by: ['orderId'],
+    where: {
+      orderId: { in: orderIds },
+      type,
+    },
+    _count: { _all: true },
+  });
+
+  return new Map(rows.map((row) => [row.orderId, row._count._all]));
 }
 
 function computePackedByLine(confirmations: Array<{ lines: Prisma.JsonValue }>) {

@@ -7,10 +7,12 @@ import { getUserAllowedStoreIds, assertOrderStoreAccess } from '@/lib/store-acce
 const controller = new OrderController();
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  const { searchParams } = new URL(request.url);
+  const type = searchParams.get('type');
 
   try {
     const session = await auth();
@@ -21,7 +23,7 @@ export async function GET(
       }
     }
 
-    const result = await controller.getOrderMessageCenter(id);
+    const result = await controller.getOrderMessageCenter(id, type);
     return apiSuccess({ message: result.message, data: result.data });
   } catch (error) {
     return apiError({

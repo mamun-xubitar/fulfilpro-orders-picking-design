@@ -734,7 +734,7 @@ export default function PickingListPage() {
   async function openMessageModal(order: PickingOrder) {
     setMessageModal({ order, messages: [], selectedUserId: '', message: '', loading: true, sending: false, error: '' });
     try {
-      const res = await fetch(`/api/orders/${order.id}/messages`);
+      const res = await fetch(`/api/orders/${order.id}/messages?type=picker`);
       const json = (await res.json()) as ApiResponse<{
         admins: Recipient[];
         defaultAdminIds: string[];
@@ -765,7 +765,7 @@ export default function PickingListPage() {
       const res = await fetch(`/api/orders/${messageModal.order.id}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ adminId: messageModal.selectedUserId, message }),
+        body: JSON.stringify({ adminId: messageModal.selectedUserId, message, type: 'picker' }),
       });
       const json = (await res.json()) as ApiResponse<Message>;
       if (!res.ok || !json.success) throw new Error(getApiErrorMessage(json, 'Failed to send message'));

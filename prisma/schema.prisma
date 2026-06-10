@@ -244,12 +244,18 @@ model OrderMessage {
   senderId    String?
   senderName  String?
   senderEmail String?
+  type        OrderMessageType @default(orders)
   message     String
   createdAt   DateTime @default(now())
   order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
-  @@index([orderId, createdAt])
+  @@index([orderId, type, createdAt])
   @@index([adminEmail])
+}
+
+enum OrderMessageType {
+  orders
+  picker
 }
 
 model OrderSyncJob {

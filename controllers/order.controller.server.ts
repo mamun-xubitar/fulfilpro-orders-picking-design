@@ -162,8 +162,9 @@ export class OrderController {
     };
   }
 
-  async getOrderMessageCenter(orderId: string) {
-    const result = await model.getOrderMessageCenter(orderId);
+  async getOrderMessageCenter(orderId: string, typeInput?: string | null) {
+    const type = parseOrderMessageType(typeInput, true);
+    const result = await model.getOrderMessageCenter(orderId, type);
 
     return {
       data: result,
@@ -180,11 +181,12 @@ export class OrderController {
       email?: string | null;
     } | null
   ) {
-    const { adminId, message } = parseAdminOrderMessage(body);
+    const { adminId, message, type } = parseAdminOrderMessage(body);
     const result = await model.sendAdminOrderMessage({
       orderId,
       adminId,
       message,
+      type,
       sender,
     });
 
@@ -290,7 +292,16 @@ function parseAdminOrderMessage(body: unknown) {
     throw new Error('Message must be 5000 characters or fewer');
   }
 
-  return { adminId, message };
+  const type = parseOrderMessageType(value.type, true);
+
+  return { adminId, message, type };
+}
+
+function parseOrderMessageType(value: unknown, defaultToOrders: boolean): 'orders' | 'picker' {
+  if (value == null && defaultToOrders) return 'orders';
+  const type = typeof value === 'string' ? value.trim() : '';
+  if (type === 'orders' || type === 'picker') return type;
+  throw new Error("type must be either 'orders' or 'picker'");
 }
 
 function parseBarcodes(body: unknown) {

@@ -105,7 +105,8 @@ export class PickingListModel {
       }),
     ]);
 
-    const rows = ordersResult.rows.map(toPickingOrderRow);
+    const messageCounts = await getPickingMessageCounts(ordersResult.rows.map((row) => row.id));
+    const rows = ordersResult.rows.map((row) => toPickingOrderRow(row, messageCounts.get(row.id) ?? 0));
     const filtered = rows.filter((row) => {
       if (packedStatuses.size > 0 && !packedStatuses.has(row.packingStatus)) return false;
       return true;
@@ -365,13 +366,16 @@ export class PickingListModel {
         store: { select: { id: true, name: true, storeDomain: true } },
         packingConfirmations: { orderBy: { confirmedAt: 'desc' } },
         pickingSlipPrints: { orderBy: { printedAt: 'desc' }, take: 1 },
-        _count: { select: { notes: true, messages: true } },
+        _count: { select: { notes: true } },
       },
     });
 
     if (!order) throw new Error('Order not found');
     // const [row] = await this.attachMetadata([toPickingOrderRow(order)]);
-    return { order: toPickingOrderRow(order), savedConfirmationId };
+    const messageCount = await prisma.orderMessage.count({
+      where: { orderId: order.id, type: 'picker' },
+    });
+    return { order: toPickingOrderRow(order, messageCount), savedConfirmationId };
   }
 
   private async attachMetadata<T extends { storeId: string; items: Array<OrderItem & { metadata: PickingMetadata }> }>(rows: T[]) {
@@ -456,7 +460,7 @@ function pickingOrderInclude() {
     store: { select: { id: true, name: true, storeDomain: true } },
     packingConfirmations: { orderBy: { confirmedAt: 'desc' as const } },
     pickingSlipPrints: { orderBy: { printedAt: 'desc' as const }, take: 1 },
-    _count: { select: { notes: true, messages: true } },
+    _count: { select: { notes: true } },
   } satisfies Prisma.OrderInclude;
 }
 
@@ -688,8 +692,8 @@ function toPickingOrderRow(order: {
   store: { id: string; name: string | null; storeDomain: string };
   packingConfirmations: Array<{ id: string; lines: Prisma.JsonValue; confirmedAt: Date; canceledAt: Date | null }>;
   pickingSlipPrints: Array<{ printedAt: Date }>;
-  _count: { notes: number; messages: number };
-}) {
+  _count: { notes: number };
+}, messageCount: number) {
   const items = toLineItems(order.lineItems).map((item) => ({ ...item, metadata: { location: '', remark: '', note: '' } }));
   const activeConfirmations = order.packingConfirmations.filter((confirmation) => !confirmation.canceledAt);
   const packedByLine = getPackedByLine(activeConfirmations);
@@ -741,7 +745,7 @@ function toPickingOrderRow(order: {
     lastPackedAt,
     lastPackingUpdateAt,
     noteCount: order._count.notes,
-    messageCount: order._count.messages,
+    messageCount,
     fulfillmentStatus: order.fulfillmentStatus ?? null,
     packingConfirmations: order.packingConfirmations.map((confirmation) => ({
       id: confirmation.id,
@@ -750,6 +754,21 @@ function toPickingOrderRow(order: {
       lines: normalizeStoredLines(confirmation.lines),
     })),
   };
+}
+
+async function getPickingMessageCounts(orderIds: string[]) {
+  if (orderIds.length === 0) return new Map<string, number>();
+
+  const rows = await prisma.orderMessage.groupBy({
+    by: ['orderId'],
+    where: {
+      orderId: { in: orderIds },
+      type: 'picker',
+    },
+    _count: { _all: true },
+  });
+
+  return new Map(rows.map((row) => [row.orderId, row._count._all]));
 }
 
 function toLineItems(value: Prisma.JsonValue): OrderItem[] {
