@@ -99,6 +99,7 @@ type ShopifyOrderByIdResult = {
             currencyCode: string;
           };
         } | null;
+        customAttributes: Array<{ key: string; value: string | null }>;
       }>;
     };
     fulfillments: Array<{
@@ -225,6 +226,10 @@ const ORDER_BY_ID_QUERY = `
               amount
               currencyCode
             }
+          }
+          customAttributes {
+            key
+            value
           }
         }
       }
@@ -369,6 +374,7 @@ function toShopifyOrderPayload(order: NonNullable<ShopifyOrderByIdResult['order'
               },
             }
           : undefined,
+        custom_attributes: lineItem.customAttributes.map((a) => ({ name: a.key, value: a.value })),
       };
     }),
     shipping_lines: order.shippingLines.nodes.map((shippingLine) => ({

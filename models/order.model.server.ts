@@ -120,6 +120,7 @@ export type ShopifyOrderPayload = {
     quantity?: number | null;
     fulfillable_quantity?: number | null;
     properties?: Array<{ name?: string | null; value?: string | number | null }> | null;
+    custom_attributes?: Array<{ name?: string | null; value?: string | number | null }> | null;
     image?: { src?: string | null; url?: string | null } | null;
     price?: string | number | null;
     price_set?: {
@@ -1246,6 +1247,7 @@ function buildOrderWriteData(
     title: item.title ?? item.name ?? '',
     variantTitle: item.variant_title ?? '',
     variantOptions: normalizeLineItemProperties(item.properties ?? null),
+    customAttributes: normalizeLineItemProperties(item.custom_attributes ?? item.properties ?? null),
     imageUrl: item.image?.src ?? item.image?.url ?? null,
     sku: item.sku ?? '',
     vendor: item.vendor ?? '',
@@ -2101,6 +2103,7 @@ function toLineItems(value: Prisma.JsonValue): Array<{
   title: string;
   variantTitle: string;
   variantOptions: Array<{ name: string; value: string }>;
+  customAttributes: Array<{ name: string; value: string }>;
   imageUrl: string | null;
   sku: string;
   vendor: string;
@@ -2110,7 +2113,7 @@ function toLineItems(value: Prisma.JsonValue): Array<{
 
   return value.map((item) => {
     if (!item || typeof item !== 'object') {
-      return { id: '', productId: null, variantId: null, name: '', title: '', variantTitle: '', variantOptions: [], imageUrl: null, sku: '', vendor: '', qty: 0 };
+      return { id: '', productId: null, variantId: null, name: '', title: '', variantTitle: '', variantOptions: [], customAttributes: [], imageUrl: null, sku: '', vendor: '', qty: 0 };
     }
 
     const obj = item as Record<string, unknown>;
@@ -2122,6 +2125,7 @@ function toLineItems(value: Prisma.JsonValue): Array<{
       title: typeof obj.title === 'string' ? obj.title : (typeof obj.name === 'string' ? obj.name : ''),
       variantTitle: typeof obj.variantTitle === 'string' ? obj.variantTitle : '',
       variantOptions: normalizeStoredVariantOptions(obj.variantOptions),
+      customAttributes: normalizeStoredVariantOptions(obj.customAttributes),
       imageUrl: typeof obj.imageUrl === 'string' && obj.imageUrl.trim() ? obj.imageUrl : null,
       sku: typeof obj.sku === 'string' ? obj.sku : '',
       vendor: typeof obj.vendor === 'string' ? obj.vendor : '',
