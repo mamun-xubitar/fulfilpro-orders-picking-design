@@ -6,6 +6,7 @@ export type OrderItem = {
   title?: string;
   variantTitle?: string;
   variantOptions?: Array<{ name: string; value: string }>;
+  customAttributes?: Array<{ name: string; value: string }>;
   imageUrl?: string | null;
   sku: string;
   vendor: string;

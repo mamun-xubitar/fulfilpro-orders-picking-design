@@ -31,6 +31,7 @@ import type {
 } from './types';
 import { DEFAULT_PAGINATION, PERIODS, SHOPIFY_TRACKING_CARRIERS, STATUS_MAP } from './constants';
 import { buildPackingSlipDocument, printDocumentInHiddenFrame } from './packingSlipPrint';
+import { buildNameAttributesCsv, buildNameAttributesDocument, downloadCsv, type NameAttributeRow } from './nameAttributesExport';
 import PendingRequestsPanel from './PendingRequestsPanel';
 import OrdersPagination from './OrdersPagination';
 import OrdersToolbar from './OrdersToolbar';
@@ -40,6 +41,7 @@ import {
   formatStockStatus,
   formatSyncDate,
   getApiErrorMessage,
+  getNameAttribute,
   getOrderAddressLines,
   getShippingDiscountCodes,
   getShippingLineFinalPrice,
@@ -97,6 +99,14 @@ export default function OrdersPage() {
   const [stockAdjustmentModal, setStockAdjustmentModal] = useState<StockAdjustmentModalState | null>(null);
   const [printingOrderId, setPrintingOrderId] = useState<string | null>(null);
   const [fulfillmentViewOrderId, setFulfillmentViewOrderId] = useState<string | null>(null);
+  const [selectedNames, setSelectedNames] = useState<Map<string, NameAttributeRow>>(new Map());
+  const [selectAllFilters, setSelectAllFilters] = useState(false);
+  const [excludedNames, setExcludedNames] = useState<Set<string>>(new Set());
+  const [filterNameCount, setFilterNameCount] = useState<number | null>(null);
+  const [nameCountLoading, setNameCountLoading] = useState(false);
+  const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
+  const [exportLoading, setExportLoading] = useState(false);
+  const exportDropdownRef = useRef<HTMLDivElement>(null);
   const { data: session } = useSession();
   const userRole = (session?.user?.role as string) ?? '';
   const userIsAdmin = userRole === 'admin';
@@ -142,6 +152,13 @@ export default function OrdersPage() {
     packingStatuses.forEach((s) => params.append('packingStatus', s));
     return params.toString();
   }, [pagination.page, pagination.pageSize, period, search, storeIds, dateFrom, dateTo, fulfillmentStatuses, packingStatuses]);
+
+  useEffect(() => {
+    setSelectAllFilters(false);
+    setExcludedNames(new Set());
+    setSelectedNames(new Map());
+    setFilterNameCount(null);
+  }, [period, search, storeIds, dateFrom, dateTo, fulfillmentStatuses, packingStatuses]);
 
   const filteredTrackingCarriers = useMemo(() => {
     const query = carrierSearch.trim();
@@ -425,6 +442,109 @@ export default function OrdersPage() {
     const parsed = parseInt(value, 10);
     const clamped = Number.isNaN(parsed) || parsed < 0 ? 0 : parsed > maxQty ? maxQty : parsed;
     setPartialValues((prev) => ({ ...prev, [rowItemKey(orderId, itemIndex)]: clamped }));
+  };
+
+  const nameKey = (orderId: string, lineItemId: string) => `${orderId}:${lineItemId}`;
+
+  const orderNameEntries = (order: OrderRow): Array<{ key: string; row: NameAttributeRow }> =>
+    order.items.flatMap((item) => {
+      const attr = getNameAttribute(item);
+      if (!attr) return [];
+      return [{ key: nameKey(order.id, item.id), row: { productTitle: item.title ?? item.name, value: attr.value } }];
+    });
+
+  const isNameChecked = (key: string) => (selectAllFilters ? !excludedNames.has(key) : selectedNames.has(key));
+
+  const selectedNameCount = selectAllFilters
+    ? Math.max(0, (filterNameCount ?? 0) - excludedNames.size)
+    : selectedNames.size;
+
+  const setNamesChecked = (entries: Array<{ key: string; row: NameAttributeRow }>, checked: boolean) => {
+    if (selectAllFilters) {
+      setExcludedNames((prev) => {
+        const next = new Set(prev);
+        entries.forEach(({ key }) => (checked ? next.delete(key) : next.add(key)));
+        return next;
+      });
+    } else {
+      setSelectedNames((prev) => {
+        const next = new Map(prev);
+        entries.forEach(({ key, row }) => (checked ? next.set(key, row) : next.delete(key)));
+        return next;
+      });
+    }
+  };
+
+  const isOrderAllNamesChecked = (order: OrderRow) => {
+    const entries = orderNameEntries(order);
+    return entries.length > 0 && entries.every(({ key }) => isNameChecked(key));
+  };
+
+  const toggleOrderNames = (order: OrderRow) => {
+    setNamesChecked(orderNameEntries(order), !isOrderAllNamesChecked(order));
+  };
+
+  const fetchNameAttributeCount = useCallback(async () => {
+    setNameCountLoading(true);
+    try {
+      const res = await fetch(`/api/orders/name-attributes?${queryString}`);
+      const json = (await res.json()) as ApiResponse<{ count: number }>;
+      if (!res.ok || !json.success) throw new Error(json.message || 'Failed to load attributes');
+      setFilterNameCount(json.data.count);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to load attribute count');
+      setFilterNameCount(0);
+    } finally {
+      setNameCountLoading(false);
+    }
+  }, [queryString]);
+
+  const handleToggleSelectAllFilters = () => {
+    if (selectAllFilters) {
+      setSelectAllFilters(false);
+      setExcludedNames(new Set());
+      setFilterNameCount(null);
+      return;
+    }
+    setSelectedNames(new Map());
+    setExcludedNames(new Set());
+    setSelectAllFilters(true);
+    void fetchNameAttributeCount();
+  };
+
+  const gatherExportRows = useCallback(async (): Promise<NameAttributeRow[]> => {
+    if (selectAllFilters) {
+      const res = await fetch(`/api/orders/name-attributes?${queryString}`);
+      const json = (await res.json()) as ApiResponse<{
+        attributes: Array<{ orderId: string; lineItemId: string; productTitle: string; value: string }>;
+      }>;
+      if (!res.ok || !json.success) throw new Error(json.message || 'Failed to load attributes');
+      return json.data.attributes
+        .filter((a) => !excludedNames.has(`${a.orderId}:${a.lineItemId}`))
+        .map((a) => ({ productTitle: a.productTitle, value: a.value }));
+    }
+    return Array.from(selectedNames.values());
+  }, [selectAllFilters, queryString, excludedNames, selectedNames]);
+
+  const runExport = async (mode: 'csv' | 'print') => {
+    setExportDropdownOpen(false);
+    setExportLoading(true);
+    try {
+      const rows = await gatherExportRows();
+      if (rows.length === 0) {
+        toast.info('No attributes selected to export.');
+        return;
+      }
+      if (mode === 'csv') {
+        downloadCsv(`name-attributes-${new Date().toISOString().slice(0, 10)}.csv`, buildNameAttributesCsv(rows));
+      } else {
+        await printDocumentInHiddenFrame(buildNameAttributesDocument(rows));
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to export attributes');
+    } finally {
+      setExportLoading(false);
+    }
   };
 
   const getFulfilledQty = (order: OrderRow, lineItemId: string) => {
@@ -1480,6 +1600,9 @@ export default function OrdersPage() {
       if (syncStoreDropdownRef.current && !syncStoreDropdownRef.current.contains(e.target as Node)) {
         setSyncStoreDropdownOpen(false);
       }
+      if (exportDropdownRef.current && !exportDropdownRef.current.contains(e.target as Node)) {
+        setExportDropdownOpen(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -1557,7 +1680,38 @@ export default function OrdersPage() {
         setDateFrom={setDateFrom}
         setDateTo={setDateTo}
         setPeriod={setPeriod}
+        selectedNameCount={selectedNameCount}
+        exportLoading={exportLoading}
+        exportDropdownOpen={exportDropdownOpen}
+        setExportDropdownOpen={setExportDropdownOpen}
+        exportDropdownRef={exportDropdownRef}
+        onExportCsv={() => void runExport('csv')}
+        onExportPrint={() => void runExport('print')}
       />
+
+
+      <div className="flex items-center gap-3 mb-3 px-4 py-2.5 bg-white rounded-xl shadow-sm border border-gray-200">
+        <label className="inline-flex items-center gap-2 cursor-pointer text-sm text-gray-700">
+          <input
+            type="checkbox"
+            checked={selectAllFilters}
+            onChange={handleToggleSelectAllFilters}
+            className="rounded border-gray-300 text-blue-600 cursor-pointer"
+          />
+          Select all Name attributes matching filters
+        </label>
+        <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-full px-2.5 py-1">
+          {nameCountLoading ? (
+            <svg className="w-3.5 h-3.5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 12a8 8 0 018-8" />
+            </svg>
+          ) : (
+            <>{selectedNameCount}</>
+          )}
+          selected
+        </span>
+      </div>
+
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
@@ -1651,13 +1805,12 @@ export default function OrdersPage() {
                                 e.stopPropagation();
                                 void openStockAdjustmentModal(order);
                               }}
-                              className={`inline-flex min-w-14 items-center justify-center rounded-full px-2.5 py-1 text-xs font-semibold transition-colors ${
-                                order.stockAdjustment.status === 'managed'
+                              className={`inline-flex min-w-14 items-center justify-center rounded-full px-2.5 py-1 text-xs font-semibold transition-colors ${order.stockAdjustment.status === 'managed'
                                   ? 'bg-green-100 text-green-700 hover:bg-green-200'
                                   : order.stockAdjustment.status === 'partial'
                                     ? 'bg-amber-100 text-amber-800 hover:bg-amber-200'
                                     : 'bg-red-100 text-red-700 hover:bg-red-200'
-                              }`}
+                                }`}
                               aria-label={`Manage stock adjustment for order ${order.number}`}
                             >
                               {order.stockAdjustment.managedCount}/{order.stockAdjustment.totalCount}
@@ -1780,8 +1933,8 @@ export default function OrdersPage() {
                               }}
                               disabled={printingOrderId === order.id || isFullyFulfilled}
                               className={`p-1.5 rounded-lg transition-colors duration-150 ${printingOrderId === order.id || isFullyFulfilled
-                                  ? 'text-gray-300 cursor-not-allowed'
-                                  : 'hover:bg-gray-100 text-gray-500 hover:text-gray-700 cursor-pointer'
+                                ? 'text-gray-300 cursor-not-allowed'
+                                : 'hover:bg-gray-100 text-gray-500 hover:text-gray-700 cursor-pointer'
                                 }`}
                             >
                               {printingOrderId === order.id ? (
@@ -1802,8 +1955,8 @@ export default function OrdersPage() {
                               }}
                               disabled={isFullyFulfilled}
                               className={`relative p-1.5 rounded-lg transition-colors duration-150 ${isFullyFulfilled
-                                  ? 'text-gray-300 cursor-not-allowed'
-                                  : 'hover:bg-gray-100 text-gray-500 hover:text-blue-600 cursor-pointer'
+                                ? 'text-gray-300 cursor-not-allowed'
+                                : 'hover:bg-gray-100 text-gray-500 hover:text-blue-600 cursor-pointer'
                                 }`}
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2019,7 +2172,21 @@ export default function OrdersPage() {
                                     <table className="w-full text-xs">
                                       <thead>
                                         <tr className="border-b border-blue-200">
-                                          <th className="text-left py-1 text-gray-400 font-medium">Product</th>
+                                          <th className="text-left py-1 text-gray-400 font-medium">
+                                            {orderNameEntries(order).length > 0 ? (
+                                              <label className="inline-flex items-center gap-1 cursor-pointer justify-start">
+                                                <input
+                                                  type="checkbox"
+                                                  checked={isOrderAllNamesChecked(order)}
+                                                  onChange={() => toggleOrderNames(order)}
+                                                  className="rounded border-gray-300 text-blue-600 cursor-pointer"
+                                                />
+                                                Product
+                                              </label>
+                                            ) : (
+                                              'Product'
+                                            )}
+                                          </th>
                                           <th className="text-left py-1 text-gray-400 font-medium">SKU</th>
                                           <th className="text-center py-1 text-gray-400 font-medium">QTY</th>
                                           <th className="text-center py-1 text-gray-400 font-medium">Packed</th>
@@ -2051,7 +2218,28 @@ export default function OrdersPage() {
                                               key={`${order.id}-${itemIndex}`}
                                               className={getFulfillmentRowClass(fulfilledQty, item.qty, remainingQty, isFull, partialValue)}
                                             >
-                                              <td className="py-1.5 pr-2 text-gray-700">{item.name}</td>
+                                              <td className="py-1.5 pr-2 text-gray-700">
+                                                {(() => {
+                                                  const nameAttr = getNameAttribute(item);
+                                                  if (!nameAttr) return item.name;
+                                                  const key = nameKey(order.id, item.id);
+                                                  const entry = { key, row: { productTitle: item.title ?? item.name, value: nameAttr.value } };
+                                                  return (
+                                                    <div className="flex flex-col gap-0.5">
+                                                      <span>{item.name}</span>
+                                                      <label className="inline-flex items-center gap-1 cursor-pointer text-[11px] text-blue-700">
+                                                        <input
+                                                          type="checkbox"
+                                                          checked={isNameChecked(key)}
+                                                          onChange={() => setNamesChecked([entry], !isNameChecked(key))}
+                                                          className="rounded border-gray-300 text-blue-600 cursor-pointer"
+                                                        />
+                                                        {nameAttr.name}: {nameAttr.value}
+                                                      </label>
+                                                    </div>
+                                                  );
+                                                })()}
+                                              </td>
                                               <td className="py-1.5 pr-2 font-mono text-gray-500">{item.sku || '-'}</td>
                                               <td className="py-1.5 text-center text-gray-700">
                                                 {fulfilledQty}/{item.qty}
@@ -2110,18 +2298,18 @@ export default function OrdersPage() {
                                               onClick={() => openFulfillmentConfirmation(order)}
                                               disabled={isConfirmDisabled}
                                               className={`w-full py-2 rounded-lg text-xs font-semibold transition-colors duration-150 mb-2 ${isConfirmDisabled
-                                                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                                                  : 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer'
+                                                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                                : 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer'
                                                 }`}
                                             >
                                               {lockedFulfillment ? 'Fulfilment Locked' : fulSaving[order.id] ? 'Confirming...' : 'Confirm Fulfilment'}
                                             </button>
                                             <button
-                                              onClick={() => {openFulfillmentConfirmation(order);printPackingSlipLabel(order)}}
+                                              onClick={() => { openFulfillmentConfirmation(order); printPackingSlipLabel(order) }}
                                               disabled={isConfirmDisabled}
                                               className={`w-full py-2 rounded-lg text-xs font-semibold transition-colors duration-150 mb-2 ${isConfirmDisabled
-                                                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                                                  : 'bg-sky-600 text-white hover:bg-sky-700 cursor-pointer'
+                                                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                                : 'bg-sky-600 text-white hover:bg-sky-700 cursor-pointer'
                                                 }`}
                                             >
                                               {lockedFulfillment ? 'Fulfilment Locked' : fulSaving[order.id] ? 'Confirming...' : 'Confirm & Print'}
@@ -2135,8 +2323,8 @@ export default function OrdersPage() {
                                         onClick={() => void printPackingSlipLabel(order)}
                                         disabled={printingOrderId === order.id || isFullyFulfilled}
                                         className={`flex-1 border py-1.5 rounded-lg text-xs font-medium transition-colors duration-150 ${printingOrderId === order.id || isFullyFulfilled
-                                            ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
-                                            : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-50 cursor-pointer'
+                                          ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                                          : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-50 cursor-pointer'
                                           }`}
                                       >
                                         {printingOrderId === order.id ? 'Loading label...' : 'Print Label'}
@@ -2145,8 +2333,8 @@ export default function OrdersPage() {
                                         onClick={() => void openMessageModal(order)}
                                         disabled={isFullyFulfilled}
                                         className={`relative flex-1 border py-1.5 rounded-lg text-xs font-medium transition-colors duration-150 ${isFullyFulfilled
-                                            ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
-                                            : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-50 cursor-pointer'
+                                          ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                                          : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-50 cursor-pointer'
                                           }`}
                                       >
                                         Message

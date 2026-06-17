@@ -362,6 +362,35 @@ export class OrderModel {
     return { total, orders };
   }
 
+  async listNameAttributesForFilters(params: {
+    search?: string;
+    storeIds?: string[];
+    period?: 'all' | 'week' | 'month' | 'year';
+    dateFrom?: string;
+    dateTo?: string;
+    fulfillmentStatuses?: string[];
+    packingStatuses?: string[];
+    viewerId?: string;
+  }) {
+    const { orders } = await this.listForConnectedStores({ ...params, page: 1, pageSize: 10000 });
+
+    const attributes = orders.flatMap((order) =>
+      order.items.flatMap((item) => {
+        const nameAttr = item.customAttributes?.find((a) => a.name.trim().toLowerCase() === 'name');
+        if (!nameAttr) return [];
+        return [{
+          orderId: order.id,
+          orderNumber: order.number,
+          lineItemId: item.id,
+          productTitle: item.title ?? item.name,
+          value: nameAttr.value,
+        }];
+      }),
+    );
+
+    return { attributes, count: attributes.length };
+  }
+
   async getConnectedStoreOptions(allowedStoreIds?: string[] | null) {
     const where: Prisma.StoreWhereInput = { status: 'connected' };
     if (allowedStoreIds !== null && allowedStoreIds !== undefined) {

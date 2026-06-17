@@ -88,6 +88,36 @@ export class OrderController {
     };
   }
 
+  async listNameAttributes(searchParams: URLSearchParams, viewerId?: string, allowedStoreIds?: string[] | null) {
+    const search = searchParams.get('search')?.trim() ?? '';
+    let storeIds = searchParams.getAll('storeId').map((s) => s.trim()).filter(Boolean);
+    const period = normalizePeriod(searchParams.get('period'));
+    const dateFrom = searchParams.get('dateFrom')?.trim() ?? '';
+    const dateTo = searchParams.get('dateTo')?.trim() ?? '';
+    const fulfillmentStatuses = searchParams.getAll('status').map((s) => s.trim()).filter(Boolean);
+    const packingStatuses = searchParams.getAll('packingStatus').map((s) => s.trim()).filter(Boolean);
+
+    if (allowedStoreIds !== null && allowedStoreIds !== undefined) {
+      if (allowedStoreIds.length === 0) {
+        return { data: { attributes: [], count: 0 } };
+      }
+      storeIds = storeIds.length > 0 ? storeIds.filter((id) => allowedStoreIds.includes(id)) : allowedStoreIds;
+    }
+
+    const result = await model.listNameAttributesForFilters({
+      search,
+      storeIds,
+      period,
+      dateFrom: dateFrom || undefined,
+      dateTo: dateTo || undefined,
+      fulfillmentStatuses,
+      packingStatuses,
+      viewerId,
+    });
+
+    return { data: result };
+  }
+
   async confirmFulfillment(orderId: string, body: unknown, originUrl?: string) {
     const lines = parseFulfillmentLines(body);
     const notifyCustomer = parseNotifyCustomer(body);

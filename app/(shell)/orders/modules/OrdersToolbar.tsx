@@ -58,6 +58,13 @@ type OrdersToolbarProps = {
   setDateFrom: Dispatch<SetStateAction<string>>;
   setDateTo: Dispatch<SetStateAction<string>>;
   setPeriod: Dispatch<SetStateAction<(typeof PERIODS)[number]['value']>>;
+  selectedNameCount: number;
+  exportLoading: boolean;
+  exportDropdownOpen: boolean;
+  setExportDropdownOpen: Dispatch<SetStateAction<boolean>>;
+  exportDropdownRef: RefObject<HTMLDivElement | null>;
+  onExportCsv: () => void;
+  onExportPrint: () => void;
 };
 
 export default function OrdersToolbar({
@@ -113,6 +120,13 @@ export default function OrdersToolbar({
   setDateFrom,
   setDateTo,
   setPeriod,
+  selectedNameCount,
+  exportLoading,
+  exportDropdownOpen,
+  setExportDropdownOpen,
+  exportDropdownRef,
+  onExportCsv,
+  onExportPrint,
 }: OrdersToolbarProps) {
   return (
   <div className="flex flex-wrap items-start gap-2 mb-5">
@@ -393,6 +407,45 @@ export default function OrdersToolbar({
           </svg>
           Clear filters
         </button>
+      )}
+      {selectedNameCount > 0 && (
+        <div ref={exportDropdownRef} className="relative">
+          <button
+            onClick={() => setExportDropdownOpen((prev) => !prev)}
+            disabled={exportLoading}
+            className="flex items-center gap-1.5 bg-white border border-blue-300 text-blue-700 text-sm px-3 py-2 rounded-lg hover:bg-blue-50 transition-colors duration-150 cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {exportLoading ? (
+              <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 12a8 8 0 018-8" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+            )}
+            Export attributes ({selectedNameCount})
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {exportDropdownOpen && (
+            <div className="absolute right-0 mt-1 w-44 bg-white border border-gray-200 rounded-lg shadow-lg z-50 overflow-hidden">
+              <button
+                onClick={onExportCsv}
+                className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              >
+                Export as CSV
+              </button>
+              <button
+                onClick={onExportPrint}
+                className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              >
+                Print
+              </button>
+            </div>
+          )}
+        </div>
       )}
       <div ref={syncStoreDropdownRef} className="relative">
         <div className="flex items-stretch gap-0">

@@ -1,6 +1,9 @@
-import type { ApiResponse, BackInStockStatus, OrderRow, PackingSlipLabel, ShippingLine } from './types';
+import type { ApiResponse, BackInStockStatus, OrderItem, OrderRow, PackingSlipLabel, ShippingLine } from './types';
 
 export type PaginationItem = number | 'ellipsis';
+
+export const getNameAttribute = (item: OrderItem) =>
+  item.customAttributes?.find((a) => a.name.trim().toLowerCase() === 'name') ?? null;
 
 export function compactAddressParts(parts: Array<string | null>) {
   return parts
