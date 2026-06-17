@@ -74,7 +74,7 @@ export default function OrdersPage() {
   const [hoverDate, setHoverDate] = useState<string | null>(null);
   const [period, setPeriod] = useState<(typeof PERIODS)[number]['value']>('all');
   const [pagination, setPagination] = useState<Pagination>(DEFAULT_PAGINATION);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncJob, setSyncJob] = useState<OrderSyncJob | null>(null);
@@ -253,7 +253,8 @@ export default function OrdersPage() {
         setOrders(json.data.orders);
         setStores(json.data.stores);
         setPagination(json.data.pagination);
-        setExpandedId(search ? json.data.orders[0]?.id ?? null : null);
+        const firstId = json.data.orders[0]?.id;
+        setExpandedIds(search && firstId ? new Set([firstId]) : new Set());
       } catch (err) {
         if (cancelled) return;
         setError(err instanceof Error ? err.message : 'Failed to load orders');
@@ -1600,7 +1601,7 @@ export default function OrdersPage() {
               {!loading && !error && orders.map((order, index) => {
                 const statusKey = order.status.toLowerCase();
                 const status = STATUS_MAP[statusKey] ?? STATUS_MAP.pending;
-                const isExpanded = expandedId === order.id;
+                const isExpanded = expandedIds.has(order.id);
                 const orderAddressLines = getOrderAddressLines(order);
                 const fulfillmentInfo = getFulfillmentInfo(order);
                 const isFullyFulfilled = isOrderFullyFulfilled(order);
@@ -1735,7 +1736,15 @@ export default function OrdersPage() {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setExpandedId((prev) => (prev === order.id ? null : order.id));
+                                setExpandedIds((prev) => {
+                                  const next = new Set(prev);
+                                  if (next.has(order.id)) {
+                                    next.delete(order.id);
+                                  } else {
+                                    next.add(order.id);
+                                  }
+                                  return next;
+                                });
                               }}
                               className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-blue-600 transition-colors duration-150 cursor-pointer text-xs font-medium"
                             >
