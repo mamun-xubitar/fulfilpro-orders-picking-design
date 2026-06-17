@@ -450,7 +450,7 @@ export default function OrdersPage() {
     order.items.flatMap((item) => {
       const attr = getNameAttribute(item);
       if (!attr) return [];
-      return [{ key: nameKey(order.id, item.id), row: { productTitle: item.title ?? item.name, value: attr.value } }];
+      return [{ key: nameKey(order.id, item.id), row: { orderNumber: order.number, productTitle: item.title ?? item.name, value: attr.value } }];
     });
 
   const isNameChecked = (key: string) => (selectAllFilters ? !excludedNames.has(key) : selectedNames.has(key));
@@ -512,16 +512,36 @@ export default function OrdersPage() {
     void fetchNameAttributeCount();
   };
 
+  const handleToggleCurrentPage = () => {
+    const entries = orders.flatMap(orderNameEntries);
+    const allChecked = entries.length > 0 && entries.every(({ key }) => isNameChecked(key));
+    if (selectAllFilters) {
+      setSelectAllFilters(false);
+      setExcludedNames(new Set());
+      setFilterNameCount(null);
+      setSelectedNames(allChecked ? new Map() : new Map(entries.map(({ key, row }) => [key, row])));
+      return;
+    }
+    setSelectedNames((prev) => {
+      const next = new Map(prev);
+      entries.forEach(({ key, row }) => (allChecked ? next.delete(key) : next.set(key, row)));
+      return next;
+    });
+  };
+
+  const currentPageNameEntries = orders.flatMap(orderNameEntries);
+  const isCurrentPageAllChecked = currentPageNameEntries.length > 0 && currentPageNameEntries.every(({ key }) => isNameChecked(key));
+
   const gatherExportRows = useCallback(async (): Promise<NameAttributeRow[]> => {
     if (selectAllFilters) {
       const res = await fetch(`/api/orders/name-attributes?${queryString}`);
       const json = (await res.json()) as ApiResponse<{
-        attributes: Array<{ orderId: string; lineItemId: string; productTitle: string; value: string }>;
+        attributes: Array<{ orderId: string; orderNumber: string; lineItemId: string; productTitle: string; value: string }>;
       }>;
       if (!res.ok || !json.success) throw new Error(json.message || 'Failed to load attributes');
       return json.data.attributes
         .filter((a) => !excludedNames.has(`${a.orderId}:${a.lineItemId}`))
-        .map((a) => ({ productTitle: a.productTitle, value: a.value }));
+        .map((a) => ({ orderNumber: a.orderNumber, productTitle: a.productTitle, value: a.value }));
     }
     return Array.from(selectedNames.values());
   }, [selectAllFilters, queryString, excludedNames, selectedNames]);
@@ -1700,6 +1720,15 @@ export default function OrdersPage() {
           />
           Select all Name attributes matching filters
         </label>
+        <label className="inline-flex items-center gap-2 cursor-pointer text-sm text-gray-700">
+          <input
+            type="checkbox"
+            checked={isCurrentPageAllChecked}
+            onChange={handleToggleCurrentPage}
+            className="rounded border-gray-300 text-blue-600 cursor-pointer"
+          />
+          Select all on this page
+        </label>
         <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-full px-2.5 py-1">
           {nameCountLoading ? (
             <svg className="w-3.5 h-3.5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2223,7 +2252,7 @@ export default function OrdersPage() {
                                                   const nameAttr = getNameAttribute(item);
                                                   if (!nameAttr) return item.name;
                                                   const key = nameKey(order.id, item.id);
-                                                  const entry = { key, row: { productTitle: item.title ?? item.name, value: nameAttr.value } };
+                                                  const entry = { key, row: { orderNumber: order.number, productTitle: item.title ?? item.name, value: nameAttr.value } };
                                                   return (
                                                     <div className="flex flex-col gap-0.5">
                                                       <span>{item.name}</span>

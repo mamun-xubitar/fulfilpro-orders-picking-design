@@ -1,6 +1,6 @@
 import { escapeHtml } from './utils';
 
-export type NameAttributeRow = { productTitle: string; value: string };
+export type NameAttributeRow = { orderNumber: string; productTitle: string; value: string };
 
 const escapeCsv = (field: string) => {
   if (/[",\n]/.test(field)) {
@@ -10,9 +10,9 @@ const escapeCsv = (field: string) => {
 };
 
 export const buildNameAttributesCsv = (rows: NameAttributeRow[]) => {
-  const lines = ['Product Title,Name'];
+  const lines = ['Order,Product Title,Name'];
   for (const row of rows) {
-    lines.push(`${escapeCsv(row.productTitle)},${escapeCsv(row.value)}`);
+    lines.push(`${escapeCsv(row.orderNumber)},${escapeCsv(row.productTitle)},${escapeCsv(row.value)}`);
   }
   return lines.join('\r\n');
 };
@@ -48,10 +48,10 @@ export const buildNameAttributesDocument = (rows: NameAttributeRow[]) => `
       <h1>Name Attributes (${rows.length})</h1>
       <table>
         <thead>
-          <tr><th>Product Title</th><th>Name</th></tr>
+          <tr><th>Order</th><th>Product Title</th><th>Name</th></tr>
         </thead>
         <tbody>
-          ${rows.map((row) => `<tr><td>${escapeHtml(row.productTitle)}</td><td>${escapeHtml(row.value)}</td></tr>`).join('')}
+          ${rows.map((row) => `<tr><td>${escapeHtml(row.orderNumber)}</td><td>${escapeHtml(row.productTitle)}</td><td>${escapeHtml(row.value)}</td></tr>`).join('')}
         </tbody>
       </table>
     </body>
