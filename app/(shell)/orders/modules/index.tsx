@@ -79,6 +79,7 @@ export default function OrdersPage() {
   const [period, setPeriod] = useState<(typeof PERIODS)[number]['value']>('all');
   const [pagination, setPagination] = useState<Pagination>(DEFAULT_PAGINATION);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [expandAll, setExpandAll] = useState(false);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncJob, setSyncJob] = useState<OrderSyncJob | null>(null);
@@ -275,7 +276,11 @@ export default function OrdersPage() {
         setStores(json.data.stores);
         setPagination(json.data.pagination);
         const firstId = json.data.orders[0]?.id;
-        setExpandedIds(search && firstId ? new Set([firstId]) : new Set());
+        if (expandAll) {
+          setExpandedIds(new Set(json.data.orders.map((o) => o.id)));
+        } else {
+          setExpandedIds(search && firstId ? new Set([firstId]) : new Set());
+        }
       } catch (err) {
         if (cancelled) return;
         setError(err instanceof Error ? err.message : 'Failed to load orders');
@@ -529,6 +534,14 @@ export default function OrdersPage() {
     setSelectedNames((prev) => {
       const next = new Map(prev);
       entries.forEach(({ key, row }) => (allChecked ? next.delete(key) : next.set(key, row)));
+      return next;
+    });
+  };
+
+  const handleToggleExpandAll = () => {
+    setExpandAll((prev) => {
+      const next = !prev;
+      setExpandedIds(next ? new Set(orders.map((o) => o.id)) : new Set());
       return next;
     });
   };
@@ -1752,6 +1765,13 @@ export default function OrdersPage() {
           )}
           selected
         </span>
+        <button
+          type="button"
+          onClick={handleToggleExpandAll}
+          className="ml-auto inline-flex items-center gap-1.5 text-sm font-medium text-gray-700 hover:text-blue-600 border border-gray-300 hover:border-blue-300 rounded-lg px-3 py-1.5 cursor-pointer transition-colors duration-150"
+        >
+          {expandAll ? '▲ Collapse all' : '▼ Expand all'}
+        </button>
       </div>
 
 
