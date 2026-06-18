@@ -4,9 +4,14 @@ const model = new OrderModel();
 
 type Period = 'all' | 'week' | 'month' | 'year';
 
+const SEARCH_FIELD_VALUES = new Set(['number', 'customer', 'address', 'lineItem']);
+
 export class OrderController {
   async list(searchParams: URLSearchParams, viewerId?: string, allowedStoreIds?: string[] | null) {
     const search = searchParams.get('search')?.trim() ?? '';
+    const searchField = SEARCH_FIELD_VALUES.has(searchParams.get('searchField')?.trim() ?? '')
+      ? searchParams.get('searchField')!.trim()
+      : '';
     let storeIds = searchParams.getAll('storeId').map((s) => s.trim()).filter(Boolean);
     const period = normalizePeriod(searchParams.get('period'));
     const dateFrom = searchParams.get('dateFrom')?.trim() ?? '';
@@ -23,6 +28,7 @@ export class OrderController {
             orders: [],
             filters: {
               search,
+              searchField,
               storeIds,
               period,
               dateFrom,
@@ -48,6 +54,7 @@ export class OrderController {
     const [result, stores] = await Promise.all([
       model.listForConnectedStores({
         search,
+        searchField,
         storeIds,
         period,
         dateFrom: dateFrom || undefined,
@@ -68,6 +75,7 @@ export class OrderController {
         orders: result.orders,
         filters: {
           search,
+          searchField,
           storeIds,
           period,
           dateFrom,
@@ -90,6 +98,9 @@ export class OrderController {
 
   async listNameAttributes(searchParams: URLSearchParams, viewerId?: string, allowedStoreIds?: string[] | null) {
     const search = searchParams.get('search')?.trim() ?? '';
+    const searchField = SEARCH_FIELD_VALUES.has(searchParams.get('searchField')?.trim() ?? '')
+      ? searchParams.get('searchField')!.trim()
+      : '';
     let storeIds = searchParams.getAll('storeId').map((s) => s.trim()).filter(Boolean);
     const period = normalizePeriod(searchParams.get('period'));
     const dateFrom = searchParams.get('dateFrom')?.trim() ?? '';
@@ -106,6 +117,7 @@ export class OrderController {
 
     const result = await model.listNameAttributesForFilters({
       search,
+      searchField,
       storeIds,
       period,
       dateFrom: dateFrom || undefined,

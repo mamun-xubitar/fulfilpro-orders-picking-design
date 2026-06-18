@@ -1,13 +1,19 @@
 'use client';
 
+import { useRef } from 'react';
 import type { Dispatch, RefObject, SetStateAction } from 'react';
-import { FULFILLMENT_STATUSES, PACKING_STATUSES, PERIODS } from './constants';
+import { FULFILLMENT_STATUSES, PACKING_STATUSES, PERIODS, SEARCH_FIELDS } from './constants';
 import type { Pagination, StoreOption } from './types';
 import { DAY_LABELS, fmtCalDate, getMonthDays, MONTH_LABELS } from './utils';
 
 type OrdersToolbarProps = {
   searchInput: string;
   setSearchInput: Dispatch<SetStateAction<string>>;
+  searchField: string;
+  setSearchField: Dispatch<SetStateAction<string>>;
+  searchDropdownOpen: boolean;
+  setSearchDropdownOpen: Dispatch<SetStateAction<boolean>>;
+  searchDropdownRef: RefObject<HTMLDivElement | null>;
   stores: StoreOption[];
   storeIds: string[];
   setStoreIds: Dispatch<SetStateAction<string[]>>;
@@ -70,6 +76,11 @@ type OrdersToolbarProps = {
 export default function OrdersToolbar({
   searchInput,
   setSearchInput,
+  searchField,
+  setSearchField,
+  searchDropdownOpen,
+  setSearchDropdownOpen,
+  searchDropdownRef,
   stores,
   storeIds,
   setStoreIds,
@@ -128,20 +139,84 @@ export default function OrdersToolbar({
   onExportCsv,
   onExportPrint,
 }: OrdersToolbarProps) {
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const activeSearchField = SEARCH_FIELDS.find((f) => f.value === searchField);
+  const filteredSearchFields = SEARCH_FIELDS.filter((f) =>
+    f.label.toLowerCase().includes(searchInput.trim().toLowerCase())
+  );
+
+  const selectSearchField = (value: string) => {
+    setSearchField(value);
+    setSearchInput('');
+    setSearchDropdownOpen(false);
+    setPagination((prev) => ({ ...prev, page: 1 }));
+    searchInputRef.current?.focus();
+  };
+
+  const clearSearchField = () => {
+    setSearchField('');
+    setPagination((prev) => ({ ...prev, page: 1 }));
+    setSearchDropdownOpen(true);
+    searchInputRef.current?.focus();
+  };
+
   return (
   <div className="flex flex-wrap items-start gap-2 mb-5">
     {/* Search */}
-    <div className="flex items-center bg-white border border-gray-300 rounded-xl overflow-hidden shadow-sm flex-1 min-w-48 sm:flex-none sm:w-64">
-      <svg className="w-4 h-4 text-gray-400 ml-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-      </svg>
-      <input
-        type="text"
-        placeholder="name order# SKU address… (space = AND)"
-        value={searchInput}
-        onChange={(e) => setSearchInput(e.target.value)}
-        className="flex-1 px-2 py-2 text-sm focus:outline-none min-w-0"
-      />
+    <div ref={searchDropdownRef} className="relative flex-1 min-w-48 sm:flex-none sm:w-64">
+      <div className="flex items-center bg-white border border-gray-300 rounded-xl overflow-hidden shadow-sm">
+        <svg className="w-4 h-4 text-gray-400 ml-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+        {activeSearchField && (
+          <span className="flex items-center gap-1 ml-1.5 pl-2 pr-1 py-0.5 bg-blue-50 border border-blue-200 text-blue-700 text-xs font-medium rounded-md whitespace-nowrap flex-shrink-0">
+            {activeSearchField.label}
+            <button
+              type="button"
+              onClick={clearSearchField}
+              className="text-blue-400 hover:text-blue-600 cursor-pointer"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </span>
+        )}
+        <input
+          ref={searchInputRef}
+          type="text"
+          placeholder={activeSearchField ? `Search by ${activeSearchField.label.toLowerCase()}…` : 'Search orders…'}
+          value={searchInput}
+          onFocus={() => { if (!searchField) setSearchDropdownOpen(true); }}
+          onChange={(e) => {
+            setSearchInput(e.target.value);
+            if (!searchField) {
+              const hasMatch = SEARCH_FIELDS.some((f) => f.label.toLowerCase().includes(e.target.value.trim().toLowerCase()));
+              setSearchDropdownOpen(hasMatch);
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Backspace' && searchInput === '' && searchField) {
+              clearSearchField();
+            }
+          }}
+          className="flex-1 px-2 py-2 text-sm focus:outline-none min-w-0"
+        />
+      </div>
+      {searchDropdownOpen && !searchField && filteredSearchFields.length > 0 && (
+        <div className="absolute top-full mt-1 left-0 z-30 bg-white border border-gray-200 rounded-xl shadow-lg w-full py-1">
+          <div className="px-3 py-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wide">Search by</div>
+          {filteredSearchFields.map((field) => (
+            <button
+              key={field.value}
+              onClick={() => selectSearchField(field.value)}
+              className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            >
+              {field.label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
 
     {/* Store multi-select */}

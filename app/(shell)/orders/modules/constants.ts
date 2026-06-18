@@ -22,6 +22,13 @@ export const PACKING_STATUSES = [
   { label: 'Packed', value: 'packed' },
 ] as const;
 
+export const SEARCH_FIELDS = [
+  { label: 'Order number', value: 'number' },
+  { label: 'Customer name', value: 'customer' },
+  { label: 'Customer address', value: 'address' },
+  { label: 'Product', value: 'lineItem' },
+] as const;
+
 export const SHOPIFY_TRACKING_CARRIERS = [
   '4PX',
   'AGS',

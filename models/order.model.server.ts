@@ -211,6 +211,7 @@ export class OrderModel {
 
   async listForConnectedStores(params: {
     search?: string;
+    searchField?: string;
     storeIds?: string[];
     period?: 'all' | 'week' | 'month' | 'year';
     dateFrom?: string;
@@ -221,7 +222,7 @@ export class OrderModel {
     page: number;
     pageSize: number;
   }) {
-    const { search, storeIds = [], period = 'all', dateFrom, dateTo, fulfillmentStatuses = [], packingStatuses = [], page, pageSize } = params;
+    const { search, searchField, storeIds = [], period = 'all', dateFrom, dateTo, fulfillmentStatuses = [], packingStatuses = [], page, pageSize } = params;
     const tokens = (search?.trim() ?? '').split(/\s+/).filter(Boolean);
     const filterByPacking = packingStatuses.length > 0;
     let orderedAtFrom: Date | undefined;
@@ -297,6 +298,7 @@ export class OrderModel {
     if (tokens.length > 0) {
       const searchPage = await getRankedOrderSearchPage({
         tokens,
+        searchField,
         storeIds,
         orderedAtFrom,
         orderedAtTo,
@@ -364,6 +366,7 @@ export class OrderModel {
 
   async listNameAttributesForFilters(params: {
     search?: string;
+    searchField?: string;
     storeIds?: string[];
     period?: 'all' | 'week' | 'month' | 'year';
     dateFrom?: string;
@@ -1861,6 +1864,7 @@ function buildFulfillmentStatusConditions(statuses: string[]): Prisma.OrderWhere
 
 async function getRankedOrderSearchPage(params: {
   tokens: string[];
+  searchField?: string;
   storeIds: string[];
   orderedAtFrom?: Date;
   orderedAtTo?: Date;
@@ -1908,6 +1912,7 @@ async function getRankedOrderSearchPage(params: {
 
 function buildRankedOrderSearchWhereSql(params: {
   tokens: string[];
+  searchField?: string;
   storeIds: string[];
   orderedAtFrom?: Date;
   orderedAtTo?: Date;
@@ -1932,33 +1937,53 @@ function buildRankedOrderSearchWhereSql(params: {
     whereParts.push(fulfillmentStatusSql);
   }
 
-  whereParts.push(buildTokenSearchSql(params.tokens));
+  whereParts.push(buildTokenSearchSql(params.tokens, params.searchField));
 
   return Prisma.join(whereParts, ' AND ');
 }
 
-function buildTokenSearchSql(tokens: string[]) {
+function buildTokenSearchSql(tokens: string[], searchField?: string) {
   const tokenConditions = tokens.map((token) => {
-    const conditions: Prisma.Sql[] = [
-      ilikeContains(Prisma.sql`o."number"`, token),
-      ilikeContains(Prisma.sql`o."cusName"`, token),
-      ilikeContains(Prisma.sql`o."cusEmail"`, token),
-      ilikeContains(Prisma.sql`o."boarcode"`, token),
-      ilikeContains(Prisma.sql`o."address"`, token),
-      ilikeContains(Prisma.sql`o."address2"`, token),
-      ilikeContains(Prisma.sql`o."city"`, token),
-      ilikeContains(Prisma.sql`o."state"`, token),
-      ilikeContains(Prisma.sql`o."country"`, token),
-      ilikeContains(Prisma.sql`s.name`, token),
-      ilikeContains(Prisma.sql`s."storeDomain"`, token),
-      ilikeContains(Prisma.sql`o."lineItems"::text`, token),
-      ...getStatusSqlConditionsForToken(token),
-    ];
-
+    const conditions = buildFieldConditionsForToken(token, searchField);
     return Prisma.sql`(${Prisma.join(conditions, ' OR ')})`;
   });
 
   return Prisma.sql`(${Prisma.join(tokenConditions, ' AND ')})`;
+}
+
+function buildFieldConditionsForToken(token: string, searchField?: string): Prisma.Sql[] {
+  switch (searchField) {
+    case 'number':
+      return [ilikeContains(Prisma.sql`o."number"`, token)];
+    case 'customer':
+      return [ilikeContains(Prisma.sql`o."cusName"`, token)];
+    case 'address':
+      return [
+        ilikeContains(Prisma.sql`o."address"`, token),
+        ilikeContains(Prisma.sql`o."address2"`, token),
+        ilikeContains(Prisma.sql`o."city"`, token),
+        ilikeContains(Prisma.sql`o."state"`, token),
+        ilikeContains(Prisma.sql`o."country"`, token),
+      ];
+    case 'lineItem':
+      return [ilikeContains(Prisma.sql`o."lineItems"::text`, token)];
+    default:
+      return [
+        ilikeContains(Prisma.sql`o."number"`, token),
+        ilikeContains(Prisma.sql`o."cusName"`, token),
+        ilikeContains(Prisma.sql`o."cusEmail"`, token),
+        ilikeContains(Prisma.sql`o."boarcode"`, token),
+        ilikeContains(Prisma.sql`o."address"`, token),
+        ilikeContains(Prisma.sql`o."address2"`, token),
+        ilikeContains(Prisma.sql`o."city"`, token),
+        ilikeContains(Prisma.sql`o."state"`, token),
+        ilikeContains(Prisma.sql`o."country"`, token),
+        ilikeContains(Prisma.sql`s.name`, token),
+        ilikeContains(Prisma.sql`s."storeDomain"`, token),
+        ilikeContains(Prisma.sql`o."lineItems"::text`, token),
+        ...getStatusSqlConditionsForToken(token),
+      ];
+  }
 }
 
 function buildOrderSearchRankSql(tokens: string[]) {

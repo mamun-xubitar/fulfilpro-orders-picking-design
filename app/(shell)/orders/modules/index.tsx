@@ -60,6 +60,8 @@ export default function OrdersPage() {
   const [stores, setStores] = useState<StoreOption[]>([]);
   const [searchInput, setSearchInput] = useState(initialSearch);
   const [search, setSearch] = useState(initialSearch);
+  const [searchField, setSearchField] = useState('');
+  const [searchDropdownOpen, setSearchDropdownOpen] = useState(false);
   const [storeIds, setStoreIds] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -120,6 +122,7 @@ export default function OrdersPage() {
   const [requestPermModal, setRequestPermModal] = useState<RequestPermissionModalState | null>(null);
   const [syncStoreIds, setSyncStoreIds] = useState<string[]>([]);
   const [syncStoreDropdownOpen, setSyncStoreDropdownOpen] = useState(false);
+  const searchDropdownRef = useRef<HTMLDivElement>(null);
   const storeDropdownRef = useRef<HTMLDivElement>(null);
   const statusDropdownRef = useRef<HTMLDivElement>(null);
   const packingStatusDropdownRef = useRef<HTMLDivElement>(null);
@@ -145,13 +148,14 @@ export default function OrdersPage() {
     params.set('pageSize', String(pagination.pageSize));
     params.set('period', period === 'custom' ? 'all' : period);
     if (search) params.set('search', search);
+    if (searchField) params.set('searchField', searchField);
     storeIds.forEach((id) => params.append('storeId', id));
     if (dateFrom) params.set('dateFrom', dateFrom);
     if (dateTo) params.set('dateTo', dateTo);
     fulfillmentStatuses.forEach((s) => params.append('status', s));
     packingStatuses.forEach((s) => params.append('packingStatus', s));
     return params.toString();
-  }, [pagination.page, pagination.pageSize, period, search, storeIds, dateFrom, dateTo, fulfillmentStatuses, packingStatuses]);
+  }, [pagination.page, pagination.pageSize, period, search, searchField, storeIds, dateFrom, dateTo, fulfillmentStatuses, packingStatuses]);
 
   useEffect(() => {
     setSelectAllFilters(false);
@@ -1556,6 +1560,7 @@ export default function OrdersPage() {
   const handleClearFilters = () => {
     setSearchInput('');
     setSearch('');
+    setSearchField('');
     setStoreIds([]);
     setPeriod('all');
     setDateFrom('');
@@ -1605,6 +1610,9 @@ export default function OrdersPage() {
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
+      if (searchDropdownRef.current && !searchDropdownRef.current.contains(e.target as Node)) {
+        setSearchDropdownOpen(false);
+      }
       if (periodDropdownRef.current && !periodDropdownRef.current.contains(e.target as Node)) {
         setPeriodDropdownOpen(false);
       }
@@ -1628,7 +1636,7 @@ export default function OrdersPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const hasActiveFilters = searchInput !== '' || storeIds.length > 0 || period !== 'all' || !!dateFrom || !!dateTo || fulfillmentStatuses.length > 0 || packingStatuses.length > 0;
+  const hasActiveFilters = searchInput !== '' || searchField !== '' || storeIds.length > 0 || period !== 'all' || !!dateFrom || !!dateTo || fulfillmentStatuses.length > 0 || packingStatuses.length > 0;
   const syncActive = syncJob?.status === 'queued' || syncJob?.status === 'running';
   const syncMessage = syncActive
     ? syncJob.status === 'queued'
@@ -1650,6 +1658,11 @@ export default function OrdersPage() {
       <OrdersToolbar
         searchInput={searchInput}
         setSearchInput={setSearchInput}
+        searchField={searchField}
+        setSearchField={setSearchField}
+        searchDropdownOpen={searchDropdownOpen}
+        setSearchDropdownOpen={setSearchDropdownOpen}
+        searchDropdownRef={searchDropdownRef}
         stores={stores}
         storeIds={storeIds}
         setStoreIds={setStoreIds}
