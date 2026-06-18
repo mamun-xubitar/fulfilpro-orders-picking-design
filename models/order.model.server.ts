@@ -7,6 +7,7 @@ import {
   type FulfillmentTrackingInput,
 } from '@/lib/shopify-fulfillment.server';
 import { fetchShopifyOrderById } from '@/lib/shopify-order-fetch.server';
+import { detectDecoration } from '@/lib/decoration-detect';
 import { sendGoogleMail } from '@/lib/google-mail.server';
 import {
   resolveHiddenRecipientEmails,
@@ -168,9 +169,11 @@ export class OrderModel {
       return { created: false };
     }
 
-    await prisma.order.create({
+    const created = await prisma.order.create({
       data: buildOrderCreateData(payload, storeId),
+      select: { id: true },
     });
+    await this.syncLineItemDecorations(created.id);
 
     return { created: true };
   }
@@ -196,17 +199,79 @@ export class OrderModel {
 
     // console.log("exisint", !!existing, storeId)
     if (!existing) {
-      await prisma.order.create({
+      const created = await prisma.order.create({
         data: buildOrderCreateData(payload, storeId),
+        select: { id: true },
       });
+      await this.syncLineItemDecorations(created.id);
       return { created: true, updated: false };
     }
     await prisma.order.update({
       where: { id: existing.id },
       data: buildOrderUpdateData(payload, storeId, existing.fulfillmentItems),
     });
+    await this.syncLineItemDecorations(existing.id);
 
     return { created: false, updated: true };
+  }
+
+  private async syncLineItemDecorations(orderId: string) {
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      select: { lineItems: true },
+    });
+    if (!order) return;
+
+    const items = toLineItems(order.lineItems);
+    const existing = await prisma.lineItemDecoration.findMany({ where: { orderId } });
+    const existingByLine = new Map(existing.map((row) => [row.lineItemId, row]));
+
+    for (const item of items) {
+      if (!item.id) continue;
+      const current = existingByLine.get(item.id);
+      if (current?.manualOverride) continue;
+
+      const { isEmbroidery, isPrint } = detectDecoration(item.title, item.name);
+      if (current) {
+        if (current.isEmbroidery !== isEmbroidery || current.isPrint !== isPrint) {
+          await prisma.lineItemDecoration.update({
+            where: { id: current.id },
+            data: { isEmbroidery, isPrint },
+          });
+        }
+      } else if (isEmbroidery || isPrint) {
+        await prisma.lineItemDecoration.create({
+          data: { orderId, lineItemId: item.id, isEmbroidery, isPrint },
+        });
+      }
+    }
+  }
+
+  async setLineItemDecoration(
+    orderId: string,
+    lineItemId: string,
+    flags: { isEmbroidery: boolean; isPrint: boolean }
+  ) {
+    const order = await prisma.order.findUnique({ where: { id: orderId }, select: { id: true } });
+    if (!order) throw new Error('Order not found');
+
+    await prisma.lineItemDecoration.upsert({
+      where: { orderId_lineItemId: { orderId, lineItemId } },
+      create: {
+        orderId,
+        lineItemId,
+        isEmbroidery: flags.isEmbroidery,
+        isPrint: flags.isPrint,
+        manualOverride: true,
+      },
+      update: {
+        isEmbroidery: flags.isEmbroidery,
+        isPrint: flags.isPrint,
+        manualOverride: true,
+      },
+    });
+
+    return { orderId, lineItemId, ...flags };
   }
 
   async listForConnectedStores(params: {
@@ -318,7 +383,8 @@ export class OrderModel {
       rows.sort((a, b) => (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0));
 
       const messageCounts = await getOrderMessageCounts(rows.map((row) => row.id), 'orders');
-      const allOrders = rows.map((row) => toOrderRow(row, messageCounts.get(row.id) ?? 0));
+      const decorationsByOrder = await getDecorationsByOrder(rows.map((row) => row.id));
+      const allOrders = rows.map((row) => toOrderRow(row, messageCounts.get(row.id) ?? 0, decorationsByOrder.get(row.id)));
 
       if (filterByPacking) {
         const packingSet = new Set(packingStatuses);
@@ -339,8 +405,9 @@ export class OrderModel {
       });
       const packingSet = new Set(packingStatuses);
       const messageCounts = await getOrderMessageCounts(allRows.map((row) => row.id), 'orders');
+      const decorationsByOrder = await getDecorationsByOrder(allRows.map((row) => row.id));
       const filtered = allRows
-        .map((row) => toOrderRow(row, messageCounts.get(row.id) ?? 0))
+        .map((row) => toOrderRow(row, messageCounts.get(row.id) ?? 0, decorationsByOrder.get(row.id)))
         .filter((o) => packingSet.has(o.packingStatus));
       const total = filtered.length;
       const sliced = filtered.slice((page - 1) * pageSize, page * pageSize);
@@ -359,7 +426,8 @@ export class OrderModel {
     ]);
 
     const messageCounts = await getOrderMessageCounts(rows.map((row) => row.id), 'orders');
-    const orders = rows.map((row) => toOrderRow(row, messageCounts.get(row.id) ?? 0));
+    const decorationsByOrder = await getDecorationsByOrder(rows.map((row) => row.id));
+    const orders = rows.map((row) => toOrderRow(row, messageCounts.get(row.id) ?? 0, decorationsByOrder.get(row.id)));
 
     return { total, orders };
   }
@@ -514,7 +582,9 @@ export class OrderModel {
       where: { orderId: row.id, type: 'orders' },
     });
 
-    return toOrderRow(row, messageCount);
+    const decorationsByOrder = await getDecorationsByOrder([row.id]);
+
+    return toOrderRow(row, messageCount, decorationsByOrder.get(row.id));
   }
 
   async confirmFulfillment(
@@ -1127,7 +1197,7 @@ function toOrderRow(row: {
     updatedAt: Date;
   } | null;
   packingConfirmations?: Array<{ id: string; lines: Prisma.JsonValue; confirmedAt: Date; canceledAt: Date | null }>;
-}, messageCount: number) {
+}, messageCount: number, decorations?: Map<string, { isEmbroidery: boolean; isPrint: boolean }>) {
   const lineItems = toLineItems(row.lineItems);
   const itemCount = lineItems.reduce((sum, item) => sum + Math.max(0, item.qty), 0);
 
@@ -1166,6 +1236,8 @@ function toOrderRow(row: {
     items: lineItems.map((item) => ({
       ...item,
       packedQuantity: packedByLine.get(item.id) ?? 0,
+      isEmbroidery: decorations?.get(item.id)?.isEmbroidery ?? false,
+      isPrint: decorations?.get(item.id)?.isPrint ?? false,
     })),
     shippingLines: toShippingLines(row.shippingLines),
     fulfillmentItems: toFulfillmentItems(row.fulfillmentItems),
@@ -1179,6 +1251,27 @@ function toOrderRow(row: {
     packedQuantity,
     totalQuantity,
   };
+}
+
+async function getDecorationsByOrder(orderIds: string[]) {
+  const map = new Map<string, Map<string, { isEmbroidery: boolean; isPrint: boolean }>>();
+  if (orderIds.length === 0) return map;
+
+  const rows = await prisma.lineItemDecoration.findMany({
+    where: { orderId: { in: orderIds } },
+    select: { orderId: true, lineItemId: true, isEmbroidery: true, isPrint: true },
+  });
+
+  for (const row of rows) {
+    let byLine = map.get(row.orderId);
+    if (!byLine) {
+      byLine = new Map();
+      map.set(row.orderId, byLine);
+    }
+    byLine.set(row.lineItemId, { isEmbroidery: row.isEmbroidery, isPrint: row.isPrint });
+  }
+
+  return map;
 }
 
 async function getOrderMessageCounts(orderIds: string[], type: OrderMessageTypeInput) {

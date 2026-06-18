@@ -12,6 +12,8 @@ export type OrderItem = {
   vendor: string;
   qty: number;
   packedQuantity?: number;
+  isEmbroidery?: boolean;
+  isPrint?: boolean;
 };
 export type ShippingLine = {
   id: string;

@@ -453,6 +453,33 @@ export default function OrdersPage() {
     setPartialValues((prev) => ({ ...prev, [rowItemKey(orderId, itemIndex)]: clamped }));
   };
 
+  const applyItemDecoration = (orderId: string, lineItemId: string, flags: { isEmbroidery: boolean; isPrint: boolean }) => {
+    setOrders((prev) => prev.map((o) => (
+      o.id === orderId
+        ? { ...o, items: o.items.map((it) => (it.id === lineItemId ? { ...it, ...flags } : it)) }
+        : o
+    )));
+  };
+
+  const toggleLineItemDecoration = async (order: OrderRow, item: OrderItem, field: 'isEmbroidery' | 'isPrint') => {
+    if (blockTestModeAction()) return;
+    const prevFlags = { isEmbroidery: item.isEmbroidery ?? false, isPrint: item.isPrint ?? false };
+    const nextFlags = { ...prevFlags, [field]: !prevFlags[field] };
+    applyItemDecoration(order.id, item.id, nextFlags);
+    try {
+      const res = await fetch(`/api/orders/${order.id}/line-items/${encodeURIComponent(item.id)}/decoration`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(nextFlags),
+      });
+      const json = (await res.json()) as ApiResponse<unknown>;
+      if (!res.ok || !json.success) throw new Error(getApiErrorMessage(json, 'Failed to update decoration'));
+    } catch (err) {
+      applyItemDecoration(order.id, item.id, prevFlags);
+      toast.error(err instanceof Error ? err.message : 'Failed to update decoration');
+    }
+  };
+
   const nameKey = (orderId: string, lineItemId: string) => `${orderId}:${lineItemId}`;
 
   const orderNameEntries = (order: OrderRow): Array<{ key: string; row: NameAttributeRow }> =>
@@ -2250,6 +2277,8 @@ export default function OrdersPage() {
                                             )}
                                           </th>
                                           <th className="text-left py-1 text-gray-400 font-medium">SKU</th>
+                                          <th className="text-center py-1 text-gray-400 font-medium">Emb</th>
+                                          <th className="text-center py-1 text-gray-400 font-medium">Print</th>
                                           <th className="text-center py-1 text-gray-400 font-medium">QTY</th>
                                           <th className="text-center py-1 text-gray-400 font-medium">Packed</th>
                                           <th className="text-start py-1 text-gray-400 font-medium">
@@ -2303,6 +2332,38 @@ export default function OrdersPage() {
                                                 })()}
                                               </td>
                                               <td className="py-1.5 pr-2 font-mono text-gray-500">{item.sku || '-'}</td>
+                                              <td className="py-1.5 text-center">
+                                                {userIsAdmin ? (
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => toggleLineItemDecoration(order, item, 'isEmbroidery')}
+                                                    title="Toggle embroidery"
+                                                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors duration-150 ${item.isEmbroidery ? 'bg-purple-100 text-purple-700 hover:bg-purple-200' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+                                                  >
+                                                    Emb
+                                                  </button>
+                                                ) : item.isEmbroidery ? (
+                                                  <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold bg-purple-100 text-purple-700">Emb</span>
+                                                ) : (
+                                                  <span className="text-gray-300">-</span>
+                                                )}
+                                              </td>
+                                              <td className="py-1.5 text-center">
+                                                {userIsAdmin ? (
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => toggleLineItemDecoration(order, item, 'isPrint')}
+                                                    title="Toggle print"
+                                                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors duration-150 ${item.isPrint ? 'bg-sky-100 text-sky-700 hover:bg-sky-200' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+                                                  >
+                                                    Print
+                                                  </button>
+                                                ) : item.isPrint ? (
+                                                  <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold bg-sky-100 text-sky-700">Print</span>
+                                                ) : (
+                                                  <span className="text-gray-300">-</span>
+                                                )}
+                                              </td>
                                               <td className="py-1.5 text-center text-gray-700">
                                                 {fulfilledQty}/{item.qty}
                                               </td>

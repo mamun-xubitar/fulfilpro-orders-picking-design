@@ -144,6 +144,16 @@ export class OrderController {
     };
   }
 
+  async setLineItemDecoration(orderId: string, lineItemId: string, body: unknown) {
+    const flags = parseDecorationFlags(body);
+    const result = await model.setLineItemDecoration(orderId, lineItemId, flags);
+
+    return {
+      data: result,
+      message: 'Decoration updated',
+    };
+  }
+
   async getStockAdjustment(orderId: string) {
     const result = await model.getStockAdjustment(orderId);
 
@@ -292,6 +302,19 @@ export class OrderController {
       message: 'Note deleted',
     };
   }
+}
+
+function parseDecorationFlags(body: unknown) {
+  if (!body || typeof body !== 'object') {
+    throw new Error('Decoration data is required');
+  }
+
+  const value = body as Record<string, unknown>;
+  if (typeof value.isEmbroidery !== 'boolean' || typeof value.isPrint !== 'boolean') {
+    throw new Error('isEmbroidery and isPrint must be booleans');
+  }
+
+  return { isEmbroidery: value.isEmbroidery, isPrint: value.isPrint };
 }
 
 function parseOrderNote(body: unknown) {

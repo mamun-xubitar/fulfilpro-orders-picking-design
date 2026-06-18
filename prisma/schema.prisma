@@ -96,10 +96,26 @@ model Order {
   pickingSlipPrints OrderPickingSlipPrint[]
   backInStockRequests BackInStockRequest[]
   stockAdjustment   OrderStockAdjustment?
+  lineItemDecorations LineItemDecoration[]
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
   @@unique([storeId, number])
+}
+
+model LineItemDecoration {
+  id             String   @id @default(uuid())
+  orderId        String
+  lineItemId     String
+  isEmbroidery   Boolean  @default(false)
+  isPrint        Boolean  @default(false)
+  manualOverride Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  order          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([orderId, lineItemId])
+  @@index([orderId])
 }
 
 model OrderPackingConfirmation {
