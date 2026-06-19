@@ -14,6 +14,6 @@ export async function GET(request: Request) {
     allowedStoreIds = await getUserAllowedStoreIds(session.user.id, session.user.role);
   }
   
-  const result = await controller.list(searchParams, session?.user?.id, allowedStoreIds);
+  const result = await controller.list(searchParams, session?.user?.id, allowedStoreIds, session?.user?.role);
   return apiSuccess({ message: 'Orders retrieved', data: result.data });
 }

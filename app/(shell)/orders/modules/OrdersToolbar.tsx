@@ -71,6 +71,7 @@ type OrdersToolbarProps = {
   exportDropdownRef: RefObject<HTMLDivElement | null>;
   onExportCsv: () => void;
   onExportPrint: () => void;
+  canSync: boolean;
 };
 
 export default function OrdersToolbar({
@@ -138,6 +139,7 @@ export default function OrdersToolbar({
   exportDropdownRef,
   onExportCsv,
   onExportPrint,
+  canSync,
 }: OrdersToolbarProps) {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const activeSearchField = SEARCH_FIELDS.find((f) => f.value === searchField);
@@ -522,6 +524,8 @@ export default function OrdersToolbar({
           )}
         </div>
       )}
+      {canSync && (
+      <>
       <div ref={syncStoreDropdownRef} className="relative">
         <div className="flex items-stretch gap-0">
           <button
@@ -600,6 +604,8 @@ export default function OrdersToolbar({
         Refresh
       </button>
       <span className="min-w-0 flex-1 text-xs text-gray-400 sm:flex-none sm:whitespace-nowrap">{syncMessage}</span>
+      </>
+      )}
     </div>
   </div>
   );

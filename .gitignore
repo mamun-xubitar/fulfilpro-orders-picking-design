@@ -41,3 +41,6 @@ logs
 next-env.d.ts
 
 /app/generated/prisma
+
+# decoration file uploads (served publicly via /api/uploads)
+/uploads

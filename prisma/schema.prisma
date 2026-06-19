@@ -98,6 +98,8 @@ model Order {
   stockAdjustment   OrderStockAdjustment?
   lineItemDecorations LineItemDecoration[]
   lineItemAssignments LineItemAssignment[]
+  lineItemWorks     LineItemWork[]
+  decorationEditRequests DecorationEditRequest[]
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
@@ -139,6 +141,61 @@ model LineItemAssignment {
   @@unique([orderId, lineItemId, assigneeId])
   @@index([orderId])
   @@index([assigneeId])
+}
+
+model LineItemWork {
+  id           String    @id @default(uuid())
+  orderId      String
+  orderNumber  String
+  lineItemId   String
+  workerId     String
+  workerName   String
+  workerEmail  String
+  workerRole   String
+  category     String
+  quantityDone Int
+  comments     Json      @default("[]")
+  digestSentAt DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  order        Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([workerId])
+  @@index([digestSentAt])
+}
+
+model DecorationEditRequest {
+  id               String    @id @default(uuid())
+  orderId          String
+  orderNumber      String
+  lineItemId       String
+  requestedById    String
+  requestedByName  String
+  requestedByEmail String
+  requestedByRole  String
+  reason           String
+  status           String    @default("pending")
+  adminTargets     Json
+  approveToken     String    @unique
+  rejectToken      String    @unique
+  approvedById     String?
+  approvedByName   String?
+  approvedAt       DateTime?
+  rejectedById     String?
+  rejectedByName   String?
+  rejectedAt       DateTime?
+  completedAt      DateTime?
+  expiresAt        DateTime
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  order            Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([lineItemId])
+  @@index([status])
+  @@index([approveToken])
+  @@index([rejectToken])
 }
 
 model OrderPackingConfirmation {

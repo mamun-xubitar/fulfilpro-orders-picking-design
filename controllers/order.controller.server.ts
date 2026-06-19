@@ -7,7 +7,7 @@ type Period = 'all' | 'week' | 'month' | 'year';
 const SEARCH_FIELD_VALUES = new Set(['number', 'customer', 'address', 'lineItem']);
 
 export class OrderController {
-  async list(searchParams: URLSearchParams, viewerId?: string, allowedStoreIds?: string[] | null) {
+  async list(searchParams: URLSearchParams, viewerId?: string, allowedStoreIds?: string[] | null, viewerRole?: string) {
     const search = searchParams.get('search')?.trim() ?? '';
     const searchField = SEARCH_FIELD_VALUES.has(searchParams.get('searchField')?.trim() ?? '')
       ? searchParams.get('searchField')!.trim()
@@ -62,6 +62,7 @@ export class OrderController {
         fulfillmentStatuses,
         packingStatuses,
         viewerId,
+        viewerRole,
         page,
         pageSize,
       }),

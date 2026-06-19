@@ -1,0 +1,176 @@
+'use client';
+
+import type { OrderItem, OrderRow } from './types';
+import { getDecorationRowTint } from './utils';
+
+type Props = {
+  order: OrderRow;
+  decoratorCategory: 'embroidery' | 'print' | null;
+  currentUserId: string;
+  requestingAccessKey: string | null;
+  onMarkDone: (order: OrderRow, item: OrderItem) => void;
+  onRequestAccess: (order: OrderRow, item: OrderItem) => void;
+  onDeleteWork: (order: OrderRow, item: OrderItem, workId: string) => void;
+};
+
+const COMMENT_FIELDS: Array<{ key: 'sizes' | 'colors' | 'remarks' | 'location'; label: string }> = [
+  { key: 'sizes', label: 'Sizes' },
+  { key: 'colors', label: 'Colors' },
+  { key: 'remarks', label: 'Remarks' },
+  { key: 'location', label: 'Location' },
+];
+
+export default function DecoratorFulfillmentPanel({
+  order,
+  decoratorCategory,
+  currentUserId,
+  requestingAccessKey,
+  onMarkDone,
+  onRequestAccess,
+  onDeleteWork,
+}: Props) {
+  const isRelevant = (item: OrderItem) => {
+    if (decoratorCategory === 'embroidery' && item.isEmbroidery) return true;
+    if (decoratorCategory === 'print' && item.isPrint) return true;
+    if ((item.assignments ?? []).some((a) => a.assigneeId === currentUserId)) return true;
+    if ((item.decoration?.works.length ?? 0) > 0) return true;
+    return false;
+  };
+
+  const items = order.items.filter(isRelevant);
+
+  return (
+    <div className="bg-gray-100 border-b border-gray-200 p-5">
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="text-xs font-semibold text-gray-500 uppercase">Product Fulfilment</h4>
+        <span className="text-xs text-gray-400">Order {order.number} · {order.customer}</span>
+      </div>
+
+      {items.length === 0 ? (
+        <p className="text-sm text-gray-400">No items for you on this order.</p>
+      ) : (
+        <div className="space-y-3">
+          {items.map((item) => {
+            const d = item.decoration;
+            const doneQty = d?.doneQty ?? 0;
+            const remaining = d?.remaining ?? item.qty;
+            const locked = d?.locked ?? false;
+            const editable = !locked;
+            const pending = d?.hasPendingRequest ?? false;
+            const tint = getDecorationRowTint(item) ?? 'bg-white';
+            const requestKey = `${order.id}:${item.id}`;
+            const works = d?.works ?? [];
+
+            return (
+              <div key={item.id} className={`rounded-lg border border-gray-200 p-3 ${tint}`}>
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-sm font-medium text-gray-800">{item.name || item.title}</span>
+                      {item.isEmbroidery && <span className="rounded-full bg-purple-100 text-purple-700 px-1.5 py-0.5 text-[10px] font-semibold">Emb</span>}
+                      {item.isPrint && <span className="rounded-full bg-sky-100 text-sky-700 px-1.5 py-0.5 text-[10px] font-semibold">Print</span>}
+                    </div>
+                    <div className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-gray-500">
+                      {item.sku && <span className="font-mono">{item.sku}</span>}
+                      <span>Done <strong className="text-gray-700">{doneQty}</strong> / {item.qty}</span>
+                      <span>Left <strong className="text-gray-700">{remaining}</strong></span>
+                    </div>
+                    {(item.assignments ?? []).some((a) => a.assigneeId === currentUserId && a.dueDate) && (
+                      <p className="mt-0.5 text-[11px] text-amber-700">
+                        Due {(item.assignments ?? []).find((a) => a.assigneeId === currentUserId && a.dueDate)?.dueDate}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {locked ? (
+                      <>
+                        <span className="inline-flex items-center gap-1 rounded-full bg-gray-200 text-gray-600 px-2 py-1 text-[11px] font-semibold">
+                          🔒 Locked
+                        </span>
+                        {pending ? (
+                          <span className="text-[11px] text-gray-500">Access requested</span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => onRequestAccess(order, item)}
+                            disabled={requestingAccessKey === requestKey}
+                            className="rounded-lg border border-amber-300 text-amber-700 bg-white px-2.5 py-1 text-xs font-medium hover:bg-amber-50 disabled:opacity-50"
+                          >
+                            {requestingAccessKey === requestKey ? 'Requesting…' : 'Request edit access'}
+                          </button>
+                        )}
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => onMarkDone(order, item)}
+                        disabled={remaining <= 0}
+                        className="rounded-lg bg-emerald-600 text-white px-3 py-1.5 text-xs font-semibold hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Mark done
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {works.length > 0 && (
+                  <div className="mt-3 space-y-2 border-t border-gray-200 pt-2">
+                    {works.map((work) => (
+                      <div key={work.id} className="rounded-md bg-white/70 border border-gray-100 px-2.5 py-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-medium text-gray-700">
+                            Done {work.quantityDone} · {new Date(work.createdAt).toLocaleString()}
+                          </span>
+                          {editable && (
+                            <button
+                              type="button"
+                              onClick={() => onDeleteWork(order, item, work.id)}
+                              className="text-[11px] text-red-500 hover:text-red-700"
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
+                        {work.comments.length > 0 && (
+                          <div className="mt-1.5 space-y-1.5">
+                            {work.comments.map((comment, ci) => (
+                              <div key={ci} className="text-[11px] text-gray-600">
+                                <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+                                  {COMMENT_FIELDS.map(({ key, label }) =>
+                                    comment[key] ? (
+                                      <span key={key}><span className="text-gray-400">{label}:</span> {comment[key]}</span>
+                                    ) : null
+                                  )}
+                                </div>
+                                {(comment.files ?? []).length > 0 && (
+                                  <div className="mt-0.5 flex flex-wrap gap-2">
+                                    {(comment.files ?? []).map((file, fi) => (
+                                      <a
+                                        key={fi}
+                                        href={file.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-blue-600 hover:underline"
+                                      >
+                                        📎 {file.name}
+                                      </a>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}

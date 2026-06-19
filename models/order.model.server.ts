@@ -8,7 +8,13 @@ import {
 } from '@/lib/shopify-fulfillment.server';
 import { fetchShopifyOrderById } from '@/lib/shopify-order-fetch.server';
 import { detectDecoration } from '@/lib/decoration-detect';
-import { getAssignmentsByOrder, type AssignmentRow } from '@/models/decoration.model.server';
+import { isDecoratorRole, getDecoratorCategory } from '@/lib/roles';
+import {
+  getAssignmentsByOrder,
+  getDecorationSummariesByOrder,
+  type AssignmentRow,
+  type LineDecorationSummary,
+} from '@/models/decoration.model.server';
 import { sendGoogleMail } from '@/lib/google-mail.server';
 import {
   resolveHiddenRecipientEmails,
@@ -285,10 +291,13 @@ export class OrderModel {
     fulfillmentStatuses?: string[];
     packingStatuses?: string[];
     viewerId?: string;
+    viewerRole?: string;
     page: number;
     pageSize: number;
   }) {
-    const { search, searchField, storeIds = [], period = 'all', dateFrom, dateTo, fulfillmentStatuses = [], packingStatuses = [], page, pageSize } = params;
+    const { search, searchField, storeIds = [], period = 'all', dateFrom, dateTo, fulfillmentStatuses = [], packingStatuses = [], viewerId, viewerRole, page, pageSize } = params;
+    const viewer = { id: viewerId, role: viewerRole };
+    const viewerIsDecorator = isDecoratorRole(viewerRole);
     const tokens = (search?.trim() ?? '').split(/\s+/).filter(Boolean);
     const filterByPacking = packingStatuses.length > 0;
     let orderedAtFrom: Date | undefined;
@@ -324,6 +333,18 @@ export class OrderModel {
       if (statusConditions.length > 0) {
         andConditions.push({ OR: statusConditions });
       }
+    }
+
+    // Decorators only see orders in their category, assigned to them, or with their past work.
+    if (viewerIsDecorator && viewerId) {
+      const category = getDecoratorCategory(viewerRole);
+      const decoratorConditions: Prisma.OrderWhereInput[] = [
+        { lineItemAssignments: { some: { assigneeId: viewerId } } },
+        { lineItemWorks: { some: { workerId: viewerId } } },
+      ];
+      if (category === 'embroidery') decoratorConditions.push({ lineItemDecorations: { some: { isEmbroidery: true } } });
+      if (category === 'print') decoratorConditions.push({ lineItemDecorations: { some: { isPrint: true } } });
+      andConditions.push({ OR: decoratorConditions });
     }
 
     if (andConditions.length > 0) {
@@ -386,7 +407,9 @@ export class OrderModel {
       const messageCounts = await getOrderMessageCounts(rows.map((row) => row.id), 'orders');
       const decorationsByOrder = await getDecorationsByOrder(rows.map((row) => row.id));
       const assignmentsByOrder = await getAssignmentsByOrder(rows.map((row) => row.id));
-      const allOrders = rows.map((row) => toOrderRow(row, messageCounts.get(row.id) ?? 0, decorationsByOrder.get(row.id), assignmentsByOrder.get(row.id)));
+      const summariesByOrder = await getDecorationSummariesByOrder(rows.map((row) => row.id), viewer);
+      let allOrders = rows.map((row) => toOrderRow(row, messageCounts.get(row.id) ?? 0, decorationsByOrder.get(row.id), assignmentsByOrder.get(row.id), summariesByOrder.get(row.id)));
+      if (viewerIsDecorator) allOrders = sortDecoratorOrders(allOrders);
 
       if (filterByPacking) {
         const packingSet = new Set(packingStatuses);
@@ -409,9 +432,11 @@ export class OrderModel {
       const messageCounts = await getOrderMessageCounts(allRows.map((row) => row.id), 'orders');
       const decorationsByOrder = await getDecorationsByOrder(allRows.map((row) => row.id));
       const assignmentsByOrder = await getAssignmentsByOrder(allRows.map((row) => row.id));
-      const filtered = allRows
-        .map((row) => toOrderRow(row, messageCounts.get(row.id) ?? 0, decorationsByOrder.get(row.id), assignmentsByOrder.get(row.id)))
+      const summariesByOrder = await getDecorationSummariesByOrder(allRows.map((row) => row.id), viewer);
+      let filtered = allRows
+        .map((row) => toOrderRow(row, messageCounts.get(row.id) ?? 0, decorationsByOrder.get(row.id), assignmentsByOrder.get(row.id), summariesByOrder.get(row.id)))
         .filter((o) => packingSet.has(o.packingStatus));
+      if (viewerIsDecorator) filtered = sortDecoratorOrders(filtered);
       const total = filtered.length;
       const sliced = filtered.slice((page - 1) * pageSize, page * pageSize);
       return { total, orders: sliced };
@@ -431,7 +456,9 @@ export class OrderModel {
     const messageCounts = await getOrderMessageCounts(rows.map((row) => row.id), 'orders');
     const decorationsByOrder = await getDecorationsByOrder(rows.map((row) => row.id));
     const assignmentsByOrder = await getAssignmentsByOrder(rows.map((row) => row.id));
-    const orders = rows.map((row) => toOrderRow(row, messageCounts.get(row.id) ?? 0, decorationsByOrder.get(row.id), assignmentsByOrder.get(row.id)));
+    const summariesByOrder = await getDecorationSummariesByOrder(rows.map((row) => row.id), viewer);
+    let orders = rows.map((row) => toOrderRow(row, messageCounts.get(row.id) ?? 0, decorationsByOrder.get(row.id), assignmentsByOrder.get(row.id), summariesByOrder.get(row.id)));
+    if (viewerIsDecorator) orders = sortDecoratorOrders(orders);
 
     return { total, orders };
   }
@@ -588,8 +615,9 @@ export class OrderModel {
 
     const decorationsByOrder = await getDecorationsByOrder([row.id]);
     const assignmentsByOrder = await getAssignmentsByOrder([row.id]);
+    const summariesByOrder = await getDecorationSummariesByOrder([row.id], { role: 'admin' });
 
-    return toOrderRow(row, messageCount, decorationsByOrder.get(row.id), assignmentsByOrder.get(row.id));
+    return toOrderRow(row, messageCount, decorationsByOrder.get(row.id), assignmentsByOrder.get(row.id), summariesByOrder.get(row.id));
   }
 
   async confirmFulfillment(
@@ -1202,7 +1230,7 @@ function toOrderRow(row: {
     updatedAt: Date;
   } | null;
   packingConfirmations?: Array<{ id: string; lines: Prisma.JsonValue; confirmedAt: Date; canceledAt: Date | null }>;
-}, messageCount: number, decorations?: Map<string, { isEmbroidery: boolean; isPrint: boolean }>, assignments?: Map<string, AssignmentRow[]>) {
+}, messageCount: number, decorations?: Map<string, { isEmbroidery: boolean; isPrint: boolean }>, assignments?: Map<string, AssignmentRow[]>, summaries?: Map<string, LineDecorationSummary>) {
   const lineItems = toLineItems(row.lineItems);
   const itemCount = lineItems.reduce((sum, item) => sum + Math.max(0, item.qty), 0);
 
@@ -1238,13 +1266,28 @@ function toOrderRow(row: {
     storeId: row.store.id,
     storeName: row.store.name ?? row.store.storeDomain,
     storeDomain: row.store.storeDomain,
-    items: lineItems.map((item) => ({
-      ...item,
-      packedQuantity: packedByLine.get(item.id) ?? 0,
-      isEmbroidery: decorations?.get(item.id)?.isEmbroidery ?? false,
-      isPrint: decorations?.get(item.id)?.isPrint ?? false,
-      assignments: assignments?.get(item.id) ?? [],
-    })),
+    items: lineItems.map((item) => {
+      const summary = summaries?.get(item.id);
+      const doneQty = summary?.doneQty ?? 0;
+      const remaining = Math.max(0, item.qty - doneQty);
+      const fullyDone = item.qty > 0 && doneQty >= item.qty;
+      return {
+        ...item,
+        packedQuantity: packedByLine.get(item.id) ?? 0,
+        isEmbroidery: decorations?.get(item.id)?.isEmbroidery ?? false,
+        isPrint: decorations?.get(item.id)?.isPrint ?? false,
+        assignments: assignments?.get(item.id) ?? [],
+        decoration: {
+          doneQty,
+          remaining,
+          fullyDone,
+          locked: fullyDone && !(summary?.hasActiveGrant ?? false),
+          hasPendingRequest: summary?.hasPendingRequest ?? false,
+          hasActiveGrant: summary?.hasActiveGrant ?? false,
+          works: summary?.works ?? [],
+        },
+      };
+    }),
     shippingLines: toShippingLines(row.shippingLines),
     fulfillmentItems: toFulfillmentItems(row.fulfillmentItems),
     itemsCount: itemCount,
@@ -1257,6 +1300,25 @@ function toOrderRow(row: {
     packedQuantity,
     totalQuantity,
   };
+}
+
+type DecoratorSortable = {
+  items: Array<{ isEmbroidery?: boolean; isPrint?: boolean; assignments?: unknown[]; decoration?: { remaining: number } }>;
+};
+
+function orderHasPendingDecorationWork(order: DecoratorSortable) {
+  return order.items.some((item) => {
+    const relevant = Boolean(item.isEmbroidery || item.isPrint || (Array.isArray(item.assignments) && item.assignments.length > 0));
+    if (!relevant) return false;
+    return item.decoration ? item.decoration.remaining > 0 : true;
+  });
+}
+
+// Push orders with not-yet-done decoration work to the top (stable; preserves orderedAt order within groups).
+function sortDecoratorOrders<T extends DecoratorSortable>(orders: T[]): T[] {
+  return orders
+    .slice()
+    .sort((a, b) => Number(orderHasPendingDecorationWork(b)) - Number(orderHasPendingDecorationWork(a)));
 }
 
 async function getDecorationsByOrder(orderIds: string[]) {

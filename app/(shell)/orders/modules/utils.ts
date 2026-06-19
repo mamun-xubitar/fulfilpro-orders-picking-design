@@ -5,6 +5,60 @@ export type PaginationItem = number | 'ellipsis';
 export const getNameAttribute = (item: OrderItem) =>
   item.customAttributes?.find((a) => a.name.trim().toLowerCase() === 'name') ?? null;
 
+export type DecorationBadge = { label: string; className: string };
+
+// Decoration status badges for the order Status column (emb / partially emb / print / partially print).
+export function getDecorationStatusBadges(order: Pick<OrderRow, 'items'>): DecorationBadge[] {
+  const badges: DecorationBadge[] = [];
+  const summarize = (items: OrderItem[]) => {
+    const total = items.reduce((sum, i) => sum + i.qty, 0);
+    const done = items.reduce((sum, i) => sum + (i.decoration?.doneQty ?? 0), 0);
+    return { total, done };
+  };
+
+  const emb = order.items.filter((i) => i.isEmbroidery);
+  if (emb.length > 0) {
+    const { total, done } = summarize(emb);
+    if (done > 0) {
+      badges.push(done >= total
+        ? { label: 'Emb', className: 'bg-purple-100 text-purple-700' }
+        : { label: 'Partially Emb', className: 'bg-purple-50 text-purple-600' });
+    }
+  }
+
+  const print = order.items.filter((i) => i.isPrint);
+  if (print.length > 0) {
+    const { total, done } = summarize(print);
+    if (done > 0) {
+      badges.push(done >= total
+        ? { label: 'Print', className: 'bg-sky-100 text-sky-700' }
+        : { label: 'Partially Print', className: 'bg-sky-50 text-sky-600' });
+    }
+  }
+
+  return badges;
+}
+
+// Decoration tint for a product fulfilment row. Fulfilment color has priority:
+// only applied when the row has no fulfilment-derived background.
+export function getDecorationRowTint(item: OrderItem): string | null {
+  const decoration = item.decoration;
+  const assignedCount = item.assignments?.length ?? 0;
+  const relevant = Boolean(item.isEmbroidery || item.isPrint || assignedCount > 0);
+  if (!relevant) return null;
+  if (decoration?.fullyDone) return 'bg-emerald-50';
+  if ((decoration?.doneQty ?? 0) > 0) return 'bg-pink-50';
+  if (assignedCount > 0) return 'bg-amber-50'; // assigned but not started/done
+  return null;
+}
+
+// Combine a fulfilment row class with a decoration tint, keeping fulfilment color priority.
+export function applyDecorationTint(fulfillmentClass: string, item: OrderItem): string {
+  if (/\bbg-/.test(fulfillmentClass)) return fulfillmentClass;
+  const tint = getDecorationRowTint(item);
+  return tint ? `${fulfillmentClass} ${tint}` : fulfillmentClass;
+}
+
 export function compactAddressParts(parts: Array<string | null>) {
   return parts
     .map((part) => part?.trim())

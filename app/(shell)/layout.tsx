@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
-import { isOrderPickerRole, isRestrictedSessionRole } from "@/lib/roles";
+import { isDecoratorRole, isOrderPickerRole, isRestrictedSessionRole } from "@/lib/roles";
 
 type SessionPolicy = {
   forceLogout: boolean;
@@ -41,6 +41,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
   const blockedActionTimer = useRef<number | null>(null);
   const isOrdersPath = pathname === "/orders" || pathname.startsWith("/orders/");
   const userIsOrderPicker = isOrderPickerRole(session?.user?.role);
+  const userIsDecorator = isDecoratorRole(session?.user?.role);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -396,6 +397,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
 
         <nav className="flex-1 py-4 space-y-1 px-2">
           {navItems.map((item) => {
+            if (userIsDecorator && item.id !== "orders") return null;
             if (item.adminOnly && user?.role !== "admin") return null;
             if (item.pickerHidden && userIsOrderPicker) return null;
             if (item.pickerOnly && user?.role !== "admin" && !userIsOrderPicker) return null;

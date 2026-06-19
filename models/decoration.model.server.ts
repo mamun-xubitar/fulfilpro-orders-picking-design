@@ -95,6 +95,170 @@ export async function getAssignmentsByOrder(orderIds: string[]) {
   return map;
 }
 
+export type DecorationFileRef = { name: string; url: string; size?: number; mimeType?: string };
+export type DecorationWorkComment = {
+  sizes?: string;
+  colors?: string;
+  remarks?: string;
+  location?: string;
+  files?: DecorationFileRef[];
+};
+export type DecorationWorkRecord = {
+  id: string;
+  workerId: string;
+  workerName: string;
+  workerRole: string;
+  category: string;
+  quantityDone: number;
+  comments: DecorationWorkComment[];
+  createdAt: string;
+};
+export type LineDecorationSummary = {
+  doneQty: number;
+  works: DecorationWorkRecord[];
+  hasPendingRequest: boolean;
+  hasActiveGrant: boolean;
+};
+
+function normalizeWorkComments(value: unknown): DecorationWorkComment[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((row) => {
+      if (!row || typeof row !== 'object') return null;
+      const obj = row as Record<string, unknown>;
+      const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
+      const files = Array.isArray(obj.files)
+        ? obj.files
+            .map((f) => {
+              if (!f || typeof f !== 'object') return null;
+              const fo = f as Record<string, unknown>;
+              const name = typeof fo.name === 'string' ? fo.name : '';
+              const url = typeof fo.url === 'string' ? fo.url : '';
+              if (!name || !url) return null;
+              const ref: DecorationFileRef = { name, url };
+              if (typeof fo.size === 'number') ref.size = fo.size;
+              if (typeof fo.mimeType === 'string') ref.mimeType = fo.mimeType;
+              return ref;
+            })
+            .filter((f): f is DecorationFileRef => Boolean(f))
+        : [];
+      const comment: DecorationWorkComment = {
+        sizes: str(obj.sizes),
+        colors: str(obj.colors),
+        remarks: str(obj.remarks),
+        location: str(obj.location),
+        files: files.length > 0 ? files : undefined,
+      };
+      const hasContent = comment.sizes || comment.colors || comment.remarks || comment.location || comment.files;
+      return hasContent ? comment : null;
+    })
+    .filter((c): c is DecorationWorkComment => Boolean(c));
+}
+
+function toWorkRecord(row: {
+  id: string;
+  workerId: string;
+  workerName: string;
+  workerRole: string;
+  category: string;
+  quantityDone: number;
+  comments: unknown;
+  createdAt: Date;
+}): DecorationWorkRecord {
+  return {
+    id: row.id,
+    workerId: row.workerId,
+    workerName: row.workerName,
+    workerRole: row.workerRole,
+    category: row.category,
+    quantityDone: row.quantityDone,
+    comments: normalizeWorkComments(row.comments),
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+/**
+ * Per-line decoration summary for a set of orders, keyed orderId -> lineItemId.
+ * doneQty counts ALL decorators' work; detailed `works` (with comments/files) are
+ * included only for admins and for the decorator who authored them.
+ */
+export async function getDecorationSummariesByOrder(
+  orderIds: string[],
+  viewer: { id?: string | null; role?: string | null }
+) {
+  const map = new Map<string, Map<string, LineDecorationSummary>>();
+  if (orderIds.length === 0) return map;
+
+  const isAdmin = viewer.role === 'admin';
+
+  const [works, requests] = await Promise.all([
+    prisma.lineItemWork.findMany({
+      where: { orderId: { in: orderIds } },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        id: true, orderId: true, lineItemId: true, workerId: true, workerName: true,
+        workerRole: true, category: true, quantityDone: true, comments: true, createdAt: true,
+      },
+    }),
+    prisma.decorationEditRequest.findMany({
+      where: { orderId: { in: orderIds }, status: { in: ['pending', 'approved'] }, expiresAt: { gt: new Date() } },
+      select: { orderId: true, lineItemId: true, status: true },
+    }),
+  ]);
+
+  const ensure = (orderId: string, lineItemId: string): LineDecorationSummary => {
+    let byLine = map.get(orderId);
+    if (!byLine) {
+      byLine = new Map();
+      map.set(orderId, byLine);
+    }
+    let summary = byLine.get(lineItemId);
+    if (!summary) {
+      summary = { doneQty: 0, works: [], hasPendingRequest: false, hasActiveGrant: false };
+      byLine.set(lineItemId, summary);
+    }
+    return summary;
+  };
+
+  for (const work of works) {
+    const summary = ensure(work.orderId, work.lineItemId);
+    summary.doneQty += work.quantityDone;
+    if (isAdmin || work.workerId === viewer.id) {
+      summary.works.push(toWorkRecord(work));
+    }
+  }
+
+  for (const request of requests) {
+    const summary = ensure(request.orderId, request.lineItemId);
+    if (request.status === 'pending') summary.hasPendingRequest = true;
+    if (request.status === 'approved') summary.hasActiveGrant = true;
+  }
+
+  return map;
+}
+
+async function getLineItemContext(orderId: string, lineItemId: string) {
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: { number: true, lineItems: true },
+  });
+  if (!order) throw new Error('Order not found');
+
+  let qty = 0;
+  if (Array.isArray(order.lineItems)) {
+    for (const item of order.lineItems) {
+      if (!item || typeof item !== 'object') continue;
+      const obj = item as Record<string, unknown>;
+      if (String(obj.id ?? '') === lineItemId) {
+        qty = typeof obj.qty === 'number' ? obj.qty : Number(obj.qty ?? 0);
+        break;
+      }
+    }
+  }
+
+  return { orderNumber: order.number, qty };
+}
+
 export class DecorationModel {
   async listDecoratorUsers(): Promise<DecoratorUser[]> {
     const users = await prisma.user.findMany({
@@ -184,6 +348,109 @@ export class DecorationModel {
       where: { id: assignmentId, orderId, lineItemId },
     });
     return this.listLineItemAssignments(orderId, lineItemId);
+  }
+
+  async getLineItemMeta(orderId: string, lineItemId: string) {
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      select: { number: true, lineItems: true },
+    });
+    if (!order) throw new Error('Order not found');
+    return { orderNumber: order.number, productTitle: findLineItemTitle(order.lineItems, lineItemId) };
+  }
+
+  async createWork(params: {
+    orderId: string;
+    lineItemId: string;
+    worker: { id: string; name: string; email: string; role: string };
+    quantityDone: number;
+    comments: DecorationWorkComment[];
+  }) {
+    const { orderId, lineItemId, worker } = params;
+    if (!isDecoratorRole(worker.role)) throw new Error('Only decorators can mark work as done');
+
+    const { orderNumber, qty } = await getLineItemContext(orderId, lineItemId);
+
+    const [doneAgg, activeGrant] = await Promise.all([
+      prisma.lineItemWork.aggregate({ where: { orderId, lineItemId }, _sum: { quantityDone: true } }),
+      prisma.decorationEditRequest.findFirst({
+        where: { orderId, lineItemId, status: 'approved', expiresAt: { gt: new Date() } },
+        orderBy: { approvedAt: 'desc' },
+      }),
+    ]);
+
+    const doneQty = doneAgg._sum.quantityDone ?? 0;
+    const remaining = Math.max(0, qty - doneQty);
+    const fullyDone = qty > 0 && doneQty >= qty;
+
+    if (fullyDone && !activeGrant) {
+      throw new Error('This item is locked. Request edit access from an admin.');
+    }
+
+    const quantity = Math.floor(params.quantityDone);
+    if (!Number.isFinite(quantity) || quantity < 1) throw new Error('Quantity must be at least 1');
+    if (quantity > remaining) throw new Error(`Only ${remaining} left to mark as done`);
+
+    const category = getDecoratorCategory(worker.role) ?? 'sewing';
+
+    await prisma.lineItemWork.create({
+      data: {
+        orderId,
+        orderNumber,
+        lineItemId,
+        workerId: worker.id,
+        workerName: worker.name,
+        workerEmail: worker.email,
+        workerRole: worker.role,
+        category,
+        quantityDone: quantity,
+        comments: params.comments as object[],
+      },
+    });
+
+    // Re-lock: if the item is now fully done and a grant was consumed, mark it completed.
+    if (activeGrant && doneQty + quantity >= qty) {
+      await prisma.decorationEditRequest.update({
+        where: { id: activeGrant.id },
+        data: { status: 'completed', completedAt: new Date() },
+      });
+    }
+
+    return { orderId, lineItemId };
+  }
+
+  async deleteWork(params: {
+    orderId: string;
+    lineItemId: string;
+    workId: string;
+    viewer: { id: string; role: string };
+  }) {
+    const { orderId, lineItemId, workId, viewer } = params;
+    const work = await prisma.lineItemWork.findUnique({ where: { id: workId } });
+    if (!work || work.orderId !== orderId || work.lineItemId !== lineItemId) {
+      throw new Error('Work record not found');
+    }
+
+    const isAdmin = viewer.role === 'admin';
+    if (!isAdmin && work.workerId !== viewer.id) {
+      throw new Error('You can only remove your own work');
+    }
+
+    if (!isAdmin) {
+      const { qty } = await getLineItemContext(orderId, lineItemId);
+      const doneAgg = await prisma.lineItemWork.aggregate({ where: { orderId, lineItemId }, _sum: { quantityDone: true } });
+      const doneQty = doneAgg._sum.quantityDone ?? 0;
+      const fullyDone = qty > 0 && doneQty >= qty;
+      if (fullyDone) {
+        const grant = await prisma.decorationEditRequest.findFirst({
+          where: { orderId, lineItemId, status: 'approved', expiresAt: { gt: new Date() } },
+        });
+        if (!grant) throw new Error('This item is locked. Request edit access from an admin.');
+      }
+    }
+
+    await prisma.lineItemWork.delete({ where: { id: workId } });
+    return { orderId, lineItemId };
   }
 }
 

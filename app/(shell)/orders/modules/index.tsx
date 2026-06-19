@@ -3,14 +3,18 @@
 import { Fragment, useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { toast } from 'react-toastify';
-import { getRoleLabel, isStaffLikeRole, isTestUserRole } from '@/lib/roles';
+import { getDecoratorCategory, getRoleLabel, isDecoratorRole, isStaffLikeRole, isTestUserRole } from '@/lib/roles';
 import type {
   AdminOption,
   ApiResponse,
   AssignModalState,
   BackInStockItem,
   BackInStockRequest,
+  DecorationFileRef,
   DecoratorUser,
+  WorkCommentDraft,
+  WorkModalState,
+  WorkDetailsModalState,
   FulfillmentConfirmation,
   FulfillmentEditRequestRow,
   FulfillmentLine,
@@ -39,11 +43,14 @@ import PendingRequestsPanel from './PendingRequestsPanel';
 import OrdersPagination from './OrdersPagination';
 import OrdersToolbar from './OrdersToolbar';
 import OrderModals from './OrderModals';
+import DecoratorFulfillmentPanel from './DecoratorFulfillmentPanel';
 import {
+  applyDecorationTint,
   formatShippingMoney,
   formatStockStatus,
   formatSyncDate,
   getApiErrorMessage,
+  getDecorationStatusBadges,
   getNameAttribute,
   getOrderAddressLines,
   getShippingDiscountCodes,
@@ -116,6 +123,9 @@ export default function OrdersPage() {
   const { data: session } = useSession();
   const userRole = (session?.user?.role as string) ?? '';
   const userIsAdmin = userRole === 'admin';
+  const userIsDecorator = isDecoratorRole(userRole);
+  const decoratorCategory = getDecoratorCategory(userRole);
+  const ordersColSpan = userIsAdmin ? 11 : userIsDecorator ? 9 : 10;
   const userIsStaff = isStaffLikeRole(userRole);
   const userIsTest = isTestUserRole(userRole);
   const [orderFulfillmentRequests, setOrderFulfillmentRequests] = useState<Record<string, FulfillmentEditRequestRow[]>>({});
@@ -127,6 +137,9 @@ export default function OrdersPage() {
   const [assignModal, setAssignModal] = useState<AssignModalState | null>(null);
   const [decoratorUsers, setDecoratorUsers] = useState<DecoratorUser[]>([]);
   const [decoratorUsersLoaded, setDecoratorUsersLoaded] = useState(false);
+  const [workModal, setWorkModal] = useState<WorkModalState | null>(null);
+  const [workDetails, setWorkDetails] = useState<WorkDetailsModalState | null>(null);
+  const [requestingAccessKey, setRequestingAccessKey] = useState<string | null>(null);
   const [syncStoreIds, setSyncStoreIds] = useState<string[]>([]);
   const [syncStoreDropdownOpen, setSyncStoreDropdownOpen] = useState(false);
   const searchDropdownRef = useRef<HTMLDivElement>(null);
@@ -564,6 +577,115 @@ export default function OrdersPage() {
       setAssignModal((prev) => (prev ? { ...prev, removingId: null, error: err instanceof Error ? err.message : 'Failed to remove assignment' } : prev));
     }
   };
+
+  // ----- Decorator "done" workflow -----
+  const emptyCommentDraft = (): WorkCommentDraft => ({ sizes: '', colors: '', remarks: '', location: '', files: [], uploading: false });
+
+  const openWorkModal = (order: OrderRow, item: OrderItem) => {
+    if (blockTestModeAction()) return;
+    const remaining = item.decoration?.remaining ?? item.qty;
+    setWorkModal({ order, item, quantityDone: Math.max(1, Math.min(remaining, 1)), comments: [emptyCommentDraft()], saving: false, error: '' });
+  };
+  const closeWorkModal = () => setWorkModal(null);
+
+  const updateWorkQuantity = (value: string) => {
+    setWorkModal((prev) => {
+      if (!prev) return prev;
+      const remaining = prev.item.decoration?.remaining ?? prev.item.qty;
+      const parsed = parseInt(value, 10);
+      const clamped = Number.isNaN(parsed) || parsed < 1 ? 1 : Math.min(parsed, Math.max(1, remaining));
+      return { ...prev, quantityDone: clamped };
+    });
+  };
+  const addCommentRow = () => setWorkModal((prev) => (prev ? { ...prev, comments: [...prev.comments, emptyCommentDraft()] } : prev));
+  const removeCommentRow = (index: number) => setWorkModal((prev) => (prev ? { ...prev, comments: prev.comments.filter((_, i) => i !== index) } : prev));
+  const updateCommentField = (index: number, field: 'sizes' | 'colors' | 'remarks' | 'location', value: string) =>
+    setWorkModal((prev) => (prev ? { ...prev, comments: prev.comments.map((c, i) => (i === index ? { ...c, [field]: value } : c)) } : prev));
+
+  const uploadCommentFiles = async (index: number, fileList: FileList | null) => {
+    if (!fileList || fileList.length === 0) return;
+    setWorkModal((prev) => (prev ? { ...prev, comments: prev.comments.map((c, i) => (i === index ? { ...c, uploading: true } : c)) } : prev));
+    try {
+      const fd = new FormData();
+      Array.from(fileList).forEach((f) => fd.append('files', f));
+      const res = await fetch('/api/decoration/uploads', { method: 'POST', body: fd });
+      const json = (await res.json()) as ApiResponse<{ files: DecorationFileRef[] }>;
+      if (!res.ok || !json.success) throw new Error(getApiErrorMessage(json, 'Upload failed'));
+      setWorkModal((prev) => (prev ? { ...prev, comments: prev.comments.map((c, i) => (i === index ? { ...c, files: [...c.files, ...json.data.files], uploading: false } : c)) } : prev));
+    } catch (err) {
+      setWorkModal((prev) => (prev ? { ...prev, comments: prev.comments.map((c, i) => (i === index ? { ...c, uploading: false } : c)) } : prev));
+      toast.error(err instanceof Error ? err.message : 'Upload failed');
+    }
+  };
+  const removeCommentFile = (index: number, fileIndex: number) =>
+    setWorkModal((prev) => (prev ? { ...prev, comments: prev.comments.map((c, i) => (i === index ? { ...c, files: c.files.filter((_, fi) => fi !== fileIndex) } : c)) } : prev));
+
+  const submitWork = async () => {
+    if (!workModal) return;
+    const { order, item, quantityDone, comments } = workModal;
+    setWorkModal((prev) => (prev ? { ...prev, saving: true, error: '' } : prev));
+    const cleanedComments = comments
+      .map(({ sizes, colors, remarks, location, files }) => ({
+        sizes: sizes.trim() || undefined,
+        colors: colors.trim() || undefined,
+        remarks: remarks.trim() || undefined,
+        location: location.trim() || undefined,
+        files: files.length ? files : undefined,
+      }))
+      .filter((c) => c.sizes || c.colors || c.remarks || c.location || c.files);
+    try {
+      const res = await fetch(`/api/orders/${order.id}/line-items/${encodeURIComponent(item.id)}/work`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quantityDone, comments: cleanedComments }),
+      });
+      const json = (await res.json()) as ApiResponse<unknown>;
+      if (!res.ok || !json.success) throw new Error(getApiErrorMessage(json, 'Failed to mark as done'));
+      toast.success('Marked as done.');
+      setWorkModal(null);
+      setRefreshToken((prev) => prev + 1);
+    } catch (err) {
+      setWorkModal((prev) => (prev ? { ...prev, saving: false, error: err instanceof Error ? err.message : 'Failed to mark as done' } : prev));
+    }
+  };
+
+  const deleteWorkRecord = async (order: OrderRow, item: OrderItem, workId: string) => {
+    if (blockTestModeAction()) return;
+    try {
+      const res = await fetch(`/api/orders/${order.id}/line-items/${encodeURIComponent(item.id)}/work/${workId}`, { method: 'DELETE' });
+      const json = (await res.json()) as ApiResponse<unknown>;
+      if (!res.ok || !json.success) throw new Error(getApiErrorMessage(json, 'Failed to remove work'));
+      toast.success('Work removed.');
+      setWorkDetails(null);
+      setRefreshToken((prev) => prev + 1);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to remove work');
+    }
+  };
+
+  const requestEditAccess = async (order: OrderRow, item: OrderItem) => {
+    if (blockTestModeAction()) return;
+    const key = `${order.id}:${item.id}`;
+    setRequestingAccessKey(key);
+    try {
+      const res = await fetch('/api/decoration/edit-requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId: order.id, lineItemId: item.id, reason: 'Requesting edit access' }),
+      });
+      const json = (await res.json()) as ApiResponse<unknown>;
+      if (!res.ok || !json.success) throw new Error(getApiErrorMessage(json, 'Failed to request access'));
+      toast.success('Edit access requested. An admin will review it.');
+      setRefreshToken((prev) => prev + 1);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to request access');
+    } finally {
+      setRequestingAccessKey(null);
+    }
+  };
+
+  const openWorkDetails = (order: OrderRow, item: OrderItem) => setWorkDetails({ order, item });
+  const closeWorkDetails = () => setWorkDetails(null);
 
   const nameKey = (orderId: string, lineItemId: string) => `${orderId}:${lineItemId}`;
 
@@ -1845,6 +1967,7 @@ export default function OrdersPage() {
         exportDropdownRef={exportDropdownRef}
         onExportCsv={() => void runExport('csv')}
         onExportPrint={() => void runExport('print')}
+        canSync={!userIsDecorator}
       />
 
 
@@ -1894,7 +2017,9 @@ export default function OrdersPage() {
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="hidden sm:table-cell px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-10">#</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Order No.</th>
-                <th className="hidden md:table-cell px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Store</th>
+                {!userIsDecorator && (
+                  <th className="hidden md:table-cell px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Store</th>
+                )}
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Customer</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Ordered At</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
@@ -1910,19 +2035,19 @@ export default function OrdersPage() {
             <tbody>
               {loading && (
                 <tr>
-                  <td colSpan={userIsAdmin ? 11 : 10} className="text-center text-gray-400 py-12 text-sm">Loading orders...</td>
+                  <td colSpan={ordersColSpan} className="text-center text-gray-400 py-12 text-sm">Loading orders...</td>
                 </tr>
               )}
 
               {!loading && error && (
                 <tr>
-                  <td colSpan={userIsAdmin ? 11 : 10} className="text-center text-red-500 py-12 text-sm">{error}</td>
+                  <td colSpan={ordersColSpan} className="text-center text-red-500 py-12 text-sm">{error}</td>
                 </tr>
               )}
 
               {!loading && !error && orders.length === 0 && (
                 <tr>
-                  <td colSpan={userIsAdmin ? 11 : 10} className="text-center text-gray-400 py-16 text-sm">No orders found.</td>
+                  <td colSpan={ordersColSpan} className="text-center text-gray-400 py-16 text-sm">No orders found.</td>
                 </tr>
               )}
 
@@ -1943,7 +2068,9 @@ export default function OrdersPage() {
                         {(pagination.page - 1) * pagination.pageSize + index + 1}
                       </td>
                       <td className="px-4 py-3 font-mono text-sm font-medium text-gray-900">{order.number}</td>
-                      <td className="hidden md:table-cell px-4 py-3 text-sm text-gray-600">{order.storeName}</td>
+                      {!userIsDecorator && (
+                        <td className="hidden md:table-cell px-4 py-3 text-sm text-gray-600">{order.storeName}</td>
+                      )}
                       <td className="px-4 py-3 text-sm text-gray-700">{order.customer}</td>
                       <td className="px-4 py-3 text-sm text-gray-600">
                         {new Date(order.orderedAt).toLocaleString()}
@@ -1968,6 +2095,11 @@ export default function OrdersPage() {
                               {formatStockStatus(order.backInStockStatus)}
                             </span>
                           )}
+                          {getDecorationStatusBadges(order).map((badge) => (
+                            <span key={badge.label} className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${badge.className}`}>
+                              {badge.label}
+                            </span>
+                          ))}
                         </div>
                       </td>
                       {userIsAdmin && (
@@ -2079,6 +2211,8 @@ export default function OrdersPage() {
                             </button>
                             <span className="tt">View Details</span>
                           </div>
+                          {!userIsDecorator && (
+                          <>
                           <div className="tooltip">
                             <button
                               onClick={(e) => {
@@ -2121,6 +2255,8 @@ export default function OrdersPage() {
                             </button>
                             <span className="tt">Print Label</span>
                           </div>
+                          </>
+                          )}
                           <div className="tooltip">
                             <button
                               onClick={(e) => {
@@ -2149,7 +2285,18 @@ export default function OrdersPage() {
                     </tr>
                     {isExpanded && (
                       <tr>
-                        <td colSpan={userIsAdmin ? 11 : 10} className="p-0">
+                        <td colSpan={ordersColSpan} className="p-0">
+                          {userIsDecorator ? (
+                            <DecoratorFulfillmentPanel
+                              order={order}
+                              decoratorCategory={decoratorCategory}
+                              currentUserId={session?.user?.id ?? ''}
+                              requestingAccessKey={requestingAccessKey}
+                              onMarkDone={openWorkModal}
+                              onRequestAccess={requestEditAccess}
+                              onDeleteWork={deleteWorkRecord}
+                            />
+                          ) : (
                           <div className="relative bg-gray-100 border-b border-gray-200 p-5">
                             <div className="absolute top-3 right-4">
                               {fulfillmentViewOrderId === order.id ? (
@@ -2366,6 +2513,7 @@ export default function OrdersPage() {
                                           <th className="text-center py-1 text-gray-400 font-medium">Print</th>
                                           <th className="text-center py-1 text-gray-400 font-medium">QTY</th>
                                           <th className="text-center py-1 text-gray-400 font-medium">Packed</th>
+                                          <th className="text-center py-1 text-gray-400 font-medium">Done</th>
                                           <th className="text-start py-1 text-gray-400 font-medium">
                                             <label className="inline-flex items-center gap-1 cursor-pointer justify-start">
                                               <input
@@ -2392,7 +2540,7 @@ export default function OrdersPage() {
                                           return (
                                             <tr
                                               key={`${order.id}-${itemIndex}`}
-                                              className={getFulfillmentRowClass(fulfilledQty, item.qty, remainingQty, isFull, partialValue)}
+                                              className={applyDecorationTint(getFulfillmentRowClass(fulfilledQty, item.qty, remainingQty, isFull, partialValue), item)}
                                             >
                                               <td className="py-1.5 pr-2 text-gray-700">
                                                 {(() => {
@@ -2484,6 +2632,32 @@ export default function OrdersPage() {
                                                 ) : (
                                                   <span className="text-gray-300">-</span>
                                                 )}
+                                              </td>
+                                              <td className="py-1.5 text-center">
+                                                {(() => {
+                                                  const d = item.decoration;
+                                                  const doneQty = d?.doneQty ?? 0;
+                                                  const hasDecor = item.isEmbroidery || item.isPrint || (item.assignments?.length ?? 0) > 0 || doneQty > 0;
+                                                  if (!hasDecor) return <span className="text-gray-300">-</span>;
+                                                  const badgeClass = d?.fullyDone
+                                                    ? 'bg-emerald-100 text-emerald-700'
+                                                    : doneQty > 0
+                                                      ? 'bg-amber-100 text-amber-700'
+                                                      : 'bg-gray-100 text-gray-500';
+                                                  const badge = (
+                                                    <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${badgeClass}`}>
+                                                      {doneQty}/{item.qty}
+                                                    </span>
+                                                  );
+                                                  if (userIsAdmin && (d?.works.length ?? 0) > 0) {
+                                                    return (
+                                                      <button type="button" onClick={() => openWorkDetails(order, item)} title="View decoration work" className="cursor-pointer">
+                                                        {badge}
+                                                      </button>
+                                                    );
+                                                  }
+                                                  return badge;
+                                                })()}
                                               </td>
                                               <td className="py-1.5 flex-inline justify-start items-center">
                                                 <input
@@ -2587,6 +2761,7 @@ export default function OrdersPage() {
                               )}
                             </div>
                           </div>
+                          )}
                         </td>
                       </tr>
                     )}
@@ -2732,6 +2907,146 @@ export default function OrdersPage() {
                   {assignModal.saving ? 'Assigning…' : 'Assign'}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {workModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={closeWorkModal}>
+          <div className="w-full max-w-lg rounded-xl bg-white shadow-xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between border-b border-gray-200 px-5 py-3">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-800">Mark as done</h3>
+                <p className="text-xs text-gray-500 mt-0.5">Order {workModal.order.number} · {workModal.item.name || workModal.item.title}</p>
+              </div>
+              <button onClick={closeWorkModal} className="text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
+            </div>
+
+            <div className="px-5 py-4 space-y-4">
+              <div>
+                <label className="block text-[11px] text-gray-500 mb-1">
+                  Quantity done (max {workModal.item.decoration?.remaining ?? workModal.item.qty})
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={workModal.item.decoration?.remaining ?? workModal.item.qty}
+                  value={workModal.quantityDone}
+                  onChange={(e) => updateWorkQuantity(e.target.value)}
+                  className="w-28 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-medium text-gray-500 uppercase">Comments &amp; files</p>
+                  <button onClick={addCommentRow} className="text-xs text-blue-600 hover:text-blue-800">+ Add row</button>
+                </div>
+                {workModal.comments.map((comment, ci) => (
+                  <div key={ci} className="rounded-lg border border-gray-200 p-3 space-y-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      {(['sizes', 'colors', 'remarks', 'location'] as const).map((field) => (
+                        <input
+                          key={field}
+                          value={comment[field]}
+                          onChange={(e) => updateCommentField(ci, field, e.target.value)}
+                          placeholder={field.charAt(0).toUpperCase() + field.slice(1)}
+                          className="border border-gray-300 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      ))}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <label className="inline-flex items-center gap-1 cursor-pointer text-xs text-blue-600 hover:text-blue-800">
+                        <input type="file" multiple className="hidden" onChange={(e) => { void uploadCommentFiles(ci, e.target.files); e.target.value = ''; }} />
+                        📎 Add files
+                      </label>
+                      {comment.uploading && <span className="text-[11px] text-gray-400">Uploading…</span>}
+                      {comment.files.map((file, fi) => (
+                        <span key={fi} className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-600">
+                          <a href={file.url} target="_blank" rel="noopener noreferrer" className="hover:underline">{file.name}</a>
+                          <button onClick={() => removeCommentFile(ci, fi)} className="text-gray-400 hover:text-red-500">×</button>
+                        </span>
+                      ))}
+                      {workModal.comments.length > 1 && (
+                        <button onClick={() => removeCommentRow(ci)} className="ml-auto text-[11px] text-red-500 hover:text-red-700">Remove row</button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {workModal.error && <p className="text-xs text-red-500">{workModal.error}</p>}
+              <button
+                onClick={submitWork}
+                disabled={workModal.saving || workModal.comments.some((c) => c.uploading)}
+                className="w-full rounded-lg bg-emerald-600 text-white py-2 text-xs font-semibold hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150"
+              >
+                {workModal.saving ? 'Saving…' : 'Confirm done'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {workDetails && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={closeWorkDetails}>
+          <div className="w-full max-w-lg rounded-xl bg-white shadow-xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between border-b border-gray-200 px-5 py-3">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-800">Decoration work</h3>
+                <p className="text-xs text-gray-500 mt-0.5">Order {workDetails.order.number} · {workDetails.item.name || workDetails.item.title}</p>
+              </div>
+              <button onClick={closeWorkDetails} className="text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
+            </div>
+
+            <div className="px-5 py-4 space-y-3">
+              {(workDetails.item.decoration?.works ?? []).length === 0 ? (
+                <p className="text-sm text-gray-400">No work recorded yet.</p>
+              ) : (
+                (workDetails.item.decoration?.works ?? []).map((work) => (
+                  <div key={work.id} className="rounded-lg border border-gray-200 p-3">
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs">
+                        <span className="font-medium text-gray-800">{work.workerName}</span>
+                        <span className="text-gray-400"> · {getRoleLabel(work.workerRole)}</span>
+                      </div>
+                      <span className="text-[11px] text-gray-400">{new Date(work.createdAt).toLocaleString()}</span>
+                    </div>
+                    <p className="mt-1 text-xs text-gray-600">Done {work.quantityDone}</p>
+                    {work.comments.length > 0 && (
+                      <div className="mt-2 space-y-1.5">
+                        {work.comments.map((comment, ci) => (
+                          <div key={ci} className="text-[11px] text-gray-600">
+                            <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+                              {(['sizes', 'colors', 'remarks', 'location'] as const).map((field) =>
+                                comment[field] ? (
+                                  <span key={field}><span className="text-gray-400">{field}:</span> {comment[field]}</span>
+                                ) : null
+                              )}
+                            </div>
+                            {(comment.files ?? []).length > 0 && (
+                              <div className="mt-0.5 flex flex-wrap gap-2">
+                                {(comment.files ?? []).map((file, fi) => (
+                                  <a key={fi} href={file.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">📎 {file.name}</a>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {userIsAdmin && (
+                      <button
+                        onClick={() => deleteWorkRecord(workDetails.order, workDetails.item, work.id)}
+                        className="mt-2 text-[11px] text-red-500 hover:text-red-700"
+                      >
+                        Remove this record
+                      </button>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>

@@ -15,6 +15,34 @@ export type OrderItem = {
   isEmbroidery?: boolean;
   isPrint?: boolean;
   assignments?: LineItemAssignment[];
+  decoration?: DecorationLineSummary;
+};
+export type DecorationFileRef = { name: string; url: string; size?: number; mimeType?: string };
+export type DecorationWorkComment = {
+  sizes?: string;
+  colors?: string;
+  remarks?: string;
+  location?: string;
+  files?: DecorationFileRef[];
+};
+export type DecorationWorkRecord = {
+  id: string;
+  workerId: string;
+  workerName: string;
+  workerRole: string;
+  category: string;
+  quantityDone: number;
+  comments: DecorationWorkComment[];
+  createdAt: string;
+};
+export type DecorationLineSummary = {
+  doneQty: number;
+  remaining: number;
+  fullyDone: boolean;
+  locked: boolean;
+  hasPendingRequest: boolean;
+  hasActiveGrant: boolean;
+  works: DecorationWorkRecord[];
 };
 export type LineItemAssignment = {
   id: string;
@@ -46,6 +74,26 @@ export type AssignModalState = {
   saving: boolean;
   removingId: string | null;
   error: string;
+};
+export type WorkCommentDraft = {
+  sizes: string;
+  colors: string;
+  remarks: string;
+  location: string;
+  files: DecorationFileRef[];
+  uploading: boolean;
+};
+export type WorkModalState = {
+  order: OrderRow;
+  item: OrderItem;
+  quantityDone: number;
+  comments: WorkCommentDraft[];
+  saving: boolean;
+  error: string;
+};
+export type WorkDetailsModalState = {
+  order: OrderRow;
+  item: OrderItem;
 };
 export type ShippingLine = {
   id: string;
