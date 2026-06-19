@@ -1,7 +1,7 @@
 'use client';
 
 import type { OrderItem, OrderRow } from './types';
-import { getDecorationRowTint } from './utils';
+import { getFulfilledQty, getDecorationRowTint } from './utils';
 
 type Props = {
   order: OrderRow;
@@ -72,7 +72,10 @@ export default function DecoratorFulfillmentPanel({
                     </div>
                     <div className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-gray-500">
                       {item.sku && <span className="font-mono">{item.sku}</span>}
-                      <span>Done <strong className="text-gray-700">{doneQty}</strong> / {item.qty}</span>
+                      <span>Qty <strong className="text-gray-700">{item.qty}</strong></span>
+                      <span>Packed <strong className="text-gray-700">{item.packedQuantity ?? 0}/{item.qty}</strong></span>
+                      <span>Fulfilled <strong className="text-gray-700">{getFulfilledQty(order, item.id)}/{item.qty}</strong></span>
+                      <span>Done <strong className="text-gray-700">{doneQty}</strong></span>
                       <span>Left <strong className="text-gray-700">{remaining}</strong></span>
                     </div>
                     {(item.assignments ?? []).some((a) => a.assigneeId === currentUserId && a.dueDate) && (

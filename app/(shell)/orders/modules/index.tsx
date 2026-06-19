@@ -55,6 +55,7 @@ import {
   getOrderAddressLines,
   getShippingDiscountCodes,
   getShippingLineFinalPrice,
+  getOrderDecorationRowTint,
   getStockStatusChip,
   isOrderFulfillmentLocked,
   type PaginationItem,
@@ -125,7 +126,7 @@ export default function OrdersPage() {
   const userIsAdmin = userRole === 'admin';
   const userIsDecorator = isDecoratorRole(userRole);
   const decoratorCategory = getDecoratorCategory(userRole);
-  const ordersColSpan = userIsAdmin ? 11 : userIsDecorator ? 9 : 10;
+  const ordersColSpan = userIsAdmin ? 11 : 10;
   const userIsStaff = isStaffLikeRole(userRole);
   const userIsTest = isTestUserRole(userRole);
   const [orderFulfillmentRequests, setOrderFulfillmentRequests] = useState<Record<string, FulfillmentEditRequestRow[]>>({});
@@ -2022,7 +2023,7 @@ export default function OrdersPage() {
                 )}
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Customer</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Ordered At</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
                 {userIsAdmin && (
                   <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Stock Adjustment</th>
                 )}
@@ -2059,10 +2060,13 @@ export default function OrdersPage() {
                 const fulfillmentInfo = getFulfillmentInfo(order);
                 const isFullyFulfilled = isOrderFullyFulfilled(order);
                 const hasBackInStockSignal = Boolean(order.backInStockStatus && !isFullyFulfilled);
+                const restockItems = (order.stockAdjustment?.items ?? []).filter((i) => i.action === 'restore');
+                const hasRestock = restockItems.length > 0;
+                const hasDecorationWork = order.items.some((i) => (i.decoration?.works?.length ?? 0) > 0);
                 return (
                   <Fragment key={order.id}>
                     <tr
-                      className={`border-b border-gray-100 ${hasBackInStockSignal ? 'bg-amber-50 hover:bg-amber-100' : status.row ?? 'hover:bg-gray-50'} transition-colors duration-100`}
+                      className={`border-b border-gray-100 ${hasBackInStockSignal ? 'bg-amber-50 hover:bg-amber-100' : status.row ?? getOrderDecorationRowTint(order) ?? 'hover:bg-gray-50'} transition-colors duration-100`}
                     >
                       <td className="hidden sm:table-cell px-4 py-3 text-gray-400 text-xs">
                         {(pagination.page - 1) * pagination.pageSize + index + 1}
@@ -2104,24 +2108,27 @@ export default function OrdersPage() {
                       </td>
                       {userIsAdmin && (
                         <td className="px-4 py-3 text-center">
-                          {order.stockAdjustment ? (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                void openStockAdjustmentModal(order);
-                              }}
-                              className={`inline-flex min-w-14 items-center justify-center rounded-full px-2.5 py-1 text-xs font-semibold transition-colors ${order.stockAdjustment.status === 'managed'
-                                  ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                                  : order.stockAdjustment.status === 'partial'
-                                    ? 'bg-amber-100 text-amber-800 hover:bg-amber-200'
-                                    : 'bg-red-100 text-red-700 hover:bg-red-200'
-                                }`}
-                              aria-label={`Manage stock adjustment for order ${order.number}`}
-                            >
-                              {order.stockAdjustment.managedCount}/{order.stockAdjustment.totalCount}
-                            </button>
-                          ) : (
+                          {order.stockAdjustment ? (() => {
+                            const saClass = order.stockAdjustment.status === 'managed'
+                              ? 'bg-green-100 text-green-700'
+                              : order.stockAdjustment.status === 'partial'
+                                ? 'bg-amber-100 text-amber-800'
+                                : 'bg-red-100 text-red-700';
+                            const label = `${order.stockAdjustment.managedCount}/${order.stockAdjustment.totalCount}`;
+                            return (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  void openStockAdjustmentModal(order);
+                                }}
+                                className={`inline-flex min-w-14 items-center justify-center rounded-full px-2.5 py-1 text-xs font-semibold transition-colors ${saClass} hover:opacity-80`}
+                                aria-label={`Manage stock adjustment for order ${order.number}`}
+                              >
+                                {label}
+                              </button>
+                            );
+                          })() : (
                             <span className="text-xs text-gray-300">-</span>
                           )}
                         </td>
@@ -2513,7 +2520,8 @@ export default function OrdersPage() {
                                           <th className="text-center py-1 text-gray-400 font-medium">Print</th>
                                           <th className="text-center py-1 text-gray-400 font-medium">QTY</th>
                                           <th className="text-center py-1 text-gray-400 font-medium">Packed</th>
-                                          <th className="text-center py-1 text-gray-400 font-medium">Done</th>
+                                          {hasRestock && <th className="text-center py-1 text-gray-400 font-medium">Restock</th>}
+                                          {hasDecorationWork && <th className="text-center py-1 text-gray-400 font-medium">Work</th>}
                                           <th className="text-start py-1 text-gray-400 font-medium">
                                             <label className="inline-flex items-center gap-1 cursor-pointer justify-start">
                                               <input
@@ -2537,6 +2545,7 @@ export default function OrdersPage() {
                                           const partialValue = Math.min(remainingQty, Math.max(0, partialValues[key] ?? 0));
                                           const packedQty = item.packedQuantity ?? 0;
                                           const itemPackingStatus = packedQty >= item.qty && item.qty > 0 ? 'packed' : packedQty > 0 ? 'partial' : 'none';
+                                          const doneQty = item.decoration?.doneQty ?? 0;
                                           return (
                                             <tr
                                               key={`${order.id}-${itemIndex}`}
@@ -2593,10 +2602,10 @@ export default function OrdersPage() {
                                                     title="Toggle embroidery"
                                                     className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors duration-150 ${item.isEmbroidery ? 'bg-purple-100 text-purple-700 hover:bg-purple-200' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
                                                   >
-                                                    Emb
+                                                    {item.isEmbroidery ? `${doneQty}/${item.qty} Emb` : 'Emb'}
                                                   </button>
                                                 ) : item.isEmbroidery ? (
-                                                  <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold bg-purple-100 text-purple-700">Emb</span>
+                                                  <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold bg-purple-100 text-purple-700">{doneQty}/{item.qty} Emb</span>
                                                 ) : (
                                                   <span className="text-gray-300">-</span>
                                                 )}
@@ -2609,10 +2618,10 @@ export default function OrdersPage() {
                                                     title="Toggle print"
                                                     className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors duration-150 ${item.isPrint ? 'bg-sky-100 text-sky-700 hover:bg-sky-200' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
                                                   >
-                                                    Print
+                                                    {item.isPrint ? `${doneQty}/${item.qty} Print` : 'Print'}
                                                   </button>
                                                 ) : item.isPrint ? (
-                                                  <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold bg-sky-100 text-sky-700">Print</span>
+                                                  <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold bg-sky-100 text-sky-700">{doneQty}/{item.qty} Print</span>
                                                 ) : (
                                                   <span className="text-gray-300">-</span>
                                                 )}
@@ -2633,32 +2642,41 @@ export default function OrdersPage() {
                                                   <span className="text-gray-300">-</span>
                                                 )}
                                               </td>
-                                              <td className="py-1.5 text-center">
-                                                {(() => {
-                                                  const d = item.decoration;
-                                                  const doneQty = d?.doneQty ?? 0;
-                                                  const hasDecor = item.isEmbroidery || item.isPrint || (item.assignments?.length ?? 0) > 0 || doneQty > 0;
-                                                  if (!hasDecor) return <span className="text-gray-300">-</span>;
-                                                  const badgeClass = d?.fullyDone
-                                                    ? 'bg-emerald-100 text-emerald-700'
-                                                    : doneQty > 0
-                                                      ? 'bg-amber-100 text-amber-700'
-                                                      : 'bg-gray-100 text-gray-500';
-                                                  const badge = (
-                                                    <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${badgeClass}`}>
-                                                      {doneQty}/{item.qty}
+                                              {hasRestock && (() => {
+                                                const restockItem = restockItems.find((r) => r.lineItemId === item.id);
+                                                if (!restockItem) return <td className="py-1.5 text-center"><span className="text-gray-300">-</span></td>;
+                                                return (
+                                                  <td className="py-1.5 text-center">
+                                                    <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${restockItem.managed ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                                                      {restockItem.managed ? restockItem.quantity : 0}/{restockItem.quantity}
                                                     </span>
-                                                  );
-                                                  if (userIsAdmin && (d?.works.length ?? 0) > 0) {
-                                                    return (
+                                                  </td>
+                                                );
+                                              })()}
+                                              {hasDecorationWork && (() => {
+                                                const d = item.decoration;
+                                                const hasWork = (d?.works?.length ?? 0) > 0;
+                                                if (!hasWork) return <td className="py-1.5 text-center"><span className="text-gray-300">-</span></td>;
+                                                const badgeClass = d?.fullyDone
+                                                  ? 'bg-emerald-100 text-emerald-700'
+                                                  : doneQty > 0
+                                                    ? 'bg-amber-100 text-amber-700'
+                                                    : 'bg-gray-100 text-gray-500';
+                                                const badge = (
+                                                  <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${badgeClass}`}>
+                                                    {doneQty}/{item.qty}
+                                                  </span>
+                                                );
+                                                return (
+                                                  <td className="py-1.5 text-center">
+                                                    {userIsAdmin ? (
                                                       <button type="button" onClick={() => openWorkDetails(order, item)} title="View decoration work" className="cursor-pointer">
                                                         {badge}
                                                       </button>
-                                                    );
-                                                  }
-                                                  return badge;
-                                                })()}
-                                              </td>
+                                                    ) : badge}
+                                                  </td>
+                                                );
+                                              })()}
                                               <td className="py-1.5 flex-inline justify-start items-center">
                                                 <input
                                                   type="checkbox"

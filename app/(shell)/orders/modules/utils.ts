@@ -1,5 +1,13 @@
 import type { ApiResponse, BackInStockStatus, OrderItem, OrderRow, PackingSlipLabel, ShippingLine } from './types';
 
+export function getFulfilledQty(order: Pick<OrderRow, 'fulfillmentItems'>, lineItemId: string): number {
+  return order.fulfillmentItems.confirmations.reduce((sum, confirmation) => {
+    return sum + confirmation.lines.reduce((lineSum, line) => (
+      line.lineItemId === lineItemId ? lineSum + line.quantity : lineSum
+    ), 0);
+  }, 0);
+}
+
 export type PaginationItem = number | 'ellipsis';
 
 export const getNameAttribute = (item: OrderItem) =>
@@ -19,24 +27,23 @@ export function getDecorationStatusBadges(order: Pick<OrderRow, 'items'>): Decor
   const emb = order.items.filter((i) => i.isEmbroidery);
   if (emb.length > 0) {
     const { total, done } = summarize(emb);
-    if (done > 0) {
-      badges.push(done >= total
-        ? { label: 'Emb', className: 'bg-purple-100 text-purple-700' }
-        : { label: 'Partially Emb', className: 'bg-purple-50 text-purple-600' });
-    }
+    badges.push({ label: `${done}/${total} Emb`, className: 'bg-purple-100 text-purple-700' });
   }
 
   const print = order.items.filter((i) => i.isPrint);
   if (print.length > 0) {
     const { total, done } = summarize(print);
-    if (done > 0) {
-      badges.push(done >= total
-        ? { label: 'Print', className: 'bg-sky-100 text-sky-700' }
-        : { label: 'Partially Print', className: 'bg-sky-50 text-sky-600' });
-    }
+    badges.push({ label: `${done}/${total} Print`, className: 'bg-sky-100 text-sky-700' });
   }
 
   return badges;
+}
+
+// Order-level decoration row tint (emb wins over print; applied only when no fulfilment color is present).
+export function getOrderDecorationRowTint(order: Pick<OrderRow, 'items'>): string | null {
+  if (order.items.some((i) => i.isEmbroidery)) return 'bg-purple-50 hover:bg-purple-100';
+  if (order.items.some((i) => i.isPrint)) return 'bg-sky-50 hover:bg-sky-100';
+  return null;
 }
 
 // Decoration tint for a product fulfilment row. Fulfilment color has priority:
@@ -142,7 +149,7 @@ export function formatSyncDate(value: string) {
 export function formatStockStatus(status: BackInStockStatus) {
   if (status === 'back_in_stock') return 'Restocked';
   if (status === 'partially_back_in_stock') return 'Partially Restocked';
-  return 'Pending';
+  return 'Need Restock';
 }
 
 export function getStockStatusChip(status: BackInStockStatus) {

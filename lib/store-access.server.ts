@@ -1,10 +1,9 @@
 import prisma from '@/lib/prisma.server';
-import { isDecoratorRole } from '@/lib/roles';
 
 export async function getUserAllowedStoreIds(userId: string, role: string): Promise<string[] | null> {
-  // Admins and decorators are not store-scoped. Decorator visibility is governed by
-  // the decoration category / assignment filter in the orders model instead.
-  if (role === 'admin' || isDecoratorRole(role)) {
+  // Only admins are fully unscoped. Decorators fall through to their allowedStoreIds
+  // (the orders model also filters by decoration category / assignment).
+  if (role === 'admin') {
     return null;
   }
 
