@@ -4,6 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
 import { isDecoratorRole, isOrderPickerRole, isRestrictedSessionRole } from "@/lib/roles";
+import NotificationBell from "@/app/(shell)/NotificationBell";
 
 type SessionPolicy = {
   forceLogout: boolean;
@@ -456,6 +457,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
             <h1 className="truncate text-lg font-semibold text-gray-900">{pageTitles[activeId] || ""}</h1>
           </div>
           <div className="flex items-center gap-3 relative">
+            <NotificationBell isAdmin={user?.role === "admin"} />
             <span className="text-sm text-gray-600 hidden sm:block">{user?.name}</span>
             <button
               id="avatar-btn"

@@ -7,6 +7,7 @@ import {
   isDecoratorRole,
   type DecorationCategory,
 } from '@/lib/roles';
+import { createNotification } from '@/lib/notifications.server';
 
 export type DecoratorUser = {
   id: string;
@@ -340,6 +341,16 @@ export class DecorationModel {
       dueDate,
     });
 
+    await createNotification({
+      recipientId: assignee.id,
+      type: 'assignment',
+      title: 'New assignment',
+      body: `You've been assigned to Order #${order.number}${productTitle ? ` — ${productTitle}` : ''}${dueDate ? ` (due ${dueDate})` : ''}`,
+      orderId,
+      orderNumber: order.number,
+      lineItemId,
+    });
+
     return this.listLineItemAssignments(orderId, lineItemId);
   }
 
@@ -415,6 +426,21 @@ export class DecorationModel {
         data: { status: 'completed', completedAt: new Date() },
       });
     }
+
+    const admins = await prisma.user.findMany({ where: { active: true, role: 'admin' }, select: { id: true } });
+    await Promise.all(
+      admins.map((a) =>
+        createNotification({
+          recipientId: a.id,
+          type: 'work_done',
+          title: 'Decoration work logged',
+          body: `${worker.name} marked ${quantity} item(s) done on Order #${orderNumber}`,
+          orderId,
+          orderNumber,
+          lineItemId,
+        })
+      )
+    );
 
     return { orderId, lineItemId };
   }

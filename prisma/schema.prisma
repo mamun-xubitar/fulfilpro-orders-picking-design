@@ -31,6 +31,7 @@ model User {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   staffLoginApprovals StaffLoginApproval[]
+  notifications       Notification[]
 
   @@index([email])
   @@index([active])
@@ -434,6 +435,27 @@ model FulfillmentEditRequest {
   @@index([requestedById])
   @@index([approveToken])
   @@index([rejectToken])
+}
+
+model Notification {
+  id               String    @id @default(uuid())
+  recipientId      String
+  type             String
+  title            String
+  body             String
+  orderId          String?
+  orderNumber      String?
+  lineItemId       String?
+  relatedRequestId String?
+  actionable       Boolean   @default(false)
+  actionStatus     String?
+  readAt           DateTime?
+  createdAt        DateTime  @default(now())
+  recipient        User      @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@index([recipientId])
+  @@index([recipientId, readAt])
+  @@index([relatedRequestId])
 }
 
 model StaffLoginApproval {

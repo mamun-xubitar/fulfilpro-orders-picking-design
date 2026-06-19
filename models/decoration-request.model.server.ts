@@ -1,6 +1,7 @@
 import prisma from '@/lib/prisma.server';
 import { sendGoogleMail } from '@/lib/google-mail.server';
 import { getRoleLabel } from '@/lib/roles';
+import { createNotification } from '@/lib/notifications.server';
 
 export type DecorationEditRequestRow = {
   id: string;
@@ -86,6 +87,22 @@ export class DecorationEditRequestModel {
       } catch (error) {
         console.error('Failed to send decoration edit-request email', { requestId: request.id, error });
       }
+
+      await Promise.all(
+        admins.map((a) =>
+          createNotification({
+            recipientId: a.id,
+            type: 'edit_request',
+            title: 'Edit access requested',
+            body: `${params.requestedBy.name} is requesting edit access for Order #${params.orderNumber}${params.productTitle ? ` — ${params.productTitle}` : ''}`,
+            orderId: params.orderId,
+            orderNumber: params.orderNumber,
+            lineItemId: params.lineItemId,
+            relatedRequestId: request.id,
+            actionable: true,
+          })
+        )
+      );
     }
 
     return toRow(request);
@@ -117,6 +134,24 @@ export class DecorationEditRequestModel {
       where: { id: requestId },
       data: { status: 'approved', approvedById: adminId, approvedByName: adminName, approvedAt: new Date() },
     });
+
+    await Promise.all([
+      prisma.notification.updateMany({
+        where: { relatedRequestId: requestId, actionable: true },
+        data: { actionStatus: 'accepted' },
+      }),
+      createNotification({
+        recipientId: existing.requestedById,
+        type: 'request_decision',
+        title: 'Edit access approved',
+        body: `${adminName} approved your edit access request for Order #${existing.orderNumber}`,
+        orderId: existing.orderId,
+        orderNumber: existing.orderNumber,
+        lineItemId: existing.lineItemId,
+        relatedRequestId: requestId,
+      }),
+    ]);
+
     return toRow(updated);
   }
 
@@ -129,6 +164,24 @@ export class DecorationEditRequestModel {
       where: { id: requestId },
       data: { status: 'rejected', rejectedById: adminId, rejectedByName: adminName, rejectedAt: new Date() },
     });
+
+    await Promise.all([
+      prisma.notification.updateMany({
+        where: { relatedRequestId: requestId, actionable: true },
+        data: { actionStatus: 'rejected' },
+      }),
+      createNotification({
+        recipientId: existing.requestedById,
+        type: 'request_decision',
+        title: 'Edit access rejected',
+        body: `${adminName} rejected your edit access request for Order #${existing.orderNumber}`,
+        orderId: existing.orderId,
+        orderNumber: existing.orderNumber,
+        lineItemId: existing.lineItemId,
+        relatedRequestId: requestId,
+      }),
+    ]);
+
     return toRow(updated);
   }
 
@@ -143,6 +196,24 @@ export class DecorationEditRequestModel {
       where: { id: requestId },
       data: { status: 'approved', approvedAt: new Date() },
     });
+
+    await Promise.all([
+      prisma.notification.updateMany({
+        where: { relatedRequestId: requestId, actionable: true },
+        data: { actionStatus: 'accepted' },
+      }),
+      createNotification({
+        recipientId: existing.requestedById,
+        type: 'request_decision',
+        title: 'Edit access approved',
+        body: `Your edit access request for Order #${existing.orderNumber} was approved.`,
+        orderId: existing.orderId,
+        orderNumber: existing.orderNumber,
+        lineItemId: existing.lineItemId,
+        relatedRequestId: requestId,
+      }),
+    ]);
+
     return toRow(updated);
   }
 
@@ -156,6 +227,24 @@ export class DecorationEditRequestModel {
       where: { id: requestId },
       data: { status: 'rejected', rejectedAt: new Date() },
     });
+
+    await Promise.all([
+      prisma.notification.updateMany({
+        where: { relatedRequestId: requestId, actionable: true },
+        data: { actionStatus: 'rejected' },
+      }),
+      createNotification({
+        recipientId: existing.requestedById,
+        type: 'request_decision',
+        title: 'Edit access rejected',
+        body: `Your edit access request for Order #${existing.orderNumber} was rejected.`,
+        orderId: existing.orderId,
+        orderNumber: existing.orderNumber,
+        lineItemId: existing.lineItemId,
+        relatedRequestId: requestId,
+      }),
+    ]);
+
     return toRow(updated);
   }
 }
