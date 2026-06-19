@@ -3,15 +3,18 @@
 import { Fragment, useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { toast } from 'react-toastify';
-import { isStaffLikeRole, isTestUserRole } from '@/lib/roles';
+import { getRoleLabel, isStaffLikeRole, isTestUserRole } from '@/lib/roles';
 import type {
   AdminOption,
   ApiResponse,
+  AssignModalState,
   BackInStockItem,
   BackInStockRequest,
+  DecoratorUser,
   FulfillmentConfirmation,
   FulfillmentEditRequestRow,
   FulfillmentLine,
+  LineItemAssignment,
   PendingFulfillmentModalState,
   MessageModalState,
   NoteModalState,
@@ -121,6 +124,9 @@ export default function OrdersPage() {
   const [editFulModal, setEditFulModal] = useState<EditFulfillmentModalState | null>(null);
   const [cancelFulModal, setCancelFulModal] = useState<CancelFulfillmentModalState | null>(null);
   const [requestPermModal, setRequestPermModal] = useState<RequestPermissionModalState | null>(null);
+  const [assignModal, setAssignModal] = useState<AssignModalState | null>(null);
+  const [decoratorUsers, setDecoratorUsers] = useState<DecoratorUser[]>([]);
+  const [decoratorUsersLoaded, setDecoratorUsersLoaded] = useState(false);
   const [syncStoreIds, setSyncStoreIds] = useState<string[]>([]);
   const [syncStoreDropdownOpen, setSyncStoreDropdownOpen] = useState(false);
   const searchDropdownRef = useRef<HTMLDivElement>(null);
@@ -477,6 +483,85 @@ export default function OrdersPage() {
     } catch (err) {
       applyItemDecoration(order.id, item.id, prevFlags);
       toast.error(err instanceof Error ? err.message : 'Failed to update decoration');
+    }
+  };
+
+  const applyItemAssignments = (orderId: string, lineItemId: string, assignments: LineItemAssignment[]) => {
+    setOrders((prev) => prev.map((o) => (
+      o.id === orderId
+        ? { ...o, items: o.items.map((it) => (it.id === lineItemId ? { ...it, assignments } : it)) }
+        : o
+    )));
+  };
+
+  const ensureDecoratorUsers = async () => {
+    if (decoratorUsersLoaded) return;
+    try {
+      const res = await fetch('/api/users/decorators');
+      const json = (await res.json()) as ApiResponse<DecoratorUser[]>;
+      if (!res.ok || !json.success) throw new Error(getApiErrorMessage(json, 'Failed to load decorators'));
+      setDecoratorUsers(json.data);
+      setDecoratorUsersLoaded(true);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to load decorators');
+    }
+  };
+
+  const openAssignModal = (order: OrderRow, item: OrderItem) => {
+    if (blockTestModeAction()) return;
+    setAssignModal({
+      orderId: order.id,
+      orderNumber: order.number,
+      lineItemId: item.id,
+      productName: item.name || item.title || item.sku || 'Item',
+      assignments: item.assignments ?? [],
+      selectedUserId: '',
+      dueDate: '',
+      saving: false,
+      removingId: null,
+      error: '',
+    });
+    void ensureDecoratorUsers();
+  };
+
+  const closeAssignModal = () => setAssignModal(null);
+
+  const submitAssignment = async () => {
+    if (!assignModal) return;
+    if (!assignModal.selectedUserId) {
+      setAssignModal((prev) => (prev ? { ...prev, error: 'Select a decorator to assign.' } : prev));
+      return;
+    }
+    const { orderId, lineItemId, selectedUserId, dueDate } = assignModal;
+    setAssignModal((prev) => (prev ? { ...prev, saving: true, error: '' } : prev));
+    try {
+      const res = await fetch(`/api/orders/${orderId}/line-items/${encodeURIComponent(lineItemId)}/assignments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assigneeId: selectedUserId, dueDate: dueDate || null }),
+      });
+      const json = (await res.json()) as ApiResponse<{ assignments: LineItemAssignment[] }>;
+      if (!res.ok || !json.success) throw new Error(getApiErrorMessage(json, 'Failed to add assignment'));
+      applyItemAssignments(orderId, lineItemId, json.data.assignments);
+      setAssignModal((prev) => (prev ? { ...prev, assignments: json.data.assignments, selectedUserId: '', dueDate: '', saving: false } : prev));
+      toast.success('Assignment added.');
+    } catch (err) {
+      setAssignModal((prev) => (prev ? { ...prev, saving: false, error: err instanceof Error ? err.message : 'Failed to add assignment' } : prev));
+    }
+  };
+
+  const removeAssignment = async (assignmentId: string) => {
+    if (!assignModal) return;
+    const { orderId, lineItemId } = assignModal;
+    setAssignModal((prev) => (prev ? { ...prev, removingId: assignmentId, error: '' } : prev));
+    try {
+      const res = await fetch(`/api/orders/${orderId}/line-items/${encodeURIComponent(lineItemId)}/assignments/${assignmentId}`, { method: 'DELETE' });
+      const json = (await res.json()) as ApiResponse<{ assignments: LineItemAssignment[] }>;
+      if (!res.ok || !json.success) throw new Error(getApiErrorMessage(json, 'Failed to remove assignment'));
+      applyItemAssignments(orderId, lineItemId, json.data.assignments);
+      setAssignModal((prev) => (prev ? { ...prev, assignments: json.data.assignments, removingId: null } : prev));
+    } catch (err) {
+      setAssignModal((prev) => (prev ? { ...prev, removingId: null, error: err instanceof Error ? err.message : 'Failed to remove assignment' } : prev));
     }
   };
 
@@ -2330,6 +2415,26 @@ export default function OrdersPage() {
                                                     </div>
                                                   );
                                                 })()}
+                                                {userIsAdmin && (
+                                                  <div className="mt-1 flex flex-wrap items-center gap-1">
+                                                    {(item.assignments ?? []).map((a) => (
+                                                      <span
+                                                        key={a.id}
+                                                        title={`${getRoleLabel(a.assigneeRole)}${a.dueDate ? ` · due ${a.dueDate}` : ''}`}
+                                                        className="inline-flex items-center rounded-full bg-indigo-100 text-indigo-700 px-1.5 py-0.5 text-[10px] font-medium"
+                                                      >
+                                                        {a.assigneeName}{a.dueDate ? ` · ${a.dueDate}` : ''}
+                                                      </span>
+                                                    ))}
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => openAssignModal(order, item)}
+                                                      className="inline-flex items-center rounded-full border border-indigo-200 text-indigo-600 hover:bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium transition-colors duration-150"
+                                                    >
+                                                      + Assign
+                                                    </button>
+                                                  </div>
+                                                )}
                                               </td>
                                               <td className="py-1.5 pr-2 font-mono text-gray-500">{item.sku || '-'}</td>
                                               <td className="py-1.5 text-center">
@@ -2549,6 +2654,88 @@ export default function OrdersPage() {
         toggleManagedStockAdjustmentItem={toggleManagedStockAdjustmentItem}
         submitStockAdjustment={submitStockAdjustment}
       />
+
+      {assignModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={closeAssignModal}>
+          <div className="w-full max-w-md rounded-xl bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between border-b border-gray-200 px-5 py-3">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-800">Assign decorators</h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Order {assignModal.orderNumber} · {assignModal.productName}
+                </p>
+              </div>
+              <button onClick={closeAssignModal} className="text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
+            </div>
+
+            <div className="px-5 py-4 space-y-4">
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase mb-2">Current assignees</p>
+                {assignModal.assignments.length === 0 ? (
+                  <p className="text-xs text-gray-400">No decorators assigned yet.</p>
+                ) : (
+                  <ul className="space-y-1.5">
+                    {assignModal.assignments.map((a) => (
+                      <li key={a.id} className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2">
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium text-gray-800 truncate">{a.assigneeName}</p>
+                          <p className="text-[11px] text-gray-500">
+                            {getRoleLabel(a.assigneeRole)}{a.dueDate ? ` · due ${a.dueDate}` : ''}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => removeAssignment(a.id)}
+                          disabled={assignModal.removingId === a.id}
+                          className="text-xs text-red-500 hover:text-red-700 disabled:opacity-50"
+                        >
+                          {assignModal.removingId === a.id ? 'Removing…' : 'Remove'}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              <div className="space-y-2 border-t border-gray-100 pt-3">
+                <p className="text-xs font-medium text-gray-500 uppercase">Add assignee</p>
+                <div>
+                  <label className="block text-[11px] text-gray-500 mb-1">Decorator</label>
+                  <select
+                    value={assignModal.selectedUserId}
+                    onChange={(e) => setAssignModal((prev) => (prev ? { ...prev, selectedUserId: e.target.value } : prev))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Select a decorator…</option>
+                    {decoratorUsers.map((u) => (
+                      <option key={u.id} value={u.id}>{u.name} — {getRoleLabel(u.role)}</option>
+                    ))}
+                  </select>
+                  {decoratorUsersLoaded && decoratorUsers.length === 0 && (
+                    <p className="text-[11px] text-amber-600 mt-1">No active decorator users. Create them in Users.</p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-[11px] text-gray-500 mb-1">Complete by (optional)</label>
+                  <input
+                    type="date"
+                    value={assignModal.dueDate}
+                    onChange={(e) => setAssignModal((prev) => (prev ? { ...prev, dueDate: e.target.value } : prev))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                {assignModal.error && <p className="text-xs text-red-500">{assignModal.error}</p>}
+                <button
+                  onClick={submitAssignment}
+                  disabled={assignModal.saving || !assignModal.selectedUserId}
+                  className="w-full rounded-lg bg-blue-600 text-white py-2 text-xs font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150"
+                >
+                  {assignModal.saving ? 'Assigning…' : 'Assign'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

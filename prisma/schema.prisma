@@ -97,6 +97,7 @@ model Order {
   backInStockRequests BackInStockRequest[]
   stockAdjustment   OrderStockAdjustment?
   lineItemDecorations LineItemDecoration[]
+  lineItemAssignments LineItemAssignment[]
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
@@ -116,6 +117,28 @@ model LineItemDecoration {
 
   @@unique([orderId, lineItemId])
   @@index([orderId])
+}
+
+model LineItemAssignment {
+  id             String    @id @default(uuid())
+  orderId        String
+  orderNumber    String
+  lineItemId     String
+  assigneeId     String
+  assigneeName   String
+  assigneeEmail  String
+  assigneeRole   String
+  category       String?
+  dueDate        DateTime?
+  assignedById   String?
+  assignedByName String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  order          Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([orderId, lineItemId, assigneeId])
+  @@index([orderId])
+  @@index([assigneeId])
 }
 
 model OrderPackingConfirmation {

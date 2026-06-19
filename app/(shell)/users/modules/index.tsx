@@ -289,6 +289,9 @@ export default function UsersPage() {
                 <option value="staff">Staff - restricted hours</option>
                 <option value="test">Test User - orders view only</option>
                 <option value="order_picker">Order Picker - picking list only</option>
+                <option value="decorator_print">Decorator - Print</option>
+                <option value="decorator_emb">Decorator - Emb</option>
+                <option value="decorator_sewer">Decorator - Sewer</option>
               </select>
             </div>
 

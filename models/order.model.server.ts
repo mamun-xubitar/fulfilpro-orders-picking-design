@@ -8,6 +8,7 @@ import {
 } from '@/lib/shopify-fulfillment.server';
 import { fetchShopifyOrderById } from '@/lib/shopify-order-fetch.server';
 import { detectDecoration } from '@/lib/decoration-detect';
+import { getAssignmentsByOrder, type AssignmentRow } from '@/models/decoration.model.server';
 import { sendGoogleMail } from '@/lib/google-mail.server';
 import {
   resolveHiddenRecipientEmails,
@@ -384,7 +385,8 @@ export class OrderModel {
 
       const messageCounts = await getOrderMessageCounts(rows.map((row) => row.id), 'orders');
       const decorationsByOrder = await getDecorationsByOrder(rows.map((row) => row.id));
-      const allOrders = rows.map((row) => toOrderRow(row, messageCounts.get(row.id) ?? 0, decorationsByOrder.get(row.id)));
+      const assignmentsByOrder = await getAssignmentsByOrder(rows.map((row) => row.id));
+      const allOrders = rows.map((row) => toOrderRow(row, messageCounts.get(row.id) ?? 0, decorationsByOrder.get(row.id), assignmentsByOrder.get(row.id)));
 
       if (filterByPacking) {
         const packingSet = new Set(packingStatuses);
@@ -406,8 +408,9 @@ export class OrderModel {
       const packingSet = new Set(packingStatuses);
       const messageCounts = await getOrderMessageCounts(allRows.map((row) => row.id), 'orders');
       const decorationsByOrder = await getDecorationsByOrder(allRows.map((row) => row.id));
+      const assignmentsByOrder = await getAssignmentsByOrder(allRows.map((row) => row.id));
       const filtered = allRows
-        .map((row) => toOrderRow(row, messageCounts.get(row.id) ?? 0, decorationsByOrder.get(row.id)))
+        .map((row) => toOrderRow(row, messageCounts.get(row.id) ?? 0, decorationsByOrder.get(row.id), assignmentsByOrder.get(row.id)))
         .filter((o) => packingSet.has(o.packingStatus));
       const total = filtered.length;
       const sliced = filtered.slice((page - 1) * pageSize, page * pageSize);
@@ -427,7 +430,8 @@ export class OrderModel {
 
     const messageCounts = await getOrderMessageCounts(rows.map((row) => row.id), 'orders');
     const decorationsByOrder = await getDecorationsByOrder(rows.map((row) => row.id));
-    const orders = rows.map((row) => toOrderRow(row, messageCounts.get(row.id) ?? 0, decorationsByOrder.get(row.id)));
+    const assignmentsByOrder = await getAssignmentsByOrder(rows.map((row) => row.id));
+    const orders = rows.map((row) => toOrderRow(row, messageCounts.get(row.id) ?? 0, decorationsByOrder.get(row.id), assignmentsByOrder.get(row.id)));
 
     return { total, orders };
   }
@@ -583,8 +587,9 @@ export class OrderModel {
     });
 
     const decorationsByOrder = await getDecorationsByOrder([row.id]);
+    const assignmentsByOrder = await getAssignmentsByOrder([row.id]);
 
-    return toOrderRow(row, messageCount, decorationsByOrder.get(row.id));
+    return toOrderRow(row, messageCount, decorationsByOrder.get(row.id), assignmentsByOrder.get(row.id));
   }
 
   async confirmFulfillment(
@@ -1197,7 +1202,7 @@ function toOrderRow(row: {
     updatedAt: Date;
   } | null;
   packingConfirmations?: Array<{ id: string; lines: Prisma.JsonValue; confirmedAt: Date; canceledAt: Date | null }>;
-}, messageCount: number, decorations?: Map<string, { isEmbroidery: boolean; isPrint: boolean }>) {
+}, messageCount: number, decorations?: Map<string, { isEmbroidery: boolean; isPrint: boolean }>, assignments?: Map<string, AssignmentRow[]>) {
   const lineItems = toLineItems(row.lineItems);
   const itemCount = lineItems.reduce((sum, item) => sum + Math.max(0, item.qty), 0);
 
@@ -1238,6 +1243,7 @@ function toOrderRow(row: {
       packedQuantity: packedByLine.get(item.id) ?? 0,
       isEmbroidery: decorations?.get(item.id)?.isEmbroidery ?? false,
       isPrint: decorations?.get(item.id)?.isPrint ?? false,
+      assignments: assignments?.get(item.id) ?? [],
     })),
     shippingLines: toShippingLines(row.shippingLines),
     fulfillmentItems: toFulfillmentItems(row.fulfillmentItems),

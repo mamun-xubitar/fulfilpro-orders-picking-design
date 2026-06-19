@@ -14,6 +14,38 @@ export type OrderItem = {
   packedQuantity?: number;
   isEmbroidery?: boolean;
   isPrint?: boolean;
+  assignments?: LineItemAssignment[];
+};
+export type LineItemAssignment = {
+  id: string;
+  lineItemId?: string;
+  assigneeId: string;
+  assigneeName: string;
+  assigneeEmail: string;
+  assigneeRole: string;
+  category: string | null;
+  dueDate: string | null;
+  assignedByName: string | null;
+  createdAt: string;
+};
+export type DecoratorUser = {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  category: 'embroidery' | 'print' | null;
+};
+export type AssignModalState = {
+  orderId: string;
+  orderNumber: string;
+  lineItemId: string;
+  productName: string;
+  assignments: LineItemAssignment[];
+  selectedUserId: string;
+  dueDate: string;
+  saving: boolean;
+  removingId: string | null;
+  error: string;
 };
 export type ShippingLine = {
   id: string;
