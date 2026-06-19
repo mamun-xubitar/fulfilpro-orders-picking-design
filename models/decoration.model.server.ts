@@ -120,7 +120,7 @@ export type LineDecorationSummary = {
   hasActiveGrant: boolean;
 };
 
-function normalizeWorkComments(value: unknown): DecorationWorkComment[] {
+export function normalizeWorkComments(value: unknown): DecorationWorkComment[] {
   if (!Array.isArray(value)) return [];
   return value
     .map((row) => {

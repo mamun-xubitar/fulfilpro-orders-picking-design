@@ -27,9 +27,16 @@ const DEFAULT_EMAIL_RULES: AppSettingsRow["emailRules"] = {
   },
 };
 
+const DEFAULT_DECORATION_DIGEST: AppSettingsRow["decorationDigest"] = {
+  mode: "global_time",
+  time: "17:00",
+  recipientUserIds: [],
+};
+
 const SECTION_LABELS: Record<string, string> = {
   timezone: "Timezone",
   emailRules: "Email Sending Rules",
+  decorationDigest: "Decoration Work Digest",
 };
 
 type ApiResponse<T> = { success: boolean; message: string; data: T };
@@ -40,6 +47,7 @@ type RuleUser = AppSettingsRow["emailRules"]["eligibleUsers"]["activeUsers"][num
 export default function SettingsPage() {
   const [tz, setTz] = useState("Australia/Sydney");
   const [emailRules, setEmailRules] = useState<AppSettingsRow["emailRules"]>(DEFAULT_EMAIL_RULES);
+  const [decorationDigest, setDecorationDigest] = useState<AppSettingsRow["decorationDigest"]>(DEFAULT_DECORATION_DIGEST);
   const [saveMsg, setSaveMsg] = useState("");
   const [showSaveMsg, setShowSaveMsg] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -80,6 +88,14 @@ export default function SettingsPage() {
       return { timezone: tz };
     }
 
+    if (section === "decorationDigest") {
+      return {
+        decorationDigestMode: decorationDigest.mode,
+        decorationDigestTime: decorationDigest.time,
+        decorationDigestRecipientUserIds: decorationDigest.recipientUserIds,
+      };
+    }
+
     return {
       loginApprovalRecipientUserIds: emailRules.loginApprovalRecipientUserIds,
       backInStockAdminRecipientUserIds: emailRules.backInStockAdminRecipientUserIds,
@@ -99,6 +115,7 @@ export default function SettingsPage() {
     setGoogleEmail(settings.googleEmail);
     setGoogleConnected(settings.googleConnected);
     setEmailRules(settings.emailRules);
+    setDecorationDigest(settings.decorationDigest);
   }
 
   async function connectGoogle() {
@@ -332,6 +349,51 @@ export default function SettingsPage() {
               />
               Send requester update emails when admins post back-in-stock updates
             </label>
+          </RuleCard>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-5 space-y-5">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold text-gray-900">Decoration Work Digest</h2>
+              <p className="text-xs text-gray-500 mt-1">Email a summary of completed decoration work to the selected admins. Nothing is sent when no new work was done.</p>
+            </div>
+            <button disabled={savingSection === "decorationDigest" || loading} onClick={() => save("decorationDigest")} className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed sm:w-auto">{savingSection === "decorationDigest" ? "Saving..." : "Save Digest"}</button>
+          </div>
+
+          <RuleCard
+            title="Schedule"
+            hint="Choose when the digest is sent. Per-decorator mode sends each decorator's summary at the end of their own working hours."
+          >
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <select
+                value={decorationDigest.mode}
+                onChange={(e) => setDecorationDigest((prev) => ({ ...prev, mode: e.target.value as AppSettingsRow["decorationDigest"]["mode"] }))}
+                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer"
+              >
+                <option value="global_time">Single global time</option>
+                <option value="per_user_working_hour">Per decorator at their working-hour end</option>
+              </select>
+              {decorationDigest.mode === "global_time" && (
+                <input
+                  type="time"
+                  value={decorationDigest.time}
+                  onChange={(e) => setDecorationDigest((prev) => ({ ...prev, time: e.target.value }))}
+                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer sm:w-40"
+                />
+              )}
+            </div>
+          </RuleCard>
+
+          <RuleCard
+            title="Digest Recipients"
+            hint="Which admins receive the decoration work digest email?"
+          >
+            <UserChecklist
+              users={activeAdmins}
+              selectedUserIds={decorationDigest.recipientUserIds}
+              onChange={(ids) => setDecorationDigest((prev) => ({ ...prev, recipientUserIds: ids }))}
+            />
           </RuleCard>
         </div>
 

@@ -8,6 +8,7 @@
     "prisma:setup": "prisma generate && prisma migrate deploy",
     "start": "next start -p 9090",
     "worker:orders-sync": "tsx workers/order-sync.worker.ts",
+    "worker:decoration-digest": "tsx workers/decoration-digest.worker.ts",
     "lint": "eslint",
     "pm2": "pm2",
     "pm2:start": "pm2 start .pm2.json",

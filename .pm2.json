@@ -23,6 +23,18 @@
       "exec_mode": "fork",
       "instances": "1",
       "watch": false
+    },
+    {
+      "name": "order-fulfillment--decoration-digest-worker",
+      "script": "npm",
+      "args": "run worker:decoration-digest",
+      "time": true,
+      "error_file": "./logs/worker--decoration-digest-error.log",
+      "out_file": "./logs/worker--decoration-digest-out.log",
+      "log_file": "./logs/worker--decoration-digest-logs.log",
+      "exec_mode": "fork",
+      "instances": "1",
+      "watch": false
     }
   ]
 }

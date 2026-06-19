@@ -32,6 +32,11 @@ export type AppSettingsRow = {
       activeAdminUsers: EmailRuleUser[];
     };
   };
+  decorationDigest: {
+    mode: 'global_time' | 'per_user_working_hour';
+    time: string;
+    recipientUserIds: string[];
+  };
   updatedAt: string;
 };
 
@@ -52,6 +57,9 @@ export type UpdateAppSettingsData = Partial<{
   directMessageAllowedUserIds: string[];
   directMessageDefaultUserIds: string[];
   backInStockRequesterUpdatesEnabled: boolean;
+  decorationDigestMode: string;
+  decorationDigestTime: string;
+  decorationDigestRecipientUserIds: string[];
 }>;
 
 const SETTINGS_ID = 'default';
@@ -76,6 +84,9 @@ const DEFAULT_SETTINGS = {
   directMessageAllowedUserIds: [] as string[],
   directMessageDefaultUserIds: [] as string[],
   backInStockRequesterUpdatesEnabled: true,
+  decorationDigestMode: 'global_time',
+  decorationDigestTime: '17:00',
+  decorationDigestRecipientUserIds: [] as string[],
 };
 
 type GoogleTokenData = {
@@ -175,6 +186,9 @@ async function toSettingsRow(settings: {
   directMessageAllowedUserIds: unknown;
   directMessageDefaultUserIds: unknown;
   backInStockRequesterUpdatesEnabled: boolean;
+  decorationDigestMode?: string;
+  decorationDigestTime?: string;
+  decorationDigestRecipientUserIds?: unknown;
   updatedAt: Date;
 }): Promise<AppSettingsRow> {
   const { activeUsers, activeAdminUsers } = await listEmailRuleUsers();
@@ -205,6 +219,11 @@ async function toSettingsRow(settings: {
         activeUsers,
         activeAdminUsers,
       },
+    },
+    decorationDigest: {
+      mode: settings.decorationDigestMode === 'per_user_working_hour' ? 'per_user_working_hour' : 'global_time',
+      time: settings.decorationDigestTime ?? DEFAULT_SETTINGS.decorationDigestTime,
+      recipientUserIds: normalizeUserIdList(settings.decorationDigestRecipientUserIds),
     },
     updatedAt: settings.updatedAt.toISOString(),
   };

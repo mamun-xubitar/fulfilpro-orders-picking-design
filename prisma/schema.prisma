@@ -396,6 +396,9 @@ model AppSettings {
   directMessageAllowedUserIds Json       @default("[]")
   directMessageDefaultUserIds Json       @default("[]")
   backInStockRequesterUpdatesEnabled Boolean @default(true)
+  decorationDigestMode             String  @default("global_time")
+  decorationDigestTime             String  @default("17:00")
+  decorationDigestRecipientUserIds Json    @default("[]")
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 }

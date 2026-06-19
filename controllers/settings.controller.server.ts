@@ -271,6 +271,39 @@ export class SettingsController {
       }
     }
 
+    if ('decorationDigestMode' in data) {
+      if (data.decorationDigestMode !== 'global_time' && data.decorationDigestMode !== 'per_user_working_hour') {
+        errors.push('decorationDigestMode: Select a valid digest mode');
+      } else {
+        updateData.decorationDigestMode = data.decorationDigestMode;
+      }
+    }
+
+    if ('decorationDigestTime' in data) {
+      if (typeof data.decorationDigestTime !== 'string' || !TIME_PATTERN.test(data.decorationDigestTime)) {
+        errors.push('decorationDigestTime: Enter a valid time');
+      } else {
+        updateData.decorationDigestTime = data.decorationDigestTime;
+      }
+    }
+
+    if ('decorationDigestRecipientUserIds' in data) {
+      const value = data.decorationDigestRecipientUserIds;
+      if (!Array.isArray(value)) {
+        errors.push('decorationDigestRecipientUserIds: Must be an array of user IDs');
+      } else {
+        const ids = normalizeUserIdList(value);
+        const { activeAdminUsers } = await listEmailRuleUsers();
+        const activeAdminIds = new Set(activeAdminUsers.map((user) => user.id));
+        const invalidIds = ids.filter((id) => !activeAdminIds.has(id));
+        if (invalidIds.length > 0) {
+          errors.push('decorationDigestRecipientUserIds: Contains invalid IDs (must be active admins)');
+        } else {
+          updateData.decorationDigestRecipientUserIds = ids;
+        }
+      }
+    }
+
     if (errors.length) {
       return { error: { message: 'Validation failed', errors, status: 400 } };
     }
