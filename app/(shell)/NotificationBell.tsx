@@ -32,7 +32,7 @@ export default function NotificationBell({ isAdmin }: { isAdmin: boolean }) {
 
   useEffect(() => {
     load();
-    const interval = window.setInterval(load, 30_000);
+    const interval = window.setInterval(load, 3000);
     return () => window.clearInterval(interval);
   }, []);
 

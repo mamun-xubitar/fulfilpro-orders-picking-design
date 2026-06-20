@@ -92,7 +92,7 @@ export class DecorationEditRequestModel {
         admins.map((a) =>
           createNotification({
             recipientId: a.id,
-            type: 'edit_request',
+            type: 'decorator_edit_request',
             title: 'Edit access requested',
             body: `${params.requestedBy.name} is requesting edit access for Order #${params.orderNumber}${params.productTitle ? ` — ${params.productTitle}` : ''}`,
             orderId: params.orderId,

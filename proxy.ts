@@ -1,9 +1,8 @@
 import { auth } from '@/auth';
 import { evaluateStaffAccess, getUserAuthPolicy, getSessionExpiresAt } from '@/lib/auth-policy.server';
-import { isOrderPickerRole, isRestrictedSessionRole, isStaffLikeRole, isTestUserRole } from '@/lib/roles';
+import { isOrderDecoratorRole, isOrderPickerRole, isRestrictedSessionRole, isStaffLikeRole, isTestUserRole } from '@/lib/roles';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import prisma from '@/lib/prisma.server';
 
 export const config = {
   matcher: [
@@ -27,6 +26,7 @@ const PICKER_DASHBOARD_ROUTE = '/picking-list';
 const LOGIN_ROUTE = '/';
 const RESTRICTED_ROUTE = '/restricted';
 const SESSION_EXPIRED_ROUTE = '/session-expired';
+
 const STAFF_ALLOWED_PAGE_ROUTES = ['/orders', '/back-in-stock', '/profile'];
 const STAFF_ALLOWED_API_ROUTES = [
   '/api/orders',
@@ -39,10 +39,13 @@ const STAFF_ALLOWED_API_ROUTES = [
   '/api/auth/.*',
   '/api/fulfillment-requests',
   '/api/fulfillment-requests/.*',
+  '/api/notifications',
+  '/api/notifications/.*',
 ];
 const STAFF_RESTRICTED_API_ROUTES = ['/api/auth/.*'];
 const STAFF_EXPIRED_API_ROUTES = ['/api/auth/.*'];
 const TEST_USER_MUTATION_BLOCKED_API_ROUTES = ['/api/orders', '/api/orders/.*', '/api/back-in-stock', '/api/back-in-stock/.*', '/api/fulfillment-requests', '/api/fulfillment-requests/.*'];
+
 const PICKER_ALLOWED_PAGE_ROUTES = ['/picking-list', '/profile'];
 const PICKER_ALLOWED_API_ROUTES = [
   '/api/picking-list',
@@ -58,8 +61,26 @@ const PICKER_ALLOWED_API_ROUTES = [
   '/api/profile',
   '/api/profile/.*',
   '/api/auth/.*',
+  '/api/notifications',
+  '/api/notifications/.*',
 ];
 const TEST_MODE_MESSAGE = 'This action is not allowed in test mode.';
+
+const DECORATOR_ALLOWED_PAGE_ROUTES = ['/orders', '/profile']
+const DECORATOR_ALLOWED_API_ROUTES = [
+  '/api/orders',
+  '/api/orders/.*',
+  '/api/back-in-stock',
+  '/api/back-in-stock/.*',
+  '/api/uploads/logos',
+  '/api/profile',
+  '/api/profile/.*',
+  '/api/auth/.*',
+  '/api/fulfillment-requests',
+  '/api/fulfillment-requests/.*',
+  '/api/notifications',
+  '/api/notifications/.*',
+]
 
 function matchesRoute(pathname: string, routes: string[]) {
   return routes.some((route) => {
@@ -101,6 +122,7 @@ export const proxy = auth(async (request) => {
   const userRole = request.auth?.user?.role;
   const isStaffLike = isStaffLikeRole(userRole);
   const isOrderPicker = isOrderPickerRole(userRole);
+  const isDecorator = isOrderDecoratorRole(userRole);
   const isRestrictedSession = isRestrictedSessionRole(userRole);
   const isTestUser = isTestUserRole(userRole);
 
@@ -207,6 +229,21 @@ export const proxy = auth(async (request) => {
 
     if (!matchesRoute(pathname, STAFF_ALLOWED_PAGE_ROUTES)) {
       return NextResponse.redirect(new URL(DASHBOARD_ROUTE, request.url));
+    }
+  } else if (isDecorator) {
+    if (isApiRoute(pathname)) {
+      if (!matchesRoute(pathname, DECORATOR_ALLOWED_API_ROUTES)) {
+        return NextResponse.json(
+          { error: 'Forbidden', message: 'Decorators do not have access to this API' },
+          { status: 403 }
+        );
+      }
+
+      return NextResponse.next();
+    }
+
+    if (!matchesRoute(pathname, DECORATOR_ALLOWED_PAGE_ROUTES)) {
+      return NextResponse.redirect(new URL("/orders", request.url));
     }
   }
 

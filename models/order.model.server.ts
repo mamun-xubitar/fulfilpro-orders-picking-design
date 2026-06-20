@@ -18,8 +18,10 @@ import {
 import { sendGoogleMail } from '@/lib/google-mail.server';
 import {
   resolveHiddenRecipientEmails,
+  resolveHiddenRecipientIds,
   resolvePickerRecipientOptions,
 } from '@/lib/email-rules.server';
+import { createNotification } from '@/lib/notifications.server';
 import { Prisma } from '@prisma/client';
 type OrderMessageTypeInput = 'orders' | 'picker';
 
@@ -1037,6 +1039,15 @@ export class OrderModel {
       html: buildOrderMessageEmailHtml({ order, message: params.message, senderName, senderEmail }),
     });
 
+    void createNotification({
+      recipientId: recipient.id,
+      type: 'direct_message',
+      title: 'New order message',
+      body: `Message about Order #${order.number}`,
+      orderId: order.id,
+      orderNumber: order.number,
+    }).catch(() => undefined);
+
     const savedMessage = await prisma.orderMessage.create({
       data: {
         orderId: order.id,
@@ -1866,18 +1877,33 @@ async function notifyAdminsAboutStockAdjustment(params: {
   eventType: StockAdjustmentEventType;
   originUrl?: string;
 }) {
-  const recipients = await resolveHiddenRecipientEmails('stock_adjustment');
-  if (recipients.length === 0) return;
-
   const items = toStockAdjustmentItems(params.adjustment.items).filter((item) => !item.managed);
   if (items.length === 0) return;
 
-  await sendGoogleMail({
-    to: recipients,
-    subject: `Stock adjustment needed for Order #${params.order.number}`,
-    text: buildStockAdjustmentEmailText(params.order, items, params.eventType, params.originUrl),
-    html: buildStockAdjustmentEmailHtml(params.order, items, params.eventType, params.originUrl),
-  });
+  const [recipients, recipientIds] = await Promise.all([
+    resolveHiddenRecipientEmails('stock_adjustment'),
+    resolveHiddenRecipientIds('stock_adjustment'),
+  ]);
+
+  if (recipients.length > 0) {
+    await sendGoogleMail({
+      to: recipients,
+      subject: `Stock adjustment needed for Order #${params.order.number}`,
+      text: buildStockAdjustmentEmailText(params.order, items, params.eventType, params.originUrl),
+      html: buildStockAdjustmentEmailHtml(params.order, items, params.eventType, params.originUrl),
+    });
+  }
+
+  await Promise.all(recipientIds.map((id) =>
+    createNotification({
+      recipientId: id,
+      type: 'stock_adjustment',
+      title: 'Stock adjustment needed',
+      body: `Order #${params.order.number} — ${params.eventType.replace(/_/g, ' ')}`,
+      orderId: params.order.id,
+      orderNumber: params.order.number,
+    })
+  ));
 }
 
 function buildStockAdjustmentEmailText(order: OrderEmailDetails & { id: string }, items: StockAdjustmentItem[], eventType: StockAdjustmentEventType, originUrl?: string) {

@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma.server';
 import { sendGoogleMail } from '@/lib/google-mail.server';
 import { OrderModel } from '@/models/order.model.server';
 import { resolvePickerRecipientOptions } from '@/lib/email-rules.server';
+import { createNotification } from '@/lib/notifications.server';
 
 export type PickingLineInput = {
   lineItemId: string;
@@ -1012,6 +1013,17 @@ async function sendPackingEmail(params: {
     text: `${actor} ${verb} items for order ${params.order.number} (${params.order.cusName}).\n\n${lines}${note}${url ? `\n\n${url}` : ''}`,
     html: `<p><strong>${escapeHtml(actor)}</strong> ${escapeHtml(verb)} items for order <strong>${escapeHtml(params.order.number)}</strong> (${escapeHtml(params.order.cusName)}).</p><pre>${escapeHtml(lines)}</pre>${params.message ? `<p><strong>Message:</strong><br>${escapeHtml(params.message).replace(/\n/g, '<br>')}</p>` : ''}${url ? `<p><a href="${escapeHtml(url)}">Open order</a></p>` : ''}`,
   });
+
+  await Promise.all(params.recipients.map((r) =>
+    createNotification({
+      recipientId: r.id,
+      type: 'packing_notification',
+      title: `Packing ${params.type}`,
+      body: `Order #${params.order.number} packing ${params.type} by ${params.actor?.name || 'picker'}`,
+      orderId: params.order.id,
+      orderNumber: params.order.number,
+    })
+  ));
 }
 
 function escapeHtml(value: string | number | null | undefined) {

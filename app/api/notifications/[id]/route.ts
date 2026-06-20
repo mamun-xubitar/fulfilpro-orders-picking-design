@@ -3,9 +3,12 @@ import { auth } from '@/auth';
 import { markRead } from '@/lib/notifications.server';
 import { apiSuccess, apiError } from '@/lib/api-response.server';
 import { DecorationController } from '@/controllers/decoration.controller.server';
+import { resolveApprovalById } from '@/lib/staff-login-approval.server';
+import { FulfillmentEditRequestModel } from '@/models/fulfillment-request.model.server';
 import prisma from '@/lib/prisma.server';
 
-const controller = new DecorationController();
+const decorationController = new DecorationController();
+const fulfillmentModel = new FulfillmentEditRequestModel();
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -37,12 +40,31 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       if (!notif.relatedRequestId) return apiError({ message: 'No related request', status: 400 });
       if (notif.actionStatus) return apiError({ message: 'Already acted on', status: 409 });
 
-      const result = await controller.actOnRequest(
-        notif.relatedRequestId,
-        action === 'accept' ? 'approve' : 'reject',
-        { id: user.id, name: user.name ?? '' }
-      );
-      return apiSuccess({ message: result.message, data: null });
+      if (notif.type === 'login_approval') {
+        await resolveApprovalById(notif.relatedRequestId, action === 'accept' ? 'approved' : 'rejected');
+        return apiSuccess({ message: action === 'accept' ? 'Login approved' : 'Login rejected', data: null });
+      }
+
+      if (notif.type === 'fulfillment_request') {
+        if (action === 'accept') {
+          await fulfillmentModel.approveById(notif.relatedRequestId, user.id, user.name ?? '');
+        } else {
+          await fulfillmentModel.rejectById(notif.relatedRequestId, user.id, user.name ?? '');
+        }
+        return apiSuccess({ message: action === 'accept' ? 'Request approved' : 'Request rejected', data: null });
+      }
+
+      if (notif.type === 'decorator_edit_request') {
+        const result = await decorationController.actOnRequest(
+          notif.relatedRequestId,
+          action === 'accept' ? 'approve' : 'reject',
+          { id: user.id, name: user.name ?? '' }
+        );
+        return apiSuccess({ message: result.message, data: null });
+      }
+
+      return apiError({ message: "Request not found" })
+
     }
 
     return apiError({ message: "action must be 'read', 'accept', or 'reject'", status: 400 });

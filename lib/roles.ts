@@ -28,6 +28,9 @@ export function isStaffLikeRole(role: string | null | undefined) {
 export function isOrderPickerRole(role: string | null | undefined) {
   return role === ORDER_PICKER_ROLE;
 }
+export function isOrderDecoratorRole(role: string | null | undefined) {
+  return role === DECORATOR_EMB_ROLE || role === DECORATOR_PRINT_ROLE || role === DECORATOR_SEWER_ROLE;
+}
 
 export function isDecoratorRole(role: string | null | undefined) {
   return role === DECORATOR_PRINT_ROLE || role === DECORATOR_EMB_ROLE || role === DECORATOR_SEWER_ROLE;

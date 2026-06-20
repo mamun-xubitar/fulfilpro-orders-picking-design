@@ -1,7 +1,8 @@
 import crypto from 'crypto';
 import prisma from '@/lib/prisma.server';
 import { sendGoogleMail } from '@/lib/google-mail.server';
-import { resolveHiddenRecipientEmails } from '@/lib/email-rules.server';
+import { resolveHiddenRecipientEmails, resolveHiddenRecipientIds } from '@/lib/email-rules.server';
+import { createNotification } from '@/lib/notifications.server';
 
 export async function createStaffLoginApproval(user: {
   id: string;
@@ -139,6 +140,44 @@ async function sendApprovalEmail({
     text,
     html,
   });
+
+  const recipientIds = await resolveHiddenRecipientIds('login_approval');
+  await Promise.all(recipientIds.map((id) =>
+    createNotification({
+      recipientId: id,
+      type: 'login_approval',
+      title: 'Staff login approval requested',
+      body: `${staffName} is requesting login access`,
+      relatedRequestId: approvalId,
+      actionable: true,
+    })
+  ));
+}
+
+export async function resolveApprovalById(id: string, action: 'approved' | 'rejected') {
+  const approval = await prisma.staffLoginApproval.findUnique({ where: { id } });
+  if (!approval) throw new Error('Request not found');
+  if (approval.status !== 'pending') throw new Error('Request is no longer pending');
+  if (approval.expiresAt.getTime() <= Date.now()) {
+    await prisma.staffLoginApproval.update({ where: { id }, data: { status: 'expired' } });
+    throw new Error('Request has expired');
+  }
+
+  const [updated] = await Promise.all([
+    prisma.staffLoginApproval.update({
+      where: { id },
+      data: {
+        status: action,
+        ...(action === 'approved' ? { approvedAt: new Date() } : { rejectedAt: new Date() }),
+      },
+    }),
+    prisma.notification.updateMany({
+      where: { relatedRequestId: id, actionable: true },
+      data: { actionStatus: action === 'approved' ? 'accepted' : 'rejected' },
+    }),
+  ]);
+
+  return updated;
 }
 
 function escapeHtml(value: string) {

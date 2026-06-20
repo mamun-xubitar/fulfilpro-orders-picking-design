@@ -3,7 +3,9 @@ import { sendGoogleMail } from '@/lib/google-mail.server';
 import {
   isBackInStockRequesterUpdatesEnabled,
   resolveHiddenRecipientEmails,
+  resolveHiddenRecipientIds,
 } from '@/lib/email-rules.server';
+import { createNotification } from '@/lib/notifications.server';
 import { Prisma } from '@prisma/client';
 
 export type BackInStockStatus = 'pending' | 'partially_back_in_stock' | 'back_in_stock';
@@ -403,18 +405,32 @@ function toQuantitySnapshot(item: BackInStockItemInput) {
 }
 
 async function notifyAdmins(request: { orderNumber: string; requesterName: string; requesterEmail: string; items: Prisma.JsonValue; requestMessage: string | null }) {
-  const recipients = await resolveHiddenRecipientEmails('back_in_stock_admin');
-  if (recipients.length === 0) return;
-  const row = { ...request, items: toItems(request.items) };
-  await sendGoogleMail({
-    to: recipients,
-    subject: `Back in stock request for Order #${request.orderNumber}`,
-    text: buildRequestText(row),
-    html: buildRequestHtml(row),
-  });
+  const [recipients, recipientIds] = await Promise.all([
+    resolveHiddenRecipientEmails('back_in_stock_admin'),
+    resolveHiddenRecipientIds('back_in_stock_admin'),
+  ]);
+
+  if (recipients.length > 0) {
+    const row = { ...request, items: toItems(request.items) };
+    await sendGoogleMail({
+      to: recipients,
+      subject: `Back in stock request for Order #${request.orderNumber}`,
+      text: buildRequestText(row),
+      html: buildRequestHtml(row),
+    });
+  }
+
+  await Promise.all(recipientIds.map((id) =>
+    createNotification({
+      recipientId: id,
+      type: 'back_in_stock_request',
+      title: 'New back-in-stock request',
+      body: `Order #${request.orderNumber} from ${request.requesterName}`,
+    })
+  ));
 }
 
-async function notifyRequester(request: { orderNumber: string; requesterEmail: string; status: string; items: Prisma.JsonValue }, message: string) {
+async function notifyRequester(request: { orderNumber: string; requesterId: string; requesterEmail: string; status: string; items: Prisma.JsonValue }, message: string) {
   const requesterUpdatesEnabled = await isBackInStockRequesterUpdatesEnabled();
   if (!requesterUpdatesEnabled) return;
 
@@ -445,6 +461,13 @@ async function notifyRequester(request: { orderNumber: string; requesterEmail: s
         <div style="border:1px solid #e5e7eb;border-radius:8px;padding:12px;white-space:pre-wrap">${escapeHtml(message)}</div>
       </div>
     `,
+  });
+
+  await createNotification({
+    recipientId: request.requesterId,
+    type: 'back_in_stock_update',
+    title: 'Back-in-stock request updated',
+    body: `Your request for Order #${request.orderNumber} has been updated`,
   });
 }
 

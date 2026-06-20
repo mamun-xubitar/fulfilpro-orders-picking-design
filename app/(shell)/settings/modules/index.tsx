@@ -246,15 +246,15 @@ export default function SettingsPage() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-5 space-y-5">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-sm font-semibold text-gray-900">Email Sending Rules</h2>
+              <h2 className="text-sm font-semibold text-gray-900">Email/Notification Sending Rules</h2>
               <p className="text-xs text-gray-500 mt-1">Control who can receive each notification and who is selected by default in recipient pickers.</p>
             </div>
             <button disabled={savingSection === "emailRules" || loading} onClick={() => save("emailRules")} className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed sm:w-auto">{savingSection === "emailRules" ? "Saving..." : "Save Rules"}</button>
           </div>
 
           <RuleCard
-            title="Staff/Test/Picker Login Approval"
-            hint="Who will receive login approval request emails?"
+            title="Staff/Test/Picker/Decorator Login Approval"
+            hint="Who will receive login approval request emails and notifications?"
           >
             <UserChecklist
               users={activeAdmins}
@@ -265,7 +265,7 @@ export default function SettingsPage() {
 
           <RuleCard
             title="Back-In-Stock Request Notifications"
-            hint="Who will receive emails for new back-in-stock requests?"
+            hint="Who will receive emails and notifications for new back-in-stock requests?"
           >
             <UserChecklist
               users={activeUsers}
@@ -276,7 +276,7 @@ export default function SettingsPage() {
 
           <RuleCard
             title="Stock Adjustment Notifications"
-            hint="Who will receive emails to adjust the stocks when staff create a fulfillment?"
+            hint="Who will receive emails and notifications to adjust the stocks when staff create a fulfillment?"
           >
             <UserChecklist
               users={activeUsers}
@@ -287,7 +287,7 @@ export default function SettingsPage() {
 
           <RuleCard
             title="Fulfillment Permission Requests"
-            hint="Who will get notified when a user requests permission to edit/cancel an order fulfillment?"
+            hint="Who will receive emails and notifications when a user requests permission to edit/cancel an order fulfillment?"
           >
             <AllowedDefaultChecklist
               users={activeAdmins}
@@ -304,7 +304,7 @@ export default function SettingsPage() {
 
           <RuleCard
             title="Picking List Packing Notifications"
-            hint="Who will receive emails if an order is packed/canceled?"
+            hint="Who will receive emails and notifications if an order is packed/canceled?"
           >
             <AllowedDefaultChecklist
               users={activeUsers}
@@ -321,7 +321,7 @@ export default function SettingsPage() {
 
           <RuleCard
             title="Order & Picking-List Direct Messages"
-            hint="Who will receive direct message notification on orders and picking list tables?"
+            hint="Who will receive email and notification for direct messages on orders and picking list tables?"
           >
             <AllowedDefaultChecklist
               users={activeUsers}
@@ -347,7 +347,7 @@ export default function SettingsPage() {
                 onChange={(event) => setEmailRules((prev) => ({ ...prev, backInStockRequesterUpdatesEnabled: event.target.checked }))}
                 className="rounded border-gray-300 text-blue-600 cursor-pointer"
               />
-              Send requester update emails when admins post back-in-stock updates
+              Send requester email and notification updates when admins post back-in-stock updates
             </label>
           </RuleCard>
         </div>

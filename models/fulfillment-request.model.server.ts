@@ -1,6 +1,7 @@
 import prisma from '@/lib/prisma.server';
 import { sendGoogleMail } from '@/lib/google-mail.server';
 import { resolvePickerRecipientOptions } from '@/lib/email-rules.server';
+import { createNotification } from '@/lib/notifications.server';
 
 export type AdminTarget = { id: string; name: string; email: string };
 
@@ -85,6 +86,19 @@ export class FulfillmentEditRequestModel {
       // Don't fail the request creation if email fails; admin can still approve from dashboard
     }
 
+    void Promise.all(admins.map((admin) =>
+      createNotification({
+        recipientId: admin.id,
+        type: 'fulfillment_request',
+        title: 'Fulfillment permission request',
+        body: `${params.requestedBy.name} requested ${params.requestType} on Order #${params.orderNumber}`,
+        orderId: params.orderId,
+        orderNumber: params.orderNumber,
+        relatedRequestId: request.id,
+        actionable: true,
+      })
+    )).catch(() => undefined);
+
     return toRow(request);
   }
 
@@ -127,6 +141,23 @@ export class FulfillmentEditRequestModel {
         approvedAt: new Date(),
       },
     });
+
+    await Promise.all([
+      prisma.notification.updateMany({
+        where: { relatedRequestId: requestId, actionable: true },
+        data: { actionStatus: 'accepted' },
+      }),
+      createNotification({
+        recipientId: existing.requestedById,
+        type: 'fulfillment_request_decision',
+        title: 'Fulfillment request approved',
+        body: `Your ${existing.requestType} request for Order #${existing.orderNumber} was approved`,
+        orderId: existing.orderId,
+        orderNumber: existing.orderNumber,
+        relatedRequestId: requestId,
+      }),
+    ]);
+
     return toRow(updated);
   }
 
@@ -144,6 +175,23 @@ export class FulfillmentEditRequestModel {
         rejectedAt: new Date(),
       },
     });
+
+    await Promise.all([
+      prisma.notification.updateMany({
+        where: { relatedRequestId: requestId, actionable: true },
+        data: { actionStatus: 'rejected' },
+      }),
+      createNotification({
+        recipientId: existing.requestedById,
+        type: 'fulfillment_request_decision',
+        title: 'Fulfillment request rejected',
+        body: `Your ${existing.requestType} request for Order #${existing.orderNumber} was rejected`,
+        orderId: existing.orderId,
+        orderNumber: existing.orderNumber,
+        relatedRequestId: requestId,
+      }),
+    ]);
+
     return toRow(updated);
   }
 
@@ -158,6 +206,23 @@ export class FulfillmentEditRequestModel {
       where: { id: requestId },
       data: { status: 'approved', approvedAt: new Date() },
     });
+
+    await Promise.all([
+      prisma.notification.updateMany({
+        where: { relatedRequestId: requestId, actionable: true },
+        data: { actionStatus: 'accepted' },
+      }),
+      createNotification({
+        recipientId: existing.requestedById,
+        type: 'fulfillment_request_decision',
+        title: 'Fulfillment request approved',
+        body: `Your ${existing.requestType} request for Order #${existing.orderNumber} was approved`,
+        orderId: existing.orderId,
+        orderNumber: existing.orderNumber,
+        relatedRequestId: requestId,
+      }),
+    ]);
+
     return toRow(updated);
   }
 
@@ -171,6 +236,23 @@ export class FulfillmentEditRequestModel {
       where: { id: requestId },
       data: { status: 'rejected', rejectedAt: new Date() },
     });
+
+    await Promise.all([
+      prisma.notification.updateMany({
+        where: { relatedRequestId: requestId, actionable: true },
+        data: { actionStatus: 'rejected' },
+      }),
+      createNotification({
+        recipientId: existing.requestedById,
+        type: 'fulfillment_request_decision',
+        title: 'Fulfillment request rejected',
+        body: `Your ${existing.requestType} request for Order #${existing.orderNumber} was rejected`,
+        orderId: existing.orderId,
+        orderNumber: existing.orderNumber,
+        relatedRequestId: requestId,
+      }),
+    ]);
+
     return toRow(updated);
   }
 
