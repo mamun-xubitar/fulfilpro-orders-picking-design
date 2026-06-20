@@ -2102,6 +2102,11 @@ export default function OrdersPage() {
                           {getDecorationStatusBadges(order).map((badge) => (
                             <span key={badge.label} className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${badge.className}`}>
                               {badge.label}
+                              {badge.count ? (
+                                <span className="ml-1.5 inline-flex items-center justify-center rounded-full bg-white/70 px-1.5 text-[10px] font-bold">
+                                  {badge.count}
+                                </span>
+                              ) : null}
                             </span>
                           ))}
                         </div>

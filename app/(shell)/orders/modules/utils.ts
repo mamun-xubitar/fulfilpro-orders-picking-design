@@ -13,7 +13,7 @@ export type PaginationItem = number | 'ellipsis';
 export const getNameAttribute = (item: OrderItem) =>
   item.customAttributes?.find((a) => a.name.trim().toLowerCase() === 'name') ?? null;
 
-export type DecorationBadge = { label: string; className: string };
+export type DecorationBadge = { label: string; className: string; count?: number };
 
 // Decoration status badges for the order Status column (emb / partially emb / print / partially print).
 export function getDecorationStatusBadges(order: Pick<OrderRow, 'items'>): DecorationBadge[] {
@@ -21,19 +21,20 @@ export function getDecorationStatusBadges(order: Pick<OrderRow, 'items'>): Decor
   const summarize = (items: OrderItem[]) => {
     const total = items.reduce((sum, i) => sum + i.qty, 0);
     const done = items.reduce((sum, i) => sum + (i.decoration?.doneQty ?? 0), 0);
-    return { total, done };
+    const count = new Set(items.flatMap((i) => (i.assignments ?? []).map((a) => a.assigneeId))).size;
+    return { total, done, count };
   };
 
   const emb = order.items.filter((i) => i.isEmbroidery);
   if (emb.length > 0) {
-    const { total, done } = summarize(emb);
-    badges.push({ label: `${done}/${total} Emb`, className: 'bg-purple-100 text-purple-700' });
+    const { total, done, count } = summarize(emb);
+    badges.push({ label: `${done}/${total} Emb`, className: 'bg-purple-100 text-purple-700', count: count || undefined });
   }
 
   const print = order.items.filter((i) => i.isPrint);
   if (print.length > 0) {
-    const { total, done } = summarize(print);
-    badges.push({ label: `${done}/${total} Print`, className: 'bg-sky-100 text-sky-700' });
+    const { total, done, count } = summarize(print);
+    badges.push({ label: `${done}/${total} Print`, className: 'bg-sky-100 text-sky-700', count: count || undefined });
   }
 
   return badges;
