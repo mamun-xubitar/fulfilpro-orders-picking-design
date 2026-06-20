@@ -68,18 +68,20 @@ const TEST_MODE_MESSAGE = 'This action is not allowed in test mode.';
 
 const DECORATOR_ALLOWED_PAGE_ROUTES = ['/orders', '/profile']
 const DECORATOR_ALLOWED_API_ROUTES = [
-  '/api/orders',
-  '/api/orders/.*',
-  '/api/back-in-stock',
-  '/api/back-in-stock/.*',
-  '/api/uploads/logos',
   '/api/profile',
   '/api/profile/.*',
   '/api/auth/.*',
-  '/api/fulfillment-requests',
-  '/api/fulfillment-requests/.*',
   '/api/notifications',
   '/api/notifications/.*',
+  '/api/orders',
+  '/api/orders/sync',
+  '^/api/orders/[^/]+/notes$',
+  '^/api/orders/[^/]+/notes/.*$',
+  '^/api/orders/[^/]+/messages$',
+  '^/api/orders/[^/]+/line-items/[^/]+/work$',
+  '^/api/orders/[^/]+/line-items/[^/]+/work/[^/]+$',
+  '/api/decoration/uploads',
+  '/api/decoration/edit-requests',
 ]
 
 function matchesRoute(pathname: string, routes: string[]) {
