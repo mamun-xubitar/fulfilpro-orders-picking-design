@@ -159,6 +159,16 @@ request({
 - Reset page to 1 whenever filters change.
 - Pass `pagination` object and `onPageChange` down to the table component.
 
+### Function & Component Size
+- Plain functions: **≤ 100 lines**. React component functions: **≤ 160 lines**.
+- When a component exceeds 160 lines, extract presentational sub-components and/or custom hooks.
+- Keep `index.tsx` a thin orchestrator: state + hook composition + JSX tree only.
+- Pull pure request-body/payload assembly into separate helper functions.
+
+### Sub-components & hooks layout
+- Page-local pieces (hooks, sub-components) live in the page's own `modules/` folder.
+- Logic shared across pages lives in top-level `hooks/` and `components/`.
+
 ---
 
 ## CSS Utility Classes (`app/globals.css`)

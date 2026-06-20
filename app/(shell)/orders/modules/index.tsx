@@ -3,6 +3,9 @@
 import { Fragment, useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { toast } from 'react-toastify';
+import { useSyncStatus } from '@/hooks/useSyncStatus';
+import { useOrderNotes } from '@/hooks/useOrderNotes';
+import { useOrderMessages } from '@/hooks/useOrderMessages';
 import { getDecoratorCategory, getRoleLabel, isDecoratorRole, isStaffLikeRole, isTestUserRole } from '@/lib/roles';
 import type {
   AdminOption,
@@ -20,16 +23,12 @@ import type {
   FulfillmentLine,
   LineItemAssignment,
   PendingFulfillmentModalState,
-  MessageModalState,
-  NoteModalState,
   StockModalState,
   StockAdjustmentModalState,
   EditFulfillmentModalState,
   CancelFulfillmentModalState,
   RequestPermissionModalState,
-  OrderAdminMessage,
   OrderItem,
-  OrderNote,
   OrderRow,
   OrderSyncJob,
   PackingSlipLabel,
@@ -69,8 +68,37 @@ export default function OrdersPage() {
   const initialSearch = getInitialSearch();
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [stores, setStores] = useState<StoreOption[]>([]);
+
   const [searchInput, setSearchInput] = useState(initialSearch);
   const [search, setSearch] = useState(initialSearch);
+
+  const guardRef = useRef<() => boolean>(() => false);
+
+  const [syncStoreIds, setSyncStoreIds] = useState<string[]>([]);
+  const { syncJob, lastSynced, syncActive, syncRefreshNeeded, setSyncRefreshNeeded, syncing, triggerSync } = useSyncStatus({
+    syncStoreIds,
+    guard: () => guardRef.current(),
+    onError: (msg) => setError(msg),
+  });
+
+  const { noteModal, setNoteModal, openNoteModal, closeNoteModal, startEditNote, cancelEditNote, submitNote: submitOrderNote, deleteNote: deleteOrderNote } = useOrderNotes<OrderRow>({
+    guard: () => guardRef.current(),
+    onCountChange: (orderId, count, delta) => {
+      setOrders((prev) => prev.map((item) => {
+        if (item.id !== orderId) return item;
+        return { ...item, noteCount: delta !== 0 ? Math.max(0, item.noteCount + delta) : count };
+      }));
+    },
+  });
+
+  const { messageModal, setMessageModal, openMessageModal, closeMessageModal, submitMessage: submitAdminMessage } = useOrderMessages<OrderRow>({
+    messageType: 'orders',
+    guard: () => guardRef.current(),
+    onCountChange: (orderId, delta) => {
+      if (delta > 0) setOrders((prev) => prev.map((item) => item.id === orderId ? { ...item, messageCount: item.messageCount + delta } : item));
+    },
+  });
+
   const [searchField, setSearchField] = useState('');
   const [searchDropdownOpen, setSearchDropdownOpen] = useState(false);
   const [storeIds, setStoreIds] = useState<string[]>([]);
@@ -92,13 +120,9 @@ export default function OrdersPage() {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [expandAll, setExpandAll] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [syncing, setSyncing] = useState(false);
-  const [syncJob, setSyncJob] = useState<OrderSyncJob | null>(null);
   const [error, setError] = useState('');
-  const [lastSynced, setLastSynced] = useState('');
   const [refreshRotation, setRefreshRotation] = useState(0);
   const [refreshToken, setRefreshToken] = useState(0);
-  const [syncRefreshNeeded, setSyncRefreshNeeded] = useState(false);
   const [refreshingOrderIds, setRefreshingOrderIds] = useState<Record<string, boolean>>({});
   const [fullChecks, setFullChecks] = useState<Record<string, boolean>>({});
   const [partialValues, setPartialValues] = useState<Record<string, number>>({});
@@ -107,8 +131,6 @@ export default function OrdersPage() {
   const [carrierDropdownOpen, setCarrierDropdownOpen] = useState(false);
   const [carrierSearch, setCarrierSearch] = useState('');
   const [pendingFulfillment, setPendingFulfillment] = useState<PendingFulfillmentModalState | null>(null);
-  const [messageModal, setMessageModal] = useState<MessageModalState | null>(null);
-  const [noteModal, setNoteModal] = useState<NoteModalState | null>(null);
   const [stockModal, setStockModal] = useState<StockModalState | null>(null);
   const [stockAdjustmentModal, setStockAdjustmentModal] = useState<StockAdjustmentModalState | null>(null);
   const [printingOrderId, setPrintingOrderId] = useState<string | null>(null);
@@ -141,7 +163,6 @@ export default function OrdersPage() {
   const [workModal, setWorkModal] = useState<WorkModalState | null>(null);
   const [workDetails, setWorkDetails] = useState<WorkDetailsModalState | null>(null);
   const [requestingAccessKey, setRequestingAccessKey] = useState<string | null>(null);
-  const [syncStoreIds, setSyncStoreIds] = useState<string[]>([]);
   const [syncStoreDropdownOpen, setSyncStoreDropdownOpen] = useState(false);
   const searchDropdownRef = useRef<HTMLDivElement>(null);
   const storeDropdownRef = useRef<HTMLDivElement>(null);
@@ -150,8 +171,6 @@ export default function OrdersPage() {
   const periodDropdownRef = useRef<HTMLDivElement>(null);
   const syncStoreDropdownRef = useRef<HTMLDivElement>(null);
   const messageTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
-  const activeSyncJobIdRef = useRef<string | null>(null);
-  const completedSyncJobIdRef = useRef<string | null>(null);
   const fullSelectBtnRef = useRef<HTMLButtonElement>(null);
   const trackingNumInputRef = useRef<HTMLInputElement>(null);
 
@@ -196,82 +215,6 @@ export default function OrdersPage() {
 
     return hasExactMatch ? matchingCarriers : [query, ...matchingCarriers];
   }, [carrierSearch]);
-
-  const loadSyncStatus = useCallback(async (refreshAfterCompletion = false) => {
-    const res = await fetch('/api/orders/sync');
-    const json = (await res.json()) as ApiResponse<{
-      activeJob: OrderSyncJob | null;
-      lastSuccessfulJob: OrderSyncJob | null;
-      latestJob: OrderSyncJob | null;
-    }>;
-
-    if (!res.ok || !json.success) {
-      throw new Error(json.message || 'Failed to load Shopify order sync status');
-    }
-
-    setSyncJob(json.data.activeJob);
-    if (json.data.activeJob) {
-      activeSyncJobIdRef.current = json.data.activeJob.id;
-    }
-
-    if (json.data.lastSuccessfulJob?.finishedAt) {
-      const completedJobId = json.data.lastSuccessfulJob.id;
-      setLastSynced(`Last synced: ${formatSyncDate(json.data.lastSuccessfulJob.finishedAt)}`);
-
-      if (
-        refreshAfterCompletion &&
-        activeSyncJobIdRef.current === completedJobId &&
-        completedSyncJobIdRef.current !== completedJobId
-      ) {
-        completedSyncJobIdRef.current = completedJobId;
-        activeSyncJobIdRef.current = null;
-        setSyncRefreshNeeded(
-          json.data.lastSuccessfulJob.totalCreated > 0 || json.data.lastSuccessfulJob.totalUpdated > 0
-        );
-      }
-    }
-
-    if (
-      refreshAfterCompletion &&
-      json.data.latestJob?.status === 'failed' &&
-      activeSyncJobIdRef.current === json.data.latestJob.id
-    ) {
-      setError(json.data.latestJob.error || 'Shopify order sync failed');
-      activeSyncJobIdRef.current = null;
-    }
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const fetchSyncStatus = async () => {
-      try {
-        await loadSyncStatus(false);
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Failed to load Shopify order sync status');
-        }
-      }
-    };
-
-    void fetchSyncStatus();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [loadSyncStatus]);
-
-  useEffect(() => {
-    if (!syncJob || (syncJob.status !== 'queued' && syncJob.status !== 'running')) return;
-
-    const timer = window.setInterval(() => {
-      void loadSyncStatus(true).catch((err) => {
-        setError(err instanceof Error ? err.message : 'Failed to load Shopify order sync status');
-      });
-    }, 2000);
-
-    return () => window.clearInterval(timer);
-  }, [loadSyncStatus, syncJob]);
 
   useEffect(() => {
     let cancelled = false;
@@ -330,6 +273,7 @@ export default function OrdersPage() {
     toast.error('This action is not allowed in test mode.');
     return true;
   };
+  guardRef.current = blockTestModeAction;
 
   const refreshSingleOrder = async (order: OrderRow) => {
     if (blockTestModeAction()) return;
@@ -357,41 +301,7 @@ export default function OrdersPage() {
     }
   };
 
-  const handleSync = async () => {
-    if (blockTestModeAction()) return;
-    if (syncJob && (syncJob.status === 'queued' || syncJob.status === 'running')) return;
-
-    setSyncing(true);
-    setError('');
-    try {
-      const res = await fetch('/api/orders/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ storeIds: syncStoreIds.length > 0 ? syncStoreIds : undefined }),
-      });
-      const json = (await res.json()) as ApiResponse<{
-        job: OrderSyncJob;
-        alreadyRunning: boolean;
-      }>;
-
-      if ((!res.ok && res.status !== 409) || !json.success) {
-        throw new Error(json.message || 'Failed to queue Shopify order sync');
-      }
-
-      setSyncJob(json.data.job);
-      activeSyncJobIdRef.current = json.data.job.id;
-      setSyncRefreshNeeded(false);
-      if (json.data.alreadyRunning) {
-        toast.info('A Shopify order sync is already running.');
-      } else {
-        toast.success('Shopify order sync queued.');
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to queue Shopify order sync');
-    } finally {
-      setSyncing(false);
-    }
-  };
+  const handleSync = () => void triggerSync();
 
   const rowItemKey = (orderId: string, itemIndex: number) => `${orderId}-${itemIndex}`;
 
@@ -1242,258 +1152,6 @@ export default function OrdersPage() {
     }
   };
 
-  const openMessageModal = async (order: OrderRow) => {
-    setMessageModal({
-      order,
-      admins: [],
-      messages: [],
-      selectedAdminId: '',
-      message: '',
-      loading: true,
-      sending: false,
-      error: '',
-    });
-
-    try {
-      const res = await fetch(`/api/orders/${encodeURIComponent(order.id)}/messages`);
-      const json = (await res.json()) as ApiResponse<{
-        admins: AdminOption[];
-        defaultAdminIds: string[];
-        fulfillmentRequestAdmins: AdminOption[];
-        fulfillmentRequestDefaultAdminIds: string[];
-        messages: OrderAdminMessage[];
-      }>;
-
-      if (!res.ok || !json.success) {
-        throw new Error(getApiErrorMessage(json, 'Failed to load order messages'));
-      }
-
-      setMessageModal((prev) => {
-        if (!prev || prev.order.id !== order.id) return prev;
-        const allowedIds = new Set(json.data.admins.map((admin) => admin.id));
-        const defaultId = json.data.defaultAdminIds.find((id) => allowedIds.has(id)) ?? json.data.admins[0]?.id ?? '';
-        return {
-          ...prev,
-          admins: json.data.admins,
-          messages: json.data.messages,
-          selectedAdminId: defaultId,
-          loading: false,
-        };
-      });
-      setOrders((prev) => prev.map((item) => (
-        item.id === order.id ? { ...item, messageCount: json.data.messages.length } : item
-      )));
-    } catch (err) {
-      setMessageModal((prev) => (
-        prev && prev.order.id === order.id
-          ? { ...prev, loading: false, error: err instanceof Error ? err.message : 'Failed to load order messages.' }
-          : prev
-      ));
-    }
-  };
-
-  const closeMessageModal = () => {
-    if (messageModal?.sending) return;
-    setMessageModal(null);
-  };
-
-  const submitAdminMessage = async () => {
-    if (!messageModal || messageModal.sending) return;
-    if (blockTestModeAction()) return;
-
-    const message = messageModal.message.trim();
-    if (!messageModal.selectedAdminId || !message) {
-      setMessageModal((prev) => prev ? { ...prev, error: 'Select a recipient and enter a message.' } : prev);
-      return;
-    }
-
-    setMessageModal((prev) => prev ? { ...prev, sending: true, error: '' } : prev);
-    try {
-      const res = await fetch(`/api/orders/${encodeURIComponent(messageModal.order.id)}/messages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          adminId: messageModal.selectedAdminId,
-          message,
-          type: 'orders',
-        }),
-      });
-      const json = (await res.json()) as ApiResponse<OrderAdminMessage>;
-
-      if (!res.ok || !json.success) {
-        throw new Error(getApiErrorMessage(json, 'Failed to send message'));
-      }
-
-      setMessageModal((prev) => {
-        if (!prev || prev.order.id !== messageModal.order.id) return prev;
-        return {
-          ...prev,
-          messages: [json.data, ...prev.messages],
-          message: '',
-          sending: false,
-        };
-      });
-      setOrders((prev) => prev.map((item) => (
-        item.id === messageModal.order.id ? { ...item, messageCount: item.messageCount + 1 } : item
-      )));
-      toast.success('Message sent to admin.');
-    } catch (err) {
-      setMessageModal((prev) => (
-        prev ? { ...prev, sending: false, error: err instanceof Error ? err.message : 'Failed to send message.' } : prev
-      ));
-    }
-  };
-
-  const openNoteModal = async (order: OrderRow) => {
-    setNoteModal({
-      order,
-      notes: [],
-      note: '',
-      editingNoteId: null,
-      loading: true,
-      saving: false,
-      deletingId: null,
-      error: '',
-    });
-
-    try {
-      const res = await fetch(`/api/orders/${encodeURIComponent(order.id)}/notes`);
-      const json = (await res.json()) as ApiResponse<OrderNote[]>;
-
-      if (!res.ok || !json.success) {
-        throw new Error(getApiErrorMessage(json, 'Failed to load order notes'));
-      }
-
-      setNoteModal((prev) => {
-        if (!prev || prev.order.id !== order.id) return prev;
-        return {
-          ...prev,
-          notes: json.data,
-          loading: false,
-        };
-      });
-      setOrders((prev) => prev.map((item) => (
-        item.id === order.id ? { ...item, noteCount: json.data.length } : item
-      )));
-    } catch (err) {
-      setNoteModal((prev) => (
-        prev && prev.order.id === order.id
-          ? { ...prev, loading: false, error: err instanceof Error ? err.message : 'Failed to load order notes.' }
-          : prev
-      ));
-    }
-  };
-
-  const closeNoteModal = () => {
-    if (noteModal?.saving || noteModal?.deletingId) return;
-    setNoteModal(null);
-  };
-
-  const startEditNote = (note: OrderNote) => {
-    setNoteModal((prev) => prev ? { ...prev, note: note.note, editingNoteId: note.id, error: '' } : prev);
-  };
-
-  const cancelEditNote = () => {
-    setNoteModal((prev) => prev ? { ...prev, note: '', editingNoteId: null, error: '' } : prev);
-  };
-
-  const submitOrderNote = async () => {
-    if (!noteModal || noteModal.saving) return;
-    if (blockTestModeAction()) return;
-
-    const note = noteModal.note.trim();
-    if (!note) {
-      setNoteModal((prev) => prev ? { ...prev, error: 'Note is required.' } : prev);
-      return;
-    }
-
-    const editingNoteId = noteModal.editingNoteId;
-    const orderId = noteModal.order.id;
-    setNoteModal((prev) => prev ? { ...prev, saving: true, error: '' } : prev);
-
-    try {
-      const res = await fetch(
-        editingNoteId
-          ? `/api/orders/${encodeURIComponent(orderId)}/notes/${encodeURIComponent(editingNoteId)}`
-          : `/api/orders/${encodeURIComponent(orderId)}/notes`,
-        {
-          method: editingNoteId ? 'PATCH' : 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ note }),
-        }
-      );
-      const json = (await res.json()) as ApiResponse<OrderNote>;
-
-      if (!res.ok || !json.success) {
-        throw new Error(getApiErrorMessage(json, editingNoteId ? 'Failed to update note' : 'Failed to add note'));
-      }
-
-      setNoteModal((prev) => {
-        if (!prev || prev.order.id !== orderId) return prev;
-        const notes = editingNoteId
-          ? prev.notes.map((item) => item.id === editingNoteId ? json.data : item)
-          : [json.data, ...prev.notes];
-        return {
-          ...prev,
-          notes,
-          note: '',
-          editingNoteId: null,
-          saving: false,
-        };
-      });
-      setOrders((prev) => prev.map((item) => (
-        item.id === orderId
-          ? { ...item, noteCount: editingNoteId ? item.noteCount : item.noteCount + 1 }
-          : item
-      )));
-      toast.success(editingNoteId ? 'Note updated.' : 'Note added.');
-    } catch (err) {
-      setNoteModal((prev) => (
-        prev ? { ...prev, saving: false, error: err instanceof Error ? err.message : 'Failed to save note.' } : prev
-      ));
-    }
-  };
-
-  const deleteOrderNote = async (noteId: string) => {
-    if (!noteModal || noteModal.deletingId) return;
-    if (blockTestModeAction()) return;
-    if (!window.confirm('Delete this note?')) return;
-
-    const orderId = noteModal.order.id;
-    setNoteModal((prev) => prev ? { ...prev, deletingId: noteId, error: '' } : prev);
-
-    try {
-      const res = await fetch(`/api/orders/${encodeURIComponent(orderId)}/notes/${encodeURIComponent(noteId)}`, {
-        method: 'DELETE',
-      });
-      const json = (await res.json()) as ApiResponse<{ id: string }>;
-
-      if (!res.ok || !json.success) {
-        throw new Error(getApiErrorMessage(json, 'Failed to delete note'));
-      }
-
-      setNoteModal((prev) => {
-        if (!prev || prev.order.id !== orderId) return prev;
-        const notes = prev.notes.filter((item) => item.id !== noteId);
-        return {
-          ...prev,
-          notes,
-          note: prev.editingNoteId === noteId ? '' : prev.note,
-          editingNoteId: prev.editingNoteId === noteId ? null : prev.editingNoteId,
-          deletingId: null,
-        };
-      });
-      setOrders((prev) => prev.map((item) => (
-        item.id === orderId ? { ...item, noteCount: Math.max(0, item.noteCount - 1) } : item
-      )));
-      toast.info('Note deleted.');
-    } catch (err) {
-      setNoteModal((prev) => (
-        prev ? { ...prev, deletingId: null, error: err instanceof Error ? err.message : 'Failed to delete note.' } : prev
-      ));
-    }
-  };
-
   const openStockModal = async (order: OrderRow) => {
     setStockModal({
       order,
@@ -1885,11 +1543,10 @@ export default function OrdersPage() {
   }, []);
 
   const hasActiveFilters = searchInput !== '' || searchField !== '' || storeIds.length > 0 || period !== 'all' || !!dateFrom || !!dateTo || fulfillmentStatuses.length > 0 || packingStatuses.length > 0;
-  const syncActive = syncJob?.status === 'queued' || syncJob?.status === 'running';
   const syncMessage = syncActive
-    ? syncJob.status === 'queued'
+    ? syncJob?.status === 'queued'
       ? 'Sync queued'
-      : `Syncing: ${syncJob.totalFetched} fetched`
+      : `Syncing: ${syncJob?.totalFetched ?? 0} fetched`
     : lastSynced || 'Not synced yet';
 
   return (

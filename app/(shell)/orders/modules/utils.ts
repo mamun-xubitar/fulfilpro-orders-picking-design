@@ -1,4 +1,4 @@
-import type { ApiResponse, BackInStockStatus, OrderItem, OrderRow, PackingSlipLabel, ShippingLine } from './types';
+import type { BackInStockStatus, OrderItem, OrderRow, PackingSlipLabel, ShippingLine } from './types';
 
 export function getFulfilledQty(order: Pick<OrderRow, 'fulfillmentItems'>, lineItemId: string): number {
   return order.fulfillmentItems.confirmations.reduce((sum, confirmation) => {
@@ -121,10 +121,7 @@ export function getShippingLineFinalPrice(line: ShippingLine) {
   return line.discountedPrice ?? Math.max(0, line.price - line.discountAllocations.reduce((sum, item) => sum + item.amount, 0));
 }
 
-export function getApiErrorMessage(response: ApiResponse<unknown>, fallback: string) {
-  if (response.errors?.length) return response.errors.join(', ');
-  return response.message || fallback;
-}
+export { getApiErrorMessage } from '@/lib/utils/api';
 
 export function isOrderFulfillmentLocked(order: Pick<OrderRow, 'closed' | 'canceled' | 'status'>) {
   const status = order.status.toLowerCase();
@@ -140,12 +137,7 @@ export function escapeHtml(value: string | number | null | undefined) {
     .replaceAll("'", '&#039;');
 }
 
-export function formatSyncDate(value: string) {
-  return new Date(value).toLocaleString(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  });
-}
+export { formatSyncDate } from '@/lib/utils/api';
 
 export function formatStockStatus(status: BackInStockStatus) {
   if (status === 'back_in_stock') return 'Restocked';

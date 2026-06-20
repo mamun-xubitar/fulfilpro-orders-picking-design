@@ -1,3 +1,6 @@
+import type { MessageAdmin } from '@/hooks/useOrderMessages';
+type AdminOption = MessageAdmin;
+
 export type OrderItem = {
   id: string;
   productId: string | null;
@@ -155,26 +158,8 @@ export type OrderRow = {
 };
 
 export type StoreOption = { id: string; name: string; storeDomain: string };
-export type AdminOption = { id: string; name: string; email: string };
-export type OrderAdminMessage = {
-  id: string;
-  adminName: string;
-  adminEmail: string;
-  senderName: string | null;
-  senderEmail: string | null;
-  message: string;
-  createdAt: string;
-};
-export type OrderNote = {
-  id: string;
-  note: string;
-  authorName: string | null;
-  authorEmail: string | null;
-  editorName: string | null;
-  editorEmail: string | null;
-  createdAt: string;
-  updatedAt: string;
-};
+export type { MessageAdmin as AdminOption, MessageRecord as OrderAdminMessage } from '@/hooks/useOrderMessages';
+export type { NoteRecord as OrderNote } from '@/hooks/useOrderNotes';
 export type BackInStockStatus = 'pending' | 'partially_back_in_stock' | 'back_in_stock';
 export type OrderStockAdjustmentStatus = 'pending' | 'partial' | 'managed';
 export type OrderStockAdjustmentItem = {
@@ -325,27 +310,10 @@ export type PendingFulfillmentModalState = {
   trackingCompany: string;
 };
 
-export type MessageModalState = {
-  order: OrderRow;
-  admins: AdminOption[];
-  messages: OrderAdminMessage[];
-  selectedAdminId: string;
-  message: string;
-  loading: boolean;
-  sending: boolean;
-  error: string;
-};
-
-export type NoteModalState = {
-  order: OrderRow;
-  notes: OrderNote[];
-  note: string;
-  editingNoteId: string | null;
-  loading: boolean;
-  saving: boolean;
-  deletingId: string | null;
-  error: string;
-};
+import type { MessageModalState as MessageModalStateGeneric } from '@/hooks/useOrderMessages';
+import type { NoteModalState as NoteModalStateGeneric } from '@/hooks/useOrderNotes';
+export type MessageModalState = MessageModalStateGeneric<OrderRow>;
+export type NoteModalState = NoteModalStateGeneric<OrderRow>;
 
 export type StockModalState = {
   order: OrderRow;
