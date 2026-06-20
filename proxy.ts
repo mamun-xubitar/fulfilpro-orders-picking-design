@@ -18,7 +18,7 @@ const PUBLIC_ROUTES = [
   '/api/auth/staff-login-approvals/.*',
   '/api/webhooks/.*',
   '/api/fulfillment-requests/.*',
-  '/api/uploads/.*',
+  '/api/uploads/files/.*',
 ];
 
 const AUTH_ONLY_ROUTES = ['/'];

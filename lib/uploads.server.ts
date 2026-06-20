@@ -25,7 +25,7 @@ export async function saveUploadedFile(file: File): Promise<SavedFile> {
   await fs.writeFile(path.join(dir, safeName), buffer);
   return {
     name: safeName,
-    url: `/api/uploads/${id}/${encodeURIComponent(safeName)}`,
+    url: `/api/uploads/files/${id}/${encodeURIComponent(safeName)}`,
     size: buffer.length,
     mimeType: file.type || 'application/octet-stream',
   };
