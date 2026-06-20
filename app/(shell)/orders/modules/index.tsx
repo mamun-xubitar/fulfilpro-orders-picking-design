@@ -2127,7 +2127,7 @@ export default function OrdersPage() {
                                   e.stopPropagation();
                                   void openStockAdjustmentModal(order);
                                 }}
-                                className={`inline-flex min-w-14 items-center justify-center rounded-full px-2.5 py-1 text-xs font-semibold transition-colors ${saClass} hover:opacity-80`}
+                                className={`inline-flex min-w-14 items-center justify-center rounded-full px-2.5 py-1 text-xs font-semibold transition-colors ${saClass} hover:opacity-80 cursor-pointer`}
                                 aria-label={`Manage stock adjustment for order ${order.number}`}
                               >
                                 {label}
