@@ -202,7 +202,81 @@ Rules for the hook:
 - **Preserve timing hacks** (e.g. `setTimeout(() => ref.current?.click(), 100)`) verbatim.
 - Return a single grouped bundle object so `index.tsx` can spread props: `<OrdersTable {...p.table} />`.
 
-When the hook itself would exceed ~400 lines, split into domain hooks (`useOrdersFilters`, `useOrdersData`, `useFulfillment`, etc.) and compose them inside `usePageName.ts`. Share primitives by passing them as arguments — never duplicate state.
+When the hook itself would exceed ~300 lines, split into domain hooks and compose them inside `usePageName.ts`:
+
+#### Splitting the composer hook into domain hooks
+
+Each domain hook owns one logical slice of state. The composer receives its output and wires everything together.
+
+**File layout:**
+```
+modules/
+  hooks/
+    useOrdersPage.ts          ← thin composer (~120–200 lines)
+    useOrdersFilters.ts       ← filter state, queryString, pagination
+    useOrdersData.ts          ← fetch orders, refresh, expand rows
+    useSync.ts                ← sync polling, triggerSync
+    useFulfillment.ts         ← confirm fulfillment, line checks
+    useFulfillmentRequests.ts ← edit/cancel/permission requests
+    useNameAttributes.ts      ← name selection, CSV/print export
+    useDecorationWork.ts      ← work modal, file uploads, decoration toggle
+    useAssignments.ts         ← decorator assignments
+    useOrderMessages.ts       ← admin messages
+    useOrderNotes.ts          ← order notes
+    useStockRequests.ts       ← back in stock requests
+    useStockAdjustment.ts     ← stock adjustment
+```
+
+**Domain hook shape:**
+```ts
+// Domain hooks receive shared primitives as args — never own duplicated state
+export function useFulfillment({
+  orders,
+  setOrders,
+  blockTestModeAction,
+}: {
+  orders: OrderRow[];
+  setOrders: React.Dispatch<React.SetStateAction<OrderRow[]>>;
+  blockTestModeAction: () => boolean;
+}) {
+  // owns ONLY its slice of state
+  const [pendingFulfillment, setPendingFulfillment] = useState<...>(null);
+  // ...
+  return { pendingFulfillment, confirmFul, ... };
+}
+```
+
+**Composer hook shape:**
+```ts
+export function useOrdersPage() {
+  const { data: session } = useSession();
+  const userIsAdmin = ...;
+  const blockTestModeAction = () => { ... };
+
+  // Call domain hooks in dependency order
+  const filters = useOrdersFilters();
+  const data = useOrdersData({ queryString: filters.queryString, ... });
+  const sync = useSync({ blockTestModeAction, setError: data.setError });
+  const fulfillment = useFulfillment({ orders: data.orders, setOrders: data.setOrders, blockTestModeAction });
+  // ...
+
+  // Compose handlers that span multiple hooks
+  const handleRefresh = () => {
+    data.bumpRefresh();
+    sync.setSyncRefreshNeeded(false);
+  };
+
+  return { ...filters, ...data, ...sync, ...fulfillment, handleRefresh, ... };
+}
+```
+
+**Rules for domain hooks:**
+- Each hook owns the `useState`/`useRef`/`useEffect` for its domain — no duplicated state.
+- Shared primitives (`setOrders`, `setPagination`, `blockTestModeAction`, `bumpRefresh`) are passed as args.
+- **Stable setters** (React `setState` dispatchers) passed as args do not need to be listed in `useEffect` dep arrays — they are guaranteed stable.
+- Handlers that span two hooks (e.g. `handleRefresh` touching both data + sync state) belong in the composer, not in either domain hook.
+- `useCallback` dep arrays stay identical to the original.
+- Target: each domain hook ≤ 300 lines; composer ≤ 200 lines.
 
 #### Move 3 — JSX tree → presentational components
 Split the return JSX into focused components. Each receives data and callbacks as props; no fetching inside.
