@@ -1,4 +1,5 @@
-import type { BackInStockStatus, OrderItem, OrderRow, PackingSlipLabel, ShippingLine } from './types';
+import type { ApiResponse, BackInStockItem, BackInStockStatus, FulfillmentEditRequestRow, OrderItem, OrderRow, PackingSlipLabel, ShippingLine, WorkCommentDraft } from './types';
+import type { NameAttributeRow } from './nameAttributesExport';
 
 export function getFulfilledQty(order: Pick<OrderRow, 'fulfillmentItems'>, lineItemId: string): number {
   return order.fulfillmentItems.confirmations.reduce((sum, confirmation) => {
@@ -121,7 +122,10 @@ export function getShippingLineFinalPrice(line: ShippingLine) {
   return line.discountedPrice ?? Math.max(0, line.price - line.discountAllocations.reduce((sum, item) => sum + item.amount, 0));
 }
 
-export { getApiErrorMessage } from '@/lib/utils/api';
+export function getApiErrorMessage(response: ApiResponse<unknown>, fallback: string) {
+  if (response.errors?.length) return response.errors.join(', ');
+  return response.message || fallback;
+}
 
 export function isOrderFulfillmentLocked(order: Pick<OrderRow, 'closed' | 'canceled' | 'status'>) {
   const status = order.status.toLowerCase();
@@ -137,7 +141,12 @@ export function escapeHtml(value: string | number | null | undefined) {
     .replaceAll("'", '&#039;');
 }
 
-export { formatSyncDate } from '@/lib/utils/api';
+export function formatSyncDate(value: string) {
+  return new Date(value).toLocaleString(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
+}
 
 export function formatStockStatus(status: BackInStockStatus) {
   if (status === 'back_in_stock') return 'Restocked';
@@ -170,4 +179,138 @@ export function fmtCalDate(iso: string): string {
   const [y, m, d] = iso.split('-').map(Number);
   const yr = new Date().getFullYear() !== y ? ` ${y}` : '';
   return `${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][m - 1]} ${d}${yr}`;
+}
+
+export const rowItemKey = (orderId: string, itemIndex: number) => `${orderId}-${itemIndex}`;
+
+export const isLineFullyFulfilled = (order: OrderRow, item: OrderItem) => getFulfilledQty(order, item.id) >= item.qty;
+
+export function getFulfillmentRowClass(
+  fulfilledQty: number,
+  itemQty: number,
+  remainingQty: number,
+  isFull: boolean,
+  partialValue: number,
+) {
+  const baseClass = 'border-b border-blue-100 transition-colors duration-150';
+
+  if (itemQty > 0 && fulfilledQty >= itemQty) {
+    return `${baseClass} bg-emerald-100`;
+  }
+
+  if ((isFull || partialValue >= remainingQty) && remainingQty > 0) {
+    return `${baseClass} bg-blue-100`;
+  }
+
+  if (partialValue > 0) {
+    return `${baseClass} bg-pink-100`;
+  }
+
+  if (fulfilledQty > 0) {
+    return `${baseClass} bg-purple-100`;
+  }
+
+  return baseClass;
+}
+
+export function isOrderFullyFulfilled(order: OrderRow) {
+  const totalQuantity = order.items.reduce((sum, item) => sum + Math.max(0, item.qty), 0);
+  const fulfilledQuantity = order.fulfillmentItems.confirmations.reduce((sum, confirmation) => {
+    return sum + confirmation.lines.reduce((lineSum, line) => lineSum + line.quantity, 0);
+  }, 0);
+  return totalQuantity > 0 && fulfilledQuantity >= totalQuantity;
+}
+
+export function parseBarcodes(value: string) {
+  return value.split(/\s+/).map((barcode) => barcode.trim()).filter(Boolean);
+}
+
+export function getFulfillmentInfo(order: OrderRow) {
+  return order.fulfillmentItems.confirmations
+    .map((confirmation) => ({
+      date: confirmation.fulfillmentDate?.trim() ?? '',
+      carrier: confirmation.trackingInfo?.company?.trim() ?? '',
+      trackingNumber: confirmation.trackingInfo?.number?.trim() ?? '',
+      trackingUrl: confirmation.trackingInfo?.url?.trim() ?? '',
+    }))
+    .filter((info) => info.date || info.carrier || info.trackingNumber);
+}
+
+export function formatFulfillmentDate(value: string) {
+  const [year, month, day] = value.split('-').map(Number);
+  if (!year || !month || !day) return value;
+
+  return new Date(year, month - 1, day).toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+export function getBackInStockEligibleItems(order: OrderRow) {
+  return order.items
+    .map((item) => {
+      const fulfilledQty = getFulfilledQty(order, item.id);
+      const remainingQty = Math.max(0, item.qty - fulfilledQty);
+      return {
+        lineItemId: item.id,
+        name: item.name,
+        sku: item.sku,
+        vendor: item.vendor,
+        remainingQty,
+      };
+    })
+    .filter((item) => item.remainingQty > 0);
+}
+
+export function createDefaultStockItem(order: OrderRow): BackInStockItem {
+  const firstItem = getBackInStockEligibleItems(order)[0];
+  return {
+    lineItemId: firstItem?.lineItemId ?? '',
+    dueDate: '',
+    supplierName: firstItem?.vendor ?? '',
+    quantity: firstItem?.remainingQty ?? 1,
+    item: firstItem?.name ?? '',
+  };
+}
+
+export function getAvailableStockItemsForRow(order: OrderRow, items: BackInStockItem[], rowIndex: number) {
+  const selectedIds = new Set(
+    items
+      .map((item, index) => (index === rowIndex ? '' : item.lineItemId))
+      .filter(Boolean)
+  );
+  return getBackInStockEligibleItems(order).filter((item) => !selectedIds.has(item.lineItemId));
+}
+
+export function hasStockItemAvailableToAdd(order: OrderRow, items: BackInStockItem[]) {
+  return getBackInStockEligibleItems(order).some((item) => (
+    !items.some((selected) => selected.lineItemId === item.lineItemId)
+  ));
+}
+
+export const nameKey = (orderId: string, lineItemId: string) => `${orderId}:${lineItemId}`;
+
+export const orderNameEntries = (order: OrderRow): Array<{ key: string; row: NameAttributeRow }> =>
+  order.items.flatMap((item) => {
+    const attr = getNameAttribute(item);
+    if (!attr) return [];
+    return [{ key: nameKey(order.id, item.id), row: { orderNumber: order.number, productTitle: item.title ?? item.name, value: attr.value } }];
+  });
+
+export const emptyCommentDraft = (): WorkCommentDraft => ({ sizes: '', colors: '', remarks: '', location: '', files: [], uploading: false });
+
+export function getActiveFulfillmentRequest(
+  requests: FulfillmentEditRequestRow[],
+  orderId: string,
+  fulfillmentId: string | undefined,
+  requestType: 'edit' | 'cancel',
+) {
+  if (!fulfillmentId) return null;
+  return requests.find((r) =>
+    r.fulfillmentId === fulfillmentId &&
+    r.requestType === requestType &&
+    (r.status === 'pending' || r.status === 'approved') &&
+    new Date(r.expiresAt) > new Date()
+  ) ?? null;
 }

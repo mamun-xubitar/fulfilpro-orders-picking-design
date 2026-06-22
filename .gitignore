@@ -44,3 +44,4 @@ next-env.d.ts
 
 # decoration file uploads (served publicly via /api/uploads)
 /uploads
+/.calude

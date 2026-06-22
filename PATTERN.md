@@ -169,6 +169,82 @@ request({
 - Page-local pieces (hooks, sub-components) live in the page's own `modules/` folder.
 - Logic shared across pages lives in top-level `hooks/` and `components/`.
 
+### Breaking up a large page module (the three-move pattern)
+
+When a `modules/index.tsx` grows beyond ~300 lines, decompose it in three moves — **no behavior change**:
+
+#### Move 1 — Pure helpers → `utils.ts`
+Extract every state-free function (formatters, key builders, derived value calculators) out of the component body and into the page's `utils.ts`. This makes them importable by both hooks and components without circular deps.
+
+```
+Before: helper defined inside OrdersPage() { ... }
+After:  export function rowItemKey(orderId, lineItemId) { ... }  ← utils.ts
+```
+
+Rules:
+- Signatures stay identical, except functions that close over state must become pure by accepting that state as a parameter (e.g. `getActiveFulfillmentRequest(requests, orderId)` instead of reading `orderFulfillmentRequests` from closure).
+- Import from `./utils` in the page folder; from `../utils` in the `hooks/` subfolder.
+
+#### Move 2 — State + handlers → `hooks/usePageName.ts`
+Move all `useState`, `useRef`, `useEffect`, `useMemo`, `useCallback`, and every handler function into a single composer hook. The component body becomes: call the hook, render JSX.
+
+```
+modules/
+  hooks/
+    useOrdersPage.ts   ← all state, effects, handlers
+  index.tsx            ← calls useOrdersPage(), renders top-level components
+```
+
+Rules for the hook:
+- **One source of truth per piece of state** — never duplicate `setOrders`, `setPagination`, etc. across hooks. Pass them as arguments when a secondary hook needs them.
+- **Effect dependency arrays must be byte-identical** to what they were in the component — do not add or remove deps.
+- **`useCallback` memoizations must preserve their dep arrays** exactly.
+- **Preserve timing hacks** (e.g. `setTimeout(() => ref.current?.click(), 100)`) verbatim.
+- Return a single grouped bundle object so `index.tsx` can spread props: `<OrdersTable {...p.table} />`.
+
+When the hook itself would exceed ~400 lines, split into domain hooks (`useOrdersFilters`, `useOrdersData`, `useFulfillment`, etc.) and compose them inside `usePageName.ts`. Share primitives by passing them as arguments — never duplicate state.
+
+#### Move 3 — JSX tree → presentational components
+Split the return JSX into focused components. Each receives data and callbacks as props; no fetching inside.
+
+```tsx
+// index.tsx after the split
+const p = useOrdersPage();
+return (
+  <main>
+    <OrdersToolbar {...p.toolbar} />
+    <OrdersTable {...p.table} />
+    <OrderModals {...p.modals} />
+  </main>
+);
+```
+
+Component shape convention:
+```tsx
+'use client';  // only if the component uses hooks or browser APIs
+
+type OrdersTableProps = {
+  orders: OrderRow[];
+  loading: boolean;
+  onToggleExpand: (id: string) => void;
+  // ...
+};
+
+export default function OrdersTable({ orders, loading, onToggleExpand }: OrdersTableProps) {
+  // ...
+}
+```
+
+Rules:
+- `className`, `aria-label`, element keys, and every conditional branch must move verbatim — zero text changes inside JSX.
+- If extracting a subtree would still exceed 160 lines, extract a further sub-component from within it (e.g. `OrderTableRow` → `OrderStatusBadges`, `OrderRowActions`).
+- Components that only render JSX from props do **not** need `'use client'` unless they directly call hooks or attach event handlers with browser APIs.
+
+#### Verification after the split
+1. `npx tsc --noEmit` — zero new errors (primary gate).
+2. `npm run lint` — zero new lint warnings.
+3. Manual smoke of every interactive slice: expand/collapse, form submission, filters, modals, exports.
+
 ---
 
 ## CSS Utility Classes (`app/globals.css`)
