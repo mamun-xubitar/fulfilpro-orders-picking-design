@@ -86,12 +86,14 @@ export default function OrderTableRow({
         isExpanded={isExpanded}
         isFullyFulfilled={isFullyFulfilled}
         userIsDecorator={p.userIsDecorator}
+        userIsAdmin={p.userIsAdmin}
         refreshingOrderIds={p.refreshingOrderIds}
         printingOrderId={p.printingOrderId}
         setExpandedIds={p.setExpandedIds}
         refreshSingleOrder={p.refreshSingleOrder}
         printPackingSlipLabel={p.printPackingSlipLabel}
         openMessageModal={p.openMessageModal}
+        openTrackingModal={p.openTrackingModal}
       />
     </tr>
   );

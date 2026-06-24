@@ -25,6 +25,7 @@ import { useOrderMessages } from "./useOrderMessages";
 import { useOrderNotes } from "./useOrderNotes";
 import { useStockRequests } from "./useStockRequests";
 import { useStockAdjustment } from "./useStockAdjustment";
+import { useTracking } from "./useTracking";
 
 export function useOrdersPage() {
   const { data: session } = useSession();
@@ -143,6 +144,8 @@ export function useOrdersPage() {
     blockTestModeAction,
     userIsAdmin,
   });
+
+  const tracking = useTracking({ orders: data.orders, setOrders: data.setOrders });
 
   const handleRefresh = () => {
     data.setRefreshRotation((prev) => prev + 360);
@@ -356,5 +359,10 @@ export function useOrdersPage() {
     closeStockAdjustmentModal: stockAdj.closeStockAdjustmentModal,
     toggleManagedStockAdjustmentItem: stockAdj.toggleManagedStockAdjustmentItem,
     submitStockAdjustment: stockAdj.submitStockAdjustment,
+    // tracking
+    trackingModal: tracking.trackingModal,
+    openTrackingModal: tracking.openTrackingModal,
+    closeTrackingModal: tracking.closeTrackingModal,
+    submitTrackingAction: tracking.submitTrackingAction,
   };
 }

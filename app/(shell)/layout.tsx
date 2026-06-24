@@ -184,6 +184,12 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
       pickerHidden: true,
     },
     {
+      id: "tracking", label: "Tracking", href: "/tracking",
+      icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z M15 11a3 3 0 11-6 0 3 3 0 016 0z" />,
+      adminOnly: false,
+      pickerHidden: true,
+    },
+    {
       id: "stores", label: "Stores", href: "/stores",
       icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/>,
       adminOnly: true,
@@ -208,7 +214,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
     },
   ];
 
-  const pageTitles: Record<string, string> = { orders: "Orders", "picking-list": "Picking List", "back-in-stock": "Back In Stock", stores: "Stores", users: "Users", profile: "Profile", settings: "Settings" };
+  const pageTitles: Record<string, string> = { orders: "Orders", "picking-list": "Picking List", "back-in-stock": "Back In Stock", tracking: "Tracking", stores: "Stores", users: "Users", profile: "Profile", settings: "Settings" };
   const activeId = pathname.split("/")[1] || "";
 
   const sidebarWidth = sidebarCollapsed ? "64px" : "240px";

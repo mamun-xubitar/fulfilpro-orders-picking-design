@@ -7,26 +7,49 @@ type OrderRowActionsProps = {
   isExpanded: boolean;
   isFullyFulfilled: boolean;
   userIsDecorator: boolean;
+  userIsAdmin: boolean;
   refreshingOrderIds: Record<string, boolean>;
   printingOrderId: string | null;
   setExpandedIds: React.Dispatch<React.SetStateAction<Set<string>>>;
   refreshSingleOrder: (order: OrderRow) => void;
   printPackingSlipLabel: (order: OrderRow) => void;
   openMessageModal: (order: OrderRow) => void;
+  openTrackingModal: (order: OrderRow) => void;
 };
+
+function trackingIconColor(order: OrderRow) {
+  const t = order?.trackings?.[0];
+  if (!t) return 'text-gray-400';
+  if (t.registrationStatus === 'paused') return 'text-amber-500';
+  if (t.status && t.status !== 'NotFound') return 'text-green-500';
+  return 'text-blue-500';
+}
+
+function trackingTooltip(order: OrderRow) {
+  const t = order?.trackings?.[0];
+  if (!t) return 'Register Tracking';
+  if (t.registrationStatus === 'paused') return 'Tracking Paused — Click to Restart';
+  if (t.status && t.status !== 'NotFound') return `Tracking: ${t.status}`;
+  return 'Tracking Registered';
+}
 
 export default function OrderRowActions({
   order,
   isExpanded,
   isFullyFulfilled,
   userIsDecorator,
+  userIsAdmin,
   refreshingOrderIds,
   printingOrderId,
   setExpandedIds,
   refreshSingleOrder,
   printPackingSlipLabel,
   openMessageModal,
+  openTrackingModal,
 }: OrderRowActionsProps) {
+  const hasTrackingNumber = (order.fulfillmentItems?.confirmations ?? []).some(
+    (c) => c.trackingInfo?.number?.trim(),
+  );
   return (
     <td className="px-4 py-3">
       <div className="flex items-center gap-1">
@@ -119,6 +142,23 @@ export default function OrderRowActions({
           </button>
           <span className="tt">Admin Messages</span>
         </div>
+        {hasTrackingNumber && (
+          <div className="tooltip">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                if (userIsAdmin) openTrackingModal(order);
+              }}
+              disabled={!userIsAdmin}
+              className={`p-1.5 rounded-lg transition-colors duration-150 ${userIsAdmin ? 'hover:bg-gray-100 cursor-pointer' : 'cursor-not-allowed opacity-40'} ${trackingIconColor(order)}`}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 17l4 4 4-4m0-5l-4-4-4 4M12 3v13" />
+              </svg>
+            </button>
+            <span className="tt">{trackingTooltip(order)}</span>
+          </div>
+        )}
       </div>
     </td>
   );

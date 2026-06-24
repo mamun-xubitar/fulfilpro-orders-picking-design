@@ -15,6 +15,7 @@ import {
   type AssignmentRow,
   type LineDecorationSummary,
 } from '@/models/decoration.model.server';
+import { TrackingModel, type TrackingSummary } from '@/models/tracking.model.server';
 import { sendGoogleMail } from '@/lib/google-mail.server';
 import {
   resolveHiddenRecipientEmails,
@@ -410,7 +411,8 @@ export class OrderModel {
       const decorationsByOrder = await getDecorationsByOrder(rows.map((row) => row.id));
       const assignmentsByOrder = await getAssignmentsByOrder(rows.map((row) => row.id));
       const summariesByOrder = await getDecorationSummariesByOrder(rows.map((row) => row.id), viewer);
-      let allOrders = rows.map((row) => toOrderRow(row, messageCounts.get(row.id) ?? 0, decorationsByOrder.get(row.id), assignmentsByOrder.get(row.id), summariesByOrder.get(row.id)));
+      const trackingsByOrder = await new TrackingModel().getSummariesByOrderIds(rows.map((row) => row.id));
+      let allOrders = rows.map((row) => toOrderRow(row, messageCounts.get(row.id) ?? 0, decorationsByOrder.get(row.id), assignmentsByOrder.get(row.id), summariesByOrder.get(row.id), trackingsByOrder.get(row.id)));
       if (viewerIsDecorator) allOrders = sortDecoratorOrders(allOrders);
 
       if (filterByPacking) {
@@ -435,8 +437,9 @@ export class OrderModel {
       const decorationsByOrder = await getDecorationsByOrder(allRows.map((row) => row.id));
       const assignmentsByOrder = await getAssignmentsByOrder(allRows.map((row) => row.id));
       const summariesByOrder = await getDecorationSummariesByOrder(allRows.map((row) => row.id), viewer);
+      const trackingsByOrder = await new TrackingModel().getSummariesByOrderIds(allRows.map((row) => row.id));
       let filtered = allRows
-        .map((row) => toOrderRow(row, messageCounts.get(row.id) ?? 0, decorationsByOrder.get(row.id), assignmentsByOrder.get(row.id), summariesByOrder.get(row.id)))
+        .map((row) => toOrderRow(row, messageCounts.get(row.id) ?? 0, decorationsByOrder.get(row.id), assignmentsByOrder.get(row.id), summariesByOrder.get(row.id), trackingsByOrder.get(row.id)))
         .filter((o) => packingSet.has(o.packingStatus));
       if (viewerIsDecorator) filtered = sortDecoratorOrders(filtered);
       const total = filtered.length;
@@ -459,7 +462,8 @@ export class OrderModel {
     const decorationsByOrder = await getDecorationsByOrder(rows.map((row) => row.id));
     const assignmentsByOrder = await getAssignmentsByOrder(rows.map((row) => row.id));
     const summariesByOrder = await getDecorationSummariesByOrder(rows.map((row) => row.id), viewer);
-    let orders = rows.map((row) => toOrderRow(row, messageCounts.get(row.id) ?? 0, decorationsByOrder.get(row.id), assignmentsByOrder.get(row.id), summariesByOrder.get(row.id)));
+    const trackingsByOrder = await new TrackingModel().getSummariesByOrderIds(rows.map((row) => row.id));
+    let orders = rows.map((row) => toOrderRow(row, messageCounts.get(row.id) ?? 0, decorationsByOrder.get(row.id), assignmentsByOrder.get(row.id), summariesByOrder.get(row.id), trackingsByOrder.get(row.id)));
     if (viewerIsDecorator) orders = sortDecoratorOrders(orders);
 
     return { total, orders };
@@ -618,8 +622,9 @@ export class OrderModel {
     const decorationsByOrder = await getDecorationsByOrder([row.id]);
     const assignmentsByOrder = await getAssignmentsByOrder([row.id]);
     const summariesByOrder = await getDecorationSummariesByOrder([row.id], { role: 'admin' });
+    const trackingsByOrder = await new TrackingModel().getSummariesByOrderIds([row.id]);
 
-    return toOrderRow(row, messageCount, decorationsByOrder.get(row.id), assignmentsByOrder.get(row.id), summariesByOrder.get(row.id));
+    return toOrderRow(row, messageCount, decorationsByOrder.get(row.id), assignmentsByOrder.get(row.id), summariesByOrder.get(row.id), trackingsByOrder.get(row.id));
   }
 
   async confirmFulfillment(
@@ -1241,7 +1246,7 @@ function toOrderRow(row: {
     updatedAt: Date;
   } | null;
   packingConfirmations?: Array<{ id: string; lines: Prisma.JsonValue; confirmedAt: Date; canceledAt: Date | null }>;
-}, messageCount: number, decorations?: Map<string, { isEmbroidery: boolean; isPrint: boolean }>, assignments?: Map<string, AssignmentRow[]>, summaries?: Map<string, LineDecorationSummary>) {
+}, messageCount: number, decorations?: Map<string, { isEmbroidery: boolean; isPrint: boolean }>, assignments?: Map<string, AssignmentRow[]>, summaries?: Map<string, LineDecorationSummary>, trackings?: TrackingSummary[]) {
   const lineItems = toLineItems(row.lineItems);
   const itemCount = lineItems.reduce((sum, item) => sum + Math.max(0, item.qty), 0);
 
@@ -1310,6 +1315,7 @@ function toOrderRow(row: {
     packingStatus,
     packedQuantity,
     totalQuantity,
+    trackings: trackings ?? [],
   };
 }
 

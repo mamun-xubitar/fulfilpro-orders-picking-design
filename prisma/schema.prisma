@@ -59,6 +59,7 @@ model Store {
   createdAt                   DateTime  @default(now())
   updatedAt                   DateTime  @updatedAt
   orders                      Order[]
+  shipmentTrackings           ShipmentTracking[]
 
   @@index([status])
   @@index([partnerStoreId])
@@ -101,6 +102,7 @@ model Order {
   lineItemAssignments LineItemAssignment[]
   lineItemWorks     LineItemWork[]
   decorationEditRequests DecorationEditRequest[]
+  shipmentTrackings ShipmentTracking[]
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
@@ -400,6 +402,11 @@ model AppSettings {
   decorationDigestMode             String  @default("global_time")
   decorationDigestTime             String  @default("17:00")
   decorationDigestRecipientUserIds Json    @default("[]")
+  seventrackApiKey                 String?
+  trackingAutoRegisterEnabled      Boolean @default(false)
+  trackingPendingAlertDays         Int     @default(7)
+  trackingPendingAlertUserIds      Json    @default("[]")
+  trackingPickupReminderDays       Json    @default("[]")
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 }
@@ -477,4 +484,54 @@ model StaffLoginApproval {
   @@index([email])
   @@index([status])
   @@index([expiresAt])
+}
+
+model ShipmentTracking {
+  id                   String    @id @default(uuid())
+  orderId              String
+  storeId              String
+  orderNumber          String
+  trackingNumber       String
+  carrier              Int?
+  registrationStatus   String    @default("registered")
+  status               String?
+  subStatus            String?
+  lastEventAt          DateTime?
+  lastEventDesc        String?
+  lastEventLocation    String?
+  events               Json?
+  shippedAt            DateTime?
+  registeredAt         DateTime?
+  availableForPickupAt DateTime?
+  deliveredAt          DateTime?
+  pendingAlertSentAt   DateTime?
+  pickupRemindersSent  Json      @default("[]")
+  lastSyncedAt         DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  order                Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  store                Store     @relation(fields: [storeId], references: [id])
+
+  @@unique([orderId, trackingNumber])
+  @@index([trackingNumber])
+  @@index([status])
+  @@index([registrationStatus])
+}
+
+model BackgroundJob {
+  id         String    @id @default(uuid())
+  type       String
+  payload    Json?
+  status     String    @default("queued")
+  attempts   Int       @default(0)
+  error      String?
+  runAfter   DateTime?
+  startedAt  DateTime?
+  finishedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([status])
+  @@index([runAfter])
+  @@index([createdAt])
 }

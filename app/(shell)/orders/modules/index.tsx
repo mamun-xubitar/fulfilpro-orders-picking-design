@@ -168,6 +168,9 @@ export default function OrdersPage() {
         closeStockAdjustmentModal={p.closeStockAdjustmentModal}
         toggleManagedStockAdjustmentItem={p.toggleManagedStockAdjustmentItem}
         submitStockAdjustment={p.submitStockAdjustment}
+        trackingModal={p.trackingModal}
+        closeTrackingModal={p.closeTrackingModal}
+        submitTrackingAction={p.submitTrackingAction}
       />
 
       {p.assignModal && (

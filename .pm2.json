@@ -35,6 +35,18 @@
       "exec_mode": "fork",
       "instances": "1",
       "watch": false
+    },
+    {
+      "name": "order-fulfillment--background-worker",
+      "script": "npm",
+      "args": "run worker:background",
+      "time": true,
+      "error_file": "./logs/worker--background-error.log",
+      "out_file": "./logs/worker--background-out.log",
+      "log_file": "./logs/worker--background-logs.log",
+      "exec_mode": "fork",
+      "instances": "1",
+      "watch": false
     }
   ]
 }

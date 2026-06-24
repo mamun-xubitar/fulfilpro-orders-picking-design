@@ -7,6 +7,7 @@ const SECTION_LABELS: Record<string, string> = {
   timezone: 'Timezone',
   emailRules: 'Email Sending Rules',
   decorationDigest: 'Decoration Work Digest',
+  tracking: 'Shipment Tracking',
 };
 
 const DEFAULT_EMAIL_RULES: AppSettingsRow['emailRules'] = {
@@ -29,8 +30,16 @@ const DEFAULT_DECORATION_DIGEST: AppSettingsRow['decorationDigest'] = {
   recipientUserIds: [],
 };
 
+const DEFAULT_TRACKING: AppSettingsRow['shipmentTracking'] = {
+  seventrackApiKey: null,
+  autoRegisterEnabled: false,
+  pendingAlertDays: 7,
+  pendingAlertUserIds: [],
+  pickupReminderDays: [],
+};
+
 type ApiResponse<T> = { success: boolean; message: string; data: T };
-export type SettingsSection = 'timezone' | 'emailRules' | 'decorationDigest';
+export type SettingsSection = 'timezone' | 'emailRules' | 'decorationDigest' | 'tracking';
 
 async function getJson<T>(url: string, init?: RequestInit) {
   const res = await fetch(url, init);
@@ -43,6 +52,7 @@ export function useSettingsData() {
   const [tz, setTz] = useState('Australia/Sydney');
   const [emailRules, setEmailRules] = useState<AppSettingsRow['emailRules']>(DEFAULT_EMAIL_RULES);
   const [decorationDigest, setDecorationDigest] = useState<AppSettingsRow['decorationDigest']>(DEFAULT_DECORATION_DIGEST);
+  const [tracking, setTracking] = useState<AppSettingsRow['shipmentTracking']>(DEFAULT_TRACKING);
   const [saveMsg, setSaveMsg] = useState('');
   const [showSaveMsg, setShowSaveMsg] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -61,6 +71,7 @@ export function useSettingsData() {
     setGoogleConnected(settings.googleConnected);
     setEmailRules(settings.emailRules);
     setDecorationDigest(settings.decorationDigest);
+    setTracking(settings.shipmentTracking);
   };
 
   const save = async (section: SettingsSection) => {
@@ -74,6 +85,14 @@ export function useSettingsData() {
         decorationDigestMode: decorationDigest.mode,
         decorationDigestTime: decorationDigest.time,
         decorationDigestRecipientUserIds: decorationDigest.recipientUserIds,
+      };
+    } else if (section === 'tracking') {
+      payload = {
+        seventrackApiKey: tracking.seventrackApiKey,
+        trackingAutoRegisterEnabled: tracking.autoRegisterEnabled,
+        trackingPendingAlertDays: tracking.pendingAlertDays,
+        trackingPendingAlertUserIds: tracking.pendingAlertUserIds,
+        trackingPickupReminderDays: tracking.pickupReminderDays,
       };
     } else {
       payload = {
@@ -179,6 +198,7 @@ export function useSettingsData() {
     tz, setTz,
     emailRules, setEmailRules,
     decorationDigest, setDecorationDigest,
+    tracking, setTracking,
     saveMsg, showSaveMsg,
     loading, mounted,
     savingSection, error,

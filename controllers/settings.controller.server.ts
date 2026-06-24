@@ -304,6 +304,62 @@ export class SettingsController {
       }
     }
 
+    if ('seventrackApiKey' in data) {
+      if (data.seventrackApiKey !== null && typeof data.seventrackApiKey !== 'string') {
+        errors.push('seventrackApiKey: Must be a string or null');
+      } else {
+        updateData.seventrackApiKey = data.seventrackApiKey as string | null;
+      }
+    }
+
+    if ('trackingAutoRegisterEnabled' in data) {
+      if (typeof data.trackingAutoRegisterEnabled !== 'boolean') {
+        errors.push('trackingAutoRegisterEnabled: Must be true or false');
+      } else {
+        updateData.trackingAutoRegisterEnabled = data.trackingAutoRegisterEnabled;
+      }
+    }
+
+    if ('trackingPendingAlertDays' in data) {
+      const days = Number(data.trackingPendingAlertDays);
+      if (!Number.isInteger(days) || days < 1) {
+        errors.push('trackingPendingAlertDays: Must be a positive integer');
+      } else {
+        updateData.trackingPendingAlertDays = days;
+      }
+    }
+
+    if ('trackingPendingAlertUserIds' in data) {
+      const value = data.trackingPendingAlertUserIds;
+      if (!Array.isArray(value)) {
+        errors.push('trackingPendingAlertUserIds: Must be an array of user IDs');
+      } else {
+        const ids = normalizeUserIdList(value);
+        const { activeUsers } = await listEmailRuleUsers();
+        const activeUserIds = new Set(activeUsers.map((u) => u.id));
+        const invalid = ids.filter((id) => !activeUserIds.has(id));
+        if (invalid.length > 0) {
+          errors.push('trackingPendingAlertUserIds: Contains invalid user IDs');
+        } else {
+          updateData.trackingPendingAlertUserIds = ids;
+        }
+      }
+    }
+
+    if ('trackingPickupReminderDays' in data) {
+      const value = data.trackingPickupReminderDays;
+      if (!Array.isArray(value)) {
+        errors.push('trackingPickupReminderDays: Must be an array of numbers');
+      } else {
+        const days = (value as unknown[]).filter((d): d is number => typeof d === 'number' && Number.isInteger(d) && d > 0);
+        if (days.length !== value.length) {
+          errors.push('trackingPickupReminderDays: All entries must be positive integers');
+        } else {
+          updateData.trackingPickupReminderDays = days;
+        }
+      }
+    }
+
     if (errors.length) {
       return { error: { message: 'Validation failed', errors, status: 400 } };
     }

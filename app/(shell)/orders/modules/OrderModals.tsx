@@ -14,6 +14,7 @@ import type {
   RequestPermissionModalState,
   StockAdjustmentModalState,
   StockModalState,
+  TrackingActionModalState,
 } from './types';
 
 type EligibleStockItem = { lineItemId: string; name: string; sku: string; vendor: string; remainingQty: number };
@@ -66,6 +67,9 @@ type OrderModalsProps = {
   closeStockAdjustmentModal: () => void;
   toggleManagedStockAdjustmentItem: (lineItemId: string) => void;
   submitStockAdjustment: () => Promise<void>;
+  trackingModal: TrackingActionModalState | null;
+  closeTrackingModal: () => void;
+  submitTrackingAction: () => Promise<void>;
 };
 
 export default function OrderModals({
@@ -116,6 +120,9 @@ export default function OrderModals({
   closeStockAdjustmentModal,
   toggleManagedStockAdjustmentItem,
   submitStockAdjustment,
+  trackingModal,
+  closeTrackingModal,
+  submitTrackingAction,
 }: OrderModalsProps) {
   return (
     <>
@@ -1012,6 +1019,64 @@ export default function OrderModals({
         <div className="flex flex-col-reverse gap-2 px-5 py-4 border-t border-gray-200 bg-gray-50 sm:flex-row sm:justify-end">
           <button onClick={() => setRequestPermModal(null)} disabled={requestPermModal.saving} className="px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 cursor-pointer disabled:opacity-50">Cancel</button>
           <button onClick={() => void submitPermissionRequest()} disabled={requestPermModal.saving || requestPermModal.loadingAdmins} className="px-3 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 cursor-pointer disabled:opacity-60">{requestPermModal.saving ? 'Submitting…' : 'Submit Request'}</button>
+        </div>
+      </div>
+    </div>
+  )}
+
+  {trackingModal && (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="tracking-action-title"
+      onClick={closeTrackingModal}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="px-5 py-4 border-b border-gray-200">
+          <h2 id="tracking-action-title" className="text-base font-semibold text-gray-900">
+            {trackingModal.action === 'register' ? 'Register Tracking' : trackingModal.action === 'pause' ? 'Pause Tracking' : 'Restart Tracking'}
+          </h2>
+          <p className="text-xs text-gray-500 mt-0.5">Order #{trackingModal.order.number}</p>
+        </div>
+        <div className="p-5">
+          {trackingModal.error && (
+            <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-4">{trackingModal.error}</div>
+          )}
+          <p className="text-sm text-gray-700">
+            {trackingModal.action === 'register'
+              ? 'Register all tracking numbers for this order with 17track to enable automated shipment tracking.'
+              : trackingModal.action === 'pause'
+              ? `Pause tracking for ${trackingModal.tracking?.trackingNumber ?? 'this shipment'}. No further updates will be fetched until restarted.`
+              : `Restart tracking for ${trackingModal.tracking?.trackingNumber ?? 'this shipment'}.`}
+          </p>
+        </div>
+        <div className="flex flex-col-reverse gap-2 px-5 py-4 border-t border-gray-200 bg-gray-50 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            onClick={closeTrackingModal}
+            disabled={trackingModal.saving}
+            className="px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 cursor-pointer disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => void submitTrackingAction()}
+            disabled={trackingModal.saving}
+            className="px-3 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 cursor-pointer disabled:opacity-60"
+          >
+            {trackingModal.saving
+              ? 'Saving...'
+              : trackingModal.action === 'register'
+              ? 'Register'
+              : trackingModal.action === 'pause'
+              ? 'Pause Tracking'
+              : 'Restart Tracking'}
+          </button>
         </div>
       </div>
     </div>

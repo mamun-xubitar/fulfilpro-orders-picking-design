@@ -120,6 +120,13 @@ export type ShippingLine = {
     discountApplicationIndex: number | null;
   }>;
 };
+export type TrackingSummary = {
+  id: string;
+  trackingNumber: string;
+  registrationStatus: string;
+  status: string | null;
+};
+
 export type OrderRow = {
   id: string;
   number: string;
@@ -155,6 +162,15 @@ export type OrderRow = {
   packingStatus: 'packed' | 'partially_packed' | 'not_packed';
   packedQuantity: number;
   totalQuantity: number;
+  trackings: TrackingSummary[];
+};
+
+export type TrackingActionModalState = {
+  order: OrderRow;
+  tracking: TrackingSummary | null;
+  action: 'register' | 'pause' | 'restart';
+  saving: boolean;
+  error: string;
 };
 
 export type StoreOption = { id: string; name: string; storeDomain: string };

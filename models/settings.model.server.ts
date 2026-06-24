@@ -37,6 +37,13 @@ export type AppSettingsRow = {
     time: string;
     recipientUserIds: string[];
   };
+  shipmentTracking: {
+    seventrackApiKey: string | null;
+    autoRegisterEnabled: boolean;
+    pendingAlertDays: number;
+    pendingAlertUserIds: string[];
+    pickupReminderDays: number[];
+  };
   updatedAt: string;
 };
 
@@ -60,6 +67,11 @@ export type UpdateAppSettingsData = Partial<{
   decorationDigestMode: string;
   decorationDigestTime: string;
   decorationDigestRecipientUserIds: string[];
+  seventrackApiKey: string | null;
+  trackingAutoRegisterEnabled: boolean;
+  trackingPendingAlertDays: number;
+  trackingPendingAlertUserIds: string[];
+  trackingPickupReminderDays: number[];
 }>;
 
 const SETTINGS_ID = 'default';
@@ -87,6 +99,11 @@ const DEFAULT_SETTINGS = {
   decorationDigestMode: 'global_time',
   decorationDigestTime: '17:00',
   decorationDigestRecipientUserIds: [] as string[],
+  seventrackApiKey: null,
+  trackingAutoRegisterEnabled: false,
+  trackingPendingAlertDays: 7,
+  trackingPendingAlertUserIds: [] as string[],
+  trackingPickupReminderDays: [] as number[],
 };
 
 type GoogleTokenData = {
@@ -189,10 +206,19 @@ async function toSettingsRow(settings: {
   decorationDigestMode?: string;
   decorationDigestTime?: string;
   decorationDigestRecipientUserIds?: unknown;
+  seventrackApiKey?: string | null;
+  trackingAutoRegisterEnabled?: boolean;
+  trackingPendingAlertDays?: number;
+  trackingPendingAlertUserIds?: unknown;
+  trackingPickupReminderDays?: unknown;
   updatedAt: Date;
 }): Promise<AppSettingsRow> {
   const { activeUsers, activeAdminUsers } = await listEmailRuleUsers();
   const emailRules = getNormalizedEmailRuleSettings(settings);
+
+  const pickupReminderDays = Array.isArray(settings.trackingPickupReminderDays)
+    ? (settings.trackingPickupReminderDays as unknown[]).filter((d): d is number => typeof d === 'number')
+    : [];
 
   return {
     timezone: settings.timezone,
@@ -224,6 +250,13 @@ async function toSettingsRow(settings: {
       mode: settings.decorationDigestMode === 'per_user_working_hour' ? 'per_user_working_hour' : 'global_time',
       time: settings.decorationDigestTime ?? DEFAULT_SETTINGS.decorationDigestTime,
       recipientUserIds: normalizeUserIdList(settings.decorationDigestRecipientUserIds),
+    },
+    shipmentTracking: {
+      seventrackApiKey: settings.seventrackApiKey ?? null,
+      autoRegisterEnabled: settings.trackingAutoRegisterEnabled ?? false,
+      pendingAlertDays: settings.trackingPendingAlertDays ?? DEFAULT_SETTINGS.trackingPendingAlertDays,
+      pendingAlertUserIds: normalizeUserIdList(settings.trackingPendingAlertUserIds),
+      pickupReminderDays,
     },
     updatedAt: settings.updatedAt.toISOString(),
   };
