@@ -1,25 +1,22 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { toast } from 'react-toastify';
-import type { TrackingRow, Pagination, BulkRegisterModalState } from '../types';
-
-const PAGE_SIZE = 30;
-
-const EMPTY_PAGINATION: Pagination = { page: 1, pageSize: PAGE_SIZE, total: 0, totalPages: 1, hasPrev: false, hasNext: false };
+import { useTrackingFilters } from './useTrackingFilters';
+import type { TrackingRow, BulkRegisterModalState, StoreOption } from '../types';
 
 export function useTrackingPage() {
+  const filters = useTrackingFilters();
+  const { queryString, setPagination } = filters;
+
   const [rows, setRows] = useState<TrackingRow[]>([]);
-  const [pagination, setPagination] = useState<Pagination>(EMPTY_PAGINATION);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [searchInput, setSearchInput] = useState('');
-  const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
+  const [stores, setStores] = useState<StoreOption[]>([]);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [bulkModal, setBulkModal] = useState<BulkRegisterModalState | null>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [refresh, setRefresh] = useState(0);
+  const countDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const bumpRefresh = useCallback(() => setRefresh((n) => n + 1), []);
 
@@ -30,24 +27,23 @@ export function useTrackingPage() {
       setLoading(true);
       setError('');
       try {
-        const params = new URLSearchParams();
-        params.set('page', String(page));
-        params.set('pageSize', String(PAGE_SIZE));
-        if (search) params.set('search', search);
-
-        const res = await fetch(`/api/tracking?${params.toString()}`);
-        const json = await res.json() as { success: boolean; message: string; data: { rows: TrackingRow[]; total: number; totalPages: number } };
+        const res = await fetch(`/api/tracking?${queryString}`);
+        const json = await res.json() as {
+          success: boolean;
+          message: string;
+          data: { rows: TrackingRow[]; total: number; totalPages: number; stores: StoreOption[] };
+        };
         if (cancelled) return;
         if (!res.ok || !json.success) throw new Error(json.message || 'Failed to load');
         setRows(json.data.rows);
-        setPagination({
-          page,
-          pageSize: PAGE_SIZE,
+        setStores(json.data.stores);
+        setPagination((prev) => ({
+          ...prev,
           total: json.data.total,
           totalPages: json.data.totalPages,
-          hasPrev: page > 1,
-          hasNext: page < json.data.totalPages,
-        });
+          hasPrev: prev.page > 1,
+          hasNext: prev.page < json.data.totalPages,
+        }));
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load tracking records');
       } finally {
@@ -57,16 +53,7 @@ export function useTrackingPage() {
 
     void fetchRows();
     return () => { cancelled = true; };
-  }, [page, search, refresh]);
-
-  const handleSearchChange = (value: string) => {
-    setSearchInput(value);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      setSearch(value);
-      setPage(1);
-    }, 300);
-  };
+  }, [queryString, refresh, setPagination]);
 
   const toggleExpand = (id: string) => {
     setExpandedIds((prev) => {
@@ -77,23 +64,102 @@ export function useTrackingPage() {
     });
   };
 
-  const openBulkModal = async () => {
-    setBulkModal({ count: null, loading: true, submitting: false, error: '' });
+  const fetchBulkCount = useCallback(async (modal: BulkRegisterModalState) => {
+    setBulkModal((prev) => prev ? { ...prev, loading: true, error: '' } : null);
     try {
-      const res = await fetch('/api/tracking/bulk');
+      const params = new URLSearchParams();
+      if (modal.dateFrom) params.set('dateFrom', modal.dateFrom);
+      if (modal.dateTo) params.set('dateTo', modal.dateTo);
+      modal.storeIds.forEach((id) => params.append('storeId', id));
+      const res = await fetch(`/api/tracking/bulk?${params.toString()}`);
       const json = await res.json() as { success: boolean; message: string; data: { count: number } };
       if (!res.ok || !json.success) throw new Error(json.message || 'Failed to load count');
       setBulkModal((prev) => prev ? { ...prev, count: json.data.count, loading: false } : null);
     } catch (err) {
       setBulkModal((prev) => prev ? { ...prev, loading: false, error: err instanceof Error ? err.message : 'Failed' } : null);
     }
+  }, []);
+
+  const openBulkModal = useCallback(async () => {
+    const now = new Date();
+    const initialModal: BulkRegisterModalState = {
+      count: null,
+      loading: true,
+      submitting: false,
+      error: '',
+      dateFrom: '',
+      dateTo: '',
+      storeIds: stores.map((s) => s.id),
+      calendarNav: { year: now.getFullYear(), month: now.getMonth() },
+      hoverDate: null,
+      storeDropdownOpen: false,
+    };
+    setBulkModal(initialModal);
+    await fetchBulkCount(initialModal);
+  }, [stores, fetchBulkCount]);
+
+  const handleBulkDateClick = (date: string) => {
+    if (!bulkModal) return;
+    let next: BulkRegisterModalState;
+    if (!bulkModal.dateFrom || (bulkModal.dateFrom && bulkModal.dateTo)) {
+      next = { ...bulkModal, dateFrom: date, dateTo: '', hoverDate: null };
+    } else {
+      const [start, end] = date >= bulkModal.dateFrom ? [bulkModal.dateFrom, date] : [date, bulkModal.dateFrom];
+      next = { ...bulkModal, dateFrom: start, dateTo: end, hoverDate: null };
+    }
+    setBulkModal(next);
+    if (countDebounceRef.current) clearTimeout(countDebounceRef.current);
+    countDebounceRef.current = setTimeout(() => { void fetchBulkCount(next); }, 400);
+  };
+
+  const handleBulkStoreToggle = (id: string) => {
+    if (!bulkModal) return;
+    const storeIds = bulkModal.storeIds.includes(id)
+      ? bulkModal.storeIds.filter((s) => s !== id)
+      : [...bulkModal.storeIds, id];
+    const next = { ...bulkModal, storeIds };
+    setBulkModal(next);
+    if (countDebounceRef.current) clearTimeout(countDebounceRef.current);
+    countDebounceRef.current = setTimeout(() => { void fetchBulkCount(next); }, 400);
+  };
+
+  const handleBulkNavPrev = () => {
+    setBulkModal((prev) => {
+      if (!prev) return null;
+      const d = new Date(prev.calendarNav.year, prev.calendarNav.month - 1, 1);
+      return { ...prev, calendarNav: { year: d.getFullYear(), month: d.getMonth() } };
+    });
+  };
+
+  const handleBulkNavNext = () => {
+    setBulkModal((prev) => {
+      if (!prev) return null;
+      const d = new Date(prev.calendarNav.year, prev.calendarNav.month + 1, 1);
+      return { ...prev, calendarNav: { year: d.getFullYear(), month: d.getMonth() } };
+    });
+  };
+
+  const handleBulkClearDates = () => {
+    if (!bulkModal) return;
+    const next = { ...bulkModal, dateFrom: '', dateTo: '', hoverDate: null };
+    setBulkModal(next);
+    if (countDebounceRef.current) clearTimeout(countDebounceRef.current);
+    countDebounceRef.current = setTimeout(() => { void fetchBulkCount(next); }, 400);
   };
 
   const submitBulkRegister = async () => {
     if (!bulkModal) return;
     setBulkModal((prev) => prev ? { ...prev, submitting: true, error: '' } : null);
     try {
-      const res = await fetch('/api/tracking/bulk', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+      const res = await fetch('/api/tracking/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          dateFrom: bulkModal.dateFrom || undefined,
+          dateTo: bulkModal.dateTo || undefined,
+          storeIds: bulkModal.storeIds,
+        }),
+      });
       const json = await res.json() as { success: boolean; message: string };
       if (!res.ok || !json.success) throw new Error(json.message || 'Failed');
       toast.success(json.message || 'Bulk registration queued');
@@ -107,11 +173,14 @@ export function useTrackingPage() {
   const closeBulkModal = () => setBulkModal(null);
 
   return {
+    ...filters,
     rows, loading, error,
-    pagination, page, setPage,
-    searchInput, handleSearchChange,
+    stores,
     expandedIds, toggleExpand,
     bulkModal, openBulkModal, closeBulkModal, submitBulkRegister,
+    handleBulkDateClick, handleBulkStoreToggle,
+    handleBulkNavPrev, handleBulkNavNext, handleBulkClearDates,
+    setBulkModal,
     bumpRefresh,
   };
 }

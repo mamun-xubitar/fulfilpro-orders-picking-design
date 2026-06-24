@@ -9,19 +9,37 @@ const model = new TrackingModel();
 
 export class TrackingController {
   async list(searchParams: URLSearchParams, session: { userId: string; role: string }) {
-    const storeIds = await getUserAllowedStoreIds(session.userId, session.role);
+    const allowedStoreIds = await getUserAllowedStoreIds(session.userId, session.role);
     const page = Math.max(1, Number(searchParams.get('page') ?? '1'));
     const pageSize = Math.min(100, Math.max(1, Number(searchParams.get('pageSize') ?? '50')));
     const search = searchParams.get('search') ?? undefined;
+    const selectedStoreIds = searchParams.getAll('storeId');
+    const statuses = searchParams.getAll('status');
+    const period = searchParams.get('period') ?? undefined;
+    const dateFrom = searchParams.get('dateFrom') ?? undefined;
+    const dateTo = searchParams.get('dateTo') ?? undefined;
+    // console.log("all ids", selectedStoreIds)
+    const effectiveStoreIds = selectedStoreIds;
 
-    const result = await model.list({
-      search,
-      storeIds,
-      page,
-      pageSize,
-    });
+    const [result, stores] = await Promise.all([
+      model.list({
+        search,
+        storeIds: effectiveStoreIds,
+        page,
+        pageSize,
+        statuses: statuses.length > 0 ? statuses : undefined,
+        period,
+        dateFrom,
+        dateTo,
+      }),
+      prisma.store.findMany({
+        where: allowedStoreIds !== null ? { id: { in: allowedStoreIds }, status: "connected" } : {status: "connected"},
+        select: { id: true, name: true },
+        orderBy: { name: 'asc' },
+      }),
+    ]);
 
-    return { data: result };
+    return { data: { ...result, stores } };
   }
 
   async register(orderId: string) {

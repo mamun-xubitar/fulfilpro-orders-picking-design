@@ -8,6 +8,7 @@ export type TrackingRow = {
   storeName: string | null;
   orderNumber: string;
   trackingNumber: string;
+  trackingUrl: string | null;
   carrier: number | null;
   registrationStatus: string;
   status: string | null;
@@ -51,12 +52,30 @@ export class TrackingModel {
     storeIds?: string[] | null;
     page: number;
     pageSize: number;
+    statuses?: string[];
+    period?: string;
+    dateFrom?: string;
+    dateTo?: string;
   }): Promise<{ rows: TrackingRow[]; total: number; totalPages: number }> {
-    const { search, storeIds, page, pageSize } = params;
+    const { search, storeIds, page, pageSize, statuses, period, dateFrom, dateTo } = params;
     const where: Prisma.ShipmentTrackingWhereInput = {};
 
     if (storeIds && storeIds.length > 0) {
       where.storeId = { in: storeIds };
+    }
+
+    if (statuses && statuses.length > 0) {
+      where.status = { in: statuses };
+    }
+
+    if (dateFrom || dateTo) {
+      where.createdAt = {
+        ...(dateFrom ? { gte: new Date(`${dateFrom}T00:00:00.000Z`) } : {}),
+        ...(dateTo ? { lte: new Date(`${dateTo}T23:59:59.999Z`) } : {}),
+      };
+    } else if (period && period !== 'all') {
+      const start = getPeriodStartDate(period as 'week' | 'month' | 'year');
+      if (start) where.createdAt = { gte: start };
     }
 
     if (search?.trim()) {
@@ -72,7 +91,7 @@ export class TrackingModel {
     const [rows, total] = await Promise.all([
       prisma.shipmentTracking.findMany({
         where,
-        include: { store: { select: { name: true } } },
+        include: { store: { select: { name: true } }, order: { select: { fulfillmentItems: true } } },
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * pageSize,
         take: pageSize,
@@ -306,6 +325,7 @@ function toTrackingRow(row: {
   createdAt: Date;
   updatedAt: Date;
   store?: { name: string | null };
+  order?: { fulfillmentItems: unknown } | null;
 }): TrackingRow {
   const events = Array.isArray(row.events) ? (row.events as unknown[]) : null;
   const reminders = Array.isArray(row.pickupRemindersSent) ? (row.pickupRemindersSent as number[]) : [];
@@ -317,6 +337,7 @@ function toTrackingRow(row: {
     storeName: row.store?.name ?? null,
     orderNumber: row.orderNumber,
     trackingNumber: row.trackingNumber,
+    trackingUrl: extractTrackingUrlForNumber(row.order?.fulfillmentItems, row.trackingNumber),
     carrier: row.carrier,
     registrationStatus: row.registrationStatus,
     status: row.status,
@@ -335,6 +356,34 @@ function toTrackingRow(row: {
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
+}
+
+function getPeriodStartDate(period: 'week' | 'month' | 'year'): Date | null {
+  const now = new Date();
+  if (period === 'year') return new Date(now.getFullYear(), 0, 1, 0, 0, 0, 0);
+  if (period === 'month') return new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+  const weekStart = new Date(now);
+  weekStart.setDate(now.getDate() - now.getDay());
+  weekStart.setHours(0, 0, 0, 0);
+  return weekStart;
+}
+
+function extractTrackingUrlForNumber(fulfillmentItems: unknown, trackingNumber: string): string | null {
+  if (!fulfillmentItems || typeof fulfillmentItems !== 'object') return null;
+  const items = fulfillmentItems as Record<string, unknown>;
+  const confirmations = Array.isArray(items.confirmations) ? items.confirmations : [];
+  for (const conf of confirmations) {
+    if (!conf || typeof conf !== 'object') continue;
+    const c = conf as Record<string, unknown>;
+    const trackingInfo = c.trackingInfo as Record<string, unknown> | null | undefined;
+    if (!trackingInfo) continue;
+    const num = typeof trackingInfo.number === 'string' ? trackingInfo.number.trim() : '';
+    if (num === trackingNumber) {
+      const url = typeof trackingInfo.url === 'string' ? trackingInfo.url.trim() : '';
+      return url || null;
+    }
+  }
+  return null;
 }
 
 function extractTrackingNumbersFromFulfillmentItems(fulfillmentItems: unknown): string[] {

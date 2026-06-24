@@ -1,6 +1,7 @@
 'use client';
 
 import type { TrackingRow } from './types';
+import { trackingLinkUrl } from './utils';
 
 type TrackingEvent = {
   time?: string;
@@ -44,7 +45,17 @@ export default function TrackingTableRow({ row, isExpanded, onToggle }: Tracking
         onClick={() => onToggle(row.id)}
       >
         <td className="px-4 py-3 font-mono text-sm font-medium text-gray-900">{row.orderNumber}</td>
-        <td className="px-4 py-3 text-sm text-gray-700 font-mono">{row.trackingNumber}</td>
+        <td className="px-4 py-3 text-sm font-mono">
+          <a
+            href={trackingLinkUrl(row)}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="text-blue-600 hover:underline"
+          >
+            {row.trackingNumber}
+          </a>
+        </td>
         <td className="hidden sm:table-cell px-4 py-3 text-sm text-gray-500">{row.storeName ?? '—'}</td>
         <td className="px-4 py-3">
           <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${regColor}`}>
