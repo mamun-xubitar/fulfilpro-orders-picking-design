@@ -68,6 +68,29 @@ export default function OrderItemRow({ p, order, item, itemIndex, restockItems, 
             >
               + Assign
             </button>
+            {(item.isEmbroidery || item.isPrint) && (() => {
+              const remaining = item.decoration?.remaining ?? item.qty;
+              return (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => p.openWorkModal(order, item)}
+                    disabled={remaining <= 0}
+                    className="inline-flex items-center rounded-full border border-emerald-200 text-emerald-600 hover:bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    Mark decoration done
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => p.openWorkDetails(order, item)}
+                    disabled={(item.decoration?.works?.length ?? 0) === 0}
+                    className="inline-flex items-center rounded-full border border-blue-200 text-blue-600 hover:bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    View decorations
+                  </button>
+                </>
+              );
+            })()}
           </div>
         )}
       </td>
@@ -134,6 +157,7 @@ export default function OrderItemRow({ p, order, item, itemIndex, restockItems, 
       {hasDecorationWork && (() => {
         const d = item.decoration;
         const hasWork = (d?.works?.length ?? 0) > 0;
+
         if (!hasWork) return <td className="py-1.5 text-center"><span className="text-gray-300">-</span></td>;
         const badgeClass = d?.fullyDone
           ? 'bg-emerald-100 text-emerald-700'

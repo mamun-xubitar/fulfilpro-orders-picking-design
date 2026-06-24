@@ -1,6 +1,7 @@
 import prisma from '@/lib/prisma.server';
 import { sendGoogleMail } from '@/lib/google-mail.server';
 import {
+  ADMIN_ROLE,
   DECORATOR_ROLES,
   getDecoratorCategory,
   getRoleLabel,
@@ -378,7 +379,8 @@ export class DecorationModel {
     comments: DecorationWorkComment[];
   }) {
     const { orderId, lineItemId, worker } = params;
-    if (!isDecoratorRole(worker.role)) throw new Error('Only decorators can mark work as done');
+    const isAdmin = worker.role === ADMIN_ROLE;
+    if (!isAdmin && !isDecoratorRole(worker.role)) throw new Error('Only decorators can mark work as done');
 
     const { orderNumber, qty } = await getLineItemContext(orderId, lineItemId);
 
@@ -394,7 +396,7 @@ export class DecorationModel {
     const remaining = Math.max(0, qty - doneQty);
     const fullyDone = qty > 0 && doneQty >= qty;
 
-    if (fullyDone && !activeGrant) {
+    if (fullyDone && !activeGrant && !isAdmin) {
       throw new Error('This item is locked. Request edit access from an admin.');
     }
 
@@ -402,7 +404,16 @@ export class DecorationModel {
     if (!Number.isFinite(quantity) || quantity < 1) throw new Error('Quantity must be at least 1');
     if (quantity > remaining) throw new Error(`Only ${remaining} left to mark as done`);
 
-    const category = getDecoratorCategory(worker.role) ?? 'sewing';
+    let category: string;
+    if (isAdmin) {
+      const flags = await prisma.lineItemDecoration.findUnique({
+        where: { orderId_lineItemId: { orderId, lineItemId } },
+        select: { isEmbroidery: true, isPrint: true },
+      });
+      category = flags?.isEmbroidery ? 'embroidery' : flags?.isPrint ? 'print' : 'sewing';
+    } else {
+      category = getDecoratorCategory(worker.role) ?? 'sewing';
+    }
 
     await prisma.lineItemWork.create({
       data: {

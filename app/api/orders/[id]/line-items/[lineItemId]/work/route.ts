@@ -11,7 +11,8 @@ type RouteParams = { params: Promise<{ id: string; lineItemId: string }> };
 export async function POST(request: NextRequest, { params }: RouteParams) {
   const session = await auth();
   const user = session?.user;
-  if (!user?.id || !isDecoratorRole(user.role)) return apiError({ message: 'Forbidden', status: 403 });
+  const isAllowed = user?.role === 'admin' || isDecoratorRole(user?.role);
+  if (!user?.id || !isAllowed) return apiError({ message: 'Forbidden', status: 403 });
 
   const { id, lineItemId } = await params;
 
