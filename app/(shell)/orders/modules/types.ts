@@ -94,6 +94,12 @@ export type WorkModalState = {
   saving: boolean;
   error: string;
 };
+export type WorkDraftState = {
+  quantityDone: number;
+  comments: WorkCommentDraft[];
+  saving: boolean;
+  error: string;
+};
 export type WorkDetailsModalState = {
   order: OrderRow;
   item: OrderItem;

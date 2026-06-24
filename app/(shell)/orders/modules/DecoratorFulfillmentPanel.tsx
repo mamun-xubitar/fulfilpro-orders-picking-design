@@ -1,16 +1,24 @@
 'use client';
 
-import type { OrderItem, OrderRow } from './types';
+import type { OrderItem, OrderRow, WorkDraftState } from './types';
 import { getFulfilledQty, getDecorationRowTint } from './utils';
+import DecoratorWorkForm from './DecoratorWorkForm';
 
 type Props = {
   order: OrderRow;
   decoratorCategory: 'embroidery' | 'print' | null;
   currentUserId: string;
   requestingAccessKey: string | null;
-  onMarkDone: (order: OrderRow, item: OrderItem) => void;
   onRequestAccess: (order: OrderRow, item: OrderItem) => void;
   onDeleteWork: (order: OrderRow, item: OrderItem, workId: string) => void;
+  getWorkDraft: (key: string, item: OrderItem) => WorkDraftState;
+  onDraftQuantity: (key: string, item: OrderItem, value: string) => void;
+  onDraftAddRow: (key: string, item: OrderItem) => void;
+  onDraftRemoveRow: (key: string, item: OrderItem, index: number) => void;
+  onDraftField: (key: string, item: OrderItem, index: number, field: 'sizes' | 'colors' | 'remarks' | 'location', value: string) => void;
+  onDraftUpload: (key: string, item: OrderItem, index: number, files: FileList | null) => void;
+  onDraftRemoveFile: (key: string, item: OrderItem, index: number, fileIndex: number) => void;
+  onDraftSubmit: (order: OrderRow, item: OrderItem) => void;
 };
 
 const COMMENT_FIELDS: Array<{ key: 'sizes' | 'colors' | 'remarks' | 'location'; label: string }> = [
@@ -25,9 +33,16 @@ export default function DecoratorFulfillmentPanel({
   decoratorCategory,
   currentUserId,
   requestingAccessKey,
-  onMarkDone,
   onRequestAccess,
   onDeleteWork,
+  getWorkDraft,
+  onDraftQuantity,
+  onDraftAddRow,
+  onDraftRemoveRow,
+  onDraftField,
+  onDraftUpload,
+  onDraftRemoveFile,
+  onDraftSubmit,
 }: Props) {
   const isRelevant = (item: OrderItem) => {
     if (decoratorCategory === 'embroidery' && item.isEmbroidery) return true;
@@ -85,37 +100,43 @@ export default function DecoratorFulfillmentPanel({
                     )}
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    {locked ? (
-                      <>
-                        <span className="inline-flex items-center gap-1 rounded-full bg-gray-200 text-gray-600 px-2 py-1 text-[11px] font-semibold">
-                          🔒 Locked
-                        </span>
-                        {pending ? (
-                          <span className="text-[11px] text-gray-500">Access requested</span>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => onRequestAccess(order, item)}
-                            disabled={requestingAccessKey === requestKey}
-                            className="rounded-lg border border-amber-300 text-amber-700 bg-white px-2.5 py-1 text-xs font-medium hover:bg-amber-50 disabled:opacity-50"
-                          >
-                            {requestingAccessKey === requestKey ? 'Requesting…' : 'Request edit access'}
-                          </button>
-                        )}
-                      </>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => onMarkDone(order, item)}
-                        disabled={remaining <= 0}
-                        className="rounded-lg bg-emerald-600 text-white px-3 py-1.5 text-xs font-semibold hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        Mark done
-                      </button>
-                    )}
-                  </div>
+                  {locked && (
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-gray-200 text-gray-600 px-2 py-1 text-[11px] font-semibold">
+                        🔒 Locked
+                      </span>
+                      {pending ? (
+                        <span className="text-[11px] text-gray-500">Access requested</span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => onRequestAccess(order, item)}
+                          disabled={requestingAccessKey === requestKey}
+                          className="rounded-lg border border-amber-300 text-amber-700 bg-white px-2.5 py-1 text-xs font-medium hover:bg-amber-50 disabled:opacity-50"
+                        >
+                          {requestingAccessKey === requestKey ? 'Requesting…' : 'Request edit access'}
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
+
+                {!locked && remaining > 0 && (
+                  <DecoratorWorkForm
+                    draft={getWorkDraft(requestKey, item)}
+                    item={item}
+                    onQuantity={(v) => onDraftQuantity(requestKey, item, v)}
+                    onAddRow={() => onDraftAddRow(requestKey, item)}
+                    onRemoveRow={(i) => onDraftRemoveRow(requestKey, item, i)}
+                    onField={(i, field, v) => onDraftField(requestKey, item, i, field, v)}
+                    onUpload={(i, files) => onDraftUpload(requestKey, item, i, files)}
+                    onRemoveFile={(i, fi) => onDraftRemoveFile(requestKey, item, i, fi)}
+                    onSubmit={() => onDraftSubmit(order, item)}
+                  />
+                )}
+                {!locked && remaining <= 0 && (
+                  <p className="mt-2 text-xs text-emerald-600 font-medium">✓ All done</p>
+                )}
 
                 {works.length > 0 && (
                   <div className="mt-3 space-y-2 border-t border-gray-200 pt-2">

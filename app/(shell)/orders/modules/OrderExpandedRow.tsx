@@ -33,9 +33,16 @@ export default function OrderExpandedRow({
             decoratorCategory={p.decoratorCategory}
             currentUserId={p.session?.user?.id ?? ''}
             requestingAccessKey={p.requestingAccessKey}
-            onMarkDone={p.openWorkModal}
             onRequestAccess={p.requestEditAccess}
             onDeleteWork={p.deleteWorkRecord}
+            getWorkDraft={p.getWorkDraft}
+            onDraftQuantity={p.setDraftQuantity}
+            onDraftAddRow={p.addDraftCommentRow}
+            onDraftRemoveRow={p.removeDraftCommentRow}
+            onDraftField={p.updateDraftCommentField}
+            onDraftUpload={p.uploadDraftFiles}
+            onDraftRemoveFile={p.removeDraftFile}
+            onDraftSubmit={p.submitDraftWork}
           />
         ) : (
           <OrderExpandedPanel

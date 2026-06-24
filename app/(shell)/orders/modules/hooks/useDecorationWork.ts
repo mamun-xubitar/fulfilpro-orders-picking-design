@@ -6,6 +6,7 @@ import type {
   OrderItem,
   OrderRow,
   WorkDetailsModalState,
+  WorkDraftState,
   WorkModalState,
 } from '../types';
 import { emptyCommentDraft, getApiErrorMessage } from '../utils';
@@ -20,6 +21,7 @@ export function useDecorationWork({ setOrders, blockTestModeAction, bumpRefresh 
   const [workModal, setWorkModal] = useState<WorkModalState | null>(null);
   const [workDetails, setWorkDetails] = useState<WorkDetailsModalState | null>(null);
   const [requestingAccessKey, setRequestingAccessKey] = useState<string | null>(null);
+  const [workDrafts, setWorkDrafts] = useState<Record<string, WorkDraftState>>({});
 
   const applyItemDecoration = (orderId: string, lineItemId: string, flags: { isEmbroidery: boolean; isPrint: boolean }) => {
     setOrders((prev) => prev.map((o) => (
@@ -155,6 +157,118 @@ export function useDecorationWork({ setOrders, blockTestModeAction, bumpRefresh 
   const openWorkDetails = (order: OrderRow, item: OrderItem) => setWorkDetails({ order, item });
   const closeWorkDetails = () => setWorkDetails(null);
 
+  // ----- Per-item inline draft state (decorator role only) -----
+  const defaultWorkDraft = (item: OrderItem): WorkDraftState => {
+    const remaining = item.decoration?.remaining ?? item.qty;
+    return { quantityDone: Math.max(1, Math.min(remaining, 1)), comments: [emptyCommentDraft()], saving: false, error: '' };
+  };
+
+  const getWorkDraft = (key: string, item: OrderItem): WorkDraftState =>
+    workDrafts[key] ?? defaultWorkDraft(item);
+
+  const setDraftQuantity = (key: string, item: OrderItem, value: string) => {
+    setWorkDrafts((prev) => {
+      const cur = prev[key] ?? defaultWorkDraft(item);
+      const remaining = item.decoration?.remaining ?? item.qty;
+      const parsed = parseInt(value, 10);
+      const clamped = Number.isNaN(parsed) || parsed < 1 ? 1 : Math.min(parsed, Math.max(1, remaining));
+      return { ...prev, [key]: { ...cur, quantityDone: clamped } };
+    });
+  };
+
+  const addDraftCommentRow = (key: string, item: OrderItem) => {
+    setWorkDrafts((prev) => {
+      const cur = prev[key] ?? defaultWorkDraft(item);
+      return { ...prev, [key]: { ...cur, comments: [...cur.comments, emptyCommentDraft()] } };
+    });
+  };
+
+  const removeDraftCommentRow = (key: string, item: OrderItem, index: number) => {
+    setWorkDrafts((prev) => {
+      const cur = prev[key] ?? defaultWorkDraft(item);
+      return { ...prev, [key]: { ...cur, comments: cur.comments.filter((_, i) => i !== index) } };
+    });
+  };
+
+  const updateDraftCommentField = (key: string, item: OrderItem, index: number, field: 'sizes' | 'colors' | 'remarks' | 'location', value: string) => {
+    setWorkDrafts((prev) => {
+      const cur = prev[key] ?? defaultWorkDraft(item);
+      return { ...prev, [key]: { ...cur, comments: cur.comments.map((c, i) => (i === index ? { ...c, [field]: value } : c)) } };
+    });
+  };
+
+  const uploadDraftFiles = async (key: string, item: OrderItem, index: number, fileList: FileList | null) => {
+    if (!fileList || fileList.length === 0) return;
+    setWorkDrafts((prev) => {
+      const cur = prev[key] ?? defaultWorkDraft(item);
+      return { ...prev, [key]: { ...cur, comments: cur.comments.map((c, i) => (i === index ? { ...c, uploading: true } : c)) } };
+    });
+    try {
+      const fd = new FormData();
+      Array.from(fileList).forEach((f) => fd.append('files', f));
+      const res = await fetch('/api/decoration/uploads', { method: 'POST', body: fd });
+      const json = (await res.json()) as ApiResponse<{ files: DecorationFileRef[] }>;
+      if (!res.ok || !json.success) throw new Error(getApiErrorMessage(json, 'Upload failed'));
+      setWorkDrafts((prev) => {
+        const cur = prev[key] ?? defaultWorkDraft(item);
+        return { ...prev, [key]: { ...cur, comments: cur.comments.map((c, i) => (i === index ? { ...c, files: [...c.files, ...json.data.files], uploading: false } : c)) } };
+      });
+    } catch (err) {
+      setWorkDrafts((prev) => {
+        const cur = prev[key] ?? defaultWorkDraft(item);
+        return { ...prev, [key]: { ...cur, comments: cur.comments.map((c, i) => (i === index ? { ...c, uploading: false } : c)) } };
+      });
+      toast.error(err instanceof Error ? err.message : 'Upload failed');
+    }
+  };
+
+  const removeDraftFile = (key: string, item: OrderItem, index: number, fileIndex: number) => {
+    setWorkDrafts((prev) => {
+      const cur = prev[key] ?? defaultWorkDraft(item);
+      return { ...prev, [key]: { ...cur, comments: cur.comments.map((c, i) => (i === index ? { ...c, files: c.files.filter((_, fi) => fi !== fileIndex) } : c)) } };
+    });
+  };
+
+  const submitDraftWork = async (order: OrderRow, item: OrderItem) => {
+    if (blockTestModeAction()) return;
+    const key = `${order.id}:${item.id}`;
+    const draft = workDrafts[key] ?? defaultWorkDraft(item);
+    setWorkDrafts((prev) => {
+      const cur = prev[key] ?? defaultWorkDraft(item);
+      return { ...prev, [key]: { ...cur, saving: true, error: '' } };
+    });
+    const cleanedComments = draft.comments
+      .map(({ sizes, colors, remarks, location, files }) => ({
+        sizes: sizes.trim() || undefined,
+        colors: colors.trim() || undefined,
+        remarks: remarks.trim() || undefined,
+        location: location.trim() || undefined,
+        files: files.length ? files : undefined,
+      }))
+      .filter((c) => c.sizes || c.colors || c.remarks || c.location || c.files);
+    try {
+      const res = await fetch(`/api/orders/${order.id}/line-items/${encodeURIComponent(item.id)}/work`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quantityDone: draft.quantityDone, comments: cleanedComments }),
+      });
+      const json = (await res.json()) as ApiResponse<unknown>;
+      if (!res.ok || !json.success) throw new Error(getApiErrorMessage(json, 'Failed to mark as done'));
+      toast.success('Marked as done.');
+      setWorkDrafts((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+      bumpRefresh();
+    } catch (err) {
+      setWorkDrafts((prev) => {
+        const cur = prev[key] ?? defaultWorkDraft(item);
+        return { ...prev, [key]: { ...cur, saving: false, error: err instanceof Error ? err.message : 'Failed to mark as done' } };
+      });
+    }
+  };
+
   return {
     workModal, setWorkModal,
     workDetails, setWorkDetails,
@@ -173,5 +287,14 @@ export function useDecorationWork({ setOrders, blockTestModeAction, bumpRefresh 
     requestEditAccess,
     openWorkDetails,
     closeWorkDetails,
+    workDrafts,
+    getWorkDraft,
+    setDraftQuantity,
+    addDraftCommentRow,
+    removeDraftCommentRow,
+    updateDraftCommentField,
+    uploadDraftFiles,
+    removeDraftFile,
+    submitDraftWork,
   };
 }
