@@ -62,6 +62,8 @@ export async function runJob(jobId: string) {
       await runRegisterTracking(payload);
     } else if (job.type === 'bulk_register_tracking') {
       await runBulkRegisterTracking(payload);
+    } else if (job.type === 'sync_tracking_status') {
+      await runSyncTrackingStatus(payload);
     } else {
       throw new Error(`Unknown job type: ${job.type}`);
     }
@@ -162,6 +164,20 @@ async function runBulkRegisterTracking(payload: Record<string, unknown>) {
       console.error(`bulk_register_tracking: failed for order ${order.id}`, error);
     }
   }
+}
+
+async function runSyncTrackingStatus(payload: Record<string, unknown>) {
+  const days = typeof payload.days === 'number' ? payload.days : null;
+  if (!days || ![7, 15, 30, 90].includes(days)) throw new Error('sync_tracking_status job missing or invalid days');
+
+  const storeIds = Array.isArray(payload.storeIds)
+    ? (payload.storeIds as unknown[]).filter((id): id is string => typeof id === 'string')
+    : [];
+
+  const ids = await trackingModel.findRegisteredTrackingIdsSince({ days, storeIds: storeIds.length > 0 ? storeIds : undefined });
+
+  if (ids.length === 0) return;
+  await refreshTrackingAndApply(ids);
 }
 
 export function applyTrackInfoToRow(result: TrackInfoResult) {

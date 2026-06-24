@@ -258,6 +258,17 @@ export class TrackingModel {
     return unregistered.length;
   }
 
+  async findRegisteredTrackingIdsSince(params: { days: number; storeIds?: string[] }): Promise<string[]> {
+    const since = new Date(Date.now() - params.days * 24 * 60 * 60 * 1000);
+    const where: Prisma.ShipmentTrackingWhereInput = {
+      registrationStatus: 'registered',
+      createdAt: { gte: since },
+    };
+    if (params.storeIds && params.storeIds.length > 0) where.storeId = { in: params.storeIds };
+    const rows = await prisma.shipmentTracking.findMany({ where, select: { id: true } });
+    return rows.map((r) => r.id);
+  }
+
   async findPendingAlertCandidates(thresholdDate: Date) {
     return prisma.shipmentTracking.findMany({
       where: {

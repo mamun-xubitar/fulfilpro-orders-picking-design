@@ -12,6 +12,24 @@ export type Pagination = {
   hasNext: boolean;
 };
 
+export type ApiResponse<T> = {
+  success: boolean;
+  message: string;
+  errors?: string[];
+  data: T;
+};
+
+export type TrackingSyncJob = {
+  id: string;
+  type: string;
+  status: 'queued' | 'running' | 'completed' | 'failed' | string;
+  error: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type BulkRegisterModalState = {
   count: number | null;
   loading: boolean;

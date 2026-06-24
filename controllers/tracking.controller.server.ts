@@ -155,6 +155,38 @@ export class TrackingController {
     });
     return { data: { enqueued: true }, message: 'Bulk registration queued' };
   }
+
+  async enqueueSyncStatus(params: { days: number; storeIds: string[] }) {
+    const validDays = [7, 15, 30, 90];
+    if (!validDays.includes(params.days)) {
+      return { error: { message: `Invalid days value; must be one of ${validDays.join(', ')}`, status: 400 } };
+    }
+
+    const existing = await prisma.backgroundJob.findFirst({
+      where: { type: 'sync_tracking_status', status: { in: ['queued', 'running'] } },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (existing) {
+      return { data: { job: existing, alreadyRunning: true }, message: 'Tracking status sync already running' };
+    }
+
+    const job = await enqueueJob('sync_tracking_status', { days: params.days, storeIds: params.storeIds });
+    return { data: { job, alreadyRunning: false }, message: 'Tracking status sync queued' };
+  }
+
+  async getSyncStatus() {
+    const jobs = await prisma.backgroundJob.findMany({
+      where: { type: 'sync_tracking_status' },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+    });
+
+    const activeJob = jobs.find((j) => j.status === 'queued' || j.status === 'running') ?? null;
+    const lastSuccessfulJob = jobs.find((j) => j.status === 'completed') ?? null;
+    const latestJob = jobs[0] ?? null;
+
+    return { data: { activeJob, lastSuccessfulJob, latestJob } };
+  }
 }
 
 function extractTrackingNumbers(fulfillmentItems: unknown): Array<{ number: string; company: string }> {

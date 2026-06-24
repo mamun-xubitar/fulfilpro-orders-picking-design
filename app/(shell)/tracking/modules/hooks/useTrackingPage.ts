@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { toast } from 'react-toastify';
 import { useTrackingFilters } from './useTrackingFilters';
+import { useTrackingSync } from './useTrackingSync';
 import type { TrackingRow, BulkRegisterModalState, StoreOption } from '../types';
 
 export function useTrackingPage() {
@@ -19,6 +20,9 @@ export function useTrackingPage() {
   const countDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const bumpRefresh = useCallback(() => setRefresh((n) => n + 1), []);
+
+  const setErrorStr = useCallback((msg: string) => setError(msg), []);
+  const sync = useTrackingSync({ stores, bumpRefresh, setError: setErrorStr });
 
   useEffect(() => {
     let cancelled = false;
@@ -182,5 +186,6 @@ export function useTrackingPage() {
     handleBulkNavPrev, handleBulkNavNext, handleBulkClearDates,
     setBulkModal,
     bumpRefresh,
+    ...sync,
   };
 }

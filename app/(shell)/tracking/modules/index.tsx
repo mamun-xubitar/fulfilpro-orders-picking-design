@@ -53,6 +53,15 @@ export default function TrackingPage() {
         handleClearFilters={p.handleClearFilters}
         userIsAdmin={userIsAdmin}
         onBulkRegister={() => void p.openBulkModal()}
+        syncActive={p.syncActive}
+        syncMenuOpen={p.syncMenuOpen}
+        setSyncMenuOpen={p.setSyncMenuOpen}
+        syncMenuRef={p.syncMenuRef}
+        syncDays={p.syncDays}
+        setSyncDays={p.setSyncDays}
+        syncStoreIds={p.syncStoreIds}
+        handleSyncStoreToggle={p.handleSyncStoreToggle}
+        onSync={() => void p.handleSync()}
       />
 
       {p.error && (

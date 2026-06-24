@@ -1,7 +1,7 @@
 'use client';
 
 import type { Dispatch, RefObject, SetStateAction } from 'react';
-import { PERIODS, TRACKING_STATUSES } from './constants';
+import { PERIODS, TRACKING_STATUSES, SYNC_PERIODS } from './constants';
 import { fmtCalDate } from './utils';
 import DateRangeCalendar from './DateRangeCalendar';
 import type { StoreOption } from './types';
@@ -39,6 +39,15 @@ type TrackingToolbarProps = {
   handleClearFilters: () => void;
   userIsAdmin: boolean;
   onBulkRegister: () => void;
+  syncActive: boolean;
+  syncMenuOpen: boolean;
+  setSyncMenuOpen: Dispatch<SetStateAction<boolean>>;
+  syncMenuRef: RefObject<HTMLDivElement | null>;
+  syncDays: (typeof SYNC_PERIODS)[number]['value'];
+  setSyncDays: Dispatch<SetStateAction<(typeof SYNC_PERIODS)[number]['value']>>;
+  syncStoreIds: string[];
+  handleSyncStoreToggle: (id: string) => void;
+  onSync: () => void;
 };
 
 export default function TrackingToolbar({
@@ -51,6 +60,8 @@ export default function TrackingToolbar({
   handlePeriodChange, handleCalendarDateClick,
   hasActiveFilters, handleClearFilters,
   userIsAdmin, onBulkRegister,
+  syncActive, syncMenuOpen, setSyncMenuOpen, syncMenuRef,
+  syncDays, setSyncDays, syncStoreIds, handleSyncStoreToggle, onSync,
 }: TrackingToolbarProps) {
   return (
     <div className="flex flex-wrap items-start gap-2 mb-5">
@@ -232,6 +243,76 @@ export default function TrackingToolbar({
             </svg>
             Register Existing Orders
           </button>
+        )}
+        {userIsAdmin && (
+          <div className="relative" ref={syncMenuRef}>
+            <button
+              type="button"
+              disabled={syncActive}
+              onClick={() => setSyncMenuOpen((prev) => !prev)}
+              className="flex items-center gap-2 rounded-lg bg-white border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed shadow-sm"
+            >
+              {syncActive ? (
+                <svg className="w-4 h-4 animate-spin text-blue-600" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z" />
+                </svg>
+              ) : (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              )}
+              {syncActive ? 'Syncing…' : 'Sync Status'}
+            </button>
+            {syncMenuOpen && (
+              <div className="absolute top-full mt-1 right-0 z-30 bg-white border border-gray-200 rounded-xl shadow-xl p-3 w-64">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Time window</p>
+                <div className="flex flex-wrap gap-1.5 mb-3">
+                  {SYNC_PERIODS.map((item) => (
+                    <button
+                      key={item.value}
+                      type="button"
+                      onClick={() => setSyncDays(item.value)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${syncDays === item.value ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'}`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+                {stores.length > 1 && (
+                  <>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Stores</p>
+                    <div className="flex flex-col gap-0.5 mb-3 max-h-36 overflow-y-auto">
+                      {stores.map((store) => (
+                        <button
+                          key={store.id}
+                          type="button"
+                          onClick={() => handleSyncStoreToggle(store.id)}
+                          className="w-full text-left px-2 py-1.5 text-sm hover:bg-gray-50 flex items-center gap-2 rounded-lg"
+                        >
+                          <span className={`shrink-0 w-4 h-4 rounded border flex items-center justify-center ${syncStoreIds.includes(store.id) ? 'bg-blue-600 border-blue-600' : 'border-gray-300'}`}>
+                            {syncStoreIds.includes(store.id) && (
+                              <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
+                          </span>
+                          <span className="text-gray-700 truncate">{store.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+                <button
+                  type="button"
+                  onClick={onSync}
+                  className="w-full rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors cursor-pointer"
+                >
+                  Sync now
+                </button>
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>
