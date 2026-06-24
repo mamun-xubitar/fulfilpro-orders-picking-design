@@ -35,7 +35,7 @@ export default function OrderTableRow({
 }: OrderTableRowProps) {
   return (
     <tr
-      className={`border-b border-gray-100 ${hasBackInStockSignal ? 'bg-amber-50 hover:bg-amber-100' : status.row ?? getOrderDecorationRowTint(order) ?? 'hover:bg-gray-50'} transition-colors duration-100`}
+      className={`border-b border-gray-200 ${isExpanded ? 'border-l-4 border-l-blue-500' : ''} ${hasBackInStockSignal ? 'bg-amber-50 hover:bg-amber-100' : status.row ?? getOrderDecorationRowTint(order) ?? 'hover:bg-gray-50'} transition-colors duration-100`}
     >
       <td className="hidden sm:table-cell px-4 py-3 text-gray-400 text-xs">
         {(p.pagination.page - 1) * p.pagination.pageSize + index + 1}
@@ -57,7 +57,7 @@ export default function OrderTableRow({
       <td className="hidden sm:table-cell px-4 py-3 text-sm text-gray-600">
         {order.itemsCount} item{order.itemsCount !== 1 ? 's' : ''}
       </td>
-      <OrderFulfillmentInfoCell fulfillmentInfo={fulfillmentInfo} />
+      <OrderFulfillmentInfoCell fulfillmentInfo={fulfillmentInfo} userIsDecorator={p.userIsDecorator} />
       <td className="px-4 py-3 text-center">
         <div className="tooltip inline-flex">
           <button

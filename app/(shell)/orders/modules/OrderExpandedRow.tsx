@@ -25,7 +25,7 @@ export default function OrderExpandedRow({
   hasDecorationWork,
 }: OrderExpandedRowProps) {
   return (
-    <tr>
+    <tr className="border-l-4 border-l-blue-500">
       <td colSpan={p.ordersColSpan} className="p-0">
         {p.userIsDecorator ? (
           <DecoratorFulfillmentPanel

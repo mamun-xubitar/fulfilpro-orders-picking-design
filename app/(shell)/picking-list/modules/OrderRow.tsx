@@ -33,11 +33,11 @@ export default function OrderRow({ order, isAdmin, isPicker, isExpanded, isSelec
   const canConfirmPacked = !order.closed && !order.canceled && order.packedQuantity < order.totalQuantity;
 
   const rowClass = (() => {
-    if (isSelected) return 'border-b border-blue-200 bg-blue-100 hover:bg-blue-200';
-    if (order.canceled) return 'border-b border-red-200 bg-red-100 hover:bg-red-200';
-    if (order.closed) return 'border-b border-gray-200 bg-gray-100 hover:bg-gray-200';
-    if (order.packingStatus === 'packed') return 'border-b border-blue-200 bg-blue-100 hover:bg-blue-200';
-    if (order.packingStatus === 'partially_packed') return 'border-b border-amber-200 bg-amber-100 hover:bg-amber-200';
+    if (isSelected) return 'border-b border-blue-500 bg-blue-100 hover:bg-blue-200';
+    if (order.canceled) return 'border-b border-red-500 bg-red-100 hover:bg-red-200';
+    if (order.closed) return 'border-b border-gray-500 bg-gray-100 hover:bg-gray-200';
+    if (order.packingStatus === 'packed') return 'border-b border-blue-500 bg-blue-100 hover:bg-blue-200';
+    if (order.packingStatus === 'partially_packed') return 'border-b border-amber-500 bg-amber-100 hover:bg-amber-200';
     return 'border-b border-gray-100 hover:bg-gray-50';
   })();
 
@@ -153,7 +153,7 @@ function ItemsSection({ order, isAdmin, fullChecks, partialValues, setFullChecks
                 if ((isFull || partialVal >= remaining) && remaining > 0) return 'border-b border-blue-200 bg-blue-100';
                 if (partialVal > 0) return 'border-b border-pink-200 bg-pink-100';
                 if (item.packedQuantity > 0) return 'border-b border-purple-200 bg-purple-100';
-                return 'border-b border-gray-100';
+                return 'border-b border-gray-300';
               })();
               return (
                 <tr key={`${order.id}-item-${item.id}-${itemIndex}`} className={`${itemClass} transition-colors duration-100`}>
