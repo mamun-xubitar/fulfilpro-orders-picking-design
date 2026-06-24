@@ -242,7 +242,7 @@ export async function getDecorationSummariesByOrder(
 async function getLineItemContext(orderId: string, lineItemId: string) {
   const order = await prisma.order.findUnique({
     where: { id: orderId },
-    select: { number: true, lineItems: true },
+    select: { number: true, lineItems: true, fulfillmentItems: true },
   });
   if (!order) throw new Error('Order not found');
 
@@ -258,7 +258,28 @@ async function getLineItemContext(orderId: string, lineItemId: string) {
     }
   }
 
-  return { orderNumber: order.number, qty };
+  let fulfilledQty = 0;
+  const fi = order.fulfillmentItems;
+  if (fi && typeof fi === 'object' && !Array.isArray(fi)) {
+    const confirmations = Array.isArray((fi as Record<string, unknown>).confirmations)
+      ? (fi as Record<string, unknown>).confirmations as unknown[]
+      : [];
+    for (const conf of confirmations) {
+      if (!conf || typeof conf !== 'object') continue;
+      const lines = Array.isArray((conf as Record<string, unknown>).lines)
+        ? (conf as Record<string, unknown>).lines as unknown[]
+        : [];
+      for (const line of lines) {
+        if (!line || typeof line !== 'object') continue;
+        const l = line as Record<string, unknown>;
+        if (l.lineItemId === lineItemId) {
+          fulfilledQty += typeof l.quantity === 'number' ? l.quantity : Number(l.quantity ?? 0);
+        }
+      }
+    }
+  }
+
+  return { orderNumber: order.number, qty, fulfilledQty };
 }
 
 export class DecorationModel {
@@ -382,7 +403,7 @@ export class DecorationModel {
     const isAdmin = worker.role === ADMIN_ROLE;
     if (!isAdmin && !isDecoratorRole(worker.role)) throw new Error('Only decorators can mark work as done');
 
-    const { orderNumber, qty } = await getLineItemContext(orderId, lineItemId);
+    const { orderNumber, qty, fulfilledQty } = await getLineItemContext(orderId, lineItemId);
 
     const [doneAgg, activeGrant] = await Promise.all([
       prisma.lineItemWork.aggregate({ where: { orderId, lineItemId }, _sum: { quantityDone: true } }),
@@ -393,13 +414,18 @@ export class DecorationModel {
     ]);
 
     const doneQty = doneAgg._sum.quantityDone ?? 0;
-    const remaining = Math.max(0, qty - doneQty);
     const fullyDone = qty > 0 && doneQty >= qty;
 
     if (fullyDone && !activeGrant && !isAdmin) {
       throw new Error('This item is locked. Request edit access from an admin.');
     }
 
+    if (!isAdmin && fulfilledQty >= qty) {
+      throw new Error('This item is already fulfilled.');
+    }
+
+    const cap = isAdmin ? qty : Math.max(0, qty - fulfilledQty);
+    const remaining = Math.max(0, cap - doneQty);
     const quantity = Math.floor(params.quantityDone);
     if (!Number.isFinite(quantity) || quantity < 1) throw new Error('Quantity must be at least 1');
     if (quantity > remaining) throw new Error(`Only ${remaining} left to mark as done`);

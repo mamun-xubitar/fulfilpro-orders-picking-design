@@ -72,6 +72,7 @@ type OrdersToolbarProps = {
   onExportCsv: () => void;
   onExportPrint: () => void;
   canSync: boolean;
+  userIsDecorator: boolean;
 };
 
 export default function OrdersToolbar({
@@ -140,9 +141,13 @@ export default function OrdersToolbar({
   onExportCsv,
   onExportPrint,
   canSync,
+  userIsDecorator,
 }: OrdersToolbarProps) {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const activeSearchField = SEARCH_FIELDS.find((f) => f.value === searchField);
+  const statusOptions = userIsDecorator
+    ? FULFILLMENT_STATUSES.filter((s) => s.value !== 'closed' && s.value !== 'canceled')
+    : FULFILLMENT_STATUSES;
   const filteredSearchFields = SEARCH_FIELDS.filter((f) =>
     f.label.toLowerCase().includes(searchInput.trim().toLowerCase())
   );
@@ -222,6 +227,7 @@ export default function OrdersToolbar({
     </div>
 
     {/* Store multi-select */}
+    {!userIsDecorator && (
     <div className="relative" ref={storeDropdownRef}>
       <button
         onClick={() => setStoreDropdownOpen((prev) => !prev)}
@@ -260,6 +266,7 @@ export default function OrdersToolbar({
         </div>
       )}
     </div>
+    )}
 
     {/* Period + calendar dropdown */}
     <div className="relative" ref={periodDropdownRef}>
@@ -412,7 +419,7 @@ export default function OrdersToolbar({
             All Statuses
           </button>
           <div className="border-t border-gray-100 my-1" />
-          {FULFILLMENT_STATUSES.map((item) => (
+          {statusOptions.map((item) => (
             <button
               key={item.value}
               onClick={() => handleStatusToggle(item.value)}

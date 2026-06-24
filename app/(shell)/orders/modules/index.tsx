@@ -92,6 +92,7 @@ export default function OrdersPage() {
         onExportCsv={() => void p.runExport('csv')}
         onExportPrint={() => void p.runExport('print')}
         canSync={!p.userIsDecorator}
+        userIsDecorator={p.userIsDecorator}
       />
 
 

@@ -3,7 +3,7 @@ import type { Pagination } from '../types';
 import { DEFAULT_PAGINATION, PERIODS } from '../constants';
 import type { PaginationItem } from '../utils';
 
-export function useOrdersFilters() {
+export function useOrdersFilters({ userIsDecorator }: { userIsDecorator: boolean }) {
   const getInitialSearch = () => {
     if (typeof window === 'undefined') return '';
     return new URLSearchParams(window.location.search).get('search')?.trim() ?? '';
@@ -36,6 +36,14 @@ export function useOrdersFilters() {
   const packingStatusDropdownRef = useRef<HTMLDivElement>(null);
   const periodDropdownRef = useRef<HTMLDivElement>(null);
   const syncStoreDropdownRef = useRef<HTMLDivElement>(null);
+  const decoratorDefaultApplied = useRef(false);
+
+  useEffect(() => {
+    if (userIsDecorator && !decoratorDefaultApplied.current) {
+      decoratorDefaultApplied.current = true;
+      setFulfillmentStatuses(['unfulfilled', 'partial']);
+    }
+  }, [userIsDecorator]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {

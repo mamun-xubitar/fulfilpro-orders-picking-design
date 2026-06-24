@@ -348,6 +348,7 @@ export class OrderModel {
       if (category === 'embroidery') decoratorConditions.push({ lineItemDecorations: { some: { isEmbroidery: true } } });
       if (category === 'print') decoratorConditions.push({ lineItemDecorations: { some: { isPrint: true } } });
       andConditions.push({ OR: decoratorConditions });
+      andConditions.push({ canceled: false, closed: false });
     }
 
     if (andConditions.length > 0) {
@@ -412,7 +413,7 @@ export class OrderModel {
       const assignmentsByOrder = await getAssignmentsByOrder(rows.map((row) => row.id));
       const summariesByOrder = await getDecorationSummariesByOrder(rows.map((row) => row.id), viewer);
       const trackingsByOrder = await new TrackingModel().getSummariesByOrderIds(rows.map((row) => row.id));
-      let allOrders = rows.map((row) => toOrderRow(row, messageCounts.get(row.id) ?? 0, decorationsByOrder.get(row.id), assignmentsByOrder.get(row.id), summariesByOrder.get(row.id), trackingsByOrder.get(row.id)));
+      let allOrders = rows.map((row) => toOrderRow(row, messageCounts.get(row.id) ?? 0, decorationsByOrder.get(row.id), assignmentsByOrder.get(row.id), summariesByOrder.get(row.id), trackingsByOrder.get(row.id), viewerIsDecorator));
       if (viewerIsDecorator) allOrders = sortDecoratorOrders(allOrders);
 
       if (filterByPacking) {
@@ -439,7 +440,7 @@ export class OrderModel {
       const summariesByOrder = await getDecorationSummariesByOrder(allRows.map((row) => row.id), viewer);
       const trackingsByOrder = await new TrackingModel().getSummariesByOrderIds(allRows.map((row) => row.id));
       let filtered = allRows
-        .map((row) => toOrderRow(row, messageCounts.get(row.id) ?? 0, decorationsByOrder.get(row.id), assignmentsByOrder.get(row.id), summariesByOrder.get(row.id), trackingsByOrder.get(row.id)))
+        .map((row) => toOrderRow(row, messageCounts.get(row.id) ?? 0, decorationsByOrder.get(row.id), assignmentsByOrder.get(row.id), summariesByOrder.get(row.id), trackingsByOrder.get(row.id), viewerIsDecorator))
         .filter((o) => packingSet.has(o.packingStatus));
       if (viewerIsDecorator) filtered = sortDecoratorOrders(filtered);
       const total = filtered.length;
@@ -463,7 +464,7 @@ export class OrderModel {
     const assignmentsByOrder = await getAssignmentsByOrder(rows.map((row) => row.id));
     const summariesByOrder = await getDecorationSummariesByOrder(rows.map((row) => row.id), viewer);
     const trackingsByOrder = await new TrackingModel().getSummariesByOrderIds(rows.map((row) => row.id));
-    let orders = rows.map((row) => toOrderRow(row, messageCounts.get(row.id) ?? 0, decorationsByOrder.get(row.id), assignmentsByOrder.get(row.id), summariesByOrder.get(row.id), trackingsByOrder.get(row.id)));
+    let orders = rows.map((row) => toOrderRow(row, messageCounts.get(row.id) ?? 0, decorationsByOrder.get(row.id), assignmentsByOrder.get(row.id), summariesByOrder.get(row.id), trackingsByOrder.get(row.id), viewerIsDecorator));
     if (viewerIsDecorator) orders = sortDecoratorOrders(orders);
 
     return { total, orders };
@@ -1246,13 +1247,17 @@ function toOrderRow(row: {
     updatedAt: Date;
   } | null;
   packingConfirmations?: Array<{ id: string; lines: Prisma.JsonValue; confirmedAt: Date; canceledAt: Date | null }>;
-}, messageCount: number, decorations?: Map<string, { isEmbroidery: boolean; isPrint: boolean }>, assignments?: Map<string, AssignmentRow[]>, summaries?: Map<string, LineDecorationSummary>, trackings?: TrackingSummary[]) {
+}, messageCount: number, decorations?: Map<string, { isEmbroidery: boolean; isPrint: boolean }>, assignments?: Map<string, AssignmentRow[]>, summaries?: Map<string, LineDecorationSummary>, trackings?: TrackingSummary[], viewerIsDecorator = false) {
   const lineItems = toLineItems(row.lineItems);
   const itemCount = lineItems.reduce((sum, item) => sum + Math.max(0, item.qty), 0);
 
   const packingConfirmations = row.packingConfirmations ?? [];
   const activePackingConfirmations = packingConfirmations.filter((c) => !c.canceledAt);
   const packedByLine = computePackedByLine(activePackingConfirmations);
+  const fulfillmentItems = toFulfillmentItems(row.fulfillmentItems);
+  const fulfilledByLine = viewerIsDecorator
+    ? getFulfilledQuantityByLineItem(fulfillmentItems.confirmations)
+    : new Map<string, number>();
   const totalQuantity = lineItems.reduce((sum, item) => sum + Math.max(0, item.qty), 0);
   const packedQuantity = [...packedByLine.values()].reduce((sum, qty) => sum + qty, 0);
   const packingStatus: 'packed' | 'partially_packed' | 'not_packed' =
@@ -1285,7 +1290,8 @@ function toOrderRow(row: {
     items: lineItems.map((item) => {
       const summary = summaries?.get(item.id);
       const doneQty = summary?.doneQty ?? 0;
-      const remaining = Math.max(0, item.qty - doneQty);
+      const fulfilledQty = viewerIsDecorator ? (fulfilledByLine.get(item.id) ?? 0) : 0;
+      const remaining = Math.max(0, item.qty - doneQty - fulfilledQty);
       const fullyDone = item.qty > 0 && doneQty >= item.qty;
       return {
         ...item,
@@ -1305,7 +1311,7 @@ function toOrderRow(row: {
       };
     }),
     shippingLines: toShippingLines(row.shippingLines),
-    fulfillmentItems: toFulfillmentItems(row.fulfillmentItems),
+    fulfillmentItems,
     itemsCount: itemCount,
     messageCount,
     noteCount: row._count.notes,

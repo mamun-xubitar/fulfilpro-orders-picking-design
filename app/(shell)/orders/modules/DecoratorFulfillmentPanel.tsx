@@ -135,7 +135,7 @@ export default function DecoratorFulfillmentPanel({
                   />
                 )}
                 {!locked && remaining <= 0 && (
-                  <p className="mt-2 text-xs text-emerald-600 font-medium">✓ All done</p>
+                  <p className="mt-2 text-xs text-emerald-600 font-medium">Already fulfilled</p>
                 )}
 
                 {works.length > 0 && (
