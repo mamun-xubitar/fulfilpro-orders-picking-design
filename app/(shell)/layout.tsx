@@ -85,6 +85,13 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
   }, [status]);
 
   useEffect(() => {
+    const checkWidth = () => setSidebarCollapsed(window.innerWidth < 1500);
+    checkWidth();
+    window.addEventListener("resize", checkWidth);
+    return () => window.removeEventListener("resize", checkWidth);
+  }, []);
+
+  useEffect(() => {
     function handleClick(e: MouseEvent) {
       const target = e.target as Node;
       const avatarBtn = document.getElementById("avatar-btn");
@@ -387,7 +394,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
       )}
       <aside
         id="sidebar"
-        className={`bg-gray-900 text-white flex flex-col fixed top-0 left-0 h-full z-40 overflow-hidden transition-transform duration-200 md:translate-x-0 ${mobileSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
+        className={`bg-gray-900 text-white flex flex-col fixed top-0 left-0 h-full z-40 transition-transform duration-200 md:translate-x-0 ${mobileSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
         style={{ width: sidebarWidth }}
       >
         <div className="flex items-center justify-between px-4 py-4 border-b border-gray-700 min-h-[60px]">
@@ -429,13 +436,18 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
                 key={item.id}
                 href={item.href}
                 onClick={() => setMobileSidebarOpen(false)}
-                className={`nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150 cursor-pointer ${isActive ? "bg-blue-600 text-white" : "text-gray-300 hover:bg-gray-700 hover:text-white"}`}
+                className={`nav-item relative group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150 cursor-pointer ${isActive ? "bg-blue-600 text-white" : "text-gray-300 hover:bg-gray-700 hover:text-white"}`}
                 style={sidebarCollapsed ? { justifyContent: "center", paddingLeft: 0, paddingRight: 0 } : undefined}
               >
                 <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   {item.icon}
                 </svg>
                 {!sidebarCollapsed && <span className="label-text">{item.label}</span>}
+                {sidebarCollapsed && (
+                  <span className="pointer-events-none absolute left-full top-1/2 ml-2 -translate-y-1/2 rounded bg-gray-700 px-2 py-1 text-xs text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-50">
+                    {item.label}
+                  </span>
+                )}
               </Link>
             );
           })}
@@ -445,13 +457,18 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
           <Link
             href="/profile"
             onClick={() => setMobileSidebarOpen(false)}
-            className={`nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150 cursor-pointer ${activeId === "profile" ? "bg-blue-600 text-white" : "text-gray-300 hover:bg-gray-700 hover:text-white"}`}
+            className={`nav-item relative group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150 cursor-pointer ${activeId === "profile" ? "bg-blue-600 text-white" : "text-gray-300 hover:bg-gray-700 hover:text-white"}`}
             style={sidebarCollapsed ? { justifyContent: "center", paddingLeft: 0, paddingRight: 0 } : undefined}
           >
             <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
             </svg>
             {!sidebarCollapsed && <span className="label-text">Profile</span>}
+            {sidebarCollapsed && (
+              <span className="pointer-events-none absolute left-full top-1/2 ml-2 -translate-y-1/2 rounded bg-gray-700 px-2 py-1 text-xs text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-50">
+                Profile
+              </span>
+            )}
           </Link>
         </div>
       </aside>
