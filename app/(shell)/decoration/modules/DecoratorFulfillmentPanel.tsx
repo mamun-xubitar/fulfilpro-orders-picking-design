@@ -22,6 +22,7 @@ type Props = {
   showAll?: boolean;
   canAssign?: boolean;
   onAssign?: (order: OrderRow, item: OrderItem) => void;
+  isAdmin?: boolean;
 };
 
 const COMMENT_FIELDS: Array<{ key: 'sizes' | 'colors' | 'remarks' | 'location'; label: string }> = [
@@ -49,6 +50,7 @@ export default function DecoratorFulfillmentPanel({
   showAll = false,
   canAssign = false,
   onAssign,
+  isAdmin = false,
 }: Props) {
   const isRelevant = (item: OrderItem) => {
     if (showAll) {
@@ -78,7 +80,7 @@ export default function DecoratorFulfillmentPanel({
             const d = item.decoration;
             const doneQty = d?.doneQty ?? 0;
             const remaining = d?.remaining ?? item.qty;
-            const locked = d?.locked ?? false;
+            const locked = isAdmin ? false : (d?.locked ?? false);
             const editable = !locked;
             const pending = d?.hasPendingRequest ?? false;
             const tint = getDecorationRowTint(item) ?? 'bg-white';
@@ -155,7 +157,7 @@ export default function DecoratorFulfillmentPanel({
                   />
                 )}
                 {!locked && remaining <= 0 && (
-                  <p className="mt-2 text-xs text-emerald-600 font-medium">Already fulfilled</p>
+                  <p className="mt-2 text-xs text-emerald-600 font-medium">Already done or order fulfilled</p>
                 )}
 
                 {works.length > 0 && (

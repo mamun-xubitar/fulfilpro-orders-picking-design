@@ -40,6 +40,7 @@ export default function DecorationExpandedRow({
           onDraftSubmit={p.submitDraftWork}
           showAll={p.decoratorUnscoped}
           canAssign={p.userIsAdmin}
+          isAdmin={p.userIsAdmin}
           onAssign={p.openAssignModal}
         />
       </td>
