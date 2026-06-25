@@ -3,7 +3,7 @@ import type { Pagination } from '../types';
 import { DEFAULT_PAGINATION, PERIODS } from '../constants';
 import type { PaginationItem } from '../utils';
 
-export function useOrdersFilters({ userIsDecorator }: { userIsDecorator: boolean }) {
+export function useOrdersFilters({ userIsDecorator, decorationView = false }: { userIsDecorator: boolean; decorationView?: boolean }) {
   const getInitialSearch = () => {
     if (typeof window === 'undefined') return '';
     return new URLSearchParams(window.location.search).get('search')?.trim() ?? '';
@@ -65,8 +65,9 @@ export function useOrdersFilters({ userIsDecorator }: { userIsDecorator: boolean
     if (dateTo) params.set('dateTo', dateTo);
     fulfillmentStatuses.forEach((s) => params.append('status', s));
     packingStatuses.forEach((s) => params.append('packingStatus', s));
+    if (decorationView) params.set('decorationView', '1');
     return params.toString();
-  }, [pagination.page, pagination.pageSize, period, search, searchField, storeIds, dateFrom, dateTo, fulfillmentStatuses, packingStatuses]);
+  }, [pagination.page, pagination.pageSize, period, search, searchField, storeIds, dateFrom, dateTo, fulfillmentStatuses, packingStatuses, decorationView]);
 
   const handleStoreToggle = (id: string) => {
     setStoreIds((prev) => (prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]));

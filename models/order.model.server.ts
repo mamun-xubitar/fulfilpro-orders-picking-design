@@ -295,10 +295,11 @@ export class OrderModel {
     packingStatuses?: string[];
     viewerId?: string;
     viewerRole?: string;
+    decorationView?: boolean;
     page: number;
     pageSize: number;
   }) {
-    const { search, searchField, storeIds = [], period = 'all', dateFrom, dateTo, fulfillmentStatuses = [], packingStatuses = [], viewerId, viewerRole, page, pageSize } = params;
+    const { search, searchField, storeIds = [], period = 'all', dateFrom, dateTo, fulfillmentStatuses = [], packingStatuses = [], viewerId, viewerRole, decorationView, page, pageSize } = params;
     const viewer = { id: viewerId, role: viewerRole };
     const viewerIsDecorator = isDecoratorRole(viewerRole);
     const tokens = (search?.trim() ?? '').split(/\s+/).filter(Boolean);
@@ -349,6 +350,15 @@ export class OrderModel {
       if (category === 'print') decoratorConditions.push({ lineItemDecorations: { some: { isPrint: true } } });
       andConditions.push({ OR: decoratorConditions });
       andConditions.push({ canceled: false, closed: false });
+    }
+
+    if (decorationView && !viewerIsDecorator) {
+      andConditions.push({
+        OR: [
+          { lineItemDecorations: { some: { isEmbroidery: true } } },
+          { lineItemDecorations: { some: { isPrint: true } } },
+        ],
+      });
     }
 
     if (andConditions.length > 0) {

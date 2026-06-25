@@ -20,6 +20,7 @@ export class OrderController {
     const packingStatuses = searchParams.getAll('packingStatus').map((s) => s.trim()).filter(Boolean);
     const page = normalizePositiveInt(searchParams.get('page'), 1);
     const pageSize = clamp(normalizePositiveInt(searchParams.get('pageSize'), 20), 5, 100);
+    const decorationView = searchParams.get('decorationView') === '1';
 
     if (allowedStoreIds !== null && allowedStoreIds !== undefined) {
       if (allowedStoreIds.length === 0) {
@@ -63,6 +64,7 @@ export class OrderController {
         packingStatuses,
         viewerId,
         viewerRole,
+        decorationView,
         page,
         pageSize,
       }),

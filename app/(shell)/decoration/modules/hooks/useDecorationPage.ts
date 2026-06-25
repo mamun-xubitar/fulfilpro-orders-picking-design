@@ -76,7 +76,7 @@ export function useDecorationPage() {
     }
   };
 
-  const filters = useOrdersFilters({ userIsDecorator: true });
+  const filters = useOrdersFilters({ userIsDecorator: true, decorationView: true });
 
   const data = useOrdersData({
     queryString: filters.queryString,
