@@ -43,6 +43,9 @@ export default function DecorationTableRow({
         {(p.pagination.page - 1) * p.pagination.pageSize + index + 1}
       </td>
       <td className="px-4 py-3 font-mono text-sm font-medium text-gray-900">{order.number}</td>
+      {p.userIsAdmin && (
+        <td className="px-4 py-3 text-sm text-gray-600">{order.storeName}</td>
+      )}
       <td className="px-4 py-3 text-sm text-gray-700">{order.customer}</td>
       <td className="px-4 py-3 text-sm text-gray-600">
         {new Date(order.orderedAt).toLocaleString()}
