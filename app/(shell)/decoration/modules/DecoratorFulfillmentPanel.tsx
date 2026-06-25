@@ -1,7 +1,7 @@
 'use client';
 
-import type { OrderItem, OrderRow, WorkDraftState } from './types';
-import { getFulfilledQty, getDecorationRowTint } from './utils';
+import type { OrderItem, OrderRow, WorkDraftState } from '../../orders/modules/types';
+import { getFulfilledQty, getDecorationRowTint } from '../../orders/modules/utils';
 import DecoratorWorkForm from './DecoratorWorkForm';
 
 type Props = {
@@ -19,6 +19,9 @@ type Props = {
   onDraftUpload: (key: string, item: OrderItem, index: number, files: FileList | null) => void;
   onDraftRemoveFile: (key: string, item: OrderItem, index: number, fileIndex: number) => void;
   onDraftSubmit: (order: OrderRow, item: OrderItem) => void;
+  showAll?: boolean;
+  canAssign?: boolean;
+  onAssign?: (order: OrderRow, item: OrderItem) => void;
 };
 
 const COMMENT_FIELDS: Array<{ key: 'sizes' | 'colors' | 'remarks' | 'location'; label: string }> = [
@@ -43,8 +46,14 @@ export default function DecoratorFulfillmentPanel({
   onDraftUpload,
   onDraftRemoveFile,
   onDraftSubmit,
+  showAll = false,
+  canAssign = false,
+  onAssign,
 }: Props) {
   const isRelevant = (item: OrderItem) => {
+    if (showAll) {
+      return item.isEmbroidery || item.isPrint || (item.assignments?.length ?? 0) > 0 || (item.decoration?.works.length ?? 0) > 0;
+    }
     if (decoratorCategory === 'embroidery' && item.isEmbroidery) return true;
     if (decoratorCategory === 'print' && item.isPrint) return true;
     if ((item.assignments ?? []).some((a) => a.assigneeId === currentUserId)) return true;
@@ -100,25 +109,36 @@ export default function DecoratorFulfillmentPanel({
                     )}
                   </div>
 
-                  {locked && (
-                    <div className="flex items-center gap-2">
-                      <span className="inline-flex items-center gap-1 rounded-full bg-gray-200 text-gray-600 px-2 py-1 text-[11px] font-semibold">
-                        🔒 Locked
-                      </span>
-                      {pending ? (
-                        <span className="text-[11px] text-gray-500">Access requested</span>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => onRequestAccess(order, item)}
-                          disabled={requestingAccessKey === requestKey}
-                          className="rounded-lg border border-amber-300 text-amber-700 bg-white px-2.5 py-1 text-xs font-medium hover:bg-amber-50 disabled:opacity-50"
-                        >
-                          {requestingAccessKey === requestKey ? 'Requesting…' : 'Request edit access'}
-                        </button>
-                      )}
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {canAssign && onAssign && (
+                      <button
+                        type="button"
+                        onClick={() => onAssign(order, item)}
+                        className="rounded-lg border border-blue-300 text-blue-700 bg-white px-2.5 py-1 text-xs font-medium hover:bg-blue-50"
+                      >
+                        Assign decorator
+                      </button>
+                    )}
+                    {locked && (
+                      <>
+                        <span className="inline-flex items-center gap-1 rounded-full bg-gray-200 text-gray-600 px-2 py-1 text-[11px] font-semibold">
+                          🔒 Locked
+                        </span>
+                        {pending ? (
+                          <span className="text-[11px] text-gray-500">Access requested</span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => onRequestAccess(order, item)}
+                            disabled={requestingAccessKey === requestKey}
+                            className="rounded-lg border border-amber-300 text-amber-700 bg-white px-2.5 py-1 text-xs font-medium hover:bg-amber-50 disabled:opacity-50"
+                          >
+                            {requestingAccessKey === requestKey ? 'Requesting…' : 'Request edit access'}
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
 
                 {!locked && remaining > 0 && (

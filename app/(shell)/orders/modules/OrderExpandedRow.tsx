@@ -2,7 +2,6 @@
 
 import type { OrderRow, OrderStockAdjustmentItem } from './types';
 import type { OrdersPageBundle } from './ordersPageContext';
-import DecoratorFulfillmentPanel from './DecoratorFulfillmentPanel';
 import OrderExpandedPanel from './OrderExpandedPanel';
 
 type OrderExpandedRowProps = {
@@ -27,34 +26,15 @@ export default function OrderExpandedRow({
   return (
     <tr className="border-l-4 border-l-blue-500">
       <td colSpan={p.ordersColSpan} className="p-0">
-        {p.userIsDecorator ? (
-          <DecoratorFulfillmentPanel
-            order={order}
-            decoratorCategory={p.decoratorCategory}
-            currentUserId={p.session?.user?.id ?? ''}
-            requestingAccessKey={p.requestingAccessKey}
-            onRequestAccess={p.requestEditAccess}
-            onDeleteWork={p.deleteWorkRecord}
-            getWorkDraft={p.getWorkDraft}
-            onDraftQuantity={p.setDraftQuantity}
-            onDraftAddRow={p.addDraftCommentRow}
-            onDraftRemoveRow={p.removeDraftCommentRow}
-            onDraftField={p.updateDraftCommentField}
-            onDraftUpload={p.uploadDraftFiles}
-            onDraftRemoveFile={p.removeDraftFile}
-            onDraftSubmit={p.submitDraftWork}
-          />
-        ) : (
-          <OrderExpandedPanel
-            p={p}
-            order={order}
-            orderAddressLines={orderAddressLines}
-            isFullyFulfilled={isFullyFulfilled}
-            restockItems={restockItems}
-            hasRestock={hasRestock}
-            hasDecorationWork={hasDecorationWork}
-          />
-        )}
+        <OrderExpandedPanel
+          p={p}
+          order={order}
+          orderAddressLines={orderAddressLines}
+          isFullyFulfilled={isFullyFulfilled}
+          restockItems={restockItems}
+          hasRestock={hasRestock}
+          hasDecorationWork={hasDecorationWork}
+        />
       </td>
     </tr>
   );

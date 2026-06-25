@@ -12,16 +12,14 @@ type OrdersTableProps = {
 };
 
 export default function OrdersTable({ p }: OrdersTableProps) {
-  const { orders, loading, error, expandedIds, ordersColSpan, userIsAdmin, userIsDecorator } = p;
+  const { orders, loading, error, expandedIds, ordersColSpan, userIsAdmin } = p;
   return (
     <table className="min-w-[900px] w-full text-sm">
       <thead>
         <tr className="bg-gray-50 border-b border-gray-200">
           <th className="hidden sm:table-cell px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-10">#</th>
           <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Order No.</th>
-          {!userIsDecorator && (
-            <th className="hidden md:table-cell px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Store</th>
-          )}
+          <th className="hidden md:table-cell px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Store</th>
           <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Customer</th>
           <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Ordered At</th>
           <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>

@@ -170,36 +170,49 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
       icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>,
       adminOnly: false,
       pickerHidden: true,
+      adminDecoratorOnly: false,
+    },
+    {
+      id: "decoration", label: "Decoration", href: "/decoration",
+      icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>,
+      adminOnly: false,
+      pickerHidden: true,
+      adminDecoratorOnly: true,
     },
     {
       id: "picking-list", label: "Picking List", href: "/picking-list",
       icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m-6 4h6m-6 4h4M7 3h10a2 2 0 012 2v14l-3-2-3 2-3-2-3 2V5a2 2 0 012-2z" />,
       adminOnly: false,
       pickerOnly: true,
+      adminDecoratorOnly: false,
     },
     {
       id: "back-in-stock", label: "Back In Stock", href: "/back-in-stock",
       icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7h-9m0 0 3-3m-3 3 3 3M4 17h9m0 0-3-3m3 3-3 3M5 7h2m10 10h2" />,
       adminOnly: false,
       pickerHidden: true,
+      adminDecoratorOnly: false,
     },
     {
       id: "tracking", label: "Tracking", href: "/tracking",
       icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z M15 11a3 3 0 11-6 0 3 3 0 016 0z" />,
       adminOnly: false,
       pickerHidden: true,
+      adminDecoratorOnly: false,
     },
     {
       id: "stores", label: "Stores", href: "/stores",
       icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/>,
       adminOnly: true,
       pickerHidden: true,
+      adminDecoratorOnly: false,
     },
     {
       id: "users", label: "Users", href: "/users",
       icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>,
       adminOnly: true,
       pickerHidden: true,
+      adminDecoratorOnly: false,
     },
     {
       id: "settings", label: "Settings", href: "/settings",
@@ -211,10 +224,11 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
       ),
       adminOnly: true,
       pickerHidden: true,
+      adminDecoratorOnly: false,
     },
   ];
 
-  const pageTitles: Record<string, string> = { orders: "Orders", "picking-list": "Picking List", "back-in-stock": "Back In Stock", tracking: "Tracking", stores: "Stores", users: "Users", profile: "Profile", settings: "Settings" };
+  const pageTitles: Record<string, string> = { orders: "Orders", decoration: "Decoration", "picking-list": "Picking List", "back-in-stock": "Back In Stock", tracking: "Tracking", stores: "Stores", users: "Users", profile: "Profile", settings: "Settings" };
   const activeId = pathname.split("/")[1] || "";
 
   const sidebarWidth = sidebarCollapsed ? "64px" : "240px";
@@ -404,7 +418,8 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
 
         <nav className="flex-1 py-4 space-y-1 px-2">
           {navItems.map((item) => {
-            if (userIsDecorator && item.id !== "orders") return null;
+            if (userIsDecorator && item.id !== "decoration") return null;
+            if (item.adminDecoratorOnly && user?.role !== "admin" && !userIsDecorator) return null;
             if (item.adminOnly && user?.role !== "admin") return null;
             if (item.pickerHidden && userIsOrderPicker) return null;
             if (item.pickerOnly && user?.role !== "admin" && !userIsOrderPicker) return null;

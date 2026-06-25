@@ -71,8 +71,6 @@ type OrdersToolbarProps = {
   exportDropdownRef: RefObject<HTMLDivElement | null>;
   onExportCsv: () => void;
   onExportPrint: () => void;
-  canSync: boolean;
-  userIsDecorator: boolean;
 };
 
 export default function OrdersToolbar({
@@ -140,14 +138,9 @@ export default function OrdersToolbar({
   exportDropdownRef,
   onExportCsv,
   onExportPrint,
-  canSync,
-  userIsDecorator,
 }: OrdersToolbarProps) {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const activeSearchField = SEARCH_FIELDS.find((f) => f.value === searchField);
-  const statusOptions = userIsDecorator
-    ? FULFILLMENT_STATUSES.filter((s) => s.value !== 'closed' && s.value !== 'canceled')
-    : FULFILLMENT_STATUSES;
   const filteredSearchFields = SEARCH_FIELDS.filter((f) =>
     f.label.toLowerCase().includes(searchInput.trim().toLowerCase())
   );
@@ -227,7 +220,6 @@ export default function OrdersToolbar({
     </div>
 
     {/* Store multi-select */}
-    {!userIsDecorator && (
     <div className="relative" ref={storeDropdownRef}>
       <button
         onClick={() => setStoreDropdownOpen((prev) => !prev)}
@@ -266,7 +258,6 @@ export default function OrdersToolbar({
         </div>
       )}
     </div>
-    )}
 
     {/* Period + calendar dropdown */}
     <div className="relative" ref={periodDropdownRef}>
@@ -419,7 +410,7 @@ export default function OrdersToolbar({
             All Statuses
           </button>
           <div className="border-t border-gray-100 my-1" />
-          {statusOptions.map((item) => (
+          {FULFILLMENT_STATUSES.map((item) => (
             <button
               key={item.value}
               onClick={() => handleStatusToggle(item.value)}
@@ -531,8 +522,6 @@ export default function OrdersToolbar({
           )}
         </div>
       )}
-      {canSync && (
-      <>
       <div ref={syncStoreDropdownRef} className="relative">
         <div className="flex items-stretch gap-0">
           <button
@@ -611,8 +600,6 @@ export default function OrdersToolbar({
         Refresh
       </button>
       <span className="min-w-0 flex-1 text-xs text-gray-400 sm:flex-none sm:whitespace-nowrap">{syncMessage}</span>
-      </>
-      )}
     </div>
   </div>
   );

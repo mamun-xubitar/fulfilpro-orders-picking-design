@@ -6,10 +6,10 @@ type FulfillmentInfo = { date: string; carrier: string; trackingNumber: string; 
 
 type OrderFulfillmentInfoCellProps = {
   fulfillmentInfo: FulfillmentInfo[];
-  userIsDecorator: boolean;
+  userIsDecorator?: boolean;
 };
 
-export default function OrderFulfillmentInfoCell({ fulfillmentInfo, userIsDecorator }: OrderFulfillmentInfoCellProps) {
+export default function OrderFulfillmentInfoCell({ fulfillmentInfo, userIsDecorator = false }: OrderFulfillmentInfoCellProps) {
   return (
     <td className="px-4 py-3 text-xs text-gray-600">
       {fulfillmentInfo.length > 0 ? (

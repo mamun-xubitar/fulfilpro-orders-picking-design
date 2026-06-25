@@ -245,6 +245,8 @@ export async function refreshTrackingAndApply(trackingIds: string[]): Promise<Tr
     const patch = applyTrackInfoToRow(result);
     const latestStatus = result.track_info?.latest_status?.status;
 
+    console.log("my patch", JSON.stringify(patch, null, 2))
+
     await prisma.shipmentTracking.update({
       where: { id: row.id },
       data: {

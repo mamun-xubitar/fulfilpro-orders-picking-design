@@ -77,7 +77,7 @@ export function useOrdersPage() {
     }
   };
 
-  const filters = useOrdersFilters({ userIsDecorator });
+  const filters = useOrdersFilters({ userIsDecorator: userIsDecorator });
 
   const data = useOrdersData({
     queryString: filters.queryString,

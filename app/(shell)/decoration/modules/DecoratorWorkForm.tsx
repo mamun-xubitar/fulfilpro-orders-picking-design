@@ -1,6 +1,6 @@
 'use client';
 
-import type { OrderItem, WorkDraftState } from './types';
+import type { OrderItem, WorkDraftState } from '../../orders/modules/types';
 
 type DecoratorWorkFormProps = {
   draft: WorkDraftState;

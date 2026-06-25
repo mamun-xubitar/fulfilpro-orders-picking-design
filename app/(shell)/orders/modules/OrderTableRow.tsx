@@ -41,9 +41,7 @@ export default function OrderTableRow({
         {(p.pagination.page - 1) * p.pagination.pageSize + index + 1}
       </td>
       <td className="px-4 py-3 font-mono text-sm font-medium text-gray-900">{order.number}</td>
-      {!p.userIsDecorator && (
-        <td className="hidden md:table-cell px-4 py-3 text-sm text-gray-600">{order.storeName}</td>
-      )}
+      <td className="hidden md:table-cell px-4 py-3 text-sm text-gray-600">{order.storeName}</td>
       <td className="px-4 py-3 text-sm text-gray-700">{order.customer}</td>
       <td className="px-4 py-3 text-sm text-gray-600">
         {new Date(order.orderedAt).toLocaleString()}
@@ -57,7 +55,7 @@ export default function OrderTableRow({
       <td className="hidden sm:table-cell px-4 py-3 text-sm text-gray-600">
         {order.itemsCount} item{order.itemsCount !== 1 ? 's' : ''}
       </td>
-      <OrderFulfillmentInfoCell fulfillmentInfo={fulfillmentInfo} userIsDecorator={p.userIsDecorator} />
+      <OrderFulfillmentInfoCell fulfillmentInfo={fulfillmentInfo} />
       <td className="px-4 py-3 text-center">
         <div className="tooltip inline-flex">
           <button
@@ -85,7 +83,6 @@ export default function OrderTableRow({
         order={order}
         isExpanded={isExpanded}
         isFullyFulfilled={isFullyFulfilled}
-        userIsDecorator={p.userIsDecorator}
         userIsAdmin={p.userIsAdmin}
         refreshingOrderIds={p.refreshingOrderIds}
         printingOrderId={p.printingOrderId}

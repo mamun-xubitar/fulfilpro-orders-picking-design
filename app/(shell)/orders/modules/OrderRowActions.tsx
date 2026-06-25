@@ -6,7 +6,7 @@ type OrderRowActionsProps = {
   order: OrderRow;
   isExpanded: boolean;
   isFullyFulfilled: boolean;
-  userIsDecorator: boolean;
+  userIsDecorator?: boolean;
   userIsAdmin: boolean;
   refreshingOrderIds: Record<string, boolean>;
   printingOrderId: string | null;
@@ -37,7 +37,7 @@ export default function OrderRowActions({
   order,
   isExpanded,
   isFullyFulfilled,
-  userIsDecorator,
+  userIsDecorator = false,
   userIsAdmin,
   refreshingOrderIds,
   printingOrderId,

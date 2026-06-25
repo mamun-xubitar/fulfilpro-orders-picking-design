@@ -24,6 +24,7 @@ const PUBLIC_ROUTES = [
 const AUTH_ONLY_ROUTES = ['/'];
 const DASHBOARD_ROUTE = '/orders';
 const PICKER_DASHBOARD_ROUTE = '/picking-list';
+const DECORATOR_DASHBOARD_ROUTE = '/decoration';
 const LOGIN_ROUTE = '/';
 const RESTRICTED_ROUTE = '/restricted';
 const SESSION_EXPIRED_ROUTE = '/session-expired';
@@ -67,7 +68,7 @@ const PICKER_ALLOWED_API_ROUTES = [
 ];
 const TEST_MODE_MESSAGE = 'This action is not allowed in test mode.';
 
-const DECORATOR_ALLOWED_PAGE_ROUTES = ['/orders', '/profile']
+const DECORATOR_ALLOWED_PAGE_ROUTES = ['/decoration', '/profile']
 const DECORATOR_ALLOWED_API_ROUTES = [
   '/api/profile',
   '/api/profile/.*',
@@ -246,7 +247,7 @@ export const proxy = auth(async (request) => {
     }
 
     if (!matchesRoute(pathname, DECORATOR_ALLOWED_PAGE_ROUTES)) {
-      return NextResponse.redirect(new URL("/orders", request.url));
+      return NextResponse.redirect(new URL("/decoration", request.url));
     }
   }
 
