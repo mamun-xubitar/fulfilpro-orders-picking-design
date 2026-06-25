@@ -68,6 +68,14 @@ export default function DecorationPage() {
         exportDropdownOpen={p.exportDropdownOpen}
         setExportDropdownOpen={p.setExportDropdownOpen}
         exportDropdownRef={p.exportDropdownRef}
+        stores={p.stores}
+        storeIds={p.storeIds}
+        setStoreIds={p.setStoreIds}
+        storeDropdownOpen={p.storeDropdownOpen}
+        setStoreDropdownOpen={p.setStoreDropdownOpen}
+        storeDropdownRef={p.storeDropdownRef}
+        handleStoreToggle={p.handleStoreToggle}
+        userIsAdmin={p.userIsAdmin}
         onExportCsv={() => void p.runExport('csv')}
         onExportPrint={() => void p.runExport('print')}
       />

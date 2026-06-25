@@ -21,6 +21,7 @@ export default function TrackingTable({ rows, loading, expandedIds, onToggle, pa
             <tr>
               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Order</th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Tracking #</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Customer</th>
               <th className="hidden sm:table-cell px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Store</th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Registration</th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
@@ -33,16 +34,16 @@ export default function TrackingTable({ rows, loading, expandedIds, onToggle, pa
             {loading ? (
               Array.from({ length: 8 }).map((_, i) => (
                 <tr key={i} className="border-b border-gray-100">
-                  {Array.from({ length: 8 }).map((__, j) => (
+                  {Array.from({ length: 9 }).map((__, j) => (
                     <td key={j} className="px-4 py-3">
-                      <div className="h-4 bg-gray-200 rounded animate-pulse" style={{ width: j === 7 ? '24px' : '80%' }} />
+                      <div className="h-4 bg-gray-200 rounded animate-pulse" style={{ width: j === 8 ? '24px' : '80%' }} />
                     </td>
                   ))}
                 </tr>
               ))
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-12 text-center text-sm text-gray-400">
+                <td colSpan={9} className="px-4 py-12 text-center text-sm text-gray-400">
                   No tracking records found.
                 </td>
               </tr>

@@ -142,15 +142,14 @@ export default function OrderRowActions({
           </button>
           <span className="tt">Admin Messages</span>
         </div>
-        {hasTrackingNumber && (
+        {hasTrackingNumber && userIsAdmin && (
           <div className="tooltip">
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                if (userIsAdmin) openTrackingModal(order);
+                openTrackingModal(order);
               }}
-              disabled={!userIsAdmin}
-              className={`p-1.5 rounded-lg transition-colors duration-150 ${userIsAdmin ? 'hover:bg-gray-100 cursor-pointer' : 'cursor-not-allowed opacity-40'} ${trackingIconColor(order)}`}
+              className={`p-1.5 rounded-lg transition-colors duration-150 hover:bg-gray-100 cursor-pointer ${trackingIconColor(order)}`}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 17l4 4 4-4m0-5l-4-4-4 4M12 3v13" />

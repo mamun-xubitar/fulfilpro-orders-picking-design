@@ -7,6 +7,7 @@ export type TrackingRow = {
   storeId: string;
   storeName: string | null;
   orderNumber: string;
+  customerName: string | null;
   trackingNumber: string;
   trackingUrl: string | null;
   carrier: number | null;
@@ -91,7 +92,7 @@ export class TrackingModel {
     const [rows, total] = await Promise.all([
       prisma.shipmentTracking.findMany({
         where,
-        include: { store: { select: { name: true } }, order: { select: { fulfillmentItems: true } } },
+        include: { store: { select: { name: true } }, order: { select: { fulfillmentItems: true, cusName: true } } },
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * pageSize,
         take: pageSize,
@@ -336,7 +337,7 @@ function toTrackingRow(row: {
   createdAt: Date;
   updatedAt: Date;
   store?: { name: string | null };
-  order?: { fulfillmentItems: unknown } | null;
+  order?: { fulfillmentItems: unknown; cusName?: string | null } | null;
 }): TrackingRow {
   const events = Array.isArray(row.events) ? (row.events as unknown[]) : null;
   const reminders = Array.isArray(row.pickupRemindersSent) ? (row.pickupRemindersSent as number[]) : [];
@@ -347,6 +348,7 @@ function toTrackingRow(row: {
     storeId: row.storeId,
     storeName: row.store?.name ?? null,
     orderNumber: row.orderNumber,
+    customerName: row.order?.cusName ?? null,
     trackingNumber: row.trackingNumber,
     trackingUrl: extractTrackingUrlForNumber(row.order?.fulfillmentItems, row.trackingNumber),
     carrier: row.carrier,

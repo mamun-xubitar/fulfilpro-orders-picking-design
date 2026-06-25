@@ -3,7 +3,7 @@
 import { useRef } from 'react';
 import type { Dispatch, RefObject, SetStateAction } from 'react';
 import { FULFILLMENT_STATUSES, PACKING_STATUSES, PERIODS, SEARCH_FIELDS } from '../../orders/modules/constants';
-import type { Pagination } from '../../orders/modules/types';
+import type { Pagination, StoreOption } from '../../orders/modules/types';
 import { DAY_LABELS, fmtCalDate, getMonthDays, MONTH_LABELS } from '../../orders/modules/utils';
 
 type DecorationToolbarProps = {
@@ -43,6 +43,14 @@ type DecorationToolbarProps = {
   setDateFrom: Dispatch<SetStateAction<string>>;
   setDateTo: Dispatch<SetStateAction<string>>;
   setPeriod: Dispatch<SetStateAction<(typeof PERIODS)[number]['value']>>;
+  stores: StoreOption[];
+  storeIds: string[];
+  setStoreIds: Dispatch<SetStateAction<string[]>>;
+  storeDropdownOpen: boolean;
+  setStoreDropdownOpen: Dispatch<SetStateAction<boolean>>;
+  storeDropdownRef: RefObject<HTMLDivElement | null>;
+  handleStoreToggle: (id: string) => void;
+  userIsAdmin: boolean;
   selectedNameCount: number;
   exportLoading: boolean;
   exportDropdownOpen: boolean;
@@ -91,6 +99,14 @@ export default function DecorationToolbar({
   setDateFrom,
   setDateTo,
   setPeriod,
+  stores,
+  storeIds,
+  setStoreIds,
+  storeDropdownOpen,
+  setStoreDropdownOpen,
+  storeDropdownRef,
+  handleStoreToggle,
+  userIsAdmin,
   selectedNameCount,
   exportLoading,
   exportDropdownOpen,
@@ -179,8 +195,51 @@ export default function DecorationToolbar({
       )}
     </div>
 
+    {/* Store multi-select (admin only) */}
+    {userIsAdmin && (
+      <div className="relative" ref={storeDropdownRef}>
+        <button
+          onClick={() => setStoreDropdownOpen((prev) => !prev)}
+          className="flex items-center gap-1.5 bg-white border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-600 shadow-sm hover:bg-gray-50 cursor-pointer whitespace-nowrap"
+        >
+          {storeIds.length === 0 ? 'All Stores' : `${storeIds.length} Store${storeIds.length > 1 ? 's' : ''}`}
+          <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        {storeDropdownOpen && (
+          <div className="absolute top-full mt-1 left-0 z-20 bg-white border border-gray-200 rounded-xl shadow-lg min-w-44 py-1">
+            <button
+              onClick={() => { setStoreIds([]); setPagination((prev) => ({ ...prev, page: 1 })); }}
+              className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2 ${storeIds.length === 0 ? 'font-semibold text-blue-600' : 'text-gray-700'}`}
+            >
+              All Stores
+            </button>
+            {stores.length > 0 && <div className="border-t border-gray-100 my-1" />}
+            {stores.map((store) => (
+              <button
+                key={store.id}
+                onClick={() => handleStoreToggle(store.id)}
+                className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2"
+              >
+                <span className={`flex-shrink-0 w-4 h-4 rounded border flex items-center justify-center ${storeIds.includes(store.id) ? 'bg-blue-600 border-blue-600' : 'border-gray-300'}`}>
+                  {storeIds.includes(store.id) && (
+                    <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                </span>
+                <span className="text-gray-700">{store.name}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    )}
+
     {/* Period + calendar dropdown */}
     <div className="relative" ref={periodDropdownRef}>
+      
       <button
         onClick={() => setPeriodDropdownOpen((prev) => !prev)}
         className="flex items-center gap-1.5 bg-white border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-600 shadow-sm hover:bg-gray-50 cursor-pointer whitespace-nowrap"

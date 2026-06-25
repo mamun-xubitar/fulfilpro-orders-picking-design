@@ -56,6 +56,7 @@ export default function TrackingTableRow({ row, isExpanded, onToggle }: Tracking
             {row.trackingNumber}
           </a>
         </td>
+        <td className="px-4 py-3 text-sm text-gray-700">{row.customerName ?? '—'}</td>
         <td className="hidden sm:table-cell px-4 py-3 text-sm text-gray-500">{row.storeName ?? '—'}</td>
         <td className="px-4 py-3">
           <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${regColor}`}>
@@ -83,7 +84,7 @@ export default function TrackingTableRow({ row, isExpanded, onToggle }: Tracking
       </tr>
       {isExpanded && (
         <tr className="border-b border-gray-100 bg-gray-50">
-          <td colSpan={8} className="px-6 py-4">
+          <td colSpan={9} className="px-6 py-4">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 text-xs text-gray-600 mb-4">
               <div><span className="font-semibold text-gray-500">Shipped:</span> {row.shippedAt ? new Date(row.shippedAt).toLocaleString() : '—'}</div>
               <div><span className="font-semibold text-gray-500">Registered:</span> {row.registeredAt ? new Date(row.registeredAt).toLocaleString() : '—'}</div>
