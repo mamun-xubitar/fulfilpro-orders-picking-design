@@ -1,7 +1,7 @@
 'use client';
 
 import type { OrderItem, OrderRow, WorkDraftState } from '../../orders/modules/types';
-import { getFulfilledQty, getDecorationRowTint } from '../../orders/modules/utils';
+import { getFulfilledQty, getDecorationRowTint, getDecorationRelevantItems } from '../../orders/modules/utils';
 import DecoratorWorkForm from './DecoratorWorkForm';
 
 type Props = {
@@ -52,18 +52,7 @@ export default function DecoratorFulfillmentPanel({
   onAssign,
   isAdmin = false,
 }: Props) {
-  const isRelevant = (item: OrderItem) => {
-    if (showAll) {
-      return item.isEmbroidery || item.isPrint || (item.assignments?.length ?? 0) > 0 || (item.decoration?.works.length ?? 0) > 0;
-    }
-    if (decoratorCategory === 'embroidery' && item.isEmbroidery) return true;
-    if (decoratorCategory === 'print' && item.isPrint) return true;
-    if ((item.assignments ?? []).some((a) => a.assigneeId === currentUserId)) return true;
-    if ((item.decoration?.works.length ?? 0) > 0) return true;
-    return false;
-  };
-
-  const items = order.items.filter(isRelevant);
+  const items = getDecorationRelevantItems(order, { decoratorCategory, currentUserId, showAll });
 
   return (
     <div className="bg-gray-100 border-b border-gray-200 p-5">
@@ -104,11 +93,18 @@ export default function DecoratorFulfillmentPanel({
                       <span>Done <strong className="text-gray-700">{doneQty}</strong></span>
                       <span>Left <strong className="text-gray-700">{remaining}</strong></span>
                     </div>
-                    {(item.assignments ?? []).some((a) => a.assigneeId === currentUserId && a.dueDate) && (
-                      <p className="mt-0.5 text-[11px] text-amber-700">
-                        Due {(item.assignments ?? []).find((a) => a.assigneeId === currentUserId && a.dueDate)?.dueDate}
-                      </p>
-                    )}
+                    {(() => {
+                      const myDue = (item.assignments ?? []).find(
+                        (a) => a.assigneeId === currentUserId && a.dueDate
+                      )?.dueDate;
+                      if (!myDue) return null;
+                      const overdue = myDue < new Date().toLocaleDateString('en-CA');
+                      return (
+                        <p className={`mt-0.5 text-[11px] ${overdue ? 'text-red-600 font-semibold' : 'text-amber-700'}`}>
+                          {overdue ? '⚠ ' : ''}Complete by {myDue}{overdue ? ' (overdue)' : ''}
+                        </p>
+                      );
+                    })()}
                   </div>
 
                   <div className="flex items-center gap-2">

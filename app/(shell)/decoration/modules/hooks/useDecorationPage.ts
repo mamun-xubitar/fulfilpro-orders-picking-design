@@ -32,7 +32,7 @@ export function useDecorationPage() {
   const userIsAdmin = userRole === "admin";
   const decoratorCategory = getDecoratorCategory(userRole);
   const decoratorUnscoped = userIsAdmin;
-  const ordersColSpan = 10;
+  const ordersColSpan = 11;
   const userIsStaff = isStaffLikeRole(userRole);
   const userIsTest = isTestUserRole(userRole);
 

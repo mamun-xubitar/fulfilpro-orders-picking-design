@@ -300,6 +300,32 @@ export const orderNameEntries = (order: OrderRow): Array<{ key: string; row: Nam
 
 export const emptyCommentDraft = (): WorkCommentDraft => ({ sizes: '', colors: '', remarks: '', location: '', files: [], uploading: false });
 
+type DecorationRelevanceOpts = {
+  decoratorCategory: 'embroidery' | 'print' | null;
+  currentUserId: string;
+  showAll: boolean;
+};
+
+export function isDecorationRelevantItem(item: OrderItem, opts: DecorationRelevanceOpts): boolean {
+  const { decoratorCategory, currentUserId, showAll } = opts;
+  if (showAll) {
+    return Boolean(
+      item.isEmbroidery || item.isPrint ||
+      (item.assignments?.length ?? 0) > 0 ||
+      (item.decoration?.works.length ?? 0) > 0,
+    );
+  }
+  if (decoratorCategory === 'embroidery' && item.isEmbroidery) return true;
+  if (decoratorCategory === 'print' && item.isPrint) return true;
+  if ((item.assignments ?? []).some((a) => a.assigneeId === currentUserId)) return true;
+  if ((item.decoration?.works.length ?? 0) > 0) return true;
+  return false;
+}
+
+export function getDecorationRelevantItems(order: Pick<OrderRow, 'items'>, opts: DecorationRelevanceOpts): OrderItem[] {
+  return order.items.filter((item) => isDecorationRelevantItem(item, opts));
+}
+
 export function getActiveFulfillmentRequest(
   requests: FulfillmentEditRequestRow[],
   orderId: string,

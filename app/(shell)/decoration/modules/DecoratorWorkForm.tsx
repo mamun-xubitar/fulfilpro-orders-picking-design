@@ -50,7 +50,7 @@ export default function DecoratorWorkForm({
         </div>
         {draft.comments.map((comment, ci) => (
           <div key={ci} className="rounded-lg border border-gray-200 p-3 space-y-2">
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-4 gap-2">
               {(['sizes', 'colors', 'remarks', 'location'] as const).map((field) => (
                 <input
                   key={field}
@@ -86,7 +86,7 @@ export default function DecoratorWorkForm({
         type="button"
         onClick={onSubmit}
         disabled={draft.saving || draft.comments.some((c) => c.uploading)}
-        className="w-full rounded-lg bg-emerald-600 text-white py-2 text-xs font-semibold hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150"
+        className="px-4 rounded-lg bg-emerald-600 text-white py-2 text-xs font-semibold hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150"
       >
         {draft.saving ? 'Saving…' : 'Confirm done'}
       </button>

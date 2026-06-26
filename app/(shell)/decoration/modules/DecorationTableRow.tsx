@@ -2,7 +2,7 @@
 
 import type { OrderRow } from '../../orders/modules/types';
 import type { useDecorationPage } from './hooks/useDecorationPage';
-import { getOrderDecorationRowTint } from '../../orders/modules/utils';
+import { getOrderDecorationRowTint, getDecorationRelevantItems } from '../../orders/modules/utils';
 import OrderStatusBadges from '../../orders/modules/OrderStatusBadges';
 import StockAdjustmentCell from '../../orders/modules/StockAdjustmentCell';
 import OrderFulfillmentInfoCell from '../../orders/modules/OrderFulfillmentInfoCell';
@@ -57,7 +57,14 @@ export default function DecorationTableRow({
         <StockAdjustmentCell order={order} openStockAdjustmentModal={p.openStockAdjustmentModal} />
       )}
       <td className="hidden sm:table-cell px-4 py-3 text-sm text-gray-600">
-        {order.itemsCount} item{order.itemsCount !== 1 ? 's' : ''}
+        {(() => {
+          const relevantCount = getDecorationRelevantItems(order, {
+            decoratorCategory: p.decoratorCategory,
+            currentUserId: p.session?.user?.id ?? '',
+            showAll: p.decoratorUnscoped,
+          }).length;
+          return <>{relevantCount} item{relevantCount !== 1 ? 's' : ''}</>;
+        })()}
       </td>
       <OrderFulfillmentInfoCell fulfillmentInfo={fulfillmentInfo} userIsDecorator={true} />
       <td className="px-4 py-3 text-center">
@@ -67,10 +74,10 @@ export default function DecorationTableRow({
               e.stopPropagation();
               void p.openNoteModal(order);
             }}
-            className="relative inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 transition-colors duration-150 hover:bg-gray-100 hover:text-blue-600 cursor-pointer"
+            className="relative inline-flex h-12 w-12 items-center justify-center rounded-lg text-gray-500 transition-colors duration-150 hover:bg-gray-100 hover:text-blue-600 cursor-pointer"
             aria-label={`Order ${order.number} notes`}
           >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4h10a2 2 0 012 2v14l-4-3H7a2 2 0 01-2-2V6a2 2 0 012-2z" />
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 8h8M8 12h5" />
             </svg>
