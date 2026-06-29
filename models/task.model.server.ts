@@ -259,9 +259,9 @@ export class TaskModel {
     return { pending, overdue, seriouslyLate };
   }
 
-  async report(): Promise<ReportData> {
+  async report(assigneeId?: string): Promise<ReportData> {
     const completed = await prisma.task.findMany({
-      where: { status: 'COMPLETED', completedAt: { not: null } },
+      where: { status: 'COMPLETED', completedAt: { not: null }, ...(assigneeId ? { assigneeId } : {}) },
       select: {
         assigneeId: true,
         assigneeName: true,

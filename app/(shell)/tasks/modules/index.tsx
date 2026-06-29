@@ -31,8 +31,8 @@ function TasksPageInner() {
         onAdd={p.openAdd}
       />
 
-      {p.userIsAdmin && p.tab === 'completed' ? (
-        <TaskReportTab report={p.report} loading={p.reportLoading} />
+      {p.tab === 'completed' ? (
+        <TaskReportTab report={p.report} loading={p.reportLoading} isAdmin={p.userIsAdmin} />
       ) : null}
 
       <TasksTable

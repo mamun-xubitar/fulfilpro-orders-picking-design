@@ -24,7 +24,7 @@ export function useTasksPage() {
   const data = useTasksData({ queryString: listQs, countQueryString: countQs });
   const mutations = useTaskMutations({ bumpRefresh: data.bumpRefresh, setTasks: data.setTasks });
   const messages = useTaskMessages(data.setTasks);
-  const report = useTaskReport(userIsAdmin && filters.tab === 'completed');
+  const report = useTaskReport(filters.tab === 'completed');
 
   // Deep-link: open messages modal when ?openTask=<id> is in the URL
   useEffect(() => {

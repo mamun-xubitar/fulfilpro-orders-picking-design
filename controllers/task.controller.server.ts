@@ -198,9 +198,12 @@ export class TaskController {
     return { data: summary, message: 'Summary retrieved' };
   }
 
-  async report(session: Session) {
-    if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
-    const data = await taskModel.report();
+  async report(searchParams: URLSearchParams, session: Session) {
+    const admin = isAdmin(session);
+    const filterUserId = admin
+      ? (searchParams.get('assigneeId') ?? undefined)
+      : session.user.id;
+    const data = await taskModel.report(filterUserId);
     return { data, message: 'Report retrieved' };
   }
 

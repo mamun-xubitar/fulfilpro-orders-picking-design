@@ -6,9 +6,10 @@ import { formatDuration } from './utils';
 type Props = {
   report: ReportData | null;
   loading: boolean;
+  isAdmin: boolean;
 };
 
-export default function TaskReportTab({ report, loading }: Props) {
+export default function TaskReportTab({ report, loading, isAdmin }: Props) {
   if (loading) {
     return (
       <div className="flex justify-center py-12">
@@ -32,7 +33,7 @@ export default function TaskReportTab({ report, loading }: Props) {
       {report.byAssignee.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-100">
-            <h3 className="text-sm font-semibold text-gray-700">Per-Assignee Breakdown</h3>
+            <h3 className="text-sm font-semibold text-gray-700">{isAdmin ? 'Per-Assignee Breakdown' : 'Breakdown'}</h3>
           </div>
           <table className="w-full text-sm">
             <thead>
