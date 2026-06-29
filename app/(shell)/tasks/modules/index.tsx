@@ -7,6 +7,7 @@ import TasksTable from './TasksTable';
 import AddEditTaskModal from './AddEditTaskModal';
 import CompleteTaskModal from './CompleteTaskModal';
 import ProofFilesModal from './ProofFilesModal';
+import TaskDetailsModal from './TaskDetailsModal';
 import TaskMessagesModal from './TaskMessagesModal';
 import TaskReportTab from './TaskReportTab';
 import { DEFAULT_PAGE_SIZE } from './constants';
@@ -48,6 +49,7 @@ function TasksPageInner() {
         onComplete={p.openComplete}
         onMessages={p.openMessages}
         onViewProofs={p.openProofs}
+        onView={p.openView}
       />
 
       <AddEditTaskModal
@@ -73,6 +75,7 @@ function TasksPageInner() {
       />
 
       <ProofFilesModal task={p.proofViewTask} onClose={p.closeProofs} />
+      <TaskDetailsModal task={p.viewTask} onClose={p.closeView} />
 
       <TaskMessagesModal
         task={p.messagesTask}

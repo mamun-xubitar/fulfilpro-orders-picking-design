@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import useRequest from '@/hooks/useRequest';
 import type { TaskMessageRow, TaskRow } from '../types';
 
-export function useTaskMessages(bumpRefresh: () => void) {
+export function useTaskMessages(setTasks: React.Dispatch<React.SetStateAction<TaskRow[]>>) {
   const { request, loading } = useRequest<TaskMessageRow>();
 
   const [messagesTask, setMessagesTask] = useState<TaskRow | null>(null);
@@ -22,8 +22,8 @@ export function useTaskMessages(bumpRefresh: () => void) {
       .then((r) => { if (r.success) setMessages(r.data.messages); })
       .catch(() => {})
       .finally(() => setMessagesLoading(false));
-    bumpRefresh();
-  }, [bumpRefresh]);
+    setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, unreadCount: 0 } : t)));
+  }, [setTasks]);
 
   const closeMessages = useCallback(() => {
     setMessagesTask(null);
@@ -40,7 +40,13 @@ export function useTaskMessages(bumpRefresh: () => void) {
       onSuccess: (res) => {
         setMessages((prev) => [...prev, res.data]);
         setMessageText('');
-        bumpRefresh();
+        setTasks((prev) =>
+          prev.map((t) =>
+            t.id === messagesTask.id
+              ? { ...t, messageCount: t.messageCount + 1, unreadCount: 0 }
+              : t,
+          ),
+        );
       },
     });
   }

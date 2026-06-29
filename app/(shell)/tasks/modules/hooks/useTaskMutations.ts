@@ -32,6 +32,9 @@ export function useTaskMutations({ bumpRefresh, setTasks }: MutationsParams) {
   // Proof view modal
   const [proofViewTask, setProofViewTask] = useState<TaskRow | null>(null);
 
+  // View detail modal
+  const [viewTask, setViewTask] = useState<TaskRow | null>(null);
+
   function loadUsers() {
     fetch('/api/users')
       .then((r) => r.json() as Promise<{ success: boolean; data: UserOption[] }>)
@@ -125,6 +128,9 @@ export function useTaskMutations({ bumpRefresh, setTasks }: MutationsParams) {
   const openProofs = useCallback((task: TaskRow) => setProofViewTask(task), []);
   const closeProofs = useCallback(() => setProofViewTask(null), []);
 
+  const openView = useCallback((task: TaskRow) => setViewTask(task), []);
+  const closeView = useCallback(() => setViewTask(null), []);
+
   async function uploadProof(files: FileList) {
     const formData = new FormData();
     Array.from(files).forEach((f) => formData.append('files', f));
@@ -175,5 +181,9 @@ export function useTaskMutations({ bumpRefresh, setTasks }: MutationsParams) {
     proofViewTask,
     openProofs,
     closeProofs,
+    // View detail modal
+    viewTask,
+    openView,
+    closeView,
   };
 }

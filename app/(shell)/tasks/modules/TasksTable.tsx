@@ -2,7 +2,7 @@
 
 import type { TaskRow } from './types';
 import { STATE_STYLES } from './constants';
-import { formatDueDate, taskRowKey } from './utils';
+import { formatDueDate, taskRowKey, truncate } from './utils';
 import TaskRowActions from './TaskRowActions';
 
 type Props = {
@@ -19,13 +19,14 @@ type Props = {
   onComplete: (task: TaskRow) => void;
   onMessages: (task: TaskRow) => void;
   onViewProofs: (task: TaskRow) => void;
+  onView: (task: TaskRow) => void;
 };
 
 const SKELETON_ROWS = Array.from({ length: 5 });
 
 export default function TasksTable({
   tasks, loading, total, page, pageSize, onPageChange,
-  currentUserId, isAdmin, onEdit, onDelete, onComplete, onMessages, onViewProofs,
+  currentUserId, isAdmin, onEdit, onDelete, onComplete, onMessages, onViewProofs, onView,
 }: Props) {
   const totalPages = Math.ceil(total / pageSize);
 
@@ -64,10 +65,10 @@ export default function TasksTable({
               : tasks.map((task) => {
                   const style = STATE_STYLES[task.state];
                   return (
-                    <tr key={taskRowKey(task.id)} className={`border-b border-gray-100 last:border-0 ${style.row}`}>
+                    <tr key={taskRowKey(task.id)} className={`border-b border-gray-200 last:border-0 ${style.row}`}>
                       <td className="px-4 py-3">
                         <p className="font-medium text-gray-900 leading-snug">{task.title}</p>
-                        <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{task.description}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">{truncate(task.description, 50)}</p>
                       </td>
                       <td className="px-4 py-3">
                         <p className="text-gray-800">{task.assigneeName}</p>
@@ -94,6 +95,7 @@ export default function TasksTable({
                           onComplete={onComplete}
                           onMessages={onMessages}
                           onViewProofs={onViewProofs}
+                          onView={onView}
                         />
                       </td>
                     </tr>
