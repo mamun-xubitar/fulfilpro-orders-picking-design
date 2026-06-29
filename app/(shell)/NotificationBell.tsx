@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 
 type NotificationRow = {
   id: string;
@@ -10,6 +11,7 @@ type NotificationRow = {
   orderNumber: string | null;
   lineItemId: string | null;
   relatedRequestId: string | null;
+  taskId: string | null;
   actionable: boolean;
   actionStatus: string | null;
   readAt: string | null;
@@ -19,6 +21,7 @@ type NotificationRow = {
 type Data = { notifications: NotificationRow[]; unreadCount: number };
 
 export default function NotificationBell({ isAdmin }: { isAdmin: boolean }) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [data, setData] = useState<Data>({ notifications: [], unreadCount: 0 });
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -123,8 +126,14 @@ export default function NotificationBell({ isAdmin }: { isAdmin: boolean }) {
             {data.notifications.map((n) => (
               <div
                 key={n.id}
-                onClick={() => { if (!n.readAt) void markRead(n.id); }}
-                className={`px-4 py-3 border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors duration-100 ${!n.readAt ? "bg-blue-50/40 cursor-pointer" : "cursor-default"}`}
+                onClick={() => {
+                  if (!n.readAt) void markRead(n.id);
+                  if (n.taskId) {
+                    setOpen(false);
+                    router.push(`/tasks?openTask=${n.taskId}`);
+                  }
+                }}
+                className={`px-4 py-3 border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors duration-100 ${!n.readAt || n.taskId ? "bg-blue-50/40 cursor-pointer" : "cursor-default"}`}
               >
                 <div className="flex items-start gap-2.5">
                   <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${!n.readAt ? "bg-blue-500" : "bg-transparent"}`} />

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
 import { isDecoratorRole, isOrderPickerRole, isRestrictedSessionRole } from "@/lib/roles";
 import NotificationBell from "@/app/(shell)/NotificationBell";
+import TaskReminderBubble from "@/components/TaskReminderBubble";
 
 type SessionPolicy = {
   forceLogout: boolean;
@@ -201,6 +202,13 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
       adminDecoratorOnly: false,
     },
     {
+      id: "tasks", label: "Tasks", href: "/tasks",
+      icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />,
+      adminOnly: false,
+      pickerHidden: false,
+      adminDecoratorOnly: false,
+    },
+    {
       id: "tracking", label: "Tracking", href: "/tracking",
       icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z M15 11a3 3 0 11-6 0 3 3 0 016 0z" />,
       adminOnly: false,
@@ -235,7 +243,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
     },
   ];
 
-  const pageTitles: Record<string, string> = { orders: "Orders", decoration: "Decoration", "picking-list": "Picking List", "back-in-stock": "Back In Stock", tracking: "Tracking", stores: "Stores", users: "Users", profile: "Profile", settings: "Settings" };
+  const pageTitles: Record<string, string> = { orders: "Orders", decoration: "Decoration", "picking-list": "Picking List", "back-in-stock": "Back In Stock", tasks: "Tasks", tracking: "Tracking", stores: "Stores", users: "Users", profile: "Profile", settings: "Settings" };
   const activeId = pathname.split("/")[1] || "";
 
   const sidebarWidth = sidebarCollapsed ? "64px" : "240px";
@@ -425,7 +433,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
 
         <nav className="flex-1 py-4 space-y-1 px-2">
           {navItems.map((item) => {
-            if (userIsDecorator && item.id !== "decoration") return null;
+            if (userIsDecorator && item.id !== "decoration" && item.id !== "tasks") return null;
             if (item.adminDecoratorOnly && user?.role !== "admin" && !userIsDecorator) return null;
             if (item.adminOnly && user?.role !== "admin") return null;
             if (item.pickerHidden && userIsOrderPicker) return null;
@@ -524,6 +532,8 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
 
         {children}
       </div>
+
+      <TaskReminderBubble />
     </div>
   );
 }

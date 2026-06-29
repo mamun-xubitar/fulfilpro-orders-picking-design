@@ -9,6 +9,7 @@ export type NotificationRow = {
   orderNumber: string | null;
   lineItemId: string | null;
   relatedRequestId: string | null;
+  taskId: string | null;
   actionable: boolean;
   actionStatus: string | null;
   readAt: string | null;
@@ -24,6 +25,7 @@ export async function createNotification(data: {
   orderNumber?: string;
   lineItemId?: string;
   relatedRequestId?: string;
+  taskId?: string;
   actionable?: boolean;
 }) {
   try {
@@ -68,6 +70,7 @@ function toRow(row: {
   orderNumber: string | null;
   lineItemId: string | null;
   relatedRequestId: string | null;
+  taskId: string | null;
   actionable: boolean;
   actionStatus: string | null;
   readAt: Date | null;
@@ -82,6 +85,7 @@ function toRow(row: {
     orderNumber: row.orderNumber,
     lineItemId: row.lineItemId,
     relatedRequestId: row.relatedRequestId,
+    taskId: row.taskId,
     actionable: row.actionable,
     actionStatus: row.actionStatus,
     readAt: row.readAt?.toISOString() ?? null,

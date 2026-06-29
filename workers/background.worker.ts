@@ -3,6 +3,7 @@ import moment from 'moment-timezone';
 import prisma from '@/lib/prisma.server';
 import { acquireNextJob, runJob, markJobFailed } from '@/lib/background-jobs.server';
 import { runPendingShipmentCheck, runPickupReminderCheck } from '@/lib/tracking-checks.server';
+import { runTaskReminderCheck } from '@/lib/task-reminders.server';
 
 const POLL_INTERVAL_MS = Number(process.env.BACKGROUND_WORKER_POLL_MS ?? 10000);
 const RUN_ONCE = process.env.BACKGROUND_WORKER_ONCE === '1';
@@ -55,6 +56,15 @@ async function runTimedChecks() {
       await runPickupReminderCheck(now);
     } catch (error) {
       console.error('Pickup reminder check failed', error);
+    }
+  }
+
+  if (lastFired.get('task_reminder') !== minuteKey) {
+    lastFired.set('task_reminder', minuteKey);
+    try {
+      await runTaskReminderCheck(now);
+    } catch (error) {
+      console.error('Task reminder check failed', error);
     }
   }
 }

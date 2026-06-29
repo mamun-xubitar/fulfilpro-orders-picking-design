@@ -357,6 +357,11 @@ enum OrderMessageType {
   picker
 }
 
+enum TaskStatus {
+  PENDING
+  COMPLETED
+}
+
 model OrderSyncJob {
   id           String    @id @default(uuid())
   status       String    @default("queued")
@@ -402,6 +407,7 @@ model AppSettings {
   decorationDigestMode             String  @default("global_time")
   decorationDigestTime             String  @default("17:00")
   decorationDigestRecipientUserIds Json    @default("[]")
+  taskReminderTimes                Json    @default("[\"08:00\",\"12:00\",\"16:00\"]")
   seventrackApiKey                 String?
   trackingAutoRegisterEnabled      Boolean @default(false)
   trackingPendingAlertDays         Int     @default(7)
@@ -454,6 +460,7 @@ model Notification {
   orderNumber      String?
   lineItemId       String?
   relatedRequestId String?
+  taskId           String?
   actionable       Boolean   @default(false)
   actionStatus     String?
   readAt           DateTime?
@@ -463,6 +470,7 @@ model Notification {
   @@index([recipientId])
   @@index([recipientId, readAt])
   @@index([relatedRequestId])
+  @@index([taskId])
 }
 
 model StaffLoginApproval {
@@ -534,4 +542,43 @@ model BackgroundJob {
   @@index([status])
   @@index([runAfter])
   @@index([createdAt])
+}
+
+model Task {
+  id                   String      @id @default(uuid())
+  title                String
+  description          String
+  status               TaskStatus  @default(PENDING)
+  dueDate              DateTime
+  completedAt          DateTime?
+  proofFiles           Json        @default("[]")
+  assignerId           String
+  assignerName         String
+  assignerEmail        String
+  assigneeId           String
+  assigneeName         String
+  assigneeEmail        String
+  lastReadByAssignerAt DateTime?
+  lastReadByAssigneeAt DateTime?
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+  messages             TaskMessage[]
+
+  @@index([assigneeId, status])
+  @@index([assignerId])
+  @@index([status, dueDate])
+  @@index([createdAt])
+}
+
+model TaskMessage {
+  id          String   @id @default(uuid())
+  taskId      String
+  senderId    String
+  senderName  String
+  senderEmail String
+  message     String
+  createdAt   DateTime @default(now())
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId, createdAt])
 }

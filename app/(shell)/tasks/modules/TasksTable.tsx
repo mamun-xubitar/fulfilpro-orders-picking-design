@@ -1,0 +1,129 @@
+'use client';
+
+import type { TaskRow } from './types';
+import { STATE_STYLES } from './constants';
+import { formatDueDate, taskRowKey } from './utils';
+import TaskRowActions from './TaskRowActions';
+
+type Props = {
+  tasks: TaskRow[];
+  loading: boolean;
+  total: number;
+  page: number;
+  pageSize: number;
+  onPageChange: (p: number) => void;
+  currentUserId: string;
+  isAdmin: boolean;
+  onEdit: (task: TaskRow) => void;
+  onDelete: (taskId: string) => void;
+  onComplete: (task: TaskRow) => void;
+  onMessages: (task: TaskRow) => void;
+  onViewProofs: (task: TaskRow) => void;
+};
+
+const SKELETON_ROWS = Array.from({ length: 5 });
+
+export default function TasksTable({
+  tasks, loading, total, page, pageSize, onPageChange,
+  currentUserId, isAdmin, onEdit, onDelete, onComplete, onMessages, onViewProofs,
+}: Props) {
+  const totalPages = Math.ceil(total / pageSize);
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-gray-50 border-b border-gray-200">
+              <th className="text-left px-4 py-3 font-semibold text-gray-600">Task</th>
+              <th className="text-left px-4 py-3 font-semibold text-gray-600">Assignee</th>
+              <th className="text-left px-4 py-3 font-semibold text-gray-600">Due Date</th>
+              <th className="text-left px-4 py-3 font-semibold text-gray-600">Completed At</th>
+              <th className="text-left px-4 py-3 font-semibold text-gray-600">Status</th>
+              <th className="text-right px-4 py-3 font-semibold text-gray-600">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading
+              ? SKELETON_ROWS.map((_, i) => (
+                  <tr key={i} className="border-b border-gray-100">
+                    <td className="px-4 py-3"><div className="h-4 bg-gray-200 rounded animate-pulse w-48" /></td>
+                    <td className="px-4 py-3"><div className="h-4 bg-gray-200 rounded animate-pulse w-32" /></td>
+                    <td className="px-4 py-3"><div className="h-4 bg-gray-200 rounded animate-pulse w-24" /></td>
+                    <td className="px-4 py-3"><div className="h-4 bg-gray-200 rounded animate-pulse w-24" /></td>
+                    <td className="px-4 py-3"><div className="h-4 bg-gray-200 rounded animate-pulse w-20" /></td>
+                    <td className="px-4 py-3"><div className="h-4 bg-gray-200 rounded animate-pulse w-16 ml-auto" /></td>
+                  </tr>
+                ))
+              : tasks.length === 0
+              ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-12 text-center text-sm text-gray-400">No tasks found</td>
+                  </tr>
+                )
+              : tasks.map((task) => {
+                  const style = STATE_STYLES[task.state];
+                  return (
+                    <tr key={taskRowKey(task.id)} className={`border-b border-gray-100 last:border-0 ${style.row}`}>
+                      <td className="px-4 py-3">
+                        <p className="font-medium text-gray-900 leading-snug">{task.title}</p>
+                        <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{task.description}</p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <p className="text-gray-800">{task.assigneeName}</p>
+                        <p className="text-xs text-gray-500">{task.assigneeEmail}</p>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-gray-700">
+                        {formatDueDate(task.dueDate)}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-gray-700">
+                        {task.completedAt ? formatDueDate(task.completedAt) : '—'}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-full ${style.badge}`}>
+                          {style.label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <TaskRowActions
+                          task={task}
+                          currentUserId={currentUserId}
+                          isAdmin={isAdmin}
+                          onEdit={onEdit}
+                          onDelete={onDelete}
+                          onComplete={onComplete}
+                          onMessages={onMessages}
+                          onViewProofs={onViewProofs}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
+          </tbody>
+        </table>
+      </div>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
+          <span className="text-xs text-gray-500">Page {page} of {totalPages}</span>
+          <div className="flex gap-1">
+            <button
+              disabled={page <= 1}
+              onClick={() => onPageChange(page - 1)}
+              className="px-3 py-1 text-xs rounded border border-gray-200 text-gray-600 disabled:opacity-40 hover:bg-gray-50 cursor-pointer disabled:cursor-default"
+            >
+              Prev
+            </button>
+            <button
+              disabled={page >= totalPages}
+              onClick={() => onPageChange(page + 1)}
+              className="px-3 py-1 text-xs rounded border border-gray-200 text-gray-600 disabled:opacity-40 hover:bg-gray-50 cursor-pointer disabled:cursor-default"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

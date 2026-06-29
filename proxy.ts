@@ -29,7 +29,7 @@ const LOGIN_ROUTE = '/';
 const RESTRICTED_ROUTE = '/restricted';
 const SESSION_EXPIRED_ROUTE = '/session-expired';
 
-const STAFF_ALLOWED_PAGE_ROUTES = ['/orders', '/back-in-stock', '/profile'];
+const STAFF_ALLOWED_PAGE_ROUTES = ['/orders', '/back-in-stock', '/profile', '/tasks'];
 const STAFF_ALLOWED_API_ROUTES = [
   '/api/orders',
   '/api/orders/.*',
@@ -43,12 +43,14 @@ const STAFF_ALLOWED_API_ROUTES = [
   '/api/fulfillment-requests/.*',
   '/api/notifications',
   '/api/notifications/.*',
+  '/api/tasks',
+  '/api/tasks/.*',
 ];
 const STAFF_RESTRICTED_API_ROUTES = ['/api/auth/.*'];
 const STAFF_EXPIRED_API_ROUTES = ['/api/auth/.*'];
-const TEST_USER_MUTATION_BLOCKED_API_ROUTES = ['/api/orders', '/api/orders/.*', '/api/back-in-stock', '/api/back-in-stock/.*', '/api/fulfillment-requests', '/api/fulfillment-requests/.*'];
+const TEST_USER_MUTATION_BLOCKED_API_ROUTES = ['/api/orders', '/api/orders/.*', '/api/back-in-stock', '/api/back-in-stock/.*', '/api/fulfillment-requests', '/api/fulfillment-requests/.*', '/api/tasks', '/api/tasks/.*'];
 
-const PICKER_ALLOWED_PAGE_ROUTES = ['/picking-list', '/profile'];
+const PICKER_ALLOWED_PAGE_ROUTES = ['/picking-list', '/profile', '/tasks'];
 const PICKER_ALLOWED_API_ROUTES = [
   '/api/picking-list',
   '/api/picking-list/.*',
@@ -65,10 +67,12 @@ const PICKER_ALLOWED_API_ROUTES = [
   '/api/auth/.*',
   '/api/notifications',
   '/api/notifications/.*',
+  '/api/tasks',
+  '/api/tasks/.*',
 ];
 const TEST_MODE_MESSAGE = 'This action is not allowed in test mode.';
 
-const DECORATOR_ALLOWED_PAGE_ROUTES = ['/decoration', '/profile']
+const DECORATOR_ALLOWED_PAGE_ROUTES = ['/decoration', '/profile', '/tasks']
 const DECORATOR_ALLOWED_API_ROUTES = [
   '/api/profile',
   '/api/profile/.*',
@@ -84,6 +88,8 @@ const DECORATOR_ALLOWED_API_ROUTES = [
   '^/api/orders/[^/]+/line-items/[^/]+/work/[^/]+$',
   '/api/decoration/uploads',
   '/api/decoration/edit-requests',
+  '/api/tasks',
+  '/api/tasks/.*',
 ]
 
 function matchesRoute(pathname: string, routes: string[]) {
