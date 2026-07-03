@@ -4,6 +4,8 @@ import { sendGoogleMail } from '@/lib/google-mail.server';
 import { resolveHiddenRecipientEmails, resolveHiddenRecipientIds } from '@/lib/email-rules.server';
 import { createNotification } from '@/lib/notifications.server';
 
+const APPROVAL_EXPIRY_MS = 100 * 365 * 24 * 60 * 60 * 1000;
+
 export async function createStaffLoginApproval(user: {
   id: string;
   name: string;
@@ -25,7 +27,7 @@ export async function createStaffLoginApproval(user: {
       email: user.email,
       approveToken: crypto.randomBytes(32).toString('hex'),
       rejectToken: crypto.randomBytes(32).toString('hex'),
-      expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+      expiresAt: new Date(Date.now() + APPROVAL_EXPIRY_MS),
     },
   });
 
@@ -119,8 +121,6 @@ async function sendApprovalEmail({
     '',
     `Approve: ${approveUrl}`,
     `Reject: ${rejectUrl}`,
-    '',
-    'This request expires in 15 minutes.',
   ].join('\n');
   const html = `
     <div style="font-family:Arial,sans-serif;line-height:1.5;color:#111827">
@@ -130,7 +130,6 @@ async function sendApprovalEmail({
         <a href="${approveUrl}" style="background:#2563eb;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none;font-weight:600">Yes, approve</a>
         <a href="${rejectUrl}" style="background:#fff;color:#b91c1c;padding:10px 16px;border:1px solid #fecaca;border-radius:8px;text-decoration:none;font-weight:600;margin-left:8px">No, reject</a>
       </p>
-      <p style="color:#6b7280;font-size:12px">This request expires in 15 minutes.</p>
     </div>
   `;
 

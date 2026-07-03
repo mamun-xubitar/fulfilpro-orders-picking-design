@@ -2,7 +2,7 @@ import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import { verifyPassword } from '@/lib/password';
 import prisma from '@/lib/prisma.server';
-import { evaluateStaffAccess, getUserAuthPolicy } from '@/lib/auth-policy.server';
+import { evaluateStaffAccess, getUserAuthPolicy, getTodayInSettingsTz } from '@/lib/auth-policy.server';
 import { isRestrictedSessionRole } from '@/lib/roles';
 
 const appUrl = process.env.AUTH_URL ?? process.env.NEXTAUTH_URL ?? process.env.APP_URL;
@@ -44,28 +44,34 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           if (!access.allowed) {
             throw new Error('Staff access is restricted at this time.');
           }
-          if (!approvalRequestId) {
-            throw new Error('Staff login requires admin approval.');
+
+          const today = await getTodayInSettingsTz();
+          const autoApproved = user.loginAutoApproveDate === today;
+
+          if (!autoApproved) {
+            if (!approvalRequestId) {
+              throw new Error('Staff login requires admin approval.');
+            }
+
+            const approval = await prisma.staffLoginApproval.findUnique({
+              where: { id: approvalRequestId },
+            });
+
+            if (
+              !approval ||
+              approval.userId !== user.id ||
+              approval.status !== 'approved' ||
+              approval.consumedAt ||
+              approval.expiresAt.getTime() <= Date.now()
+            ) {
+              throw new Error('Staff login approval is missing or expired.');
+            }
+
+            await prisma.staffLoginApproval.update({
+              where: { id: approval.id },
+              data: { consumedAt: new Date() },
+            });
           }
-
-          const approval = await prisma.staffLoginApproval.findUnique({
-            where: { id: approvalRequestId },
-          });
-
-          if (
-            !approval ||
-            approval.userId !== user.id ||
-            approval.status !== 'approved' ||
-            approval.consumedAt ||
-            approval.expiresAt.getTime() <= Date.now()
-          ) {
-            throw new Error('Staff login approval is missing or expired.');
-          }
-
-          await prisma.staffLoginApproval.update({
-            where: { id: approval.id },
-            data: { consumedAt: new Date() },
-          });
         }
 
         const loginAt = Date.now();

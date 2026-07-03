@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { apiError, apiSuccess } from '@/lib/api-response.server';
-import { evaluateStaffAccess, getUserAuthPolicy } from '@/lib/auth-policy.server';
+import { evaluateStaffAccess, getUserAuthPolicy, getTodayInSettingsTz } from '@/lib/auth-policy.server';
 import { verifyPassword } from '@/lib/password';
 import { createStaffLoginApproval } from '@/lib/staff-login-approval.server';
 import { isRestrictedSessionRole } from '@/lib/roles';
@@ -34,6 +34,11 @@ export async function POST(request: NextRequest) {
       status: 403,
       errors: [JSON.stringify(access)],
     });
+  }
+
+  const today = await getTodayInSettingsTz();
+  if (user.loginAutoApproveDate === today) {
+    return apiSuccess({ message: 'Login can continue', data: { mode: 'direct' as const } });
   }
 
   try {

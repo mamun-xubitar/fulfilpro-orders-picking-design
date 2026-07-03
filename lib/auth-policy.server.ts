@@ -104,6 +104,12 @@ export function getSessionExpiresAt(loginAt: number, timeoutMinutes: number) {
   return loginAt + timeoutMinutes * 60 * 1000;
 }
 
+export async function getTodayInSettingsTz(): Promise<string> {
+  const settings = await prisma.appSettings.findUnique({ where: { id: 'default' } });
+  const timezone = settings?.timezone ?? DEFAULT_POLICY.timezone;
+  return moment().tz(timezone).format('YYYY-MM-DD');
+}
+
 function parseTime(value: string) {
   const [hours = '0', minutes = '0'] = value.split(':');
   return Number(hours) * 60 + Number(minutes);
