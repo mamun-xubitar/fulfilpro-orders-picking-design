@@ -1,7 +1,7 @@
 'use client';
 
 import type { TaskRow } from './types';
-import { STATE_STYLES } from './constants';
+import { DUE_TYPE_STYLES, STATE_STYLES } from './constants';
 import { formatDueDate, taskRowKey, truncate } from './utils';
 import TaskRowActions from './TaskRowActions';
 
@@ -39,6 +39,7 @@ export default function TasksTable({
               <th className="text-left px-4 py-3 font-semibold text-gray-600">Task</th>
               <th className="text-left px-4 py-3 font-semibold text-gray-600">Assignee</th>
               <th className="text-left px-4 py-3 font-semibold text-gray-600">Due Date</th>
+              <th className="text-left px-4 py-3 font-semibold text-gray-600">Type</th>
               <th className="text-left px-4 py-3 font-semibold text-gray-600">Completed At</th>
               <th className="text-left px-4 py-3 font-semibold text-gray-600">Status</th>
               <th className="text-right px-4 py-3 font-semibold text-gray-600">Actions</th>
@@ -51,6 +52,7 @@ export default function TasksTable({
                     <td className="px-4 py-3"><div className="h-4 bg-gray-200 rounded animate-pulse w-48" /></td>
                     <td className="px-4 py-3"><div className="h-4 bg-gray-200 rounded animate-pulse w-32" /></td>
                     <td className="px-4 py-3"><div className="h-4 bg-gray-200 rounded animate-pulse w-24" /></td>
+                    <td className="px-4 py-3"><div className="h-4 bg-gray-200 rounded animate-pulse w-16" /></td>
                     <td className="px-4 py-3"><div className="h-4 bg-gray-200 rounded animate-pulse w-24" /></td>
                     <td className="px-4 py-3"><div className="h-4 bg-gray-200 rounded animate-pulse w-20" /></td>
                     <td className="px-4 py-3"><div className="h-4 bg-gray-200 rounded animate-pulse w-16 ml-auto" /></td>
@@ -59,7 +61,7 @@ export default function TasksTable({
               : tasks.length === 0
               ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-12 text-center text-sm text-gray-400">No tasks found</td>
+                    <td colSpan={7} className="px-4 py-12 text-center text-sm text-gray-400">No tasks found</td>
                   </tr>
                 )
               : tasks.map((task) => {
@@ -76,6 +78,11 @@ export default function TasksTable({
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-gray-700">
                         {formatDueDate(task.dueDate)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-full ${DUE_TYPE_STYLES[task.dueType].badge}`}>
+                          {DUE_TYPE_STYLES[task.dueType].label}
+                        </span>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-gray-700">
                         {task.completedAt ? formatDueDate(task.completedAt) : '—'}

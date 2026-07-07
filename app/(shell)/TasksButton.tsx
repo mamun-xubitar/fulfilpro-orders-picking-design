@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState } from 'react';
 import TasksButtonModal from '@/app/(shell)/TasksButtonModal';
+import type { TaskDueType } from '@/app/(shell)/tasks/modules/types';
 
 type Summary = { pending: number; overdue: number; seriouslyLate: number };
-type TaskItem = { id: string; title: string; dueDate: string; status: string; state: string; assigneeName: string };
+type TaskItem = { id: string; title: string; dueDate: string; dueType: TaskDueType; status: string; state: string; assigneeName: string };
 
 const POLL_INTERVAL_MS = 30_000;
 const AUTO_POPUP_INTERVAL_MS = 30 * 60_000;

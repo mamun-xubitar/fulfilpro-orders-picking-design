@@ -14,6 +14,12 @@ export const DUE_TYPE_OPTIONS: Array<{ value: TaskDueType; label: string }> = [
   { value: 'CUSTOM', label: 'Custom' },
 ];
 
+export const DUE_TYPE_STYLES: Record<TaskDueType, { badge: string; label: string }> = {
+  STANDARD: { badge: 'bg-blue-100 text-blue-700', label: 'Standard' },
+  URGENT: { badge: 'bg-purple-100 text-purple-700', label: 'Urgent' },
+  CUSTOM: { badge: 'bg-gray-100 text-gray-700', label: 'Custom' },
+};
+
 export const STATE_STYLES: Record<TaskState, { row: string; badge: string; label: string }> = {
   pending: {
     row: '',

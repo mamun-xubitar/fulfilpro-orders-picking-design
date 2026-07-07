@@ -2,9 +2,11 @@
 
 import { useRouter } from 'next/navigation';
 import { deriveTaskState } from '@/app/(shell)/tasks/modules/utils';
+import { DUE_TYPE_STYLES } from '@/app/(shell)/tasks/modules/constants';
+import type { TaskDueType } from '@/app/(shell)/tasks/modules/types';
 
 type Summary = { pending: number; overdue: number; seriouslyLate: number };
-type TaskItem = { id: string; title: string; dueDate: string; status: string; state: string; assigneeName: string };
+type TaskItem = { id: string; title: string; dueDate: string; dueType: TaskDueType; status: string; state: string; assigneeName: string };
 
 export default function TasksButtonModal({
   isAdmin,
@@ -59,7 +61,12 @@ export default function TasksButtonModal({
                 onClick={() => { onClose(); router.push(`/tasks?openTask=${task.id}`); }}
                 className={`w-full text-left px-5 py-3 hover:bg-gray-50 transition-colors duration-100 cursor-pointer ${rowBg}`}
               >
-                <p className="text-sm font-medium text-gray-900 leading-snug truncate">{task.title}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-medium text-gray-900 leading-snug truncate">{task.title}</p>
+                  <span className={`shrink-0 inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${DUE_TYPE_STYLES[task.dueType].badge}`}>
+                    {DUE_TYPE_STYLES[task.dueType].label}
+                  </span>
+                </div>
                 <p className="text-xs text-gray-500 mt-0.5">
                   Due {new Date(task.dueDate).toLocaleString('en-AU', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}
                   {isAdmin && <span className="ml-2 text-gray-400">· {task.assigneeName}</span>}
