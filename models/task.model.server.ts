@@ -1,7 +1,7 @@
 import prisma from '@/lib/prisma.server';
 import { type SavedFile } from '@/lib/uploads.server';
 import { deriveTaskState, completionLateness, type TaskState } from '@/lib/utils/task-status';
-import { Prisma, TaskStatus } from '@prisma/client';
+import { Prisma, TaskStatus, TaskDueType } from '@prisma/client';
 
 export type TaskMessageRow = {
   id: string;
@@ -20,6 +20,7 @@ export type TaskRow = {
   status: TaskStatus;
   state: TaskState;
   dueDate: string;
+  dueType: TaskDueType;
   completedAt: string | null;
   proofFiles: SavedFile[];
   assignerId: string;
@@ -67,6 +68,7 @@ type TaskWithMessages = {
   description: string;
   status: TaskStatus;
   dueDate: Date;
+  dueType: TaskDueType;
   completedAt: Date | null;
   proofFiles: Prisma.JsonValue;
   assignerId: string;
@@ -87,6 +89,7 @@ export class TaskModel {
     assigneeId?: string;
     state?: TaskState2;
     search?: string;
+    dueType?: TaskDueType;
     page: number;
     pageSize: number;
     viewerId: string;
@@ -140,6 +143,7 @@ export class TaskModel {
     title: string;
     description: string;
     dueDate: Date;
+    dueType: TaskDueType;
     assigner: { id: string; name: string; email: string };
     assignee: { id: string; name: string; email: string };
   }) {
@@ -148,6 +152,7 @@ export class TaskModel {
         title: data.title,
         description: data.description,
         dueDate: data.dueDate,
+        dueType: data.dueType,
         assignerId: data.assigner.id,
         assignerName: data.assigner.name,
         assignerEmail: data.assigner.email,
@@ -162,7 +167,7 @@ export class TaskModel {
 
   async update(
     id: string,
-    data: { title?: string; description?: string; dueDate?: Date; assigneeId?: string; assigneeName?: string; assigneeEmail?: string },
+    data: { title?: string; description?: string; dueDate?: Date; dueType?: TaskDueType; assigneeId?: string; assigneeName?: string; assigneeEmail?: string },
   ) {
     const row = await prisma.task.update({
       where: { id },
@@ -357,10 +362,11 @@ export class TaskModel {
   }
 }
 
-function buildWhere(params: { assigneeId?: string; state?: TaskState2; search?: string }) {
+function buildWhere(params: { assigneeId?: string; state?: TaskState2; search?: string; dueType?: TaskDueType }) {
   const where: Prisma.TaskWhereInput = {};
 
   if (params.assigneeId) where.assigneeId = params.assigneeId;
+  if (params.dueType) where.dueType = params.dueType;
 
   if (params.state === 'completed') {
     where.status = 'COMPLETED';
@@ -395,6 +401,7 @@ function toTaskRow(row: TaskWithMessages, viewerId: string): TaskRow {
     status: row.status,
     state: deriveTaskState(row.status, row.dueDate),
     dueDate: row.dueDate.toISOString(),
+    dueType: row.dueType,
     completedAt: row.completedAt?.toISOString() ?? null,
     proofFiles: toSavedFiles(row.proofFiles),
     assignerId: row.assignerId,

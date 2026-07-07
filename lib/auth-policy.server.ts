@@ -110,6 +110,25 @@ export async function getTodayInSettingsTz(): Promise<string> {
   return moment().tz(timezone).format('YYYY-MM-DD');
 }
 
+export async function computeUrgentDueDate(assigneeId: string): Promise<Date> {
+  const policy = await getUserAuthPolicy(assigneeId);
+  const [hours = '0', minutes = '0'] = policy.staffAccessEnd.split(':');
+  const now = moment().tz(policy.timezone);
+
+  let candidate = now.clone().hours(Number(hours)).minutes(Number(minutes)).seconds(0).milliseconds(0);
+
+  const isAllowedDay = (m: moment.Moment) =>
+    policy.staffAccessDays.length === 0 || policy.staffAccessDays.includes(DAY_LABELS[m.day()]);
+
+  let iterations = 0;
+  while ((candidate.isSameOrBefore(now) || !isAllowedDay(candidate)) && iterations < 14) {
+    candidate = candidate.add(1, 'day');
+    iterations += 1;
+  }
+
+  return candidate.toDate();
+}
+
 function parseTime(value: string) {
   const [hours = '0', minutes = '0'] = value.split(':');
   return Number(hours) * 60 + Number(minutes);

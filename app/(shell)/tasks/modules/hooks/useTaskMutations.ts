@@ -57,6 +57,7 @@ export function useTaskMutations({ bumpRefresh, setTasks }: MutationsParams) {
     setForm({
       title: task.title,
       description: task.description,
+      dueType: task.dueType,
       dueDate: toDatetimeLocal(task.dueDate),
       assigneeId: task.assigneeId,
     });
@@ -87,7 +88,8 @@ export function useTaskMutations({ bumpRefresh, setTasks }: MutationsParams) {
         const errs: Record<string, string> = {};
         if (!form.title.trim()) errs.title = 'Title is required';
         if (!form.description.trim()) errs.description = 'Description is required';
-        if (!form.dueDate) errs.dueDate = 'Due date is required';
+        if (!form.dueType) errs.dueType = 'Due type is required';
+        if (form.dueType === 'CUSTOM' && !form.dueDate) errs.dueDate = 'Due date is required';
         if (!form.assigneeId) errs.assigneeId = 'Assignee is required';
         return errs;
       },

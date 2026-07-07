@@ -1,5 +1,6 @@
 export type TaskState = 'completed' | 'pending' | 'overdue' | 'seriously_late';
 export type TaskStateFilter = 'all' | 'pending' | 'overdue' | 'seriously_late' | 'completed';
+export type TaskDueType = 'STANDARD' | 'URGENT' | 'CUSTOM';
 
 export type SavedFile = {
   name: string;
@@ -15,6 +16,7 @@ export type TaskRow = {
   status: 'PENDING' | 'COMPLETED';
   state: TaskState;
   dueDate: string;
+  dueType: TaskDueType;
   completedAt: string | null;
   proofFiles: SavedFile[];
   assignerId: string;
@@ -74,6 +76,7 @@ export type UserOption = {
 export type TaskForm = {
   title: string;
   description: string;
+  dueType: TaskDueType;
   dueDate: string;
   assigneeId: string;
 };
@@ -81,6 +84,7 @@ export type TaskForm = {
 export const EMPTY_TASK_FORM: TaskForm = {
   title: '',
   description: '',
+  dueType: 'STANDARD',
   dueDate: '',
   assigneeId: '',
 };

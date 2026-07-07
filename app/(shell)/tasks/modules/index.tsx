@@ -25,6 +25,8 @@ function TasksPageInner() {
         setSearch={p.setSearch}
         filterAssigneeId={p.filterAssigneeId}
         setFilterAssigneeId={p.setFilterAssigneeId}
+        filterDueType={p.filterDueType}
+        setFilterDueType={p.setFilterDueType}
         tabCounts={p.tabCounts}
         users={p.users}
         isAdmin={p.userIsAdmin}

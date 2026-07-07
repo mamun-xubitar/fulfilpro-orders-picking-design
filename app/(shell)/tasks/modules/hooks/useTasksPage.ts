@@ -47,6 +47,8 @@ export function useTasksPage() {
     setSearch: filters.setSearch,
     filterAssigneeId: filters.filterAssigneeId,
     setFilterAssigneeId: filters.setFilterAssigneeId,
+    filterDueType: filters.filterDueType,
+    setFilterDueType: filters.setFilterDueType,
     page: filters.page,
     setPage: filters.setPage,
     // data

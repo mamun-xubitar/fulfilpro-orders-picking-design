@@ -2,9 +2,16 @@ import prisma from '@/lib/prisma.server';
 import { TaskModel, type TaskState2 } from '@/models/task.model.server';
 import { createNotification } from '@/lib/notifications.server';
 import { sendGoogleMail } from '@/lib/google-mail.server';
+import { computeUrgentDueDate } from '@/lib/auth-policy.server';
 import type { SavedFile } from '@/lib/uploads.server';
+import type { TaskDueType } from '@prisma/client';
 
 const taskModel = new TaskModel();
+const DUE_TYPES: TaskDueType[] = ['STANDARD', 'URGENT', 'CUSTOM'];
+
+function isTaskDueType(value: string): value is TaskDueType {
+  return (DUE_TYPES as string[]).includes(value);
+}
 
 type Session = { user: { id: string; name?: string | null; email?: string | null; role?: string | null } };
 
@@ -26,8 +33,10 @@ export class TaskController {
     const assigneeId = admin
       ? (searchParams.get('assigneeId') ?? undefined)
       : session.user.id;
+    const dueTypeParam = searchParams.get('dueType') ?? undefined;
+    const dueType = dueTypeParam && isTaskDueType(dueTypeParam) ? dueTypeParam : undefined;
 
-    const result = await taskModel.list({ assigneeId, state, search, page, pageSize, viewerId: session.user.id });
+    const result = await taskModel.list({ assigneeId, state, search, dueType, page, pageSize, viewerId: session.user.id });
     return { data: result, message: 'Tasks retrieved' };
   }
 
@@ -48,15 +57,21 @@ export class TaskController {
     const b = body as Record<string, unknown>;
     const title = String(b.title ?? '').trim();
     const description = String(b.description ?? '').trim();
-    const dueDate = String(b.dueDate ?? '').trim();
+    const dueDateStr = String(b.dueDate ?? '').trim();
+    const dueTypeStr = String(b.dueType ?? '').trim();
     const assigneeId = String(b.assigneeId ?? '').trim();
 
     const errors: string[] = [];
     if (!title) errors.push('title: Title is required');
     if (!description) errors.push('description: Description is required');
-    if (!dueDate || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(dueDate)) errors.push('dueDate: Valid due date and time is required');
+    if (!dueTypeStr || !isTaskDueType(dueTypeStr)) errors.push('dueType: Due type is required');
+    if (dueTypeStr === 'CUSTOM' && (!dueDateStr || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(dueDateStr))) {
+      errors.push('dueDate: Valid due date and time is required');
+    }
     if (!assigneeId) errors.push('assigneeId: Assignee is required');
     if (errors.length) return { error: { message: 'Validation failed', errors, status: 400 } };
+
+    const dueType = dueTypeStr as TaskDueType;
 
     const [assigner, assignee] = await Promise.all([
       prisma.user.findUnique({ where: { id: session.user.id }, select: { id: true, name: true, email: true } }),
@@ -65,10 +80,18 @@ export class TaskController {
     if (!assigner) return { error: { message: 'Session user not found', status: 400 } };
     if (!assignee) return { error: { message: 'Validation failed', errors: ['assigneeId: User not found'], status: 400 } };
 
+    const dueDate =
+      dueType === 'STANDARD'
+        ? new Date(Date.now() + 24 * 60 * 60 * 1000)
+        : dueType === 'URGENT'
+        ? await computeUrgentDueDate(assigneeId)
+        : new Date(dueDateStr);
+
     const task = await taskModel.create({
       title,
       description,
-      dueDate: new Date(dueDate),
+      dueDate,
+      dueType,
       assigner: { id: assigner.id, name: assigner.name ?? assigner.email ?? '', email: assigner.email ?? '' },
       assignee: { id: assignee.id, name: assignee.name ?? assignee.email ?? '', email: assignee.email ?? '' },
     });
@@ -89,12 +112,17 @@ export class TaskController {
     const title = typeof b.title === 'string' ? b.title.trim() : undefined;
     const description = typeof b.description === 'string' ? b.description.trim() : undefined;
     const dueDateStr = typeof b.dueDate === 'string' ? b.dueDate.trim() : undefined;
+    const dueTypeStr = typeof b.dueType === 'string' ? b.dueType.trim() : undefined;
     const newAssigneeId = typeof b.assigneeId === 'string' ? b.assigneeId.trim() : undefined;
 
     const errors: string[] = [];
     if (title !== undefined && !title) errors.push('title: Title is required');
     if (description !== undefined && !description) errors.push('description: Description is required');
-    if (dueDateStr !== undefined && !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(dueDateStr)) errors.push('dueDate: Valid due date and time is required');
+    if (dueTypeStr !== undefined && !isTaskDueType(dueTypeStr)) errors.push('dueType: Invalid due type');
+    const effectiveDueType: TaskDueType = dueTypeStr && isTaskDueType(dueTypeStr) ? dueTypeStr : task.dueType;
+    if (effectiveDueType === 'CUSTOM' && dueDateStr !== undefined && !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(dueDateStr)) {
+      errors.push('dueDate: Valid due date and time is required');
+    }
     if (errors.length) return { error: { message: 'Validation failed', errors, status: 400 } };
 
     let assigneeFields: { assigneeId?: string; assigneeName?: string; assigneeEmail?: string } = {};
@@ -104,10 +132,24 @@ export class TaskController {
       assigneeFields = { assigneeId: assignee.id, assigneeName: assignee.name ?? '', assigneeEmail: assignee.email ?? '' };
     }
 
+    const assigneeChanged = Boolean(assigneeFields.assigneeId);
+    const typeChangedToUrgent = dueTypeStr === 'URGENT' && task.dueType !== 'URGENT';
+    const typeChangedToStandard = dueTypeStr === 'STANDARD' && task.dueType !== 'STANDARD';
+
+    let dueDate: Date | undefined;
+    if (effectiveDueType === 'URGENT' && (typeChangedToUrgent || assigneeChanged)) {
+      dueDate = await computeUrgentDueDate(assigneeFields.assigneeId ?? task.assigneeId);
+    } else if (typeChangedToStandard) {
+      dueDate = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    } else if (effectiveDueType === 'CUSTOM' && dueDateStr) {
+      dueDate = new Date(dueDateStr);
+    }
+
     const updated = await taskModel.update(id, {
       ...(title ? { title } : {}),
       ...(description ? { description } : {}),
-      ...(dueDateStr ? { dueDate: new Date(dueDateStr) } : {}),
+      ...(dueDate ? { dueDate } : {}),
+      ...(dueTypeStr && isTaskDueType(dueTypeStr) ? { dueType: dueTypeStr } : {}),
       ...assigneeFields,
     });
 

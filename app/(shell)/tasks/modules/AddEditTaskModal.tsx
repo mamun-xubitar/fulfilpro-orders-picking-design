@@ -1,6 +1,7 @@
 'use client';
 
 import type { TaskForm, TaskRow, UserOption } from './types';
+import { DUE_TYPE_OPTIONS } from './constants';
 
 type Props = {
   open: boolean;
@@ -53,12 +54,23 @@ export default function AddEditTaskModal({ open, editTask, form, set, errors, lo
           </Field>
 
           <Field label="Due Date & Time" error={errors.dueDate}>
-            <input
-              type="datetime-local"
-              value={form.dueDate}
-              onChange={set('dueDate')}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <select
+              value={form.dueType}
+              onChange={set('dueType')}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+            >
+              {DUE_TYPE_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+            {form.dueType === 'CUSTOM' && (
+              <input
+                type="datetime-local"
+                value={form.dueDate}
+                onChange={set('dueDate')}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 mt-2"
+              />
+            )}
           </Field>
 
           <Field label="Assignee" error={errors.assigneeId}>

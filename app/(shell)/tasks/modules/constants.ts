@@ -1,4 +1,4 @@
-import type { TaskState, TaskStateFilter } from './types';
+import type { TaskDueType, TaskState, TaskStateFilter } from './types';
 
 export const TAB_FILTERS: Array<{ id: TaskStateFilter; label: string }> = [
   { id: 'all', label: 'All' },
@@ -6,6 +6,12 @@ export const TAB_FILTERS: Array<{ id: TaskStateFilter; label: string }> = [
   { id: 'overdue', label: 'Overdue' },
   { id: 'seriously_late', label: 'Seriously Late' },
   { id: 'completed', label: 'Completed' },
+];
+
+export const DUE_TYPE_OPTIONS: Array<{ value: TaskDueType; label: string }> = [
+  { value: 'STANDARD', label: 'Standard (24 hours)' },
+  { value: 'URGENT', label: 'Urgent (By same day)' },
+  { value: 'CUSTOM', label: 'Custom' },
 ];
 
 export const STATE_STYLES: Record<TaskState, { row: string; badge: string; label: string }> = {

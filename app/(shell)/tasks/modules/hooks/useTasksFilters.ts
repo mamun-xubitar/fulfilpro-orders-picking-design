@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import type { TaskStateFilter } from '../types';
+import type { TaskDueType, TaskStateFilter } from '../types';
 import { DEFAULT_PAGE_SIZE } from '../constants';
 
 export function useTasksFilters() {
   const [tab, setTabRaw] = useState<TaskStateFilter>('all');
   const [search, setSearch] = useState('');
   const [filterAssigneeId, setFilterAssigneeId] = useState('');
+  const [filterDueType, setFilterDueTypeRaw] = useState<'' | TaskDueType>('');
   const [page, setPage] = useState(1);
 
   const setTab = useCallback((t: TaskStateFilter) => {
@@ -25,10 +26,16 @@ export function useTasksFilters() {
     setPage(1);
   }, []);
 
+  const setDueTypeAndReset = useCallback((t: '' | TaskDueType) => {
+    setFilterDueTypeRaw(t);
+    setPage(1);
+  }, []);
+
   function buildQueryString(extra?: Record<string, string>) {
     const params = new URLSearchParams({ state: tab, page: String(page), pageSize: String(DEFAULT_PAGE_SIZE) });
     if (search) params.set('search', search);
     if (filterAssigneeId) params.set('assigneeId', filterAssigneeId);
+    if (filterDueType) params.set('dueType', filterDueType);
     if (extra) Object.entries(extra).forEach(([k, v]) => params.set(k, v));
     return params.toString();
   }
@@ -46,6 +53,8 @@ export function useTasksFilters() {
     setSearch: setSearchAndReset,
     filterAssigneeId,
     setFilterAssigneeId: setAssigneeAndReset,
+    filterDueType,
+    setFilterDueType: setDueTypeAndReset,
     page,
     setPage,
     buildQueryString,

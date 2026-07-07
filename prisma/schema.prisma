@@ -363,6 +363,12 @@ enum TaskStatus {
   COMPLETED
 }
 
+enum TaskDueType {
+  STANDARD
+  URGENT
+  CUSTOM
+}
+
 model OrderSyncJob {
   id           String    @id @default(uuid())
   status       String    @default("queued")
@@ -551,6 +557,7 @@ model Task {
   description          String
   status               TaskStatus  @default(PENDING)
   dueDate              DateTime
+  dueType              TaskDueType @default(CUSTOM)
   completedAt          DateTime?
   proofFiles           Json        @default("[]")
   assignerId           String
