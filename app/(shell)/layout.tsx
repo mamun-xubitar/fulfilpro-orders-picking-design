@@ -6,7 +6,7 @@ import { signOut, useSession } from "next-auth/react";
 import { isDecoratorRole, isOrderPickerRole, isRestrictedSessionRole } from "@/lib/roles";
 import NotificationBell from "@/app/(shell)/NotificationBell";
 import LoginManager from "@/app/(shell)/LoginManager";
-import TaskReminderBubble from "@/components/TaskReminderBubble";
+import TasksButton from "@/app/(shell)/TasksButton";
 
 type SessionPolicy = {
   forceLogout: boolean;
@@ -504,6 +504,8 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
             <h1 className="truncate text-lg font-semibold text-gray-900">{pageTitles[activeId] || ""}</h1>
           </div>
           <div className="flex items-center gap-3 relative">
+
+            <TasksButton isAdmin={user?.role === "admin"} />
             <LoginManager isAdmin={user?.role === "admin"} />
             <NotificationBell isAdmin={user?.role === "admin"} />
             <span className="text-sm text-gray-600 hidden sm:block">{user?.name}</span>
@@ -534,8 +536,6 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
 
         {children}
       </div>
-
-      <TaskReminderBubble />
     </div>
   );
 }

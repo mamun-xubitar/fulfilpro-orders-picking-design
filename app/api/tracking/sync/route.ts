@@ -7,7 +7,7 @@ const controller = new TrackingController();
 export async function GET() {
   const session = await auth();
   if (!session?.user?.id) return apiError({ message: 'Unauthorized', status: 401 });
-  if ((session.user.role as string) !== 'admin') return apiError({ message: 'Forbidden', status: 403 });
+  if (!["admin", "staff"].includes(session.user.role as string)) return apiError({ message: 'Forbidden', status: 403 });
 
   const result = await controller.getSyncStatus();
   return apiSuccess({ message: 'Sync status retrieved', data: result.data });
@@ -16,7 +16,7 @@ export async function GET() {
 export async function POST(request: Request) {
   const session = await auth();
   if (!session?.user?.id) return apiError({ message: 'Unauthorized', status: 401 });
-  if ((session.user.role as string) !== 'admin') return apiError({ message: 'Forbidden', status: 403 });
+  if (!["admin", "staff"].includes(session.user.role as string)) return apiError({ message: 'Forbidden', status: 403 });
 
   let body: unknown;
   try {

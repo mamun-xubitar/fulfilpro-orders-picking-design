@@ -53,3 +53,11 @@ body {
 
 /* Settings */
 .day-chip { cursor: pointer; transition: background-color .15s, color .15s, border-color .15s; }
+
+/* Tasks */
+@keyframes task-shake {
+  0%, 60%, 100% { transform: translateX(0) rotate(0); }
+  8%, 24%, 40% { transform: translateX(-2px) rotate(-6deg); }
+  16%, 32%, 48% { transform: translateX(2px) rotate(6deg); }
+}
+.animate-shake { animation: task-shake 1.8s ease-in-out infinite; }

@@ -29,7 +29,7 @@ const LOGIN_ROUTE = '/';
 const RESTRICTED_ROUTE = '/restricted';
 const SESSION_EXPIRED_ROUTE = '/session-expired';
 
-const STAFF_ALLOWED_PAGE_ROUTES = ['/orders', '/back-in-stock', '/profile', '/tasks'];
+const STAFF_ALLOWED_PAGE_ROUTES = ['/orders', '/back-in-stock', '/profile', '/tasks', '/tracking'];
 const STAFF_ALLOWED_API_ROUTES = [
   '/api/orders',
   '/api/orders/.*',
@@ -45,6 +45,8 @@ const STAFF_ALLOWED_API_ROUTES = [
   '/api/notifications/.*',
   '/api/tasks',
   '/api/tasks/.*',
+  '/api/tracking',
+  '/api/tracking/.*',
 ];
 const STAFF_RESTRICTED_API_ROUTES = ['/api/auth/.*'];
 const STAFF_EXPIRED_API_ROUTES = ['/api/auth/.*'];
