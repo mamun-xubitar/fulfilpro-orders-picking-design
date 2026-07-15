@@ -7,7 +7,8 @@ import {
   type FulfillmentTrackingInput,
 } from '@/lib/shopify-fulfillment.server';
 import { fetchShopifyOrderById } from '@/lib/shopify-order-fetch.server';
-import { detectDecoration } from '@/lib/decoration-detect';
+import { detectDecoration, type DecorationKeywords } from '@/lib/decoration-detect';
+import { getDecorationKeywords } from '@/lib/decoration-keywords.server';
 import { isDecoratorRole, getDecoratorCategory } from '@/lib/roles';
 import {
   getAssignmentsByOrder,
@@ -225,36 +226,42 @@ export class OrderModel {
     return { created: false, updated: true };
   }
 
-  private async syncLineItemDecorations(orderId: string) {
+  private async syncLineItemDecorations(orderId: string, keywords?: DecorationKeywords): Promise<number> {
     const order = await prisma.order.findUnique({
       where: { id: orderId },
       select: { lineItems: true },
     });
-    if (!order) return;
+    if (!order) return 0;
 
+    const resolvedKeywords = keywords ?? await getDecorationKeywords();
     const items = toLineItems(order.lineItems);
     const existing = await prisma.lineItemDecoration.findMany({ where: { orderId } });
     const existingByLine = new Map(existing.map((row) => [row.lineItemId, row]));
+    let updated = 0;
 
     for (const item of items) {
       if (!item.id) continue;
       const current = existingByLine.get(item.id);
       if (current?.manualOverride) continue;
 
-      const { isEmbroidery, isPrint } = detectDecoration(item.title, item.name);
+      const { isEmbroidery, isPrint } = detectDecoration(resolvedKeywords, item.title, item.name);
       if (current) {
         if (current.isEmbroidery !== isEmbroidery || current.isPrint !== isPrint) {
           await prisma.lineItemDecoration.update({
             where: { id: current.id },
             data: { isEmbroidery, isPrint },
           });
+          updated++;
         }
       } else if (isEmbroidery || isPrint) {
         await prisma.lineItemDecoration.create({
           data: { orderId, lineItemId: item.id, isEmbroidery, isPrint },
         });
+        updated++;
       }
     }
+
+    return updated;
   }
 
   async setLineItemDecoration(
@@ -282,6 +289,42 @@ export class OrderModel {
     });
 
     return { orderId, lineItemId, ...flags };
+  }
+
+  async reclassifyDecorations(
+    onProgress?: (p: { total: number; scanned: number; updated: number }) => Promise<void>,
+  ): Promise<{ total: number; scanned: number; updated: number }> {
+    const keywords = await getDecorationKeywords();
+    const total = await prisma.order.count();
+    const batchSize = 500;
+    let scanned = 0;
+    let updated = 0;
+    let cursor: string | undefined;
+
+    while (true) {
+      const orders = await prisma.order.findMany({
+        select: { id: true },
+        take: batchSize,
+        orderBy: { id: 'asc' },
+        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      });
+      if (orders.length === 0) break;
+
+      for (const order of orders) {
+        updated += await this.syncLineItemDecorations(order.id, keywords);
+        scanned++;
+        if (onProgress && scanned % 25 === 0) {
+          await onProgress({ total, scanned, updated });
+        }
+      }
+
+      cursor = orders[orders.length - 1].id;
+      if (orders.length < batchSize) break;
+    }
+
+    if (onProgress) await onProgress({ total, scanned, updated });
+
+    return { total, scanned, updated };
   }
 
   async listForConnectedStores(params: {
@@ -404,6 +447,9 @@ export class OrderModel {
         orderedAtFrom,
         orderedAtTo,
         fulfillmentStatuses,
+        viewerId,
+        viewerRole,
+        decorationView,
         page: filterByPacking ? 1 : page,
         pageSize: filterByPacking ? 10000 : pageSize,
       });
@@ -490,6 +536,8 @@ export class OrderModel {
     fulfillmentStatuses?: string[];
     packingStatuses?: string[];
     viewerId?: string;
+    viewerRole?: string;
+    decorationView?: boolean;
   }) {
     const { orders } = await this.listForConnectedStores({ ...params, page: 1, pageSize: 10000 });
 
@@ -2078,6 +2126,9 @@ async function getRankedOrderSearchPage(params: {
   orderedAtFrom?: Date;
   orderedAtTo?: Date;
   fulfillmentStatuses: string[];
+  viewerId?: string;
+  viewerRole?: string;
+  decorationView?: boolean;
   page: number;
   pageSize: number;
 }) {
@@ -2126,6 +2177,9 @@ function buildRankedOrderSearchWhereSql(params: {
   orderedAtFrom?: Date;
   orderedAtTo?: Date;
   fulfillmentStatuses: string[];
+  viewerId?: string;
+  viewerRole?: string;
+  decorationView?: boolean;
 }) {
   const whereParts: Prisma.Sql[] = [Prisma.sql`s.status = 'connected'`];
 
@@ -2144,6 +2198,30 @@ function buildRankedOrderSearchWhereSql(params: {
   const fulfillmentStatusSql = buildFulfillmentStatusFilterSql(params.fulfillmentStatuses);
   if (fulfillmentStatusSql) {
     whereParts.push(fulfillmentStatusSql);
+  }
+
+  const viewerIsDecorator = isDecoratorRole(params.viewerRole);
+
+  if (viewerIsDecorator && params.viewerId) {
+    const category = getDecoratorCategory(params.viewerRole);
+    const decoratorConditions: Prisma.Sql[] = [
+      Prisma.sql`EXISTS (SELECT 1 FROM "LineItemAssignment" a WHERE a."orderId" = o.id AND a."assigneeId" = ${params.viewerId})`,
+      Prisma.sql`EXISTS (SELECT 1 FROM "LineItemWork" w WHERE w."orderId" = o.id AND w."workerId" = ${params.viewerId})`,
+    ];
+    if (category === 'embroidery') {
+      decoratorConditions.push(Prisma.sql`EXISTS (SELECT 1 FROM "LineItemDecoration" d WHERE d."orderId" = o.id AND d."isEmbroidery" = true)`);
+    }
+    if (category === 'print') {
+      decoratorConditions.push(Prisma.sql`EXISTS (SELECT 1 FROM "LineItemDecoration" d WHERE d."orderId" = o.id AND d."isPrint" = true)`);
+    }
+    whereParts.push(Prisma.sql`(${Prisma.join(decoratorConditions, ' OR ')})`);
+    whereParts.push(Prisma.sql`o."canceled" = false AND o."closed" = false`);
+  }
+
+  if (params.decorationView && !viewerIsDecorator) {
+    whereParts.push(
+      Prisma.sql`EXISTS (SELECT 1 FROM "LineItemDecoration" d WHERE d."orderId" = o.id AND (d."isEmbroidery" = true OR d."isPrint" = true))`,
+    );
   }
 
   whereParts.push(buildTokenSearchSql(params.tokens, params.searchField));

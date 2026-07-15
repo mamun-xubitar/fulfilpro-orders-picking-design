@@ -482,7 +482,7 @@ export async function updateAppScopes(
       source: appManifest,
     },
     metadata: {
-      versionTag,
+      // versionTag,
       message,
     },
   };

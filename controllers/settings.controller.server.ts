@@ -304,6 +304,24 @@ export class SettingsController {
       }
     }
 
+    if ('embroideryKeywords' in data) {
+      const value = data.embroideryKeywords;
+      if (!Array.isArray(value) || !value.every((v) => typeof v === 'string')) {
+        errors.push('embroideryKeywords: Must be an array of strings');
+      } else {
+        updateData.embroideryKeywords = value.map((v) => v.trim()).filter(Boolean);
+      }
+    }
+
+    if ('printKeywords' in data) {
+      const value = data.printKeywords;
+      if (!Array.isArray(value) || !value.every((v) => typeof v === 'string')) {
+        errors.push('printKeywords: Must be an array of strings');
+      } else {
+        updateData.printKeywords = value.map((v) => v.trim()).filter(Boolean);
+      }
+    }
+
     if ('seventrackApiKey' in data) {
       if (data.seventrackApiKey !== null && typeof data.seventrackApiKey !== 'string') {
         errors.push('seventrackApiKey: Must be a string or null');

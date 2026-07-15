@@ -415,6 +415,8 @@ model AppSettings {
   decorationDigestTime             String  @default("17:00")
   decorationDigestRecipientUserIds Json    @default("[]")
   taskReminderTimes                Json    @default("[\"08:00\",\"12:00\",\"16:00\"]")
+  embroideryKeywords               Json    @default("[\"embroider\",\"emb\"]")
+  printKeywords                    Json    @default("[\"print\"]")
   seventrackApiKey                 String?
   trackingAutoRegisterEnabled      Boolean @default(false)
   trackingPendingAlertDays         Int     @default(7)
@@ -540,6 +542,7 @@ model BackgroundJob {
   status     String    @default("queued")
   attempts   Int       @default(0)
   error      String?
+  progress   Json?
   runAfter   DateTime?
   startedAt  DateTime?
   finishedAt DateTime?

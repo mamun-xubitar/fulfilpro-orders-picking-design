@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { registerTracking, getTrackInfo, type TrackInfoResult } from '@/lib/seventrack.server';
 import { TrackingModel } from '@/models/tracking.model.server';
 import { resolveCarrierCode } from '@/lib/carrier-resolver.server';
+import { OrderModel } from '@/models/order.model.server';
 
 const trackingModel = new TrackingModel();
 
@@ -64,6 +65,8 @@ export async function runJob(jobId: string) {
       await runBulkRegisterTracking(payload);
     } else if (job.type === 'sync_tracking_status') {
       await runSyncTrackingStatus(payload);
+    } else if (job.type === 'rescan_decorations') {
+      await runRescanDecorations(jobId);
     } else {
       throw new Error(`Unknown job type: ${job.type}`);
     }
@@ -164,6 +167,16 @@ async function runBulkRegisterTracking(payload: Record<string, unknown>) {
       console.error(`bulk_register_tracking: failed for order ${order.id}`, error);
     }
   }
+}
+
+async function runRescanDecorations(jobId: string) {
+  const model = new OrderModel();
+  await model.reclassifyDecorations(async (p) => {
+    await prisma.backgroundJob.update({
+      where: { id: jobId },
+      data: { progress: p as Prisma.InputJsonValue },
+    });
+  });
 }
 
 async function runSyncTrackingStatus(payload: Record<string, unknown>) {

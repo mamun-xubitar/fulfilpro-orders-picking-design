@@ -44,6 +44,10 @@ export type AppSettingsRow = {
     pendingAlertUserIds: string[];
     pickupReminderDays: number[];
   };
+  decorationKeywords: {
+    embroidery: string[];
+    print: string[];
+  };
   updatedAt: string;
 };
 
@@ -72,6 +76,8 @@ export type UpdateAppSettingsData = Partial<{
   trackingPendingAlertDays: number;
   trackingPendingAlertUserIds: string[];
   trackingPickupReminderDays: number[];
+  embroideryKeywords: string[];
+  printKeywords: string[];
 }>;
 
 const SETTINGS_ID = 'default';
@@ -104,6 +110,8 @@ const DEFAULT_SETTINGS = {
   trackingPendingAlertDays: 7,
   trackingPendingAlertUserIds: [] as string[],
   trackingPickupReminderDays: [] as number[],
+  embroideryKeywords: ['embroider', 'emb'] as string[],
+  printKeywords: ['print'] as string[],
 };
 
 type GoogleTokenData = {
@@ -211,6 +219,8 @@ async function toSettingsRow(settings: {
   trackingPendingAlertDays?: number;
   trackingPendingAlertUserIds?: unknown;
   trackingPickupReminderDays?: unknown;
+  embroideryKeywords?: unknown;
+  printKeywords?: unknown;
   updatedAt: Date;
 }): Promise<AppSettingsRow> {
   const { activeUsers, activeAdminUsers } = await listEmailRuleUsers();
@@ -258,6 +268,10 @@ async function toSettingsRow(settings: {
       pendingAlertUserIds: normalizeUserIdList(settings.trackingPendingAlertUserIds),
       pickupReminderDays,
     },
+    decorationKeywords: {
+      embroidery: normalizeTags(settings.embroideryKeywords, DEFAULT_SETTINGS.embroideryKeywords),
+      print: normalizeTags(settings.printKeywords, DEFAULT_SETTINGS.printKeywords),
+    },
     updatedAt: settings.updatedAt.toISOString(),
   };
 }
@@ -265,4 +279,9 @@ async function toSettingsRow(settings: {
 function normalizeDays(value: unknown) {
   if (!Array.isArray(value)) return DEFAULT_SETTINGS.staffAccessDays;
   return value.filter((day): day is string => typeof day === 'string');
+}
+
+function normalizeTags(value: unknown, fallback: string[]) {
+  if (!Array.isArray(value)) return fallback;
+  return value.filter((tag): tag is string => typeof tag === 'string');
 }

@@ -1,4 +1,6 @@
 import { OrderModel, type FulfillmentLineInput } from '@/models/order.model.server';
+import { enqueueJob } from '@/lib/background-jobs.server';
+import prisma from '@/lib/prisma.server';
 
 const model = new OrderModel();
 
@@ -99,7 +101,7 @@ export class OrderController {
     };
   }
 
-  async listNameAttributes(searchParams: URLSearchParams, viewerId?: string, allowedStoreIds?: string[] | null) {
+  async listNameAttributes(searchParams: URLSearchParams, viewerId?: string, allowedStoreIds?: string[] | null, viewerRole?: string) {
     const search = searchParams.get('search')?.trim() ?? '';
     const searchField = SEARCH_FIELD_VALUES.has(searchParams.get('searchField')?.trim() ?? '')
       ? searchParams.get('searchField')!.trim()
@@ -110,6 +112,7 @@ export class OrderController {
     const dateTo = searchParams.get('dateTo')?.trim() ?? '';
     const fulfillmentStatuses = searchParams.getAll('status').map((s) => s.trim()).filter(Boolean);
     const packingStatuses = searchParams.getAll('packingStatus').map((s) => s.trim()).filter(Boolean);
+    const decorationView = searchParams.get('decorationView') === '1';
 
     if (allowedStoreIds !== null && allowedStoreIds !== undefined) {
       if (allowedStoreIds.length === 0) {
@@ -128,6 +131,8 @@ export class OrderController {
       fulfillmentStatuses,
       packingStatuses,
       viewerId,
+      viewerRole,
+      decorationView,
     });
 
     return { data: result };
@@ -155,6 +160,33 @@ export class OrderController {
       data: result,
       message: 'Decoration updated',
     };
+  }
+
+  async enqueueDecorationRescan() {
+    const existing = await prisma.backgroundJob.findFirst({
+      where: { type: 'rescan_decorations', status: { in: ['queued', 'running'] } },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (existing) {
+      return { data: { job: existing, alreadyRunning: true }, message: 'Decoration re-scan already running' };
+    }
+
+    const job = await enqueueJob('rescan_decorations');
+    return { data: { job, alreadyRunning: false }, message: 'Decoration re-scan queued' };
+  }
+
+  async getDecorationRescanStatus() {
+    const jobs = await prisma.backgroundJob.findMany({
+      where: { type: 'rescan_decorations' },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+    });
+
+    const activeJob = jobs.find((j) => j.status === 'queued' || j.status === 'running') ?? null;
+    const lastSuccessfulJob = jobs.find((j) => j.status === 'completed') ?? null;
+    const latestJob = jobs[0] ?? null;
+
+    return { data: { activeJob, lastSuccessfulJob, latestJob } };
   }
 
   async getStockAdjustment(orderId: string) {
