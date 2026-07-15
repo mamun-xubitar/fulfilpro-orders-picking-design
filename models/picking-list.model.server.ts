@@ -66,6 +66,7 @@ export class PickingListModel {
 
   async list(params: {
     search?: string;
+    searchField?: string;
     storeIds?: string[];
     period?: 'all' | 'week' | 'month' | 'year';
     dateFrom?: string;
@@ -81,17 +82,18 @@ export class PickingListModel {
     const searchTokens = (params.search?.trim() ?? '').split(/\s+/).filter(Boolean);
     const packedStatuses = new Set(params.packedStatuses ?? []);
     const filterByPacking = packedStatuses.size > 0;
-    
+
     const storeWhere: Prisma.StoreWhereInput = { status: 'connected' };
     if (params.allowedStoreIds !== null && params.allowedStoreIds !== undefined) {
       storeWhere.id = { in: params.allowedStoreIds };
     }
-    
+
     const [ordersResult, stores] = await Promise.all([
       this.listOrderRows({
         where,
         storeIds: params.storeIds ?? [],
         searchTokens,
+        searchField: params.searchField,
         printStatuses: params.printStatuses ?? [],
         filterByPacking,
         orderedAtFrom: orderedAtBounds.from,
@@ -133,6 +135,7 @@ export class PickingListModel {
     where: Prisma.OrderWhereInput;
     storeIds: string[];
     searchTokens: string[];
+    searchField?: string;
     printStatuses: string[];
     filterByPacking: boolean;
     orderedAtFrom?: Date;
@@ -145,6 +148,7 @@ export class PickingListModel {
     if (params.searchTokens.length > 0 && !params.filterByPacking) {
       const searchPage = await getRankedPickingOrderSearchPage({
         tokens: params.searchTokens,
+        searchField: params.searchField,
         storeIds: params.storeIds,
         printStatuses: params.printStatuses,
         orderedAtFrom: params.orderedAtFrom,
@@ -180,6 +184,7 @@ export class PickingListModel {
     if (params.searchTokens.length > 0) {
       const searchPage = await getRankedPickingOrderSearchPage({
         tokens: params.searchTokens,
+        searchField: params.searchField,
         storeIds: params.storeIds,
         printStatuses: params.printStatuses,
         orderedAtFrom: params.orderedAtFrom,
@@ -510,6 +515,7 @@ async function loadPickingMetadataRows(rows: Array<{ storeId: string; items: Ord
 
 async function getRankedPickingOrderSearchPage(params: {
   tokens: string[];
+  searchField?: string;
   storeIds: string[];
   printStatuses: string[];
   orderedAtFrom?: Date;
@@ -557,6 +563,7 @@ async function getRankedPickingOrderSearchPage(params: {
 
 function buildRankedPickingOrderSearchWhereSql(params: {
   tokens: string[];
+  searchField?: string;
   storeIds: string[];
   printStatuses: string[];
   orderedAtFrom?: Date;
@@ -565,7 +572,7 @@ function buildRankedPickingOrderSearchWhereSql(params: {
   const whereParts: Prisma.Sql[] = [
     Prisma.sql`s.status = 'connected'`,
     Prisma.sql`(o."fulfillmentStatus" IS NULL OR o."fulfillmentStatus" != 'fulfilled')`,
-    Prisma.sql`(o."orderedAt" IS NULL OR o."orderedAt" < ${PICKING_LIST_ORDERED_AT_CUTOFF})`,
+    Prisma.sql`(o."orderedAt" IS NULL OR o."orderedAt" > ${PICKING_LIST_ORDERED_AT_CUTOFF})`,
   ];
 
   if (params.storeIds.length > 0) {
@@ -585,33 +592,55 @@ function buildRankedPickingOrderSearchWhereSql(params: {
     whereParts.push(printStatusSql);
   }
 
-  whereParts.push(buildPickingTokenSearchSql(params.tokens));
+  whereParts.push(buildPickingTokenSearchSql(params.tokens, params.searchField));
 
   return Prisma.join(whereParts, ' AND ');
 }
 
-function buildPickingTokenSearchSql(tokens: string[]) {
+function buildPickingTokenSearchSql(tokens: string[], searchField?: string) {
   const tokenConditions = tokens.map((token) => {
-    const conditions: Prisma.Sql[] = [
-      ilikeContains(Prisma.sql`o."number"`, token),
-      ilikeContains(Prisma.sql`o."cusName"`, token),
-      ilikeContains(Prisma.sql`o."cusEmail"`, token),
-      ilikeContains(Prisma.sql`o."boarcode"`, token),
-      ilikeContains(Prisma.sql`o."address"`, token),
-      ilikeContains(Prisma.sql`o."address2"`, token),
-      ilikeContains(Prisma.sql`o."city"`, token),
-      ilikeContains(Prisma.sql`o."state"`, token),
-      ilikeContains(Prisma.sql`o."zip"`, token),
-      ilikeContains(Prisma.sql`o."country"`, token),
-      ilikeContains(Prisma.sql`s.name`, token),
-      ilikeContains(Prisma.sql`s."storeDomain"`, token),
-      ilikeContains(Prisma.sql`o."lineItems"::text`, token),
-    ];
-
+    const conditions = buildPickingFieldConditionsForToken(token, searchField);
     return Prisma.sql`(${Prisma.join(conditions, ' OR ')})`;
   });
 
   return Prisma.sql`(${Prisma.join(tokenConditions, ' AND ')})`;
+}
+
+function buildPickingFieldConditionsForToken(token: string, searchField?: string): Prisma.Sql[] {
+  switch (searchField) {
+    case 'number':
+      return [ilikeContains(Prisma.sql`o."number"`, token)];
+    case 'customer':
+      return [ilikeContains(Prisma.sql`o."cusName"`, token)];
+    case 'address':
+      return [
+        ilikeContains(Prisma.sql`o."address"`, token),
+        ilikeContains(Prisma.sql`o."address2"`, token),
+        ilikeContains(Prisma.sql`o."city"`, token),
+        ilikeContains(Prisma.sql`o."state"`, token),
+        ilikeContains(Prisma.sql`o."country"`, token),
+      ];
+    case 'lineItem':
+      return [ilikeContains(Prisma.sql`o."lineItems"::text`, token)];
+    case 'barcode':
+      return [ilikeContains(Prisma.sql`o."boarcode"`, token)];
+    default:
+      return [
+        ilikeContains(Prisma.sql`o."number"`, token),
+        ilikeContains(Prisma.sql`o."cusName"`, token),
+        ilikeContains(Prisma.sql`o."cusEmail"`, token),
+        ilikeContains(Prisma.sql`o."boarcode"`, token),
+        ilikeContains(Prisma.sql`o."address"`, token),
+        ilikeContains(Prisma.sql`o."address2"`, token),
+        ilikeContains(Prisma.sql`o."city"`, token),
+        ilikeContains(Prisma.sql`o."state"`, token),
+        ilikeContains(Prisma.sql`o."zip"`, token),
+        ilikeContains(Prisma.sql`o."country"`, token),
+        ilikeContains(Prisma.sql`s.name`, token),
+        ilikeContains(Prisma.sql`s."storeDomain"`, token),
+        ilikeContains(Prisma.sql`o."lineItems"::text`, token),
+      ];
+  }
 }
 
 function buildPickingOrderSearchRankSql(tokens: string[]) {

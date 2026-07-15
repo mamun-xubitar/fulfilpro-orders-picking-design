@@ -1,6 +1,7 @@
 import { PickingListModel } from '@/models/picking-list.model.server';
 
 const model = new PickingListModel();
+const SEARCH_FIELD_VALUES = new Set(['number', 'customer', 'address', 'lineItem', 'barcode']);
 
 type Actor = {
   id?: string | null;
@@ -13,6 +14,8 @@ export class PickingListController {
     const page = normalizePositiveInt(searchParams.get('page'), 1);
     const pageSize = clamp(normalizePositiveInt(searchParams.get('pageSize'), 20), 5, 100);
     const search = searchParams.get('search')?.trim() ?? '';
+    const searchFieldRaw = searchParams.get('searchField')?.trim() ?? '';
+    const searchField = SEARCH_FIELD_VALUES.has(searchFieldRaw) ? searchFieldRaw : undefined;
     let storeIds = searchParams.getAll('storeId').map((value) => value.trim()).filter(Boolean);
     const period = normalizePeriod(searchParams.get('period'));
     const dateFrom = searchParams.get('dateFrom')?.trim() ?? '';
@@ -28,6 +31,7 @@ export class PickingListController {
             orders: [],
             filters: {
               search,
+              searchField: searchField ?? '',
               storeIds,
               period,
               dateFrom,
@@ -56,6 +60,7 @@ export class PickingListController {
 
     const result = await model.list({
       search,
+      searchField,
       storeIds,
       period,
       dateFrom: dateFrom || undefined,
@@ -74,6 +79,7 @@ export class PickingListController {
         orders: result.orders,
         filters: {
           search,
+          searchField: searchField ?? '',
           storeIds,
           period,
           dateFrom,

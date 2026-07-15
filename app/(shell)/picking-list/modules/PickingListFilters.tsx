@@ -1,5 +1,6 @@
 'use client';
 
+import { useRef } from 'react';
 import type { Dispatch, RefObject, SetStateAction } from 'react';
 import type { StoreOption, PaginationState } from './usePickingListPage';
 
@@ -8,6 +9,13 @@ const PRINT_FILTERS = [{ value: 'not_printed', label: 'Slip Not Printed' }, { va
 const PERIODS = [{ value: 'all', label: 'All Time' }, { value: 'week', label: 'This Week' }, { value: 'month', label: 'This Month' }, { value: 'year', label: 'This Year' }, { value: 'custom', label: 'Custom' }] as const;
 const MONTH_LABELS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const DAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+const SEARCH_FIELDS = [
+  { label: 'Order number', value: 'number' },
+  { label: 'Customer name', value: 'customer' },
+  { label: 'Customer address', value: 'address' },
+  { label: 'Product', value: 'lineItem' },
+  { label: 'Barcode', value: 'barcode' },
+] as const;
 
 export type PeriodValue = (typeof PERIODS)[number]['value'];
 
@@ -44,6 +52,11 @@ type Props = {
   syncStoreDropdownRef: RefObject<HTMLDivElement | null>;
   searchInput: string;
   setSearchInput: Dispatch<SetStateAction<string>>;
+  searchField: string;
+  setSearchField: Dispatch<SetStateAction<string>>;
+  searchDropdownOpen: boolean;
+  setSearchDropdownOpen: Dispatch<SetStateAction<boolean>>;
+  searchDropdownRef: RefObject<HTMLDivElement | null>;
   hasActiveFilters: boolean;
   syncing: boolean;
   loading: boolean;
@@ -63,12 +76,71 @@ type Props = {
   setPagination: Dispatch<SetStateAction<PaginationState>>;
 };
 
-export default function PickingListFilters({ isPicker, stores, storeIds, storeDropdownOpen, setStoreDropdownOpen, storeDropdownRef, packedStatuses, setPackedStatuses, packedStatusDropdownOpen, setPackedStatusDropdownOpen, packedStatusDropdownRef, printStatuses, setPrintStatuses, printStatusDropdownOpen, setPrintStatusDropdownOpen, printStatusDropdownRef, period, dateFrom, dateTo, periodDropdownOpen, setPeriodDropdownOpen, periodDropdownRef, calendarNav, setCalendarNav, hoverDate, setHoverDate, syncStoreIds, setSyncStoreIds, syncStoreDropdownOpen, setSyncStoreDropdownOpen, syncStoreDropdownRef, searchInput, setSearchInput, hasActiveFilters, syncing, loading, syncActive, syncRefreshNeeded, syncMessage, refreshRotation, toggleStore, toggleFilter, toggleSyncStore, handlePeriodChange, handleCalendarDateClick, clearFilters, refreshList, handleSync, setPagination }: Props) {
+export default function PickingListFilters({ isPicker, stores, storeIds, storeDropdownOpen, setStoreDropdownOpen, storeDropdownRef, packedStatuses, setPackedStatuses, packedStatusDropdownOpen, setPackedStatusDropdownOpen, packedStatusDropdownRef, printStatuses, setPrintStatuses, printStatusDropdownOpen, setPrintStatusDropdownOpen, printStatusDropdownRef, period, dateFrom, dateTo, periodDropdownOpen, setPeriodDropdownOpen, periodDropdownRef, calendarNav, setCalendarNav, hoverDate, setHoverDate, syncStoreIds, setSyncStoreIds, syncStoreDropdownOpen, setSyncStoreDropdownOpen, syncStoreDropdownRef, searchInput, setSearchInput, searchField, setSearchField, searchDropdownOpen, setSearchDropdownOpen, searchDropdownRef, hasActiveFilters, syncing, loading, syncActive, syncRefreshNeeded, syncMessage, refreshRotation, toggleStore, toggleFilter, toggleSyncStore, handlePeriodChange, handleCalendarDateClick, clearFilters, refreshList, handleSync, setPagination }: Props) {
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const activeSearchField = SEARCH_FIELDS.find((f) => f.value === searchField);
+  const filteredSearchFields = SEARCH_FIELDS.filter((f) =>
+    f.label.toLowerCase().includes(searchInput.trim().toLowerCase())
+  );
+
+  const selectSearchField = (value: string) => {
+    setSearchField(value);
+    setSearchInput('');
+    setSearchDropdownOpen(false);
+    setPagination((prev) => ({ ...prev, page: 1 }));
+    searchInputRef.current?.focus();
+  };
+
+  const clearSearchField = () => {
+    setSearchField('');
+    setPagination((prev) => ({ ...prev, page: 1 }));
+    setSearchDropdownOpen(true);
+    searchInputRef.current?.focus();
+  };
+
   return (
     <div className="mb-5 flex flex-wrap items-center gap-2">
-      <div className="flex min-w-48 flex-1 items-center overflow-hidden rounded-xl border border-gray-300 bg-white shadow-sm sm:flex-none sm:w-64">
-        <svg className="ml-3 h-4 w-4 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-        <input value={searchInput} onChange={(e) => setSearchInput(e.target.value)} placeholder="name order# SKU address... (space = AND)" className="min-w-0 flex-1 px-2 py-2 text-sm outline-none" />
+      <div ref={searchDropdownRef} className="relative flex-1 min-w-48 sm:flex-none sm:w-64">
+        <div className="flex items-center overflow-hidden rounded-xl border border-gray-300 bg-white shadow-sm">
+          <svg className="ml-3 h-4 w-4 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+          {activeSearchField && (
+            <span className="ml-1.5 flex flex-shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-blue-200 bg-blue-50 py-0.5 pl-2 pr-1 text-xs font-medium text-blue-700">
+              {activeSearchField.label}
+              <button type="button" onClick={clearSearchField} className="cursor-pointer text-blue-400 hover:text-blue-600">
+                <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </span>
+          )}
+          <input
+            ref={searchInputRef}
+            value={searchInput}
+            onFocus={() => { if (!searchField) setSearchDropdownOpen(true); }}
+            onChange={(e) => {
+              setSearchInput(e.target.value);
+              if (!searchField) {
+                const hasMatch = SEARCH_FIELDS.some((f) => f.label.toLowerCase().includes(e.target.value.trim().toLowerCase()));
+                setSearchDropdownOpen(hasMatch);
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Backspace' && searchInput === '' && searchField) {
+                clearSearchField();
+              }
+            }}
+            placeholder={activeSearchField ? `Search by ${activeSearchField.label.toLowerCase()}…` : 'Search order...'}
+            className="min-w-0 flex-1 px-2 py-2 text-sm outline-none"
+          />
+        </div>
+        {searchDropdownOpen && !searchField && filteredSearchFields.length > 0 && (
+          <div className="absolute left-0 top-full z-30 mt-1 w-full rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
+            <div className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-gray-400">Search by</div>
+            {filteredSearchFields.map((field) => (
+              <button key={field.value} onClick={() => selectSearchField(field.value)} className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50">
+                {field.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {!isPicker && (

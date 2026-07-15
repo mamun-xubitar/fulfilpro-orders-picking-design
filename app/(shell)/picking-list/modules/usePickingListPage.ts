@@ -107,6 +107,8 @@ export function usePickingListPage() {
   const [pagination, setPagination] = useState(DEFAULT_PAGINATION);
   const [searchInput, setSearchInput] = useState(initialSearch);
   const [search, setSearch] = useState(initialSearch);
+  const [searchField, setSearchField] = useState('');
+  const [searchDropdownOpen, setSearchDropdownOpen] = useState(false);
   const [storeIds, setStoreIds] = useState<string[]>([]);
   const [period, setPeriod] = useState<'all' | 'week' | 'month' | 'year' | 'custom'>('all');
   const [dateFrom, setDateFrom] = useState('');
@@ -133,6 +135,7 @@ export function usePickingListPage() {
   const [printModal, setPrintModal] = useState<PrintOrder[] | null>(null);
   const [notifyModal, setNotifyModal] = useState<NotifyModalState | null>(null);
 
+  const searchDropdownRef = useRef<HTMLDivElement>(null);
   const storeDropdownRef = useRef<HTMLDivElement>(null);
   const packedStatusDropdownRef = useRef<HTMLDivElement>(null);
   const printStatusDropdownRef = useRef<HTMLDivElement>(null);
@@ -162,13 +165,14 @@ export function usePickingListPage() {
     p.set('page', String(pagination.page)); p.set('pageSize', String(pagination.pageSize));
     p.set('period', period === 'custom' ? 'all' : period);
     if (search) p.set('search', search);
+    if (searchField) p.set('searchField', searchField);
     storeIds.forEach((id) => p.append('storeId', id));
     if (dateFrom) p.set('dateFrom', dateFrom);
     if (dateTo) p.set('dateTo', dateTo);
     packedStatuses.forEach((s) => p.append('packedStatus', s));
     printStatuses.forEach((s) => p.append('printStatus', s));
     return p.toString();
-  }, [dateFrom, dateTo, packedStatuses, pagination.page, pagination.pageSize, period, printStatuses, search, storeIds]);
+  }, [dateFrom, dateTo, packedStatuses, pagination.page, pagination.pageSize, period, printStatuses, search, searchField, storeIds]);
 
   useEffect(() => {
     let cancelled = false;
@@ -198,6 +202,7 @@ export function usePickingListPage() {
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const t = event.target as Node;
+      if (searchDropdownRef.current && !searchDropdownRef.current.contains(t)) setSearchDropdownOpen(false);
       if (storeDropdownRef.current && !storeDropdownRef.current.contains(t)) setStoreDropdownOpen(false);
       if (packedStatusDropdownRef.current && !packedStatusDropdownRef.current.contains(t)) setPackedStatusDropdownOpen(false);
       if (printStatusDropdownRef.current && !printStatusDropdownRef.current.contains(t)) setPrintStatusDropdownOpen(false);
@@ -221,7 +226,7 @@ export function usePickingListPage() {
   const allSelectedExpanded = selectedIds.length > 0 && selectedIds.every((id) => expandedIds.includes(id));
   const defaultPackedStatuses = ['not_packed', 'partially_packed'];
   const isPackedStatusDefault = packedStatuses.length === defaultPackedStatuses.length && defaultPackedStatuses.every((s) => packedStatuses.includes(s));
-  const hasActiveFilters = searchInput !== '' || storeIds.length > 0 || period !== 'all' || !!dateFrom || !!dateTo || !isPackedStatusDefault || printStatuses.length > 0;
+  const hasActiveFilters = searchInput !== '' || searchField !== '' || storeIds.length > 0 || period !== 'all' || !!dateFrom || !!dateTo || !isPackedStatusDefault || printStatuses.length > 0;
   const syncMessage = syncActive
     ? syncJob?.status === 'queued' ? 'Sync queued' : `Syncing: ${syncJob?.totalFetched ?? 0} fetched`
     : lastSynced || 'Not synced yet';
@@ -281,7 +286,7 @@ export function usePickingListPage() {
     setDateFrom(start); setDateTo(end); setHoverDate(null); setPeriodDropdownOpen(false); setPeriod('custom'); setPagination((p) => ({ ...p, page: 1 }));
   }
 
-  function clearFilters() { setSearchInput(''); setSearch(''); setStoreIds([]); setPeriod('all'); setDateFrom(''); setDateTo(''); setHoverDate(null); setPackedStatuses(['not_packed', 'partially_packed']); setPrintStatuses([]); setPagination((p) => ({ ...p, page: 1 })); }
+  function clearFilters() { setSearchInput(''); setSearch(''); setSearchField(''); setStoreIds([]); setPeriod('all'); setDateFrom(''); setDateTo(''); setHoverDate(null); setPackedStatuses(['not_packed', 'partially_packed']); setPrintStatuses([]); setPagination((p) => ({ ...p, page: 1 })); }
   function refreshList() { setRefreshRotation((prev) => prev + 360); setSyncRefreshNeeded(false); setRefreshToken((v) => v + 1); }
   function goToPage(page: number) { setPagination((p) => ({ ...p, page })); }
   const handleSync = () => void triggerSync();
@@ -361,6 +366,7 @@ export function usePickingListPage() {
 
   return {
     orders, stores, packingRecipients, pagination, searchInput, setSearchInput,
+    searchField, setSearchField, searchDropdownOpen, setSearchDropdownOpen, searchDropdownRef,
     storeIds, period, setPeriod, dateFrom, setDateFrom, dateTo, setDateTo,
     packedStatuses, setPackedStatuses, printStatuses, setPrintStatuses,
     storeDropdownOpen, setStoreDropdownOpen, storeDropdownRef,

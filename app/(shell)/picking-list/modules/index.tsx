@@ -53,6 +53,11 @@ export default function PickingListPage() {
         syncStoreDropdownRef={d.syncStoreDropdownRef}
         searchInput={d.searchInput}
         setSearchInput={d.setSearchInput}
+        searchField={d.searchField}
+        setSearchField={d.setSearchField}
+        searchDropdownOpen={d.searchDropdownOpen}
+        setSearchDropdownOpen={d.setSearchDropdownOpen}
+        searchDropdownRef={d.searchDropdownRef}
         hasActiveFilters={d.hasActiveFilters}
         syncing={d.syncing}
         loading={d.loading}
