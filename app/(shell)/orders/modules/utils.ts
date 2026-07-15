@@ -326,6 +326,10 @@ export function getDecorationRelevantItems(order: Pick<OrderRow, 'items'>, opts:
   return order.items.filter((item) => isDecorationRelevantItem(item, opts));
 }
 
+export function getReferenceItems(order: Pick<OrderRow, 'items'>, opts: DecorationRelevanceOpts): OrderItem[] {
+  return order.items.filter((item) => !isDecorationRelevantItem(item, opts));
+}
+
 export function getActiveFulfillmentRequest(
   requests: FulfillmentEditRequestRow[],
   orderId: string,

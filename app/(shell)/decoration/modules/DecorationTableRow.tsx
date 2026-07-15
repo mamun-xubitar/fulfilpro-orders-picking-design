@@ -57,14 +57,7 @@ export default function DecorationTableRow({
         <StockAdjustmentCell order={order} openStockAdjustmentModal={p.openStockAdjustmentModal} />
       )}
       <td className="hidden sm:table-cell px-4 py-3 text-sm text-gray-600">
-        {(() => {
-          const relevantCount = getDecorationRelevantItems(order, {
-            decoratorCategory: p.decoratorCategory,
-            currentUserId: p.session?.user?.id ?? '',
-            showAll: p.decoratorUnscoped,
-          }).length;
-          return <>{relevantCount} item{relevantCount !== 1 ? 's' : ''}</>;
-        })()}
+        {order.itemsCount} item{order.itemsCount > 1 ? 's': ''}
       </td>
       <OrderFulfillmentInfoCell fulfillmentInfo={fulfillmentInfo} userIsDecorator={true} />
       <td className="px-4 py-3 text-center">

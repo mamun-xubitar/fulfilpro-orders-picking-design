@@ -1,8 +1,9 @@
 'use client';
 
 import type { OrderItem, OrderRow, WorkDraftState } from '../../orders/modules/types';
-import { getFulfilledQty, getDecorationRowTint, getDecorationRelevantItems } from '../../orders/modules/utils';
+import { getFulfilledQty, getDecorationRowTint, getDecorationRelevantItems, getReferenceItems } from '../../orders/modules/utils';
 import DecoratorWorkForm from './DecoratorWorkForm';
+import ReferenceProductsSection from './ReferenceProductsSection';
 
 type Props = {
   order: OrderRow;
@@ -52,7 +53,9 @@ export default function DecoratorFulfillmentPanel({
   onAssign,
   isAdmin = false,
 }: Props) {
-  const items = getDecorationRelevantItems(order, { decoratorCategory, currentUserId, showAll });
+  const opts = { decoratorCategory, currentUserId, showAll };
+  const items = getDecorationRelevantItems(order, opts);
+  const refItems = getReferenceItems(order, opts);
 
   return (
     <div className="bg-gray-100 border-b border-gray-200 p-5">
@@ -60,6 +63,8 @@ export default function DecoratorFulfillmentPanel({
         <h4 className="text-xs font-semibold text-gray-500 uppercase">Product Fulfilment</h4>
         <span className="text-xs text-gray-400">Order {order.number} · {order.customer}</span>
       </div>
+      
+      <ReferenceProductsSection order={order} items={refItems} />
 
       {items.length === 0 ? (
         <p className="text-sm text-gray-400">No items for you on this order.</p>
