@@ -378,6 +378,37 @@ export class SettingsController {
       }
     }
 
+    if ('taskVisibilityByUser' in data) {
+      const value = data.taskVisibilityByUser;
+      if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        errors.push('taskVisibilityByUser: Must be an object mapping user IDs to arrays of user IDs');
+      } else {
+        const { activeUsers } = await listEmailRuleUsers();
+        const activeUserIds = new Set(activeUsers.map((user) => user.id));
+        const entries = Object.entries(value as Record<string, unknown>);
+        const invalidKeys = entries.filter(([userId]) => !activeUserIds.has(userId));
+        if (invalidKeys.length > 0) {
+          errors.push('taskVisibilityByUser: Contains invalid user IDs as keys (must be active users)');
+        } else {
+          const map: Record<string, string[]> = {};
+          let hasInvalidValue = false;
+          for (const [userId, ids] of entries) {
+            const normalized = normalizeUserIdList(ids);
+            if (normalized.some((id) => !activeUserIds.has(id))) {
+              hasInvalidValue = true;
+              break;
+            }
+            map[userId] = normalized;
+          }
+          if (hasInvalidValue) {
+            errors.push('taskVisibilityByUser: Contains invalid IDs (must be active users)');
+          } else {
+            updateData.taskVisibilityByUser = map;
+          }
+        }
+      }
+    }
+
     if (errors.length) {
       return { error: { message: 'Validation failed', errors, status: 400 } };
     }

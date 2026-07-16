@@ -36,7 +36,7 @@ export function useTaskMutations({ bumpRefresh, setTasks }: MutationsParams) {
   const [viewTask, setViewTask] = useState<TaskRow | null>(null);
 
   function loadUsers() {
-    fetch('/api/users')
+    fetch('/api/tasks/assignable-users')
       .then((r) => r.json() as Promise<{ success: boolean; data: UserOption[] }>)
       .then((r) => { if (r.success) setUsers(r.data); })
       .catch(() => {});

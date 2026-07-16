@@ -14,7 +14,6 @@ type Props = {
   setFilterDueType: (t: '' | TaskDueType) => void;
   tabCounts: TabCounts;
   users: UserOption[];
-  isAdmin: boolean;
   onAdd: () => void;
 };
 
@@ -28,7 +27,7 @@ function countFor(tab: TaskStateFilter, counts: TabCounts): number {
 
 export default function TasksToolbar({
   tab, setTab, search, setSearch, filterAssigneeId, setFilterAssigneeId,
-  filterDueType, setFilterDueType, tabCounts, users, isAdmin, onAdd,
+  filterDueType, setFilterDueType, tabCounts, users, onAdd,
 }: Props) {
   return (
     <div className="flex flex-col gap-3 mb-4">
@@ -55,38 +54,32 @@ export default function TasksToolbar({
             );
           })}
         </div>
-        {isAdmin && (
-          <button
-            onClick={onAdd}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors duration-150 cursor-pointer"
-          >
-            + Assign Task
-          </button>
-        )}
+        <button
+          onClick={onAdd}
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors duration-150 cursor-pointer"
+        >
+          + Assign Task
+        </button>
       </div>
 
       <div className="flex gap-3 flex-wrap">
-        {isAdmin && (
-          <>
-            <input
-              type="text"
-              placeholder="Search by title, description, or ID..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm flex-1 min-w-[240px] focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <select
-              value={filterAssigneeId}
-              onChange={(e) => setFilterAssigneeId(e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm min-w-[180px] focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
-            >
-              <option value="">All Users</option>
-              {users?.map((u) => (
-                <option key={u.id} value={u.id}>{u.name || u.email}</option>
-              ))}
-            </select>
-          </>
-        )}
+        <input
+          type="text"
+          placeholder="Search by title, description, or ID..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm flex-1 min-w-[240px] focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+        <select
+          value={filterAssigneeId}
+          onChange={(e) => setFilterAssigneeId(e.target.value)}
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm min-w-[180px] focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+        >
+          <option value="">All Users</option>
+          {users?.map((u) => (
+            <option key={u.id} value={u.id}>{u.name || u.email}</option>
+          ))}
+        </select>
         <select
           value={filterDueType}
           onChange={(e) => setFilterDueType(e.target.value as '' | TaskDueType)}

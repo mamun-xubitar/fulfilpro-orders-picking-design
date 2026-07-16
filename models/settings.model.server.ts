@@ -48,6 +48,7 @@ export type AppSettingsRow = {
     embroidery: string[];
     print: string[];
   };
+  taskVisibilityByUser: Record<string, string[]>;
   updatedAt: string;
 };
 
@@ -78,6 +79,7 @@ export type UpdateAppSettingsData = Partial<{
   trackingPickupReminderDays: number[];
   embroideryKeywords: string[];
   printKeywords: string[];
+  taskVisibilityByUser: Record<string, string[]>;
 }>;
 
 const SETTINGS_ID = 'default';
@@ -112,6 +114,7 @@ const DEFAULT_SETTINGS = {
   trackingPickupReminderDays: [] as number[],
   embroideryKeywords: ['embroider', 'emb'] as string[],
   printKeywords: ['print'] as string[],
+  taskVisibilityByUser: {} as Record<string, string[]>,
 };
 
 type GoogleTokenData = {
@@ -221,6 +224,7 @@ async function toSettingsRow(settings: {
   trackingPickupReminderDays?: unknown;
   embroideryKeywords?: unknown;
   printKeywords?: unknown;
+  taskVisibilityByUser?: unknown;
   updatedAt: Date;
 }): Promise<AppSettingsRow> {
   const { activeUsers, activeAdminUsers } = await listEmailRuleUsers();
@@ -272,8 +276,18 @@ async function toSettingsRow(settings: {
       embroidery: normalizeTags(settings.embroideryKeywords, DEFAULT_SETTINGS.embroideryKeywords),
       print: normalizeTags(settings.printKeywords, DEFAULT_SETTINGS.printKeywords),
     },
+    taskVisibilityByUser: normalizeVisibilityMap(settings.taskVisibilityByUser),
     updatedAt: settings.updatedAt.toISOString(),
   };
+}
+
+function normalizeVisibilityMap(value: unknown): Record<string, string[]> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const result: Record<string, string[]> = {};
+  for (const [userId, ids] of Object.entries(value as Record<string, unknown>)) {
+    result[userId] = normalizeUserIdList(ids);
+  }
+  return result;
 }
 
 function normalizeDays(value: unknown) {

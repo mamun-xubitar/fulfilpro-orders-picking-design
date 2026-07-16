@@ -3,6 +3,7 @@ import { TaskModel, type TaskState2 } from '@/models/task.model.server';
 import { createNotification } from '@/lib/notifications.server';
 import { sendGoogleMail } from '@/lib/google-mail.server';
 import { computeUrgentDueDate } from '@/lib/auth-policy.server';
+import { getTaskVisibleUserIds, getTaskVisibleUsers } from '@/lib/task-visibility.server';
 import type { SavedFile } from '@/lib/uploads.server';
 import type { TaskDueType } from '@prisma/client';
 
@@ -29,14 +30,13 @@ export class TaskController {
     const page = Math.max(1, parseInt(searchParams.get('page') ?? '1'));
     const pageSize = Math.min(50, Math.max(1, parseInt(searchParams.get('pageSize') ?? '20')));
     const state = (searchParams.get('state') || 'all') as TaskState2;
-    const search = admin ? (searchParams.get('search') ?? undefined) : undefined;
-    const assigneeId = admin
-      ? (searchParams.get('assigneeId') ?? undefined)
-      : session.user.id;
+    const search = searchParams.get('search') ?? undefined;
+    const assigneeId = searchParams.get('assigneeId') ?? undefined;
+    const scopeUserId = admin ? undefined : session.user.id;
     const dueTypeParam = searchParams.get('dueType') ?? undefined;
     const dueType = dueTypeParam && isTaskDueType(dueTypeParam) ? dueTypeParam : undefined;
 
-    const result = await taskModel.list({ assigneeId, state, search, dueType, page, pageSize, viewerId: session.user.id });
+    const result = await taskModel.list({ assigneeId, scopeUserId, state, search, dueType, page, pageSize, viewerId: session.user.id });
     return { data: result, message: 'Tasks retrieved' };
   }
 
@@ -52,8 +52,6 @@ export class TaskController {
   }
 
   async create(body: unknown, session: Session) {
-    if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
-
     const b = body as Record<string, unknown>;
     const title = String(b.title ?? '').trim();
     const description = String(b.description ?? '').trim();
@@ -79,6 +77,12 @@ export class TaskController {
     ]);
     if (!assigner) return { error: { message: 'Session user not found', status: 400 } };
     if (!assignee) return { error: { message: 'Validation failed', errors: ['assigneeId: User not found'], status: 400 } };
+    if (!isAdmin(session)) {
+      const visibleIds = await getTaskVisibleUserIds(session.user.id);
+      if (!visibleIds.includes(assignee.id)) {
+        return { error: { message: 'You are not allowed to assign tasks to this user', status: 403 } };
+      }
+    }
 
     const dueDate =
       dueType === 'STANDARD'
@@ -251,11 +255,21 @@ export class TaskController {
 
   async tabCounts(searchParams: URLSearchParams, session: Session) {
     const admin = isAdmin(session);
-    const filterUserId = admin
-      ? (searchParams.get('assigneeId') ?? undefined)
-      : session.user.id;
-    const counts = await taskModel.tabCounts(filterUserId);
+    const filterUserId = searchParams.get('assigneeId') ?? undefined;
+    const scopeUserId = admin ? undefined : session.user.id;
+    const counts = await taskModel.tabCounts(filterUserId, scopeUserId);
     return { data: counts, message: 'Tab counts retrieved' };
+  }
+
+  async assignableUsers(session: Session) {
+    const users = isAdmin(session)
+      ? await prisma.user.findMany({
+          where: { active: true },
+          select: { id: true, name: true, email: true, role: true },
+          orderBy: [{ name: 'asc' }, { email: 'asc' }],
+        })
+      : await getTaskVisibleUsers(session.user.id);
+    return { data: users };
   }
 }
 

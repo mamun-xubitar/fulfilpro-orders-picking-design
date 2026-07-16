@@ -29,7 +29,6 @@ function TasksPageInner() {
         setFilterDueType={p.setFilterDueType}
         tabCounts={p.tabCounts}
         users={p.users}
-        isAdmin={p.userIsAdmin}
         onAdd={p.openAdd}
       />
 

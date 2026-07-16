@@ -87,6 +87,7 @@ type TaskWithMessages = {
 export class TaskModel {
   async list(params: {
     assigneeId?: string;
+    scopeUserId?: string;
     state?: TaskState2;
     search?: string;
     dueType?: TaskDueType;
@@ -217,8 +218,11 @@ export class TaskModel {
     await prisma.task.update({ where: { id: taskId }, data: { [field]: new Date() } });
   }
 
-  async tabCounts(filterUserId?: string): Promise<TabCounts> {
-    const baseWhere: Prisma.TaskWhereInput = filterUserId ? { assigneeId: filterUserId } : {};
+  async tabCounts(filterUserId?: string, scopeUserId?: string): Promise<TabCounts> {
+    const conditions: Prisma.TaskWhereInput[] = [];
+    if (filterUserId) conditions.push({ assigneeId: filterUserId });
+    if (scopeUserId) conditions.push({ OR: [{ assigneeId: scopeUserId }, { assignerId: scopeUserId }] });
+    const baseWhere: Prisma.TaskWhereInput = conditions.length ? { AND: conditions } : {};
 
     const [completedCount, pendingRows] = await Promise.all([
       prisma.task.count({ where: { ...baseWhere, status: 'COMPLETED' } }),
@@ -362,10 +366,12 @@ export class TaskModel {
   }
 }
 
-function buildWhere(params: { assigneeId?: string; state?: TaskState2; search?: string; dueType?: TaskDueType }) {
+function buildWhere(params: { assigneeId?: string; scopeUserId?: string; state?: TaskState2; search?: string; dueType?: TaskDueType }) {
   const where: Prisma.TaskWhereInput = {};
+  const and: Prisma.TaskWhereInput[] = [];
 
   if (params.assigneeId) where.assigneeId = params.assigneeId;
+  if (params.scopeUserId) and.push({ OR: [{ assigneeId: params.scopeUserId }, { assignerId: params.scopeUserId }] });
   if (params.dueType) where.dueType = params.dueType;
 
   if (params.state === 'completed') {
@@ -380,8 +386,10 @@ function buildWhere(params: { assigneeId?: string; state?: TaskState2; search?: 
 
   if (params.search) {
     const s = { contains: params.search, mode: 'insensitive' as const };
-    where.OR = [{ id: s }, { title: s }, { description: s }];
+    and.push({ OR: [{ id: s }, { title: s }, { description: s }] });
   }
+
+  if (and.length) where.AND = and;
 
   return where;
 }

@@ -22,6 +22,7 @@ const SECTION_LABELS: Record<string, string> = {
   decorationDigest: 'Decoration Work Digest',
   tracking: 'Shipment Tracking',
   decorationKeywords: 'Product Keywords',
+  taskVisibility: 'Tasks',
 };
 
 const DEFAULT_EMAIL_RULES: AppSettingsRow['emailRules'] = {
@@ -58,7 +59,7 @@ const DEFAULT_DECORATION_KEYWORDS: AppSettingsRow['decorationKeywords'] = {
 };
 
 type ApiResponse<T> = { success: boolean; message: string; data: T };
-export type SettingsSection = 'timezone' | 'emailRules' | 'decorationDigest' | 'tracking' | 'decorationKeywords';
+export type SettingsSection = 'timezone' | 'emailRules' | 'decorationDigest' | 'tracking' | 'decorationKeywords' | 'taskVisibility';
 
 async function getJson<T>(url: string, init?: RequestInit) {
   const res = await fetch(url, init);
@@ -73,6 +74,7 @@ export function useSettingsData() {
   const [decorationDigest, setDecorationDigest] = useState<AppSettingsRow['decorationDigest']>(DEFAULT_DECORATION_DIGEST);
   const [tracking, setTracking] = useState<AppSettingsRow['shipmentTracking']>(DEFAULT_TRACKING);
   const [decorationKeywords, setDecorationKeywords] = useState<AppSettingsRow['decorationKeywords']>(DEFAULT_DECORATION_KEYWORDS);
+  const [taskVisibility, setTaskVisibility] = useState<Record<string, string[]>>({});
   const [rescanJob, setRescanJob] = useState<DecorationRescanJob | null>(null);
   const [rescanning, setRescanning] = useState(false);
   const [lastScanned, setLastScanned] = useState('');
@@ -99,6 +101,7 @@ export function useSettingsData() {
     setDecorationDigest(settings.decorationDigest);
     setTracking(settings.shipmentTracking);
     setDecorationKeywords(settings.decorationKeywords);
+    setTaskVisibility(settings.taskVisibilityByUser);
   };
 
   const save = async (section: SettingsSection) => {
@@ -126,6 +129,8 @@ export function useSettingsData() {
         embroideryKeywords: decorationKeywords.embroidery,
         printKeywords: decorationKeywords.print,
       };
+    } else if (section === 'taskVisibility') {
+      payload = { taskVisibilityByUser: taskVisibility };
     } else {
       payload = {
         loginApprovalRecipientUserIds: emailRules.loginApprovalRecipientUserIds,
@@ -324,6 +329,7 @@ export function useSettingsData() {
     decorationDigest, setDecorationDigest,
     tracking, setTracking,
     decorationKeywords, setDecorationKeywords,
+    taskVisibility, setTaskVisibility,
     rescanning, rescanDecorations, rescanActive, rescanProgress, rescanError, lastScanned, rescanJob,
     saveMsg, showSaveMsg,
     loading, mounted,
