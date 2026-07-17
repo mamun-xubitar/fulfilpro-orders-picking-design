@@ -25,7 +25,7 @@ export default function DecorationExpandedRow({
       <td colSpan={p.ordersColSpan} className="p-0">
         <DecoratorFulfillmentPanel
           order={order}
-          decoratorCategory={p.decoratorCategory}
+          decoratorCategories={p.decoratorCategories}
           currentUserId={p.session?.user?.id ?? ''}
           requestingAccessKey={p.requestingAccessKey}
           onRequestAccess={p.requestEditAccess}

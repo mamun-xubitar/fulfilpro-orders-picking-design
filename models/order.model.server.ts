@@ -9,7 +9,7 @@ import {
 import { fetchShopifyOrderById } from '@/lib/shopify-order-fetch.server';
 import { detectDecoration, type DecorationKeywords } from '@/lib/decoration-detect';
 import { getDecorationKeywords } from '@/lib/decoration-keywords.server';
-import { isDecoratorRole, getDecoratorCategory } from '@/lib/roles';
+import { isDecoratorRole, getDecoratorCategories } from '@/lib/roles';
 import {
   getAssignmentsByOrder,
   getDecorationSummariesByOrder,
@@ -339,10 +339,11 @@ export class OrderModel {
     viewerId?: string;
     viewerRole?: string;
     decorationView?: boolean;
+    crossDecorationVisibility?: boolean;
     page: number;
     pageSize: number;
   }) {
-    const { search, searchField, storeIds = [], period = 'all', dateFrom, dateTo, fulfillmentStatuses = [], packingStatuses = [], viewerId, viewerRole, decorationView, page, pageSize } = params;
+    const { search, searchField, storeIds = [], period = 'all', dateFrom, dateTo, fulfillmentStatuses = [], packingStatuses = [], viewerId, viewerRole, decorationView, crossDecorationVisibility, page, pageSize } = params;
     const viewer = { id: viewerId, role: viewerRole };
     const viewerIsDecorator = isDecoratorRole(viewerRole);
     const tokens = (search?.trim() ?? '').split(/\s+/).filter(Boolean);
@@ -384,13 +385,13 @@ export class OrderModel {
 
     // Decorators only see orders in their category, assigned to them, or with their past work.
     if (viewerIsDecorator && viewerId) {
-      const category = getDecoratorCategory(viewerRole);
+      const categories = getDecoratorCategories(viewerRole, crossDecorationVisibility ?? false);
       const decoratorConditions: Prisma.OrderWhereInput[] = [
         { lineItemAssignments: { some: { assigneeId: viewerId } } },
         { lineItemWorks: { some: { workerId: viewerId } } },
       ];
-      if (category === 'embroidery') decoratorConditions.push({ lineItemDecorations: { some: { isEmbroidery: true } } });
-      if (category === 'print') decoratorConditions.push({ lineItemDecorations: { some: { isPrint: true } } });
+      if (categories.includes('embroidery')) decoratorConditions.push({ lineItemDecorations: { some: { isEmbroidery: true } } });
+      if (categories.includes('print')) decoratorConditions.push({ lineItemDecorations: { some: { isPrint: true } } });
       andConditions.push({ OR: decoratorConditions });
       andConditions.push({ canceled: false, closed: false });
     }
@@ -450,6 +451,7 @@ export class OrderModel {
         viewerId,
         viewerRole,
         decorationView,
+        crossDecorationVisibility,
         page: filterByPacking ? 1 : page,
         pageSize: filterByPacking ? 10000 : pageSize,
       });
@@ -538,6 +540,7 @@ export class OrderModel {
     viewerId?: string;
     viewerRole?: string;
     decorationView?: boolean;
+    crossDecorationVisibility?: boolean;
   }) {
     const { orders } = await this.listForConnectedStores({ ...params, page: 1, pageSize: 10000 });
 
@@ -2129,6 +2132,7 @@ async function getRankedOrderSearchPage(params: {
   viewerId?: string;
   viewerRole?: string;
   decorationView?: boolean;
+  crossDecorationVisibility?: boolean;
   page: number;
   pageSize: number;
 }) {
@@ -2180,6 +2184,7 @@ function buildRankedOrderSearchWhereSql(params: {
   viewerId?: string;
   viewerRole?: string;
   decorationView?: boolean;
+  crossDecorationVisibility?: boolean;
 }) {
   const whereParts: Prisma.Sql[] = [Prisma.sql`s.status = 'connected'`];
 
@@ -2203,15 +2208,15 @@ function buildRankedOrderSearchWhereSql(params: {
   const viewerIsDecorator = isDecoratorRole(params.viewerRole);
 
   if (viewerIsDecorator && params.viewerId) {
-    const category = getDecoratorCategory(params.viewerRole);
+    const categories = getDecoratorCategories(params.viewerRole, params.crossDecorationVisibility ?? false);
     const decoratorConditions: Prisma.Sql[] = [
       Prisma.sql`EXISTS (SELECT 1 FROM "LineItemAssignment" a WHERE a."orderId" = o.id AND a."assigneeId" = ${params.viewerId})`,
       Prisma.sql`EXISTS (SELECT 1 FROM "LineItemWork" w WHERE w."orderId" = o.id AND w."workerId" = ${params.viewerId})`,
     ];
-    if (category === 'embroidery') {
+    if (categories.includes('embroidery')) {
       decoratorConditions.push(Prisma.sql`EXISTS (SELECT 1 FROM "LineItemDecoration" d WHERE d."orderId" = o.id AND d."isEmbroidery" = true)`);
     }
-    if (category === 'print') {
+    if (categories.includes('print')) {
       decoratorConditions.push(Prisma.sql`EXISTS (SELECT 1 FROM "LineItemDecoration" d WHERE d."orderId" = o.id AND d."isPrint" = true)`);
     }
     whereParts.push(Prisma.sql`(${Prisma.join(decoratorConditions, ' OR ')})`);

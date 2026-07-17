@@ -9,6 +9,7 @@ import {
   type DecorationCategory,
 } from '@/lib/roles';
 import { createNotification } from '@/lib/notifications.server';
+import { getDecorationCrossVisibility } from '@/lib/decoration-visibility.server';
 
 export type DecoratorUser = {
   id: string;
@@ -430,8 +431,13 @@ export class DecorationModel {
     if (!Number.isFinite(quantity) || quantity < 1) throw new Error('Quantity must be at least 1');
     if (quantity > remaining) throw new Error(`Only ${remaining} left to mark as done`);
 
+    const crossVisibility = isAdmin ? false : await getDecorationCrossVisibility();
+    // Cross-visibility decorators span both categories, so derive from the product like admins do.
+    // Sewers have no category and are excluded — their work stays 'sewing'.
+    const deriveFromProduct = isAdmin || (crossVisibility && getDecoratorCategory(worker.role) !== null);
+
     let category: string;
-    if (isAdmin) {
+    if (deriveFromProduct) {
       const flags = await prisma.lineItemDecoration.findUnique({
         where: { orderId_lineItemId: { orderId, lineItemId } },
         select: { isEmbroidery: true, isPrint: true },

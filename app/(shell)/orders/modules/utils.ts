@@ -1,5 +1,6 @@
 import type { ApiResponse, BackInStockItem, BackInStockStatus, FulfillmentEditRequestRow, OrderItem, OrderRow, PackingSlipLabel, ShippingLine, WorkCommentDraft } from './types';
 import type { NameAttributeRow } from './nameAttributesExport';
+import type { DecorationCategory } from '@/lib/roles';
 
 export function getFulfilledQty(order: Pick<OrderRow, 'fulfillmentItems'>, lineItemId: string): number {
   return order.fulfillmentItems.confirmations.reduce((sum, confirmation) => {
@@ -301,13 +302,13 @@ export const orderNameEntries = (order: OrderRow): Array<{ key: string; row: Nam
 export const emptyCommentDraft = (): WorkCommentDraft => ({ sizes: '', colors: '', remarks: '', location: '', files: [], uploading: false });
 
 type DecorationRelevanceOpts = {
-  decoratorCategory: 'embroidery' | 'print' | null;
+  decoratorCategories: DecorationCategory[];
   currentUserId: string;
   showAll: boolean;
 };
 
 export function isDecorationRelevantItem(item: OrderItem, opts: DecorationRelevanceOpts): boolean {
-  const { decoratorCategory, currentUserId, showAll } = opts;
+  const { decoratorCategories, currentUserId, showAll } = opts;
   if (showAll) {
     return Boolean(
       item.isEmbroidery || item.isPrint ||
@@ -315,8 +316,8 @@ export function isDecorationRelevantItem(item: OrderItem, opts: DecorationReleva
       (item.decoration?.works.length ?? 0) > 0,
     );
   }
-  if (decoratorCategory === 'embroidery' && item.isEmbroidery) return true;
-  if (decoratorCategory === 'print' && item.isPrint) return true;
+  if (decoratorCategories.includes('embroidery') && item.isEmbroidery) return true;
+  if (decoratorCategories.includes('print') && item.isPrint) return true;
   if ((item.assignments ?? []).some((a) => a.assigneeId === currentUserId)) return true;
   if ((item.decoration?.works.length ?? 0) > 0) return true;
   return false;

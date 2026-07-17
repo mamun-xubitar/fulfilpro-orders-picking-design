@@ -1,13 +1,14 @@
 'use client';
 
 import type { OrderItem, OrderRow, WorkDraftState } from '../../orders/modules/types';
+import type { DecorationCategory } from '@/lib/roles';
 import { getFulfilledQty, getDecorationRowTint, getDecorationRelevantItems, getReferenceItems } from '../../orders/modules/utils';
 import DecoratorWorkForm from './DecoratorWorkForm';
 import ReferenceProductsSection from './ReferenceProductsSection';
 
 type Props = {
   order: OrderRow;
-  decoratorCategory: 'embroidery' | 'print' | null;
+  decoratorCategories: DecorationCategory[];
   currentUserId: string;
   requestingAccessKey: string | null;
   onRequestAccess: (order: OrderRow, item: OrderItem) => void;
@@ -35,7 +36,7 @@ const COMMENT_FIELDS: Array<{ key: 'sizes' | 'colors' | 'remarks' | 'location'; 
 
 export default function DecoratorFulfillmentPanel({
   order,
-  decoratorCategory,
+  decoratorCategories,
   currentUserId,
   requestingAccessKey,
   onRequestAccess,
@@ -53,7 +54,7 @@ export default function DecoratorFulfillmentPanel({
   onAssign,
   isAdmin = false,
 }: Props) {
-  const opts = { decoratorCategory, currentUserId, showAll };
+  const opts = { decoratorCategories, currentUserId, showAll };
   const items = getDecorationRelevantItems(order, opts);
   const refItems = getReferenceItems(order, opts);
 

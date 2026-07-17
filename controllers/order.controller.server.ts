@@ -1,6 +1,7 @@
 import { OrderModel, type FulfillmentLineInput } from '@/models/order.model.server';
 import { enqueueJob } from '@/lib/background-jobs.server';
 import prisma from '@/lib/prisma.server';
+import { getDecorationCrossVisibility } from '@/lib/decoration-visibility.server';
 
 const model = new OrderModel();
 
@@ -23,6 +24,7 @@ export class OrderController {
     const page = normalizePositiveInt(searchParams.get('page'), 1);
     const pageSize = clamp(normalizePositiveInt(searchParams.get('pageSize'), 20), 5, 100);
     const decorationView = searchParams.get('decorationView') === '1';
+    const crossDecorationVisibility = await getDecorationCrossVisibility();
 
     if (allowedStoreIds !== null && allowedStoreIds !== undefined) {
       if (allowedStoreIds.length === 0) {
@@ -48,6 +50,7 @@ export class OrderController {
               hasPrev: false,
               hasNext: false,
             },
+            crossDecorationVisibility,
           },
         };
       }
@@ -67,6 +70,7 @@ export class OrderController {
         viewerId,
         viewerRole,
         decorationView,
+        crossDecorationVisibility,
         page,
         pageSize,
       }),
@@ -97,6 +101,7 @@ export class OrderController {
           hasPrev: page > 1,
           hasNext: page < totalPages,
         },
+        crossDecorationVisibility,
       },
     };
   }
@@ -121,6 +126,8 @@ export class OrderController {
       storeIds = storeIds.length > 0 ? storeIds.filter((id) => allowedStoreIds.includes(id)) : allowedStoreIds;
     }
 
+    const crossDecorationVisibility = await getDecorationCrossVisibility();
+
     const result = await model.listNameAttributesForFilters({
       search,
       searchField,
@@ -133,6 +140,7 @@ export class OrderController {
       viewerId,
       viewerRole,
       decorationView,
+      crossDecorationVisibility,
     });
 
     return { data: result };

@@ -322,6 +322,14 @@ export class SettingsController {
       }
     }
 
+    if ('decorationCrossVisibilityEnabled' in data) {
+      if (typeof data.decorationCrossVisibilityEnabled !== 'boolean') {
+        errors.push('decorationCrossVisibilityEnabled: Must be true or false');
+      } else {
+        updateData.decorationCrossVisibilityEnabled = data.decorationCrossVisibilityEnabled;
+      }
+    }
+
     if ('seventrackApiKey' in data) {
       if (data.seventrackApiKey !== null && typeof data.seventrackApiKey !== 'string') {
         errors.push('seventrackApiKey: Must be a string or null');

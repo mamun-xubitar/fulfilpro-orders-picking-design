@@ -423,6 +423,7 @@ model AppSettings {
   trackingPendingAlertUserIds      Json    @default("[]")
   trackingPickupReminderDays       Json    @default("[]")
   taskVisibilityByUser              Json    @default("{}")
+  decorationCrossVisibilityEnabled  Boolean @default(false)
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 }

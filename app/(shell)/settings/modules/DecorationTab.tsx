@@ -111,6 +111,28 @@ export default function DecorationTab({ s }: Props) {
           {s.rescanError && <p className="text-xs text-red-600 mt-1">{s.rescanError}</p>}
         </div>
       </div>
+
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-5 space-y-5">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold text-gray-900">Decoration Visibility</h2>
+            <p className="text-xs text-gray-500 mt-1">Let embroidery and print decorators see and submit work for both categories.</p>
+          </div>
+          <button disabled={s.savingSection === "decorationVisibility" || s.loading} onClick={() => void s.save("decorationVisibility")} className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed sm:w-auto">{s.savingSection === "decorationVisibility" ? "Saving..." : "Save Visibility"}</button>
+        </div>
+
+        <RuleCard title="Cross-Category Visibility" hint="When enabled, embroidery and print decorators can see and submit work for orders in both categories. Sewers are unaffected.">
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={s.decorationCrossVisibilityEnabled}
+              onChange={(e) => s.setDecorationCrossVisibilityEnabled(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+            />
+            <span className="text-sm text-gray-700">Allow emb and print decorators to see each other&apos;s orders</span>
+          </label>
+        </RuleCard>
+      </div>
     </div>
   );
 }

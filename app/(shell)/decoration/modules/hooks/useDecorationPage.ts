@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useSession } from "next-auth/react";
 import { toast } from "react-toastify";
 import {
-  getDecoratorCategory,
+  getDecoratorCategories,
   isStaffLikeRole,
   isTestUserRole,
 } from "@/lib/roles";
@@ -30,7 +30,6 @@ export function useDecorationPage() {
   const { data: session } = useSession();
   const userRole = (session?.user?.role as string) ?? "";
   const userIsAdmin = userRole === "admin";
-  const decoratorCategory = getDecoratorCategory(userRole);
   const decoratorUnscoped = userIsAdmin;
   const ordersColSpan = 11;
   const userIsStaff = isStaffLikeRole(userRole);
@@ -85,6 +84,8 @@ export function useDecorationPage() {
     blockTestModeAction,
     setError,
   });
+
+  const decoratorCategories = getDecoratorCategories(userRole, data.crossDecorationVisibility);
 
   const sync = useSync({ blockTestModeAction, setError });
 
@@ -151,7 +152,7 @@ export function useDecorationPage() {
     userRole,
     userIsAdmin,
     userIsDecorator: true as const,
-    decoratorCategory,
+    decoratorCategories,
     decoratorUnscoped,
     ordersColSpan,
     userIsStaff,

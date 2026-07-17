@@ -49,6 +49,7 @@ export type AppSettingsRow = {
     print: string[];
   };
   taskVisibilityByUser: Record<string, string[]>;
+  decorationCrossVisibilityEnabled: boolean;
   updatedAt: string;
 };
 
@@ -80,6 +81,7 @@ export type UpdateAppSettingsData = Partial<{
   embroideryKeywords: string[];
   printKeywords: string[];
   taskVisibilityByUser: Record<string, string[]>;
+  decorationCrossVisibilityEnabled: boolean;
 }>;
 
 const SETTINGS_ID = 'default';
@@ -115,6 +117,7 @@ const DEFAULT_SETTINGS = {
   embroideryKeywords: ['embroider', 'emb'] as string[],
   printKeywords: ['print'] as string[],
   taskVisibilityByUser: {} as Record<string, string[]>,
+  decorationCrossVisibilityEnabled: false,
 };
 
 type GoogleTokenData = {
@@ -225,6 +228,7 @@ async function toSettingsRow(settings: {
   embroideryKeywords?: unknown;
   printKeywords?: unknown;
   taskVisibilityByUser?: unknown;
+  decorationCrossVisibilityEnabled?: boolean;
   updatedAt: Date;
 }): Promise<AppSettingsRow> {
   const { activeUsers, activeAdminUsers } = await listEmailRuleUsers();
@@ -277,6 +281,7 @@ async function toSettingsRow(settings: {
       print: normalizeTags(settings.printKeywords, DEFAULT_SETTINGS.printKeywords),
     },
     taskVisibilityByUser: normalizeVisibilityMap(settings.taskVisibilityByUser),
+    decorationCrossVisibilityEnabled: settings.decorationCrossVisibilityEnabled ?? false,
     updatedAt: settings.updatedAt.toISOString(),
   };
 }

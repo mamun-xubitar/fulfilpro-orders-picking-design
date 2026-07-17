@@ -23,6 +23,7 @@ const SECTION_LABELS: Record<string, string> = {
   tracking: 'Shipment Tracking',
   decorationKeywords: 'Product Keywords',
   taskVisibility: 'Tasks',
+  decorationVisibility: 'Decoration Visibility',
 };
 
 const DEFAULT_EMAIL_RULES: AppSettingsRow['emailRules'] = {
@@ -59,7 +60,7 @@ const DEFAULT_DECORATION_KEYWORDS: AppSettingsRow['decorationKeywords'] = {
 };
 
 type ApiResponse<T> = { success: boolean; message: string; data: T };
-export type SettingsSection = 'timezone' | 'emailRules' | 'decorationDigest' | 'tracking' | 'decorationKeywords' | 'taskVisibility';
+export type SettingsSection = 'timezone' | 'emailRules' | 'decorationDigest' | 'tracking' | 'decorationKeywords' | 'taskVisibility' | 'decorationVisibility';
 
 async function getJson<T>(url: string, init?: RequestInit) {
   const res = await fetch(url, init);
@@ -75,6 +76,7 @@ export function useSettingsData() {
   const [tracking, setTracking] = useState<AppSettingsRow['shipmentTracking']>(DEFAULT_TRACKING);
   const [decorationKeywords, setDecorationKeywords] = useState<AppSettingsRow['decorationKeywords']>(DEFAULT_DECORATION_KEYWORDS);
   const [taskVisibility, setTaskVisibility] = useState<Record<string, string[]>>({});
+  const [decorationCrossVisibilityEnabled, setDecorationCrossVisibilityEnabled] = useState(false);
   const [rescanJob, setRescanJob] = useState<DecorationRescanJob | null>(null);
   const [rescanning, setRescanning] = useState(false);
   const [lastScanned, setLastScanned] = useState('');
@@ -102,6 +104,7 @@ export function useSettingsData() {
     setTracking(settings.shipmentTracking);
     setDecorationKeywords(settings.decorationKeywords);
     setTaskVisibility(settings.taskVisibilityByUser);
+    setDecorationCrossVisibilityEnabled(settings.decorationCrossVisibilityEnabled);
   };
 
   const save = async (section: SettingsSection) => {
@@ -131,6 +134,8 @@ export function useSettingsData() {
       };
     } else if (section === 'taskVisibility') {
       payload = { taskVisibilityByUser: taskVisibility };
+    } else if (section === 'decorationVisibility') {
+      payload = { decorationCrossVisibilityEnabled };
     } else {
       payload = {
         loginApprovalRecipientUserIds: emailRules.loginApprovalRecipientUserIds,
@@ -330,6 +335,7 @@ export function useSettingsData() {
     tracking, setTracking,
     decorationKeywords, setDecorationKeywords,
     taskVisibility, setTaskVisibility,
+    decorationCrossVisibilityEnabled, setDecorationCrossVisibilityEnabled,
     rescanning, rescanDecorations, rescanActive, rescanProgress, rescanError, lastScanned, rescanJob,
     saveMsg, showSaveMsg,
     loading, mounted,

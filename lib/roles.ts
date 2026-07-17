@@ -43,6 +43,16 @@ export function getDecoratorCategory(role: string | null | undefined): Decoratio
   return null;
 }
 
+/** Categories a decorator sees. Sewer => [] (assignment-only, unaffected by cross-visibility). */
+export function getDecoratorCategories(
+  role: string | null | undefined,
+  crossVisibilityEnabled: boolean,
+): DecorationCategory[] {
+  const category = getDecoratorCategory(role);
+  if (!category) return [];
+  return crossVisibilityEnabled ? ['embroidery', 'print'] : [category];
+}
+
 export function isRestrictedSessionRole(role: string | null | undefined) {
   return isStaffLikeRole(role) || isOrderPickerRole(role) || isDecoratorRole(role);
 }

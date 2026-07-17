@@ -14,6 +14,7 @@ type UseOrdersDataArgs = {
 export function useOrdersData({ queryString, search, setPagination, blockTestModeAction, setError }: UseOrdersDataArgs) {
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [stores, setStores] = useState<StoreOption[]>([]);
+  const [crossDecorationVisibility, setCrossDecorationVisibility] = useState(false);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [expandAll, setExpandAll] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -33,6 +34,7 @@ export function useOrdersData({ queryString, search, setPagination, blockTestMod
           orders: OrderRow[];
           stores: StoreOption[];
           pagination: Pagination;
+          crossDecorationVisibility: boolean;
         }>;
 
         if (!res.ok || !json.success) {
@@ -43,6 +45,7 @@ export function useOrdersData({ queryString, search, setPagination, blockTestMod
         setOrders(json.data.orders);
         setStores(json.data.stores);
         setPagination(json.data.pagination);
+        setCrossDecorationVisibility(json.data.crossDecorationVisibility);
         const firstId = json.data.orders[0]?.id;
         if (expandAll) {
           setExpandedIds(new Set(json.data.orders.map((o) => o.id)));
@@ -107,6 +110,7 @@ export function useOrdersData({ queryString, search, setPagination, blockTestMod
     orders,
     setOrders,
     stores,
+    crossDecorationVisibility,
     loading,
     expandedIds,
     setExpandedIds,
