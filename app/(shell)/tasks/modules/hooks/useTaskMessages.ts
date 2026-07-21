@@ -37,9 +37,7 @@ export function useTaskMessages(setTasks: React.Dispatch<React.SetStateAction<Ta
       method: 'POST',
       data: { message: messageText.trim() },
       showToast: false,
-      onSuccess: (res) => {
-        setMessages((prev) => [...prev, res.data]);
-        setMessageText('');
+      onSuccess: () => {
         setTasks((prev) =>
           prev.map((t) =>
             t.id === messagesTask.id
@@ -47,6 +45,7 @@ export function useTaskMessages(setTasks: React.Dispatch<React.SetStateAction<Ta
               : t,
           ),
         );
+        closeMessages();
       },
     });
   }

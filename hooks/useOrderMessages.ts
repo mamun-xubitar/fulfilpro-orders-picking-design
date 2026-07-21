@@ -84,11 +84,8 @@ export function useOrderMessages<O extends OrderRef>({ messageType, guard, onCou
       });
       const json = (await res.json()) as ApiResponse<MessageRecord>;
       if (!res.ok || !json.success) throw new Error(getApiErrorMessage(json, 'Failed to send message'));
-      setMessageModal((prev) => {
-        if (!prev || prev.order.id !== messageModal.order.id) return prev;
-        return { ...prev, messages: [json.data, ...prev.messages], message: '', sending: false };
-      });
       onCountChange?.(messageModal.order.id, 1);
+      setMessageModal(null);
       toast.success('Message sent.');
     } catch (err) {
       setMessageModal((prev) => prev ? { ...prev, sending: false, error: err instanceof Error ? err.message : 'Failed to send message.' } : prev);

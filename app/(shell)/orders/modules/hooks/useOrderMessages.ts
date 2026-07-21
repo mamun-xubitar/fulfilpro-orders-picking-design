@@ -99,18 +99,10 @@ export function useOrderMessages({ setOrders, blockTestModeAction }: UseOrderMes
         throw new Error(getApiErrorMessage(json, 'Failed to send message'));
       }
 
-      setMessageModal((prev) => {
-        if (!prev || prev.order.id !== messageModal.order.id) return prev;
-        return {
-          ...prev,
-          messages: [json.data, ...prev.messages],
-          message: '',
-          sending: false,
-        };
-      });
       setOrders((prev) => prev.map((item) => (
         item.id === messageModal.order.id ? { ...item, messageCount: item.messageCount + 1 } : item
       )));
+      setMessageModal(null);
       toast.success('Message sent to admin.');
     } catch (err) {
       setMessageModal((prev) => (
