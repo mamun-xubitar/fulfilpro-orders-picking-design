@@ -4,7 +4,7 @@ import { apiError, apiSuccess } from '@/lib/api-response.server';
 import { saveUploadedFile } from '@/lib/uploads.server';
 
 const MAX_FILES = 20;
-const MAX_SIZE = 25 * 1024 * 1024;
+const MAX_SIZE = 50 * 1024 * 1024;
 
 export async function POST(request: NextRequest) {
   const session = await auth();

@@ -5,7 +5,7 @@ import { isDecoratorRole } from '@/lib/roles';
 import { saveUploadedFile } from '@/lib/uploads.server';
 
 const MAX_FILES = 20;
-const MAX_SIZE = 25 * 1024 * 1024; // 25 MB per file
+const MAX_SIZE = 50 * 1024 * 1024; // 25 MB per file
 
 export async function POST(request: NextRequest) {
   const session = await auth();
