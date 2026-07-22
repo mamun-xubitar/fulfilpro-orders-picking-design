@@ -2,7 +2,7 @@ import { TrackingModel } from '@/models/tracking.model.server';
 import { getUserAllowedStoreIds } from '@/lib/store-access.server';
 import { registerTracking, stopTracking, retrack } from '@/lib/seventrack.server';
 import { enqueueJob, refreshTrackingAndApply } from '@/lib/background-jobs.server';
-import { resolveCarrierCode } from '@/lib/carrier-resolver.server';
+import { resolveCarrierCode, getCarrierName, searchCarriers } from '@/lib/carrier-resolver.server';
 import prisma from '@/lib/prisma.server';
 
 const model = new TrackingModel();
@@ -104,6 +104,99 @@ export class TrackingController {
             status: 400,
           },
         };
+      }
+
+      return { data: { registered: true }, message: 'Tracking registered' };
+    } catch (error) {
+      return { error: { message: error instanceof Error ? error.message : 'Registration failed', status: 500 } };
+    }
+  }
+
+  async getSuggestedTracking(orderId: string) {
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      select: { id: true, fulfillmentItems: true },
+    });
+    if (!order) return { error: { message: 'Order not found', status: 404 } };
+
+    const trackingNumbers = extractTrackingNumbers(order.fulfillmentItems);
+    const first = trackingNumbers[0];
+    const carrierCode = resolveCarrierCode(first?.company);
+    const carrierName = getCarrierName(carrierCode);
+    return {
+      data: {
+        trackingNumber: first?.number ?? null,
+        company: first?.company ?? null,
+        carrierCode: carrierCode ?? null,
+        carrierName: carrierName ?? null,
+      },
+    };
+  }
+
+  async searchCarriers(query: string) {
+    return { data: { carriers: searchCarriers(query) } };
+  }
+
+  async registerSingle(orderId: string, trackingNumber: string, carrier?: number | null) {
+    const trimmedOrderId = orderId.trim();
+    const trimmedTrackingNumber = trackingNumber.trim();
+    if (!trimmedOrderId || !trimmedTrackingNumber) {
+      return { error: { message: 'orderId and trackingNumber are required', status: 400 } };
+    }
+
+    const order = await prisma.order.findUnique({
+      where: { id: trimmedOrderId },
+      select: { id: true, number: true, storeId: true },
+    });
+    if (!order) return { error: { message: 'Order not found', status: 404 } };
+
+    const existing = await prisma.shipmentTracking.findUnique({
+      where: { orderId_trackingNumber: { orderId: order.id, trackingNumber: trimmedTrackingNumber } },
+    });
+    if (existing) {
+      return { error: { message: 'Tracking already exists for this order', status: 409 } };
+    }
+
+    try {
+      const items = [{
+        number: trimmedTrackingNumber,
+        tag: order.id,
+        auto_detection: true,
+        ...(carrier != null ? { carrier } : {}),
+      }];
+      const results = await registerTracking(items);
+      const now = new Date();
+
+      const accepted: Array<{ number: string; carrier?: number }> = [];
+      const rejected: Array<{ number: string; message: string }> = [];
+      for (const res of results) {
+        for (const a of res.data?.accepted ?? []) accepted.push(a);
+        for (const r of res.data?.rejected ?? []) {
+          rejected.push({ number: r.number, message: r.error?.message ?? 'Rejected by 17track' });
+        }
+      }
+
+      if (rejected.length > 0) {
+        const reasons = rejected.map((r) => `${r.number}: ${r.message}`).join('; ');
+        return { error: { message: `Tracking registration failed — ${reasons}`, status: 400 } };
+      }
+
+      const a = accepted[0];
+      const row = await model.upsertFromOrder({
+        orderId: order.id,
+        storeId: order.storeId,
+        orderNumber: order.number,
+        trackingNumber: trimmedTrackingNumber,
+        carrier: a?.carrier ?? carrier ?? null,
+        registrationStatus: 'registered',
+        registeredAt: now,
+        shippedAt: now,
+      });
+
+      try {
+        await refreshTrackingAndApply([row.id]);
+      } catch (error) {
+        console.error('Failed to fetch track info after registration', error);
       }
 
       return { data: { registered: true }, message: 'Tracking registered' };

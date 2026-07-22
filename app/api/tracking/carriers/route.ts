@@ -1,0 +1,17 @@
+import { auth } from '@/auth';
+import { apiSuccess, apiError } from '@/lib/api-response.server';
+import { TrackingController } from '@/controllers/tracking.controller.server';
+
+const controller = new TrackingController();
+
+export async function GET(request: Request) {
+  const session = await auth();
+  if (!session?.user?.id) return apiError({ message: 'Unauthorized', status: 401 });
+  if ((session.user.role as string) !== 'admin') return apiError({ message: 'Forbidden', status: 403 });
+
+  const { searchParams } = new URL(request.url);
+  const search = searchParams.get('search') ?? '';
+
+  const result = await controller.searchCarriers(search);
+  return apiSuccess({ message: 'Carriers retrieved', data: result.data });
+}

@@ -38,6 +38,7 @@ type TrackingToolbarProps = {
   hasActiveFilters: boolean;
   handleClearFilters: () => void;
   userIsAdmin: boolean;
+  onAddTracking: () => void;
   onBulkRegister: () => void;
   syncActive: boolean;
   syncMenuOpen: boolean;
@@ -59,7 +60,7 @@ export default function TrackingToolbar({
   calendarNav, setCalendarNav,
   handlePeriodChange, handleCalendarDateClick,
   hasActiveFilters, handleClearFilters,
-  userIsAdmin, onBulkRegister,
+  userIsAdmin, onAddTracking, onBulkRegister,
   syncActive, syncMenuOpen, setSyncMenuOpen, syncMenuRef,
   syncDays, setSyncDays, syncStoreIds, handleSyncStoreToggle, onSync,
 }: TrackingToolbarProps) {
@@ -230,6 +231,18 @@ export default function TrackingToolbar({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
             Clear filters
+          </button>
+        )}
+        {userIsAdmin && (
+          <button
+            type="button"
+            onClick={onAddTracking}
+            className="flex items-center gap-2 rounded-lg bg-white border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors duration-150 cursor-pointer shadow-sm"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Add Tracking
           </button>
         )}
         {userIsAdmin && (

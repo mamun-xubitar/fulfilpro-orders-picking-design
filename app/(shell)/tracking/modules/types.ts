@@ -42,3 +42,26 @@ export type BulkRegisterModalState = {
   hoverDate: string | null;
   storeDropdownOpen: boolean;
 };
+
+export type OrderSearchOption = { id: string; number: string; customer: string | null };
+
+export type CarrierOption = { code: number; name: string };
+
+export type SingleRegisterModalState = {
+  search: string;
+  results: OrderSearchOption[];
+  searching: boolean;
+  dropdownOpen: boolean;
+  selectedOrder: OrderSearchOption | null;
+  trackingNumber: string;
+  suggesting: boolean;
+  submitting: boolean;
+  error: string;
+  carrierCode: number | null;
+  carrierName: string;
+  carrierSearch: string;
+  carrierResults: CarrierOption[];
+  carrierSearching: boolean;
+  carrierDropdownOpen: boolean;
+  carrierAutoDetected: boolean;
+};

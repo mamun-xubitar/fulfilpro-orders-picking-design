@@ -5,6 +5,7 @@ import { useTrackingPage } from './hooks/useTrackingPage';
 import TrackingToolbar from './TrackingToolbar';
 import TrackingTable from './TrackingTable';
 import BulkRegisterModal from './BulkRegisterModal';
+import SingleRegisterModal from './SingleRegisterModal';
 
 export default function TrackingPage() {
   const { data: session } = useSession();
@@ -52,6 +53,7 @@ export default function TrackingPage() {
         hasActiveFilters={p.hasActiveFilters}
         handleClearFilters={p.handleClearFilters}
         userIsAdmin={userIsAdmin}
+        onAddTracking={p.openSingleModal}
         onBulkRegister={() => void p.openBulkModal()}
         syncActive={p.syncActive}
         syncMenuOpen={p.syncMenuOpen}
@@ -90,6 +92,25 @@ export default function TrackingPage() {
           onNavPrev={p.handleBulkNavPrev}
           onNavNext={p.handleBulkNavNext}
           onClearDates={p.handleBulkClearDates}
+        />
+      )}
+
+      {p.singleModal && (
+        <SingleRegisterModal
+          modal={p.singleModal}
+          onClose={p.closeSingleModal}
+          onSubmit={() => void p.submitSingleRegister()}
+          onFocusSearch={p.focusSearch}
+          onBlurSearch={p.blurSearch}
+          onSearchChange={p.setSearch}
+          onSelectOrder={(order) => void p.selectOrder(order)}
+          onTrackingNumberChange={p.setTrackingNumber}
+          onClearOrder={p.clearSelectedOrder}
+          onCarrierSearchChange={p.setCarrierSearch}
+          onSelectCarrier={p.selectCarrier}
+          onFocusCarrierSearch={p.focusCarrierSearch}
+          onBlurCarrierSearch={p.blurCarrierSearch}
+          onClearCarrier={p.clearCarrier}
         />
       )}
     </main>

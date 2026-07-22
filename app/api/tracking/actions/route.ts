@@ -24,6 +24,7 @@ export async function POST(request: Request) {
   const orderId = typeof data.orderId === 'string' ? data.orderId : null;
   const action = typeof data.action === 'string' ? data.action : null;
   const trackingNumber = typeof data.trackingNumber === 'string' ? data.trackingNumber : null;
+  const carrier = typeof data.carrier === 'number' ? data.carrier : null;
 
   if (!orderId || !action) {
     return apiError({ message: 'orderId and action are required', status: 400 });
@@ -38,6 +39,9 @@ export async function POST(request: Request) {
   } else if (action === 'restart') {
     if (!trackingNumber) return apiError({ message: 'trackingNumber is required for restart', status: 400 });
     result = await controller.restart(orderId, trackingNumber);
+  } else if (action === 'register-single') {
+    if (!trackingNumber) return apiError({ message: 'trackingNumber is required', status: 400 });
+    result = await controller.registerSingle(orderId, trackingNumber, carrier);
   } else {
     return apiError({ message: 'Invalid action', status: 400 });
   }

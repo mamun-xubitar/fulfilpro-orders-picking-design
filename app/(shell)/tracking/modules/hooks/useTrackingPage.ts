@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { toast } from 'react-toastify';
 import { useTrackingFilters } from './useTrackingFilters';
 import { useTrackingSync } from './useTrackingSync';
+import { useTrackingSingleRegister } from './useTrackingSingleRegister';
 import type { TrackingRow, BulkRegisterModalState, StoreOption } from '../types';
 
 export function useTrackingPage() {
@@ -23,6 +24,7 @@ export function useTrackingPage() {
 
   const setErrorStr = useCallback((msg: string) => setError(msg), []);
   const sync = useTrackingSync({ stores, bumpRefresh, setError: setErrorStr });
+  const single = useTrackingSingleRegister({ bumpRefresh });
 
   useEffect(() => {
     let cancelled = false;
@@ -187,5 +189,6 @@ export function useTrackingPage() {
     setBulkModal,
     bumpRefresh,
     ...sync,
+    ...single,
   };
 }
