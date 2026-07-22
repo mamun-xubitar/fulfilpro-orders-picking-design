@@ -9,7 +9,9 @@ import SingleRegisterModal from './SingleRegisterModal';
 
 export default function TrackingPage() {
   const { data: session } = useSession();
-  const userIsAdmin = (session?.user?.role as string) === 'admin';
+  const role = session?.user?.role as string | undefined;
+  const userIsAdmin = role === 'admin';
+  const canAddTracking = userIsAdmin || role === 'staff';
   const p = useTrackingPage();
 
   return (
@@ -53,6 +55,7 @@ export default function TrackingPage() {
         hasActiveFilters={p.hasActiveFilters}
         handleClearFilters={p.handleClearFilters}
         userIsAdmin={userIsAdmin}
+        canAddTracking={canAddTracking}
         onAddTracking={p.openSingleModal}
         onBulkRegister={() => void p.openBulkModal()}
         syncActive={p.syncActive}

@@ -9,9 +9,7 @@ export async function POST(request: Request) {
   if (!session?.user?.id) {
     return apiError({ message: 'Unauthorized', status: 401 });
   }
-  if ((session.user.role as string) !== 'admin') {
-    return apiError({ message: 'Forbidden — admin only', status: 403 });
-  }
+  const role = session.user.role as string;
 
   let body: unknown;
   try {
@@ -28,6 +26,11 @@ export async function POST(request: Request) {
 
   if (!orderId || !action) {
     return apiError({ message: 'orderId and action are required', status: 400 });
+  }
+
+  const isAllowed = action === 'register-single' ? (role === 'admin' || role === 'staff') : role === 'admin';
+  if (!isAllowed) {
+    return apiError({ message: 'Forbidden — admin only', status: 403 });
   }
 
   let result;

@@ -7,7 +7,8 @@ const controller = new TrackingController();
 export async function GET(request: Request) {
   const session = await auth();
   if (!session?.user?.id) return apiError({ message: 'Unauthorized', status: 401 });
-  if ((session.user.role as string) !== 'admin') return apiError({ message: 'Forbidden', status: 403 });
+  const role = session.user.role as string;
+  if (role !== 'admin' && role !== 'staff') return apiError({ message: 'Forbidden', status: 403 });
 
   const { searchParams } = new URL(request.url);
   const orderId = searchParams.get('orderId');

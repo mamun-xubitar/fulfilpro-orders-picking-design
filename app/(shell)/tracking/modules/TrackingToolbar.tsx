@@ -38,6 +38,7 @@ type TrackingToolbarProps = {
   hasActiveFilters: boolean;
   handleClearFilters: () => void;
   userIsAdmin: boolean;
+  canAddTracking: boolean;
   onAddTracking: () => void;
   onBulkRegister: () => void;
   syncActive: boolean;
@@ -60,7 +61,7 @@ export default function TrackingToolbar({
   calendarNav, setCalendarNav,
   handlePeriodChange, handleCalendarDateClick,
   hasActiveFilters, handleClearFilters,
-  userIsAdmin, onAddTracking, onBulkRegister,
+  userIsAdmin, canAddTracking, onAddTracking, onBulkRegister,
   syncActive, syncMenuOpen, setSyncMenuOpen, syncMenuRef,
   syncDays, setSyncDays, syncStoreIds, handleSyncStoreToggle, onSync,
 }: TrackingToolbarProps) {
@@ -233,7 +234,7 @@ export default function TrackingToolbar({
             Clear filters
           </button>
         )}
-        {userIsAdmin && (
+        {canAddTracking && (
           <button
             type="button"
             onClick={onAddTracking}
