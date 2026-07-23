@@ -4,6 +4,7 @@ import {
   getStoreInfo,
   normalizeShopDomain,
   registerOrderWebhooks,
+  registerProductWebhooks,
   ShopifyCallbackQuery,
   verifyHmac,
 } from '@/lib/shopify-auth.server';
@@ -44,6 +45,7 @@ export async function GET(req: Request) {
   );
   const shopInfo = await getStoreInfo(normalizedShop, accessToken);
   await registerOrderWebhooks(normalizedShop, accessToken);
+  await registerProductWebhooks(normalizedShop, accessToken);
 
   await storeModel.updateByDomain(normalizedShop, {
     accessToken,

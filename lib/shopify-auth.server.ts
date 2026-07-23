@@ -162,6 +162,12 @@ const ORDER_WEBHOOK_TOPICS = [
   'orders/updated',
 ] as const;
 
+const PRODUCT_WEBHOOK_TOPICS = [
+  'products/create',
+  'products/update',
+  'products/delete',
+] as const;
+
 export async function registerOrderWebhooks(shop: string, accessToken: string) {
   const normalizedShop = normalizeShopDomain(shop);
   const appUrl = process.env.APP_URL?.trim();
@@ -173,6 +179,26 @@ export async function registerOrderWebhooks(shop: string, accessToken: string) {
   const existing = await fetchShopifyWebhooks(normalizedShop, accessToken);
 
   for (const topic of ORDER_WEBHOOK_TOPICS) {
+    const alreadyExists = existing.some(
+      (webhook) => webhook.topic === topic && webhook.address === callbackAddress
+    );
+    if (alreadyExists) continue;
+
+    await createShopifyWebhook(normalizedShop, accessToken, topic, callbackAddress);
+  }
+}
+
+export async function registerProductWebhooks(shop: string, accessToken: string) {
+  const normalizedShop = normalizeShopDomain(shop);
+  const appUrl = process.env.APP_URL?.trim();
+  if (!appUrl) {
+    throw new Error('APP_URL is required to register product webhooks');
+  }
+
+  const callbackAddress = `${appUrl.replace(/\/$/, '')}/api/webhooks/products`;
+  const existing = await fetchShopifyWebhooks(normalizedShop, accessToken);
+
+  for (const topic of PRODUCT_WEBHOOK_TOPICS) {
     const alreadyExists = existing.some(
       (webhook) => webhook.topic === topic && webhook.address === callbackAddress
     );
@@ -213,7 +239,7 @@ async function fetchShopifyWebhooks(shop: string, accessToken: string): Promise<
 async function createShopifyWebhook(
   shop: string,
   accessToken: string,
-  topic: (typeof ORDER_WEBHOOK_TOPICS)[number],
+  topic: (typeof ORDER_WEBHOOK_TOPICS)[number] | (typeof PRODUCT_WEBHOOK_TOPICS)[number],
   address: string
 ) {
   const res = await fetch(`https://${shop}/admin/api/2025-01/webhooks.json`, {

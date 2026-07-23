@@ -4,6 +4,7 @@ import { registerTracking, getTrackInfo, type TrackInfoResult } from '@/lib/seve
 import { TrackingModel } from '@/models/tracking.model.server';
 import { resolveCarrierCode } from '@/lib/carrier-resolver.server';
 import { OrderModel } from '@/models/order.model.server';
+import { linkOrderLineItems, refreshProductSales } from '@/lib/product-order-link.server';
 
 const trackingModel = new TrackingModel();
 
@@ -67,6 +68,8 @@ export async function runJob(jobId: string) {
       await runSyncTrackingStatus(payload);
     } else if (job.type === 'rescan_decorations') {
       await runRescanDecorations(jobId);
+    } else if (job.type === 'backfill_order_line_items') {
+      await runBackfillOrderLineItems(jobId);
     } else {
       throw new Error(`Unknown job type: ${job.type}`);
     }
@@ -177,6 +180,50 @@ async function runRescanDecorations(jobId: string) {
       data: { progress: p as Prisma.InputJsonValue },
     });
   });
+}
+
+const BACKFILL_BATCH_SIZE = 200;
+const BACKFILL_REFRESH_THRESHOLD = 500;
+
+async function runBackfillOrderLineItems(jobId: string) {
+  const total = await prisma.order.count();
+  let cursor: string | undefined;
+  let processed = 0;
+  let affectedProductIds = new Set<string>();
+
+  while (true) {
+    const orders = await prisma.order.findMany({
+      take: BACKFILL_BATCH_SIZE,
+      ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+      orderBy: { id: 'asc' },
+      select: { id: true },
+    });
+    if (orders.length === 0) break;
+
+    for (const order of orders) {
+      const affected = await linkOrderLineItems(order.id, { skipRefresh: true });
+      affected.forEach((id) => affectedProductIds.add(id));
+      processed += 1;
+    }
+
+    cursor = orders[orders.length - 1].id;
+
+    if (affectedProductIds.size >= BACKFILL_REFRESH_THRESHOLD) {
+      await refreshProductSales([...affectedProductIds]);
+      affectedProductIds = new Set();
+    }
+
+    await prisma.backgroundJob.update({
+      where: { id: jobId },
+      data: { progress: { processed, total } as Prisma.InputJsonValue },
+    });
+
+    if (orders.length < BACKFILL_BATCH_SIZE) break;
+  }
+
+  if (affectedProductIds.size > 0) {
+    await refreshProductSales([...affectedProductIds]);
+  }
 }
 
 async function runSyncTrackingStatus(payload: Record<string, unknown>) {

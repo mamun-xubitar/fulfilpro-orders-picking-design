@@ -1,0 +1,185 @@
+import prisma from '@/lib/prisma.server';
+import { Prisma, ProductStatus } from '@prisma/client';
+
+const SORTABLE_FIELDS = new Set(['title', 'vendor', 'category', 'productType', 'status', 'totalInventory', 'soldQuantity', 'updatedAt', 'store']);
+
+export type ProductListParams = {
+  search?: string;
+  searchField?: string;
+  storeIds?: string[];
+  status?: ProductStatus[];
+  stockLevel?: string;
+  stockCompare?: 'below' | 'above' | '';
+  stockQty?: number | null;
+  sort?: string;
+  dir?: 'asc' | 'desc';
+  page: number;
+  pageSize: number;
+};
+
+export class ProductModel {
+  async list(params: ProductListParams) {
+    const {
+      search,
+      searchField,
+      storeIds = [],
+      status = [],
+      stockLevel,
+      stockCompare,
+      stockQty,
+      sort = 'title',
+      dir = 'asc',
+      page,
+      pageSize,
+    } = params;
+
+    const where: Prisma.ProductWhereInput = {
+      deletedAt: null,
+      ...(storeIds.length > 0 ? { storeId: { in: storeIds } } : {}),
+      ...(status.length > 0 ? { status: { in: status } } : {}),
+    };
+
+    const tokens = (search?.trim() ?? '').split(/\s+/).filter(Boolean);
+    if (tokens.length > 0) {
+      where.AND = tokens.map((token) => (searchField ? buildFieldCondition(searchField, token) : buildAnyFieldCondition(token)));
+    }
+
+    if (stockLevel === 'not_tracked') {
+      where.variants = { some: { inventoryTracked: false } };
+    } else if (stockLevel === 'out_of_stock') {
+      where.totalInventory = { lte: 0 };
+    } else if (stockLevel === 'in_stock') {
+      where.totalInventory = { gt: 0 };
+    }
+
+    if (stockCompare && stockQty != null) {
+      where.totalInventory = {
+        ...(typeof where.totalInventory === 'object' ? where.totalInventory : {}),
+        ...(stockCompare === 'below' ? { lt: stockQty } : { gt: stockQty }),
+      };
+    }
+
+    const [total, products] = await Promise.all([
+      prisma.product.count({ where }),
+      prisma.product.findMany({
+        where,
+        orderBy: buildOrderBy(sort, dir),
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        include: { store: { select: { id: true, name: true, storeDomain: true } } },
+      }),
+    ]);
+
+    return { products: products.map(serializeProduct), total };
+  }
+
+  async formData(allowedStoreIds?: string[] | null) {
+    const where: Prisma.ProductWhereInput = { deletedAt: null };
+    if (allowedStoreIds !== null && allowedStoreIds !== undefined) {
+      where.storeId = { in: allowedStoreIds };
+    }
+
+    const [vendors, productTypes, categories, tagsAndChannels, stores] = await Promise.all([
+      prisma.product.findMany({ where, distinct: ['vendor'], select: { vendor: true } }),
+      prisma.product.findMany({ where, distinct: ['productType'], select: { productType: true } }),
+      prisma.product.findMany({ where, distinct: ['category'], select: { category: true } }),
+      prisma.product.findMany({ where, select: { tags: true, salesChannels: true } }),
+      this.getStoreOptions(allowedStoreIds),
+    ]);
+
+    const tagSet = new Set<string>();
+    const channelSet = new Set<string>();
+    for (const product of tagsAndChannels) {
+      for (const tag of product.tags) tagSet.add(tag);
+      if (Array.isArray(product.salesChannels)) {
+        for (const channel of product.salesChannels as unknown[]) {
+          if (typeof channel === 'string') channelSet.add(channel);
+        }
+      }
+    }
+
+    return {
+      vendors: vendors.map((v) => v.vendor).filter((v): v is string => !!v).sort(),
+      productTypes: productTypes.map((v) => v.productType).filter((v): v is string => !!v).sort(),
+      categories: categories.map((v) => v.category).filter((v): v is string => !!v).sort(),
+      tags: [...tagSet].sort(),
+      salesChannels: [...channelSet].sort(),
+      stores,
+    };
+  }
+
+  async getStoreOptions(allowedStoreIds?: string[] | null) {
+    const where: Prisma.StoreWhereInput = { status: 'connected' };
+    if (allowedStoreIds !== null && allowedStoreIds !== undefined) {
+      where.id = { in: allowedStoreIds };
+    }
+
+    const stores = await prisma.store.findMany({
+      where,
+      select: { id: true, name: true, storeDomain: true },
+      orderBy: [{ name: 'asc' }, { storeDomain: 'asc' }],
+    });
+
+    return stores.map((store) => ({ id: store.id, name: store.name ?? store.storeDomain, storeDomain: store.storeDomain }));
+  }
+}
+
+function buildFieldCondition(field: string, token: string): Prisma.ProductWhereInput {
+  switch (field) {
+    case 'title':
+      return { title: { contains: token, mode: 'insensitive' } };
+    case 'vendor':
+    case 'supplier':
+      return { vendor: { contains: token, mode: 'insensitive' } };
+    case 'category':
+      return { category: { contains: token, mode: 'insensitive' } };
+    case 'type':
+      return { productType: { contains: token, mode: 'insensitive' } };
+    case 'tag':
+      return { tags: { hasSome: [token] } };
+    default:
+      return {};
+  }
+}
+
+function buildAnyFieldCondition(token: string): Prisma.ProductWhereInput {
+  return {
+    OR: [
+      { title: { contains: token, mode: 'insensitive' } },
+      { vendor: { contains: token, mode: 'insensitive' } },
+      { category: { contains: token, mode: 'insensitive' } },
+      { productType: { contains: token, mode: 'insensitive' } },
+      { tags: { hasSome: [token] } },
+    ],
+  };
+}
+
+function buildOrderBy(sort: string, dir: 'asc' | 'desc'): Prisma.ProductOrderByWithRelationInput {
+  if (!SORTABLE_FIELDS.has(sort)) return { title: 'asc' };
+  if (sort === 'store') return { store: { name: dir } };
+  return { [sort]: dir } as Prisma.ProductOrderByWithRelationInput;
+}
+
+type ProductWithStore = Prisma.ProductGetPayload<{ include: { store: { select: { id: true; name: true; storeDomain: true } } } }>;
+
+function serializeProduct(product: ProductWithStore) {
+  return {
+    id: product.id,
+    title: product.title,
+    handle: product.handle,
+    vendor: product.vendor,
+    productType: product.productType,
+    category: product.category,
+    status: product.status,
+    tags: product.tags,
+    imageUrl: product.imageUrl,
+    onlineStoreUrl: product.onlineStoreUrl,
+    salesChannels: Array.isArray(product.salesChannels) ? (product.salesChannels as string[]) : [],
+    totalInventory: product.totalInventory,
+    soldQuantity: product.soldQuantity,
+    soldAmount: Number(product.soldAmount),
+    store: { id: product.store.id, name: product.store.name ?? product.store.storeDomain },
+    shopifyUpdatedAt: product.shopifyUpdatedAt?.toISOString() ?? null,
+    updatedAt: product.updatedAt.toISOString(),
+  };
+}

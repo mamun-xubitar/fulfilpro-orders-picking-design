@@ -224,6 +224,13 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
       adminDecoratorOnly: false,
     },
     {
+      id: "inventory", label: "Inventory", href: "/inventory",
+      icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>,
+      adminOnly: true,
+      pickerHidden: true,
+      adminDecoratorOnly: false,
+    },
+    {
       id: "users", label: "Users", href: "/users",
       icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>,
       adminOnly: true,
@@ -244,7 +251,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
     },
   ];
 
-  const pageTitles: Record<string, string> = { orders: "Orders", decoration: "Decoration", "picking-list": "Picking List", "back-in-stock": "Back In Stock", tasks: "Tasks", tracking: "Tracking", stores: "Stores", users: "Users", profile: "Profile", settings: "Settings" };
+  const pageTitles: Record<string, string> = { orders: "Orders", decoration: "Decoration", "picking-list": "Picking List", "back-in-stock": "Back In Stock", tasks: "Tasks", tracking: "Tracking", stores: "Stores", inventory: "Inventory", users: "Users", profile: "Profile", settings: "Settings" };
   const activeId = pathname.split("/")[1] || "";
 
   const sidebarWidth = sidebarCollapsed ? "64px" : "240px";

@@ -177,7 +177,7 @@ export class OrderModel {
     });
 
     if (exists) {
-      return { created: false };
+      return { created: false, id: exists.id };
     }
 
     const created = await prisma.order.create({
@@ -186,7 +186,7 @@ export class OrderModel {
     });
     await this.syncLineItemDecorations(created.id);
 
-    return { created: true };
+    return { created: true, id: created.id };
   }
 
   async upsertFromShopifyOrder(params: {
@@ -215,7 +215,7 @@ export class OrderModel {
         select: { id: true },
       });
       await this.syncLineItemDecorations(created.id);
-      return { created: true, updated: false };
+      return { created: true, updated: false, id: created.id };
     }
     await prisma.order.update({
       where: { id: existing.id },
@@ -223,7 +223,7 @@ export class OrderModel {
     });
     await this.syncLineItemDecorations(existing.id);
 
-    return { created: false, updated: true };
+    return { created: false, updated: true, id: existing.id };
   }
 
   private async syncLineItemDecorations(orderId: string, keywords?: DecorationKeywords): Promise<number> {

@@ -1,5 +1,6 @@
 import prisma from '@/lib/prisma.server';
 import { OrderModel, type ShopifyOrderPayload } from '@/models/order.model.server';
+import { linkOrderLineItems } from '@/lib/product-order-link.server';
 
 const SHOPIFY_API_VERSION = '2026-04';
 const SHOPIFY_ORDERS_PAGE_SIZE = 200;
@@ -319,6 +320,15 @@ export async function syncConnectedStoreOrders(params?: {
 
           if (result.created) created += 1;
           if (result.updated) updated += 1;
+
+          try {
+            await linkOrderLineItems(result.id);
+          } catch (linkError) {
+            console.error('Failed to link order line items during order sync', {
+              orderId: result.id,
+              error: linkError,
+            });
+          }
         }
 
         await prisma.store.update({

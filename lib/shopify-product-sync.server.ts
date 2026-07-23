@@ -1,0 +1,392 @@
+import prisma from '@/lib/prisma.server';
+import { shopifyGraphQL, getLegacyId } from '@/lib/shopify-graphql.server';
+import { relinkOrphanOrderLineItems } from '@/lib/product-order-link.server';
+import { ProductStatus } from '@prisma/client';
+
+const PRODUCTS_PAGE_SIZE = 50;
+const VARIANTS_PAGE_SIZE = 100;
+
+type SyncStoreResult = {
+  storeId: string;
+  storeDomain: string;
+  fetched: number;
+  created: number;
+  updated: number;
+  error?: string;
+};
+
+type ShopifyProductVariantNode = {
+  id: string;
+  title: string | null;
+  sku: string | null;
+  price: string;
+  position: number;
+  inventoryQuantity: number | null;
+  inventoryItem: { id: string; tracked: boolean } | null;
+};
+
+type ShopifyProductNode = {
+  id: string;
+  title: string;
+  handle: string | null;
+  vendor: string | null;
+  productType: string | null;
+  status: string;
+  tags: string[];
+  category: { name: string } | null;
+  featuredImage: { url: string } | null;
+  onlineStoreUrl: string | null;
+  totalInventory: number | null;
+  createdAt: string;
+  updatedAt: string;
+  variants: {
+    nodes: ShopifyProductVariantNode[];
+    pageInfo: { hasNextPage: boolean; endCursor: string | null };
+  };
+};
+
+type ShopifyProductsResult = {
+  products: {
+    nodes: ShopifyProductNode[];
+    pageInfo: { hasNextPage: boolean; endCursor: string | null };
+  };
+};
+
+type ShopifyProductVariantsResult = {
+  product: {
+    variants: { nodes: ShopifyProductVariantNode[]; pageInfo: { hasNextPage: boolean; endCursor: string | null } };
+  } | null;
+};
+
+// Channels (resourcePublicationsV2) are deliberately left out of this query: the
+// field name checks out against the live 2026-04 schema, but reading it needs the
+// read_publications scope, which isn't in DEFAULT_SCOPES yet, so existing store
+// tokens don't have it. salesChannels stays empty until scope + reconnect land.
+const PRODUCTS_QUERY = `
+  query ProductsForSync($first: Int!, $after: String, $query: String!) {
+    products(first: $first, after: $after, query: $query, sortKey: ID) {
+      nodes {
+        id
+        title
+        handle
+        vendor
+        productType
+        status
+        tags
+        category { name }
+        featuredImage { url }
+        onlineStoreUrl
+        totalInventory
+        createdAt
+        updatedAt
+        variants(first: ${VARIANTS_PAGE_SIZE}) {
+          nodes {
+            id
+            title
+            sku
+            price
+            position
+            inventoryQuantity
+            inventoryItem { id tracked }
+          }
+          pageInfo { hasNextPage endCursor }
+        }
+      }
+      pageInfo { hasNextPage endCursor }
+    }
+  }
+`;
+
+const PRODUCT_VARIANTS_QUERY = `
+  query ProductVariantsForSync($id: ID!, $first: Int!, $after: String) {
+    product(id: $id) {
+      variants(first: $first, after: $after) {
+        nodes {
+          id
+          title
+          sku
+          price
+          position
+          inventoryQuantity
+          inventoryItem { id tracked }
+        }
+        pageInfo { hasNextPage endCursor }
+      }
+    }
+  }
+`;
+
+const PRODUCT_BY_ID_QUERY = `
+  query ProductById($id: ID!) {
+    product(id: $id) {
+      id
+      title
+      handle
+      vendor
+      productType
+      status
+      tags
+      category { name }
+      featuredImage { url }
+      onlineStoreUrl
+      totalInventory
+      createdAt
+      updatedAt
+      variants(first: ${VARIANTS_PAGE_SIZE}) {
+        nodes {
+          id
+          title
+          sku
+          price
+          position
+          inventoryQuantity
+          inventoryItem { id tracked }
+        }
+        pageInfo { hasNextPage endCursor }
+      }
+    }
+  }
+`;
+
+type ShopifyProductByIdResult = { product: ShopifyProductNode | null };
+
+/** Used by the product webhook (create/update) to sync a single product on demand. */
+export async function syncSingleProduct(params: {
+  storeId: string;
+  shop: string;
+  accessToken: string;
+  shopifyProductId: string | number;
+}) {
+  const { storeId, shop, accessToken, shopifyProductId } = params;
+  const data = await shopifyGraphQL<ShopifyProductByIdResult>(shop, accessToken, PRODUCT_BY_ID_QUERY, {
+    id: toProductGid(shopifyProductId),
+  });
+  if (!data.product) return null;
+
+  const product = data.product;
+  if (product.variants.pageInfo.hasNextPage) {
+    product.variants.nodes = await fetchRemainingVariants(shop, accessToken, product);
+  }
+
+  const result = await upsertProduct(storeId, product);
+  await relinkOrphanOrderLineItems(storeId, [result.shopifyId]).catch((error) => {
+    console.error('Failed to relink order line items after single product sync', { storeId, error });
+  });
+  return result;
+}
+
+export async function softDeleteProduct(storeId: string, shopifyProductId: string | number) {
+  await prisma.product.updateMany({
+    where: { storeId, shopifyId: String(shopifyProductId) },
+    data: { deletedAt: new Date() },
+  });
+}
+
+function toProductGid(id: string | number) {
+  const value = String(id);
+  return value.startsWith('gid://shopify/Product/') ? value : `gid://shopify/Product/${value}`;
+}
+
+export async function syncConnectedStoreProducts(params?: {
+  storeIds?: string[] | null;
+  onStoreSynced?: (result: SyncStoreResult) => Promise<void> | void;
+}) {
+  const stores = await prisma.store.findMany({
+    where: {
+      status: 'connected',
+      accessToken: { not: null },
+      ...(params?.storeIds && params.storeIds.length > 0 ? { id: { in: params.storeIds } } : {}),
+    },
+    select: { id: true, storeDomain: true, accessToken: true, lastProductSyncedAt: true },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  const results: SyncStoreResult[] = [];
+
+  // One store at a time — product sync is heavier per item (up to 100
+  // variants each) than order sync, so we don't fan out with Promise.all the
+  // way order sync does; that would amplify throttling across stores.
+  for (const store of stores) {
+    try {
+      let fetched = 0;
+      let created = 0;
+      let updated = 0;
+      const syncedShopifyIds: string[] = [];
+
+      const products = await fetchShopifyProducts(store.storeDomain, store.accessToken!, store.lastProductSyncedAt);
+      fetched = products.length;
+
+      for (const product of products) {
+        const result = await upsertProduct(store.id, product);
+        if (result.created) created += 1;
+        if (result.updated) updated += 1;
+        syncedShopifyIds.push(result.shopifyId);
+      }
+
+      await prisma.store.update({ where: { id: store.id }, data: { lastProductSyncedAt: new Date() } });
+
+      if (syncedShopifyIds.length > 0) {
+        await relinkOrphanOrderLineItems(store.id, syncedShopifyIds).catch((error) => {
+          console.error('Failed to relink order line items after product sync', { storeId: store.id, error });
+        });
+      }
+
+      const result: SyncStoreResult = { storeId: store.id, storeDomain: store.storeDomain, fetched, created, updated };
+      await params?.onStoreSynced?.(result);
+      results.push(result);
+    } catch (error) {
+      console.error('Product sync failed for store', {
+        storeDomain: store.storeDomain,
+        error: error instanceof Error ? error.message : error,
+      });
+      const result: SyncStoreResult = {
+        storeId: store.id,
+        storeDomain: store.storeDomain,
+        fetched: 0,
+        created: 0,
+        updated: 0,
+        error: error instanceof Error ? error.message : 'Unknown sync error',
+      };
+      await params?.onStoreSynced?.(result);
+      results.push(result);
+    }
+  }
+
+  return {
+    totalStores: stores.length,
+    totalFetched: results.reduce((sum, item) => sum + item.fetched, 0),
+    totalCreated: results.reduce((sum, item) => sum + item.created, 0),
+    totalUpdated: results.reduce((sum, item) => sum + item.updated, 0),
+    failedStores: results.filter((item) => item.error).length,
+    results,
+  };
+}
+
+async function fetchShopifyProducts(
+  shop: string,
+  accessToken: string,
+  lastSyncedAt: Date | null
+): Promise<ShopifyProductNode[]> {
+  const products: ShopifyProductNode[] = [];
+  let after: string | null = null;
+  let hasNextPage = true;
+  const query = lastSyncedAt ? `updated_at:>'${lastSyncedAt.toISOString()}'` : '';
+
+  while (hasNextPage) {
+    const data: ShopifyProductsResult = await shopifyGraphQL<ShopifyProductsResult>(shop, accessToken, PRODUCTS_QUERY, {
+      first: PRODUCTS_PAGE_SIZE,
+      after,
+      query,
+    });
+
+    for (const product of data.products.nodes) {
+      if (product.variants.pageInfo.hasNextPage) {
+        product.variants.nodes = await fetchRemainingVariants(shop, accessToken, product);
+      }
+      products.push(product);
+    }
+
+    hasNextPage = data.products.pageInfo.hasNextPage;
+    after = data.products.pageInfo.endCursor;
+  }
+
+  return products;
+}
+
+// Rare: a product with more than 100 variants. Re-page that product's variants alone.
+async function fetchRemainingVariants(
+  shop: string,
+  accessToken: string,
+  product: ShopifyProductNode
+): Promise<ShopifyProductVariantNode[]> {
+  const variants = [...product.variants.nodes];
+  let after = product.variants.pageInfo.endCursor;
+  let hasNextPage = product.variants.pageInfo.hasNextPage;
+
+  while (hasNextPage) {
+    const data = await shopifyGraphQL<ShopifyProductVariantsResult>(shop, accessToken, PRODUCT_VARIANTS_QUERY, {
+      id: product.id,
+      first: VARIANTS_PAGE_SIZE,
+      after,
+    });
+    if (!data.product) break;
+
+    variants.push(...data.product.variants.nodes);
+    hasNextPage = data.product.variants.pageInfo.hasNextPage;
+    after = data.product.variants.pageInfo.endCursor;
+  }
+
+  return variants;
+}
+
+async function upsertProduct(storeId: string, product: ShopifyProductNode) {
+  const shopifyId = getLegacyId(product.id);
+
+  const data = {
+    title: product.title,
+    handle: product.handle,
+    vendor: product.vendor,
+    productType: product.productType,
+    category: product.category?.name ?? null,
+    status: toProductStatus(product.status),
+    tags: product.tags ?? [],
+    imageUrl: product.featuredImage?.url ?? null,
+    onlineStoreUrl: product.onlineStoreUrl,
+    totalInventory: product.totalInventory ?? 0,
+    shopifyCreatedAt: new Date(product.createdAt),
+    shopifyUpdatedAt: new Date(product.updatedAt),
+    deletedAt: null,
+  };
+
+  const existing = await prisma.product.findUnique({
+    where: { storeId_shopifyId: { storeId, shopifyId } },
+    select: { id: true },
+  });
+
+  const dbProduct = existing
+    ? await prisma.product.update({ where: { id: existing.id }, data })
+    : await prisma.product.create({ data: { ...data, storeId, shopifyId } });
+
+  await upsertVariants(dbProduct.id, storeId, product.variants.nodes);
+
+  return { created: !existing, updated: !!existing, shopifyId };
+}
+
+async function upsertVariants(productId: string, storeId: string, variants: ShopifyProductVariantNode[]) {
+  const seenShopifyIds: string[] = [];
+
+  for (const variant of variants) {
+    const shopifyId = getLegacyId(variant.id);
+    seenShopifyIds.push(shopifyId);
+
+    const data = {
+      productId,
+      title: variant.title,
+      sku: variant.sku,
+      price: Number(variant.price ?? 0),
+      inventoryItemId: variant.inventoryItem?.id ? getLegacyId(variant.inventoryItem.id) : null,
+      inventoryQuantity: variant.inventoryQuantity ?? 0,
+      inventoryTracked: variant.inventoryItem?.tracked ?? true,
+      position: variant.position ?? 0,
+    };
+
+    await prisma.productVariant.upsert({
+      where: { storeId_shopifyId: { storeId, shopifyId } },
+      update: data,
+      create: { ...data, storeId, shopifyId },
+    });
+  }
+
+  // Variants removed on Shopify's side since the last sync — drop the local mirror.
+  if (seenShopifyIds.length > 0) {
+    await prisma.productVariant.deleteMany({
+      where: { productId, shopifyId: { notIn: seenShopifyIds } },
+    });
+  }
+}
+
+function toProductStatus(value: string): ProductStatus {
+  const upper = value?.toUpperCase();
+  if (upper === 'ACTIVE' || upper === 'DRAFT' || upper === 'ARCHIVED') return upper;
+  return 'ACTIVE';
+}
