@@ -1,17 +1,17 @@
 module.exports = {
   apps: [
-    {
-      name: "order-fulfillment",
-      script: "npm",
-      args: "start",
-      time: true,
-      error_file: "./logs/error.log",
-      out_file: "./logs/out.log",
-      log_file: "./logs/logs.log",
-      exec_mode: "fork",
-      instances: "1",
-      watch: false,
-    },
+    // {
+    //   name: "order-fulfillment",
+    //   script: "npm",
+    //   args: "start",
+    //   time: true,
+    //   error_file: "./logs/error.log",
+    //   out_file: "./logs/out.log",
+    //   log_file: "./logs/logs.log",
+    //   exec_mode: "fork",
+    //   instances: "1",
+    //   watch: false,
+    // },
     {
       name: "order-fulfillment--order-sync-worker",
       script: "npm",

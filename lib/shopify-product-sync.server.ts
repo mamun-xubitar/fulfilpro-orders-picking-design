@@ -36,6 +36,7 @@ type ShopifyProductNode = {
   category: { name: string } | null;
   featuredImage: { url: string } | null;
   onlineStoreUrl: string | null;
+  onlineStorePreviewUrl: string | null;
   totalInventory: number | null;
   createdAt: string;
   updatedAt: string;
@@ -76,6 +77,7 @@ const PRODUCTS_QUERY = `
         category { name }
         featuredImage { url }
         onlineStoreUrl
+        onlineStorePreviewUrl
         totalInventory
         createdAt
         updatedAt
@@ -129,6 +131,7 @@ const PRODUCT_BY_ID_QUERY = `
       category { name }
       featuredImage { url }
       onlineStoreUrl
+      onlineStorePreviewUrl
       totalInventory
       createdAt
       updatedAt
@@ -331,7 +334,7 @@ async function upsertProduct(storeId: string, product: ShopifyProductNode) {
     status: toProductStatus(product.status),
     tags: product.tags ?? [],
     imageUrl: product.featuredImage?.url ?? null,
-    onlineStoreUrl: product.onlineStoreUrl,
+    onlineStoreUrl: product.onlineStoreUrl || product.onlineStorePreviewUrl,
     totalInventory: product.totalInventory ?? 0,
     shopifyCreatedAt: new Date(product.createdAt),
     shopifyUpdatedAt: new Date(product.updatedAt),
