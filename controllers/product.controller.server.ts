@@ -1,5 +1,8 @@
+import prisma from '@/lib/prisma.server';
 import { ProductModel } from '@/models/product.model.server';
 import { enqueueProductSyncJob, getProductSyncStatus } from '@/lib/product-sync-jobs.server';
+import { enqueueJob } from '@/lib/background-jobs.server';
+import { deleteProductNow, type BulkProductAction, type BulkProductActionPayload } from '@/lib/product-bulk-actions.server';
 import { ProductStatus } from '@prisma/client';
 
 const model = new ProductModel();
@@ -7,6 +10,15 @@ const model = new ProductModel();
 const SEARCH_FIELD_VALUES = new Set(['title', 'vendor', 'supplier', 'category', 'type', 'tag']);
 const STOCK_LEVEL_VALUES = new Set(['out_of_stock', 'not_tracked', 'in_stock']);
 const STATUS_VALUES = new Set<string>(Object.values(ProductStatus));
+const BULK_ACTIONS = new Set<BulkProductAction>([
+  'delete',
+  'archive',
+  'set_draft',
+  'include_channel',
+  'exclude_channel',
+  'add_tags',
+  'remove_tags',
+]);
 
 type Session = { user?: { id?: string | null; role?: string | null } | null } | null;
 
@@ -97,6 +109,90 @@ export class ProductController {
     if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
     const result = await getProductSyncStatus();
     return { data: result };
+  }
+
+  async enqueueBulk(body: unknown, session: Session, allowedStoreIds?: string[] | null) {
+    if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
+
+    const value = (body ?? {}) as Record<string, unknown>;
+    const actionRaw = typeof value.action === 'string' ? value.action : '';
+    if (!BULK_ACTIONS.has(actionRaw as BulkProductAction)) {
+      return { error: { message: 'Invalid bulk action', status: 400 } };
+    }
+    const action = actionRaw as BulkProductAction;
+
+    const tags = Array.isArray(value.tags)
+      ? (value.tags as unknown[]).filter((t): t is string => typeof t === 'string' && t.trim() !== '')
+      : [];
+    if ((action === 'add_tags' || action === 'remove_tags') && tags.length === 0) {
+      return { error: { message: 'At least one tag is required', status: 400 } };
+    }
+
+    const channelName = typeof value.channelName === 'string' ? value.channelName.trim() : '';
+    if ((action === 'include_channel' || action === 'exclude_channel') && !channelName) {
+      return { error: { message: 'channelName is required', status: 400 } };
+    }
+
+    const productIds = await this.resolveBulkProductIds(value, allowedStoreIds);
+    if (productIds.length === 0) {
+      return { error: { message: 'No products matched the selection', status: 400 } };
+    }
+
+    const payload: BulkProductActionPayload = {
+      action,
+      productIds,
+      ...(tags.length > 0 ? { tags } : {}),
+      ...(channelName ? { channelName } : {}),
+    };
+    const job = await enqueueJob('bulk_product_action', payload as unknown as Record<string, unknown>);
+    return { data: { job } };
+  }
+
+  async bulkStatus(jobId: string, session: Session) {
+    if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
+    const job = await prisma.backgroundJob.findFirst({ where: { id: jobId, type: 'bulk_product_action' } });
+    if (!job) return { error: { message: 'Job not found', status: 404 } };
+    return { data: { job } };
+  }
+
+  async remove(id: string, session: Session) {
+    if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
+    try {
+      await deleteProductNow(id);
+      return { message: 'Product deleted' };
+    } catch (error) {
+      return { error: { message: error instanceof Error ? error.message : 'Failed to delete product', status: 400 } };
+    }
+  }
+
+  private async resolveBulkProductIds(value: Record<string, unknown>, allowedStoreIds?: string[] | null) {
+    if (value.selectAllFilters !== true) {
+      return Array.isArray(value.productIds)
+        ? (value.productIds as unknown[]).filter((id): id is string => typeof id === 'string')
+        : [];
+    }
+
+    const filters = (value.filters ?? {}) as Record<string, unknown>;
+    let storeIds = Array.isArray(filters.storeIds)
+      ? (filters.storeIds as unknown[]).filter((s): s is string => typeof s === 'string')
+      : [];
+    if (allowedStoreIds !== null && allowedStoreIds !== undefined) {
+      if (allowedStoreIds.length === 0) return [];
+      storeIds = storeIds.length > 0 ? storeIds.filter((id) => allowedStoreIds.includes(id)) : allowedStoreIds;
+    }
+
+    const status = Array.isArray(filters.status)
+      ? (filters.status as unknown[]).filter((s): s is ProductStatus => typeof s === 'string' && STATUS_VALUES.has(s))
+      : [];
+    const stockLevelRaw = typeof filters.stockLevel === 'string' ? filters.stockLevel : '';
+    const stockLevel = STOCK_LEVEL_VALUES.has(stockLevelRaw) ? stockLevelRaw : '';
+    const stockCompare = filters.stockCompare === 'below' || filters.stockCompare === 'above' ? filters.stockCompare : '';
+    const stockQty = typeof filters.stockQty === 'number' && Number.isFinite(filters.stockQty) ? filters.stockQty : null;
+    const search = typeof filters.search === 'string' ? filters.search.trim() : '';
+    const searchFieldRaw = typeof filters.searchField === 'string' ? filters.searchField.trim() : '';
+    const searchField = SEARCH_FIELD_VALUES.has(searchFieldRaw) ? searchFieldRaw : '';
+
+    return model.listIds({ search, searchField, storeIds, status, stockLevel, stockCompare, stockQty });
   }
 }
 

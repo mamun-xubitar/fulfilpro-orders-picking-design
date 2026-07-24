@@ -40,6 +40,9 @@ type ShopifyProductNode = {
   totalInventory: number | null;
   createdAt: string;
   updatedAt: string;
+  resourcePublicationsV2: {
+    nodes: Array<{ publication: { id: string; name: string }; isPublished: boolean }>;
+  };
   variants: {
     nodes: ShopifyProductVariantNode[];
     pageInfo: { hasNextPage: boolean; endCursor: string | null };
@@ -59,11 +62,24 @@ type ShopifyProductVariantsResult = {
   } | null;
 };
 
-// Channels (resourcePublicationsV2) are deliberately left out of this query: the
-// field name checks out against the live 2026-04 schema, but reading it needs the
-// read_publications scope, which isn't in DEFAULT_SCOPES yet, so existing store
-// tokens don't have it. salesChannels stays empty until scope + reconnect land.
-const PRODUCTS_QUERY = `
+// read_publications/write_publications were added to DEFAULT_SCOPES alongside this
+// field. Existing store OAuth tokens issued before that change do NOT have the new
+// scope — Shopify only grants it after the merchant re-authorizes (reconnect flow).
+// Requesting it against such a token makes Shopify's ENTIRE query fail (top-level
+// GraphQL error, not just a null field), which would take down product sync for
+// every store that hasn't reconnected yet. So this field is opt-in per query call:
+// we try it, and if a store's token rejects it, we cache that per-shop and fall
+// back to the channel-less query for the rest of the process's lifetime.
+const RESOURCE_PUBLICATIONS_FIELD = `
+        resourcePublicationsV2(first: 25) {
+          nodes {
+            publication { id name }
+            isPublished
+          }
+        }`;
+
+function buildProductsQuery(includeChannels: boolean) {
+  return `
   query ProductsForSync($first: Int!, $after: String, $query: String!) {
     products(first: $first, after: $after, query: $query, sortKey: ID) {
       nodes {
@@ -81,6 +97,7 @@ const PRODUCTS_QUERY = `
         totalInventory
         createdAt
         updatedAt
+        ${includeChannels ? RESOURCE_PUBLICATIONS_FIELD : ''}
         variants(first: ${VARIANTS_PAGE_SIZE}) {
           nodes {
             id
@@ -98,6 +115,7 @@ const PRODUCTS_QUERY = `
     }
   }
 `;
+}
 
 const PRODUCT_VARIANTS_QUERY = `
   query ProductVariantsForSync($id: ID!, $first: Int!, $after: String) {
@@ -118,7 +136,8 @@ const PRODUCT_VARIANTS_QUERY = `
   }
 `;
 
-const PRODUCT_BY_ID_QUERY = `
+function buildProductByIdQuery(includeChannels: boolean) {
+  return `
   query ProductById($id: ID!) {
     product(id: $id) {
       id
@@ -135,6 +154,7 @@ const PRODUCT_BY_ID_QUERY = `
       totalInventory
       createdAt
       updatedAt
+      ${includeChannels ? RESOURCE_PUBLICATIONS_FIELD : ''}
       variants(first: ${VARIANTS_PAGE_SIZE}) {
         nodes {
           id
@@ -150,8 +170,42 @@ const PRODUCT_BY_ID_QUERY = `
     }
   }
 `;
+}
 
 type ShopifyProductByIdResult = { product: ShopifyProductNode | null };
+
+const shopsWithoutPublicationsScope = new Set<string>();
+
+function isPublicationsScopeError(error: unknown) {
+  return error instanceof Error && /resourcePublicationsV2|read_publications/i.test(error.message);
+}
+
+/** Requests channels opportunistically; if a shop's token lacks read_publications, falls back and remembers it for this process. */
+async function queryProducts(shop: string, accessToken: string, variables: Record<string, unknown>) {
+  const includeChannels = !shopsWithoutPublicationsScope.has(shop);
+  try {
+    return await shopifyGraphQL<ShopifyProductsResult>(shop, accessToken, buildProductsQuery(includeChannels), variables);
+  } catch (error) {
+    if (includeChannels && isPublicationsScopeError(error)) {
+      shopsWithoutPublicationsScope.add(shop);
+      return shopifyGraphQL<ShopifyProductsResult>(shop, accessToken, buildProductsQuery(false), variables);
+    }
+    throw error;
+  }
+}
+
+async function queryProductById(shop: string, accessToken: string, id: string) {
+  const includeChannels = !shopsWithoutPublicationsScope.has(shop);
+  try {
+    return await shopifyGraphQL<ShopifyProductByIdResult>(shop, accessToken, buildProductByIdQuery(includeChannels), { id });
+  } catch (error) {
+    if (includeChannels && isPublicationsScopeError(error)) {
+      shopsWithoutPublicationsScope.add(shop);
+      return shopifyGraphQL<ShopifyProductByIdResult>(shop, accessToken, buildProductByIdQuery(false), { id });
+    }
+    throw error;
+  }
+}
 
 /** Used by the product webhook (create/update) to sync a single product on demand. */
 export async function syncSingleProduct(params: {
@@ -161,9 +215,7 @@ export async function syncSingleProduct(params: {
   shopifyProductId: string | number;
 }) {
   const { storeId, shop, accessToken, shopifyProductId } = params;
-  const data = await shopifyGraphQL<ShopifyProductByIdResult>(shop, accessToken, PRODUCT_BY_ID_QUERY, {
-    id: toProductGid(shopifyProductId),
-  });
+  const data = await queryProductById(shop, accessToken, toProductGid(shopifyProductId));
   if (!data.product) return null;
 
   const product = data.product;
@@ -185,7 +237,7 @@ export async function softDeleteProduct(storeId: string, shopifyProductId: strin
   });
 }
 
-function toProductGid(id: string | number) {
+export function toProductGid(id: string | number) {
   const value = String(id);
   return value.startsWith('gid://shopify/Product/') ? value : `gid://shopify/Product/${value}`;
 }
@@ -276,7 +328,7 @@ async function fetchShopifyProducts(
   const query = lastSyncedAt ? `updated_at:>'${lastSyncedAt.toISOString()}'` : '';
 
   while (hasNextPage) {
-    const data: ShopifyProductsResult = await shopifyGraphQL<ShopifyProductsResult>(shop, accessToken, PRODUCTS_QUERY, {
+    const data: ShopifyProductsResult = await queryProducts(shop, accessToken, {
       first: PRODUCTS_PAGE_SIZE,
       after,
       query,
@@ -335,6 +387,9 @@ async function upsertProduct(storeId: string, product: ShopifyProductNode) {
     tags: product.tags ?? [],
     imageUrl: product.featuredImage?.url ?? null,
     onlineStoreUrl: product.onlineStoreUrl || product.onlineStorePreviewUrl,
+    salesChannels: (product.resourcePublicationsV2?.nodes ?? [])
+      .filter((node) => node.isPublished)
+      .map((node) => ({ id: getLegacyId(node.publication.id), name: node.publication.name })),
     totalInventory: product.totalInventory ?? 0,
     shopifyCreatedAt: new Date(product.createdAt),
     shopifyUpdatedAt: new Date(product.updatedAt),

@@ -19,45 +19,8 @@ export type ProductListParams = {
 
 export class ProductModel {
   async list(params: ProductListParams) {
-    const {
-      search,
-      searchField,
-      storeIds = [],
-      status = [],
-      stockLevel,
-      stockCompare,
-      stockQty,
-      sort = 'title',
-      dir = 'asc',
-      page,
-      pageSize,
-    } = params;
-
-    const where: Prisma.ProductWhereInput = {
-      deletedAt: null,
-      ...(storeIds.length > 0 ? { storeId: { in: storeIds } } : {}),
-      ...(status.length > 0 ? { status: { in: status } } : {}),
-    };
-
-    const tokens = (search?.trim() ?? '').split(/\s+/).filter(Boolean);
-    if (tokens.length > 0) {
-      where.AND = tokens.map((token) => (searchField ? buildFieldCondition(searchField, token) : buildAnyFieldCondition(token)));
-    }
-
-    if (stockLevel === 'not_tracked') {
-      where.variants = { some: { inventoryTracked: false } };
-    } else if (stockLevel === 'out_of_stock') {
-      where.totalInventory = { lte: 0 };
-    } else if (stockLevel === 'in_stock') {
-      where.totalInventory = { gt: 0 };
-    }
-
-    if (stockCompare && stockQty != null) {
-      where.totalInventory = {
-        ...(typeof where.totalInventory === 'object' ? where.totalInventory : {}),
-        ...(stockCompare === 'below' ? { lt: stockQty } : { gt: stockQty }),
-      };
-    }
+    const { sort = 'title', dir = 'asc', page, pageSize } = params;
+    const where = buildWhere(params);
 
     const [total, products] = await Promise.all([
       prisma.product.count({ where }),
@@ -71,6 +34,13 @@ export class ProductModel {
     ]);
 
     return { products: products.map(serializeProduct), total };
+  }
+
+  /** Resolves "select all matching filters" for bulk actions into concrete product ids. */
+  async listIds(params: Omit<ProductListParams, 'page' | 'pageSize' | 'sort' | 'dir'>) {
+    const where = buildWhere(params);
+    const products = await prisma.product.findMany({ where, select: { id: true } });
+    return products.map((p) => p.id);
   }
 
   async formData(allowedStoreIds?: string[] | null) {
@@ -93,7 +63,9 @@ export class ProductModel {
       for (const tag of product.tags) tagSet.add(tag);
       if (Array.isArray(product.salesChannels)) {
         for (const channel of product.salesChannels as unknown[]) {
-          if (typeof channel === 'string') channelSet.add(channel);
+          if (channel && typeof channel === 'object' && 'name' in channel && typeof (channel as { name: unknown }).name === 'string') {
+            channelSet.add((channel as { name: string }).name);
+          }
         }
       }
     }
@@ -122,6 +94,38 @@ export class ProductModel {
 
     return stores.map((store) => ({ id: store.id, name: store.name ?? store.storeDomain, storeDomain: store.storeDomain }));
   }
+}
+
+function buildWhere(params: Omit<ProductListParams, 'page' | 'pageSize' | 'sort' | 'dir'>): Prisma.ProductWhereInput {
+  const { search, searchField, storeIds = [], status = [], stockLevel, stockCompare, stockQty } = params;
+
+  const where: Prisma.ProductWhereInput = {
+    deletedAt: null,
+    ...(storeIds.length > 0 ? { storeId: { in: storeIds } } : {}),
+    ...(status.length > 0 ? { status: { in: status } } : {}),
+  };
+
+  const tokens = (search?.trim() ?? '').split(/\s+/).filter(Boolean);
+  if (tokens.length > 0) {
+    where.AND = tokens.map((token) => (searchField ? buildFieldCondition(searchField, token) : buildAnyFieldCondition(token)));
+  }
+
+  if (stockLevel === 'not_tracked') {
+    where.variants = { some: { inventoryTracked: false } };
+  } else if (stockLevel === 'out_of_stock') {
+    where.totalInventory = { lte: 0 };
+  } else if (stockLevel === 'in_stock') {
+    where.totalInventory = { gt: 0 };
+  }
+
+  if (stockCompare && stockQty != null) {
+    where.totalInventory = {
+      ...(typeof where.totalInventory === 'object' ? where.totalInventory : {}),
+      ...(stockCompare === 'below' ? { lt: stockQty } : { gt: stockQty }),
+    };
+  }
+
+  return where;
 }
 
 function buildFieldCondition(field: string, token: string): Prisma.ProductWhereInput {
@@ -174,7 +178,7 @@ function serializeProduct(product: ProductWithStore) {
     tags: product.tags,
     imageUrl: product.imageUrl,
     onlineStoreUrl: product.onlineStoreUrl,
-    salesChannels: Array.isArray(product.salesChannels) ? (product.salesChannels as string[]) : [],
+    salesChannels: Array.isArray(product.salesChannels) ? (product.salesChannels as Array<{ id: string; name: string }>) : [],
     totalInventory: product.totalInventory,
     soldQuantity: product.soldQuantity,
     soldAmount: Number(product.soldAmount),

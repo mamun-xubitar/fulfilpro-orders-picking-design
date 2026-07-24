@@ -5,6 +5,7 @@ import { TrackingModel } from '@/models/tracking.model.server';
 import { resolveCarrierCode } from '@/lib/carrier-resolver.server';
 import { OrderModel } from '@/models/order.model.server';
 import { linkOrderLineItems, refreshProductSales } from '@/lib/product-order-link.server';
+import { runBulkProductAction, type BulkProductActionPayload } from '@/lib/product-bulk-actions.server';
 
 const trackingModel = new TrackingModel();
 
@@ -70,6 +71,8 @@ export async function runJob(jobId: string) {
       await runRescanDecorations(jobId);
     } else if (job.type === 'backfill_order_line_items') {
       await runBackfillOrderLineItems(jobId);
+    } else if (job.type === 'bulk_product_action') {
+      await runBulkProductAction(jobId, payload as unknown as BulkProductActionPayload);
     } else {
       throw new Error(`Unknown job type: ${job.type}`);
     }

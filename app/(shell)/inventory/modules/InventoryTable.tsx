@@ -11,18 +11,47 @@ type InventoryTableProps = {
   sort: string;
   dir: 'asc' | 'desc';
   onSortChange: (key: string) => void;
+  selectedIds: string[];
+  onToggleSelect: (id: string) => void;
+  isCurrentPageAllSelected: boolean;
+  onToggleSelectAllOnPage: () => void;
+  onRequestDelete: (id: string, title: string) => void;
 };
 
-export default function InventoryTable({ products, loading, error, sort, dir, onSortChange }: InventoryTableProps) {
+export default function InventoryTable({
+  products,
+  loading,
+  error,
+  sort,
+  dir,
+  onSortChange,
+  selectedIds,
+  onToggleSelect,
+  isCurrentPageAllSelected,
+  onToggleSelectAllOnPage,
+  onRequestDelete,
+}: InventoryTableProps) {
   const colSpan = COLUMNS.length;
 
   return (
     <table className="min-w-[1000px] w-full text-sm">
       <thead>
         <tr className="bg-gray-50 border-b border-gray-200">
-          {COLUMNS.map((column) => (
-            <ColumnHeader key={column.key} column={column} sort={sort} dir={dir} onSortChange={onSortChange} />
-          ))}
+          {COLUMNS.map((column) =>
+            column.key === 'select' ? (
+              <th key={column.key} className="px-4 py-3 w-10">
+                <input
+                  type="checkbox"
+                  checked={isCurrentPageAllSelected}
+                  onChange={onToggleSelectAllOnPage}
+                  className="rounded border-gray-300 text-blue-600 cursor-pointer"
+                  aria-label="Select all on this page"
+                />
+              </th>
+            ) : (
+              <ColumnHeader key={column.key} column={column} sort={sort} dir={dir} onSortChange={onSortChange} />
+            )
+          )}
         </tr>
       </thead>
       <tbody>
@@ -45,7 +74,13 @@ export default function InventoryTable({ products, loading, error, sort, dir, on
         )}
 
         {!loading && !error && products.map((product) => (
-          <InventoryTableRow key={product.id} product={product} />
+          <InventoryTableRow
+            key={product.id}
+            product={product}
+            selected={selectedIds.includes(product.id)}
+            onToggleSelect={onToggleSelect}
+            onRequestDelete={onRequestDelete}
+          />
         ))}
       </tbody>
     </table>

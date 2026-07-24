@@ -15,7 +15,7 @@ export type ProductRow = {
   tags: string[];
   imageUrl: string | null;
   onlineStoreUrl: string | null;
-  salesChannels: string[];
+  salesChannels: Array<{ id: string; name: string }>;
   totalInventory: number;
   soldQuantity: number;
   soldAmount: number;
@@ -31,6 +31,22 @@ export type Pagination = {
   totalPages: number;
   hasPrev: boolean;
   hasNext: boolean;
+};
+
+export type BulkProductAction =
+  | 'delete'
+  | 'archive'
+  | 'set_draft'
+  | 'include_channel'
+  | 'exclude_channel'
+  | 'add_tags'
+  | 'remove_tags';
+
+export type BulkJob = {
+  id: string;
+  status: string;
+  error: string | null;
+  progress: { done: number; total: number; errors: Array<{ productId: string; title: string; message: string }> } | null;
 };
 
 export type ProductSyncJob = {

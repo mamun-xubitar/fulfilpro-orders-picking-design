@@ -4,9 +4,12 @@ import { useInventoryPage } from './hooks/useInventoryPage';
 import InventoryToolbar from './InventoryToolbar';
 import InventoryTable from './InventoryTable';
 import InventoryPagination from './InventoryPagination';
+import InventorySelectionBar from './InventorySelectionBar';
+import InventoryBulkModals from './InventoryBulkModals';
 
 export default function InventoryPage() {
   const p = useInventoryPage();
+  const hasSelection = p.selectAllFilters || p.selectedIds.length > 0;
 
   return (
     <main className="flex-1 p-4 md:p-6">
@@ -51,6 +54,24 @@ export default function InventoryPage() {
         syncMessage={p.syncMessage}
       />
 
+      {hasSelection && (
+        <InventorySelectionBar
+          selectedCount={p.selectedIds.length}
+          selectAllFilters={p.selectAllFilters}
+          onToggleSelectAllFilters={p.toggleSelectAllFilters}
+          isCurrentPageAllSelected={p.isCurrentPageAllSelected}
+          onToggleCurrentPage={p.toggleSelectAllOnPage}
+          bulkRunning={p.bulkRunning}
+          bulkJob={p.bulkJob}
+          onArchive={() => p.runBulkAction('archive')}
+          onSetDraft={() => p.runBulkAction('set_draft')}
+          onOpenTagModal={(mode) => p.setTagModal({ mode, input: '' })}
+          onOpenChannelModal={(mode) => p.setChannelModal({ mode, input: '' })}
+          onOpenDelete={() => p.setDeleteConfirm({ kind: 'selection' })}
+          onClear={p.clearSelection}
+        />
+      )}
+
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <InventoryTable
@@ -60,6 +81,11 @@ export default function InventoryPage() {
             sort={p.sort}
             dir={p.dir}
             onSortChange={p.handleSortChange}
+            selectedIds={p.selectedIds}
+            onToggleSelect={p.toggleSelect}
+            isCurrentPageAllSelected={p.isCurrentPageAllSelected}
+            onToggleSelectAllOnPage={p.toggleSelectAllOnPage}
+            onRequestDelete={(id, title) => p.setDeleteConfirm({ kind: 'single', id, title })}
           />
         </div>
 
@@ -71,6 +97,19 @@ export default function InventoryPage() {
           itemLabel="products"
         />
       </div>
+
+      <InventoryBulkModals
+        tagModal={p.tagModal}
+        setTagModal={p.setTagModal}
+        onSubmitTagModal={p.submitTagModal}
+        channelModal={p.channelModal}
+        setChannelModal={p.setChannelModal}
+        onSubmitChannelModal={p.submitChannelModal}
+        deleteConfirm={p.deleteConfirm}
+        setDeleteConfirm={p.setDeleteConfirm}
+        onConfirmDelete={p.confirmDelete}
+        bulkRunning={p.bulkRunning}
+      />
     </main>
   );
 }

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useInventoryFilters } from './useInventoryFilters';
 import { useInventoryData } from './useInventoryData';
 import { useInventorySync } from './useInventorySync';
+import { useInventoryBulk } from './useInventoryBulk';
 
 export function useInventoryPage() {
   const [error, setError] = useState('');
@@ -12,6 +13,17 @@ export function useInventoryPage() {
   const filters = useInventoryFilters();
   const data = useInventoryData({ queryString: filters.queryString, setPagination: filters.setPagination });
   const sync = useInventorySync({ setError });
+  const bulk = useInventoryBulk({
+    products: data.products,
+    filters: {
+      search: filters.search,
+      searchField: filters.searchField,
+      storeIds: filters.storeIds,
+      status: filters.status,
+      stockLevel: filters.stockLevel,
+    },
+    bumpRefresh: data.bumpRefresh,
+  });
 
   const handleRefresh = () => {
     setRefreshRotation((prev) => prev + 360);
@@ -25,6 +37,7 @@ export function useInventoryPage() {
     ...filters,
     ...data,
     ...sync,
+    ...bulk,
     error: error || data.error,
   };
 }

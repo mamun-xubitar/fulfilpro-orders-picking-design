@@ -38,6 +38,7 @@ export const STOCK_LEVEL_OPTIONS = [
 ];
 
 export const COLUMNS: Array<{ key: string; label: string; sortable: boolean }> = [
+  { key: 'select', label: '', sortable: false },
   { key: 'title', label: 'Product', sortable: true },
   { key: 'status', label: 'Status', sortable: true },
   { key: 'totalInventory', label: 'Inventory', sortable: true },
