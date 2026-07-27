@@ -16,7 +16,7 @@ export default function InventoryTableRow({ product, selected, onToggleSelect, o
   const badge = STATUS_BADGE[product.status] ?? STATUS_BADGE.DRAFT;
 
   return (
-    <tr className={`border-b border-gray-100 hover:bg-gray-50 ${selected ? 'bg-blue-50/50' : ''}`}>
+    <tr className={`border-b border-gray-200 hover:bg-gray-50 ${selected ? 'bg-blue-50/50' : ''}`}>
       <td className="px-4 py-3">
         <input
           type="checkbox"

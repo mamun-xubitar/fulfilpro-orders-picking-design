@@ -36,7 +36,7 @@ export default function ProductGallery({ product }: ProductGalleryProps) {
           )}
         </div>
 
-        <GallerySizeBreakdown heading={heading} breakdown={breakdown} />
+        {/* <GallerySizeBreakdown heading={heading} breakdown={breakdown} /> */}
       </div>
 
       {lightboxOpen && active && (

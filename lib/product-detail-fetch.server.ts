@@ -16,6 +16,7 @@ type ProductDetailVariantNode = ShopifyProductNode['variants']['nodes'][number] 
 
 type ProductDetailNode = ShopifyProductNode & {
   variants: { nodes: ProductDetailVariantNode[]; pageInfo: { hasNextPage: boolean; endCursor: string | null } };
+  collections: { nodes: Array<{ id: string; title: string; handle: string | null }> };
 };
 
 type ProductDetailResult = {
@@ -37,6 +38,7 @@ const PRODUCT_DETAIL_QUERY = `
       category { id name }
       featuredImage { url }
       media(first: 20) { nodes { id ... on MediaImage { image { url altText } } } }
+      collections(first: 25) { nodes { id title handle } }
       onlineStoreUrl
       onlineStorePreviewUrl
       totalInventory
@@ -80,6 +82,7 @@ const PRODUCT_DETAIL_QUERY = `
 export type ProductDetailFetchResult = {
   product: ProductDetailNode;
   locations: Array<{ id: string; name: string }>;
+  collections: Array<{ id: string; title: string; handle: string | null }>;
 };
 
 /** One GraphQL round trip for the product-detail page: product + variants + per-location inventory + shop locations. Also refreshes the local mirror via the shared upsert path. */
@@ -98,5 +101,6 @@ export async function fetchProductDetail(
   return {
     product: data.product,
     locations: data.locations.nodes.map((node) => ({ id: getLegacyId(node.id), name: node.name })),
+    collections: data.product.collections.nodes.map((node) => ({ id: getLegacyId(node.id), title: node.title, handle: node.handle })),
   };
 }

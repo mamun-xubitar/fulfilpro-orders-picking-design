@@ -27,6 +27,8 @@ export type VariantDetail = {
 
 export type ProductStatusValue = 'ACTIVE' | 'DRAFT' | 'ARCHIVED';
 
+export type ProductCollection = { id: string; title: string; handle: string | null };
+
 export type ProductDetail = {
   id: string;
   storeId: string;
@@ -44,6 +46,7 @@ export type ProductDetail = {
   images: ProductImage[];
   onlineStoreUrl: string | null;
   salesChannels: SalesChannel[];
+  collections: ProductCollection[];
   totalInventory: number;
   store: { id: string; name: string; storeDomain: string };
   variants: VariantDetail[];

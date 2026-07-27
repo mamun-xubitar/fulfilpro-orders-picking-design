@@ -1,7 +1,7 @@
 'use client';
 
 import GalleryThumbRail from './GalleryThumbRail';
-import GallerySizeBreakdown from './GallerySizeBreakdown';
+// import GallerySizeBreakdown from './GallerySizeBreakdown';
 import type { GalleryEntry, SizeCount } from './types';
 
 type GalleryLightboxProps = {
@@ -64,7 +64,7 @@ export default function GalleryLightbox({
       <div className="flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={active.url} alt={active.altText ?? title} className="max-h-[75vh] max-w-full object-contain" />
-        <GallerySizeBreakdown heading={heading} breakdown={breakdown} dark />
+        {/* <GallerySizeBreakdown heading={heading} breakdown={breakdown} dark /> */}
       </div>
 
       {entries.length > 1 && (

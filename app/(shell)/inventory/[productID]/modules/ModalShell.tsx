@@ -5,11 +5,13 @@ export function ModalShell({
   onClose,
   children,
   allowOverflow,
+  wide,
 }: {
   title: string;
   onClose: () => void;
   children: React.ReactNode;
   allowOverflow?: boolean;
+  wide?: boolean;
 }) {
   return (
     <div
@@ -19,7 +21,7 @@ export function ModalShell({
       onClick={onClose}
     >
       <div
-        className={`w-full max-w-md rounded-lg border border-gray-200 bg-white shadow-xl ${allowOverflow ? 'overflow-visible' : 'overflow-hidden'}`}
+        className={`w-full ${wide ? 'max-w-2xl' : 'max-w-md'} rounded-lg border border-gray-200 bg-white shadow-xl ${allowOverflow ? 'overflow-visible' : 'overflow-hidden'}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-4 border-b border-gray-200 px-5 py-4">

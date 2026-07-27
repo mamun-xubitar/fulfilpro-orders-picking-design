@@ -1,7 +1,8 @@
 'use client';
 
 import { STATUS_BADGE } from './constants';
-import { computeMargin, formatCurrency } from './utils';
+import { computeMargin, formatCurrency, groupVariantsByColor, getSizeBreakdown, htmlToPlainText } from './utils';
+import FieldChips from './FieldChips';
 import type { EditableField } from './hooks/useFieldEdit';
 import type { ProductDetail } from './types';
 
@@ -34,6 +35,9 @@ export default function ProductDetailsPanel({
   const prices = product.variants.map((v) => v.price);
   const costs = product.variants.filter((v) => v.cost != null).map((v) => v.cost as number);
   const skus = [...new Set(product.variants.map((v) => v.sku).filter(Boolean))];
+  const colorLabels = groupVariantsByColor(product.variants).map((g) => g.label);
+  const sizeLabels = getSizeBreakdown(product.variants, null).map((s) => s.size);
+  const hasColors = colorLabels.length > 0 && !(colorLabels.length === 1 && colorLabels[0] === 'Default');
   const avgMargin =
     product.variants.length > 0 && costs.length === product.variants.length
       ? product.variants.reduce((sum, v) => sum + (computeMargin(v.price, v.cost) ?? 0), 0) / product.variants.length
@@ -44,6 +48,12 @@ export default function ProductDetailsPanel({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Title" full onEdit={() => onEditField('title')}>
           <span className="text-sm text-gray-900">{product.title}</span>
+        </Field>
+
+        <Field label="Description" full onEdit={() => onEditField('description')}>
+          <p className="text-sm text-gray-700 line-clamp-3 flex-1 min-w-0">
+            {product.descriptionHtml ? htmlToPlainText(product.descriptionHtml) || '—' : '—'}
+          </p>
         </Field>
 
         <Field label="SKU">
@@ -75,6 +85,22 @@ export default function ProductDetailsPanel({
             </div>
           )}
         </Field>
+
+        <Field label="Collections" full>
+          <FieldChips values={product.collections.map((c) => c.title)} />
+        </Field>
+
+        {hasColors && (
+          <Field label="Colors">
+            <FieldChips values={colorLabels} />
+          </Field>
+        )}
+
+        {sizeLabels.length > 0 && (
+          <Field label="Sizes">
+            <FieldChips values={sizeLabels} />
+          </Field>
+        )}
 
         <Field label="Price" onEdit={() => onEditField('price')}>
           <span className="text-sm text-gray-900">{summarizeRange(prices)}</span>

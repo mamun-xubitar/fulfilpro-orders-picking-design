@@ -105,6 +105,21 @@ export function buildGalleryEntries(product: ProductDetail): GalleryEntry[] {
   return entries;
 }
 
+export function htmlToPlainText(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, ' ')
+    .replace(/<\/(p|div|li|h[1-6]|tr)>/gi, ' ')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export function getSizeBreakdown(variants: VariantDetail[], colorKey: string | null): SizeCount[] {
   const filtered = colorKey ? variants.filter((v) => getVariantColor(v).toLowerCase() === colorKey) : variants;
   const bySize = new Map<string, { quantity: number; minPosition: number }>();

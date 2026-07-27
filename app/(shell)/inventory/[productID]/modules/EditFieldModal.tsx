@@ -10,6 +10,7 @@ import type { ProductStatusValue } from './types';
 
 const TITLES: Record<string, string> = {
   title: 'Edit title',
+  description: 'Edit description',
   status: 'Edit status',
   category: 'Edit category',
   productType: 'Edit product type',
@@ -26,7 +27,12 @@ export default function EditFieldModal({ edit }: { edit: ReturnType<typeof useFi
   const moneyInvalid = isMoney && (!editing.value || Number.isNaN(Number(editing.value)));
 
   return (
-    <ModalShell title={TITLES[editing.field]} onClose={edit.closeEdit} allowOverflow={editing.field === 'category' || editing.field === 'productType'}>
+    <ModalShell
+      title={TITLES[editing.field]}
+      onClose={edit.closeEdit}
+      allowOverflow={editing.field === 'category' || editing.field === 'productType'}
+      wide={editing.field === 'description'}
+    >
       {editing.field === 'title' && (
         <input
           type="text"
@@ -34,6 +40,18 @@ export default function EditFieldModal({ edit }: { edit: ReturnType<typeof useFi
           onChange={(e) => edit.setValue(e.target.value)}
           className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400"
         />
+      )}
+
+      {editing.field === 'description' && (
+        <>
+          <p className="text-sm text-gray-600 mb-2">HTML is supported. This is the storefront product description.</p>
+          <textarea
+            rows={12}
+            value={editing.value}
+            onChange={(e) => edit.setValue(e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono outline-none focus:ring-2 focus:ring-blue-400"
+          />
+        </>
       )}
 
       {editing.field === 'status' && (

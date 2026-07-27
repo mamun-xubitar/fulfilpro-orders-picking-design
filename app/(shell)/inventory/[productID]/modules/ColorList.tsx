@@ -12,7 +12,7 @@ export default function ColorList({ colorGroups, selectedColorKeys, onToggleColo
   return (
     <div className="border-r border-gray-100 pr-3">
       <h3 className="text-sm font-semibold text-gray-900 mb-2">Colors</h3>
-      <ul className="space-y-1">
+      <ul className="space-y-1 h-full max-h-[600px] overflow-y-auto pr-1">
         {colorGroups.map((group) => (
           <li key={group.key}>
             <button

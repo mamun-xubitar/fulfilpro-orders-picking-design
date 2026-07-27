@@ -6,6 +6,7 @@ import type { ProductDetail, ProductFieldsPayload, ProductStatusValue } from '..
 
 export type EditState =
   | { field: 'title'; value: string }
+  | { field: 'description'; value: string }
   | { field: 'productType'; value: string }
   | { field: 'status'; value: ProductStatusValue }
   | { field: 'category'; value: { id: string; name: string } | null }
@@ -23,6 +24,8 @@ function seedValue(product: ProductDetail, field: EditableField): EditState {
   switch (field) {
     case 'title':
       return { field, value: product.title };
+    case 'description':
+      return { field, value: product.descriptionHtml ?? '' };
     case 'productType':
       return { field, value: product.productType ?? '' };
     case 'status':
@@ -74,6 +77,9 @@ export function useFieldEdit({ product, bumpRefresh }: UseFieldEditArgs) {
     switch (editing.field) {
       case 'title':
         payload = { title: editing.value.trim() };
+        break;
+      case 'description':
+        payload = { descriptionHtml: editing.value };
         break;
       case 'productType':
         payload = { productType: editing.value.trim() };

@@ -29,7 +29,7 @@ export default function VariantsSection({ p }: VariantsSectionProps) {
       className="grid gap-4 transition-[grid-template-columns] duration-200"
       style={{ gridTemplateColumns: supplierPanelExpanded ? '1fr 20rem' : '1fr 0rem' }}
     >
-      <div className="min-w-0 bg-white rounded-xl border border-gray-200 p-4 grid grid-cols-1 md:grid-cols-[12rem_1fr] gap-4">
+      <div className="min-w-0 bg-white rounded-xl border border-gray-200 p-4 grid grid-cols-1 md:grid-cols-[12rem_1fr] gap-4 items-start">
         <ColorList colorGroups={p.colorGroups} selectedColorKeys={p.selectedColorKeys} onToggleColor={p.toggleColor} />
 
         <div className="min-w-0">

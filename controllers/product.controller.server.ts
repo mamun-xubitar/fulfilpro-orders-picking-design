@@ -189,6 +189,7 @@ export class ProductController {
     }
 
     let locations: Array<{ id: string; name: string }> = [];
+    let collections: Array<{ id: string; title: string; handle: string | null }> = [];
     const levelsByVariantShopifyId = new Map<
       string,
       Array<{ locationId: string; locationName: string; available: number; onHand: number }>
@@ -203,6 +204,7 @@ export class ProductController {
         );
         if (live) {
           locations = live.locations;
+          collections = live.collections;
           for (const variant of live.product.variants.nodes) {
             const shopifyVariantId = getLegacyId(variant.id);
             const levels = (variant.inventoryItem?.inventoryLevels.nodes ?? []).map((level) => ({
@@ -234,7 +236,7 @@ export class ProductController {
 
     const siblings = product.handle ? await model.findSiblingsByHandle(product.handle, id) : [];
 
-    return { data: { product: { ...product, variants }, locations, siblings, stale } };
+    return { data: { product: { ...product, variants, collections }, locations, siblings, stale } };
   }
 
   async updateProduct(id: string, body: unknown, session: Session, allowedStoreIds?: string[] | null) {

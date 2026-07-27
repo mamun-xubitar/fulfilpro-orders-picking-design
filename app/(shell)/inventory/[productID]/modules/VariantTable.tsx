@@ -16,9 +16,9 @@ export default function VariantTable({ variants, selectedIds, onToggleSelect, on
   const allSelected = variants.length > 0 && variants.every((v) => selectedIds.has(v.id));
 
   return (
-    <div className="overflow-x-auto">
+    <div className="max-h-150 overflow-y-auto overflow-x-auto">
       <table className="w-full text-left">
-        <thead>
+        <thead className="sticky top-0 bg-white">
           <tr className="border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wide">
             <th className="px-3 py-2 w-8">
               <input type="checkbox" checked={allSelected} onChange={onToggleAll} className="rounded border-gray-300 text-blue-600 cursor-pointer" />

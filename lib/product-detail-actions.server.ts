@@ -55,7 +55,23 @@ const PRODUCT_VARIANTS_BULK_DELETE_MUTATION = `
 const INVENTORY_ADJUST_MUTATION = `
   mutation ProductDetailInventoryAdjust($input: InventoryAdjustQuantitiesInput!, $idempotencyKey: String!) {
     inventoryAdjustQuantities(input: $input) @idempotent(key: $idempotencyKey) {
-      userErrors { field message }
+      userErrors { field message code }
+    }
+  }
+`;
+
+const INVENTORY_LEVELS_LOOKUP_QUERY = `
+  query ProductDetailInventoryLevelsLookup($ids: [ID!]!) {
+    nodes(ids: $ids) {
+      ... on InventoryItem {
+        id
+        inventoryLevels(first: 50) {
+          nodes {
+            location { id }
+            quantities(names: ["available"]) { name quantity }
+          }
+        }
+      }
     }
   }
 `;
@@ -76,6 +92,32 @@ type ProductForAction = {
   storeId: string;
   store: { storeDomain: string; accessToken: string | null };
 };
+
+async function fetchCurrentAvailableQuantities(
+  product: ProductForAction,
+  inventoryItemGids: string[]
+): Promise<Map<string, Map<string, number>>> {
+  const result = new Map<string, Map<string, number>>();
+  if (inventoryItemGids.length === 0) return result;
+
+  const data = await shopifyGraphQL<{
+    nodes: Array<{
+      id: string;
+      inventoryLevels: { nodes: Array<{ location: { id: string }; quantities: Array<{ name: string; quantity: number }> }> };
+    } | null>;
+  }>(product.store.storeDomain, product.store.accessToken!, INVENTORY_LEVELS_LOOKUP_QUERY, { ids: inventoryItemGids });
+
+  for (const node of data.nodes) {
+    if (!node) continue;
+    const byLocation = new Map<string, number>();
+    for (const level of node.inventoryLevels.nodes) {
+      const available = level.quantities.find((q) => q.name === 'available');
+      if (available) byLocation.set(level.location.id, available.quantity);
+    }
+    result.set(node.id, byLocation);
+  }
+  return result;
+}
 
 async function getProductForAction(productId: string): Promise<ProductForAction> {
   const product = await prisma.product.findUnique({
@@ -193,21 +235,34 @@ export async function adjustInventory(productId: string, payload: InventoryAdjus
   });
   const byId = new Map(dbVariants.map((v) => [v.id, v]));
 
-  const shopifyChanges: Array<{ inventoryItemId: string; locationId: string; delta: number }> = [];
+  const activeItemGids = [
+    ...new Set(
+      payload.changes
+        .map((c) => byId.get(c.variantId))
+        .filter((v): v is NonNullable<typeof v> => !!v?.inventoryItemId && payload.changes.some((c) => c.variantId === v.id && c.delta !== 0))
+        .map((v) => toInventoryItemGid(v.inventoryItemId!))
+    ),
+  ];
+  const currentQuantities = await fetchCurrentAvailableQuantities(product, activeItemGids);
+
+  const shopifyChanges: Array<{ inventoryItemId: string; locationId: string; delta: number; changeFromQuantity: number | null }> = [];
   for (const change of payload.changes) {
     const variant = byId.get(change.variantId);
     if (!variant?.inventoryItemId || change.delta === 0) continue;
+    const itemGid = toInventoryItemGid(variant.inventoryItemId);
     for (const locationId of payload.locationIds) {
+      const locationGid = toLocationGid(locationId);
       shopifyChanges.push({
-        inventoryItemId: toInventoryItemGid(variant.inventoryItemId),
-        locationId: toLocationGid(locationId),
+        inventoryItemId: itemGid,
+        locationId: locationGid,
         delta: change.delta,
+        changeFromQuantity: currentQuantities.get(itemGid)?.get(locationGid) ?? null,
       });
     }
   }
   if (shopifyChanges.length === 0) return;
 
-  const data = await shopifyGraphQL<{ inventoryAdjustQuantities: { userErrors: ShopifyUserError[] } }>(
+  const data = await shopifyGraphQL<{ inventoryAdjustQuantities: { userErrors: (ShopifyUserError & { code?: string })[] } }>(
     product.store.storeDomain,
     product.store.accessToken!,
     INVENTORY_ADJUST_MUTATION,
@@ -216,7 +271,11 @@ export async function adjustInventory(productId: string, payload: InventoryAdjus
       idempotencyKey: crypto.randomUUID(),
     }
   );
-  assertNoUserErrors(data.inventoryAdjustQuantities.userErrors);
+  const errors = data.inventoryAdjustQuantities.userErrors;
+  if (errors.some((e) => e.code === 'CHANGE_FROM_QUANTITY_STALE')) {
+    throw new Error('Inventory quantity changed since this page was loaded. Please refresh and try again.');
+  }
+  assertNoUserErrors(errors);
 
   for (const change of payload.changes) {
     const variant = byId.get(change.variantId);
