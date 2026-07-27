@@ -408,9 +408,12 @@ model Product {
   vendor           String?
   productType      String?
   category         String?
+  categoryId       String?
   status           ProductStatus   @default(ACTIVE)
   tags             String[]        @default([])
   imageUrl         String?
+  descriptionHtml  String?
+  images           Json?
   onlineStoreUrl   String?
   salesChannels    Json?
   totalInventory   Int             @default(0)
@@ -431,6 +434,7 @@ model Product {
   @@index([productType])
   @@index([category])
   @@index([storeId, title])
+  @@index([handle])
 }
 
 model ProductVariant {
@@ -441,9 +445,13 @@ model ProductVariant {
   title             String?
   sku               String?
   price             Decimal  @default(0) @db.Decimal(14, 2)
+  cost              Decimal? @db.Decimal(14, 2)
   inventoryItemId   String?
   inventoryQuantity Int      @default(0)
   inventoryTracked  Boolean  @default(true)
+  inventoryPolicy   String   @default("DENY")
+  imageUrl          String?
+  optionValues      Json?
   position          Int      @default(0)
   soldQuantity      Int      @default(0)
   soldAmount        Decimal  @default(0) @db.Decimal(14, 2)

@@ -13,9 +13,13 @@ export function formatSyncDate(value: string) {
 }
 
 export function getShopifyThumbnailUrl(imageUrl: string, size = 50) {
-  const url = new URL(imageUrl);
-  url.searchParams.set('width', String(size));
-  url.searchParams.set('height', String(size));
-  url.searchParams.set('crop', 'center');
-  return url.toString();
+  try {
+    const url = new URL(imageUrl);
+    url.searchParams.set('width', String(size));
+    url.searchParams.set('height', String(size));
+    url.searchParams.set('crop', 'center');
+    return url.toString();
+  } catch {
+    return imageUrl;
+  }
 }

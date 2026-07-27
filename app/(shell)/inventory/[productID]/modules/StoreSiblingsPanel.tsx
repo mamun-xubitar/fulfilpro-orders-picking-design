@@ -1,0 +1,53 @@
+'use client';
+
+import type { SiblingProduct } from './types';
+
+type StoreSiblingsPanelProps = {
+  siblings: SiblingProduct[];
+  expanded: boolean;
+  onToggle: () => void;
+  onNavigate: (sibling: SiblingProduct) => void;
+  onRemove: (sibling: SiblingProduct) => void;
+};
+
+export default function StoreSiblingsPanel({ siblings, expanded, onToggle, onNavigate, onRemove }: StoreSiblingsPanelProps) {
+  return (
+    <div className="relative min-w-0">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="absolute -left-7 top-4 z-10 flex items-center gap-1 bg-gray-900 text-white text-xs rounded-l-lg px-2 py-2 cursor-pointer [writing-mode:vertical-rl]"
+      >
+        Other stores{siblings.length > 0 ? ` (${siblings.length})` : ''}
+      </button>
+
+      {expanded && (
+        <div className="bg-white rounded-xl border border-gray-200 p-4 h-full overflow-y-auto">
+          <h3 className="text-sm font-semibold text-gray-900 mb-3">Other stores</h3>
+          {siblings.length === 0 && <p className="text-xs text-gray-400">No other stores carry this handle.</p>}
+          <ul className="space-y-2">
+            {siblings.map((sibling) => (
+              <li key={sibling.id} className="border border-gray-100 rounded-lg p-2.5">
+                <p className="text-xs font-medium text-gray-900 truncate">{sibling.store.name}</p>
+                <p className="text-xs text-gray-500 truncate mb-2">{sibling.title}</p>
+                <div className="flex items-center gap-3 text-xs">
+                  {sibling.onlineStoreUrl && (
+                    <a href={sibling.onlineStoreUrl} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
+                      View
+                    </a>
+                  )}
+                  <button type="button" onClick={() => onNavigate(sibling)} className="text-blue-600 hover:underline cursor-pointer">
+                    Update
+                  </button>
+                  <button type="button" onClick={() => onRemove(sibling)} className="text-red-500 hover:underline cursor-pointer">
+                    Remove
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}

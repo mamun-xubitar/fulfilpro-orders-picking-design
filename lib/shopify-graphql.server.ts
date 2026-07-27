@@ -119,7 +119,7 @@ export async function shopifyGraphQL<T>(
       await sleep(1000 * attempt);
       continue;
     }
-
+    console.log("my payload", JSON.stringify(payload, null, 2))
     if (payload.errors?.length) {
       throw new Error(`Shopify GraphQL request failed: ${payload.errors.map((error) => error.message).join(', ')}`);
     }

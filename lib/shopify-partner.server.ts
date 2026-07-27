@@ -497,8 +497,8 @@ export async function updateAppScopes(
     signal: AbortSignal.timeout(30000),
   });
 
+  console.log("my create", JSON.stringify(createRes, null, 2))
   const createResult = await createRes.json();
-
   const createErrors = createResult?.data?.appVersionCreate?.userErrors ?? [];
   if (createErrors.length > 0) {
     const errors = createErrors.map((err: { field?: string[]; message: string }) => {

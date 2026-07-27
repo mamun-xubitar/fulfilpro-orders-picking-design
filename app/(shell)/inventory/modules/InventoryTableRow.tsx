@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { STATUS_BADGE } from './constants';
 import { formatCurrency, getShopifyThumbnailUrl } from './utils';
 import type { ProductRow } from './types';
@@ -60,14 +61,15 @@ export default function InventoryTableRow({ product, selected, onToggleSelect, o
       <td className="px-4 py-3 text-sm text-gray-700">{product.vendor ?? '—'}</td>
       <td className="px-4 py-3">
         <div className="flex items-center gap-2">
-          <button
+          <Link
+            href={`/inventory/${product.id}`}
             title="Product details"
             className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
           >
             <svg className="w-5.5 h-5.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-          </button>
+          </Link>
           {product.onlineStoreUrl && (
             <a
               href={product.onlineStoreUrl}

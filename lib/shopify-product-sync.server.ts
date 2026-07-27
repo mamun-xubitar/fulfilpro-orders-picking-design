@@ -15,17 +15,20 @@ type SyncStoreResult = {
   error?: string;
 };
 
-type ShopifyProductVariantNode = {
+export type ShopifyProductVariantNode = {
   id: string;
   title: string | null;
   sku: string | null;
   price: string;
   position: number;
   inventoryQuantity: number | null;
-  inventoryItem: { id: string; tracked: boolean } | null;
+  inventoryPolicy: string | null;
+  selectedOptions: Array<{ name: string; value: string }> | null;
+  image: { url: string } | null;
+  inventoryItem: { id: string; tracked: boolean; unitCost: { amount: string } | null } | null;
 };
 
-type ShopifyProductNode = {
+export type ShopifyProductNode = {
   id: string;
   title: string;
   handle: string | null;
@@ -33,8 +36,10 @@ type ShopifyProductNode = {
   productType: string | null;
   status: string;
   tags: string[];
-  category: { name: string } | null;
+  descriptionHtml: string | null;
+  category: { id: string; name: string } | null;
   featuredImage: { url: string } | null;
+  media: { nodes: Array<{ id: string; image: { url: string; altText: string | null } | null }> } | null;
   onlineStoreUrl: string | null;
   onlineStorePreviewUrl: string | null;
   totalInventory: number | null;
@@ -78,6 +83,18 @@ const RESOURCE_PUBLICATIONS_FIELD = `
           }
         }`;
 
+export const PRODUCT_VARIANT_FIELDS = `
+          id
+          title
+          sku
+          price
+          position
+          inventoryQuantity
+          inventoryPolicy
+          selectedOptions { name value }
+          image { url }
+          inventoryItem { id tracked unitCost { amount } }`;
+
 function buildProductsQuery(includeChannels: boolean) {
   return `
   query ProductsForSync($first: Int!, $after: String, $query: String!) {
@@ -90,8 +107,10 @@ function buildProductsQuery(includeChannels: boolean) {
         productType
         status
         tags
-        category { name }
+        descriptionHtml
+        category { id name }
         featuredImage { url }
+        media(first: 20) { nodes { id ... on MediaImage { image { url altText } } } }
         onlineStoreUrl
         onlineStorePreviewUrl
         totalInventory
@@ -99,14 +118,7 @@ function buildProductsQuery(includeChannels: boolean) {
         updatedAt
         ${includeChannels ? RESOURCE_PUBLICATIONS_FIELD : ''}
         variants(first: ${VARIANTS_PAGE_SIZE}) {
-          nodes {
-            id
-            title
-            sku
-            price
-            position
-            inventoryQuantity
-            inventoryItem { id tracked }
+          nodes {${PRODUCT_VARIANT_FIELDS}
           }
           pageInfo { hasNextPage endCursor }
         }
@@ -121,14 +133,7 @@ const PRODUCT_VARIANTS_QUERY = `
   query ProductVariantsForSync($id: ID!, $first: Int!, $after: String) {
     product(id: $id) {
       variants(first: $first, after: $after) {
-        nodes {
-          id
-          title
-          sku
-          price
-          position
-          inventoryQuantity
-          inventoryItem { id tracked }
+        nodes {${PRODUCT_VARIANT_FIELDS}
         }
         pageInfo { hasNextPage endCursor }
       }
@@ -147,8 +152,10 @@ function buildProductByIdQuery(includeChannels: boolean) {
       productType
       status
       tags
-      category { name }
+      descriptionHtml
+      category { id name }
       featuredImage { url }
+      media(first: 20) { nodes { id ... on MediaImage { image { url altText } } } }
       onlineStoreUrl
       onlineStorePreviewUrl
       totalInventory
@@ -156,14 +163,7 @@ function buildProductByIdQuery(includeChannels: boolean) {
       updatedAt
       ${includeChannels ? RESOURCE_PUBLICATIONS_FIELD : ''}
       variants(first: ${VARIANTS_PAGE_SIZE}) {
-        nodes {
-          id
-          title
-          sku
-          price
-          position
-          inventoryQuantity
-          inventoryItem { id tracked }
+        nodes {${PRODUCT_VARIANT_FIELDS}
         }
         pageInfo { hasNextPage endCursor }
       }
@@ -374,7 +374,7 @@ async function fetchRemainingVariants(
   return variants;
 }
 
-async function upsertProduct(storeId: string, product: ShopifyProductNode) {
+export async function upsertProduct(storeId: string, product: ShopifyProductNode) {
   const shopifyId = getLegacyId(product.id);
 
   const data = {
@@ -383,9 +383,14 @@ async function upsertProduct(storeId: string, product: ShopifyProductNode) {
     vendor: product.vendor,
     productType: product.productType,
     category: product.category?.name ?? null,
+    categoryId: product.category?.id ?? null,
     status: toProductStatus(product.status),
     tags: product.tags ?? [],
     imageUrl: product.featuredImage?.url ?? null,
+    descriptionHtml: product.descriptionHtml ?? null,
+    images: (product.media?.nodes ?? [])
+      .filter((node): node is { id: string; image: { url: string; altText: string | null } } => !!node.image)
+      .map((node) => ({ id: node.id, url: node.image.url, altText: node.image.altText })),
     onlineStoreUrl: product.onlineStoreUrl || product.onlineStorePreviewUrl,
     salesChannels: (product.resourcePublicationsV2?.nodes ?? [])
       .filter((node) => node.isPublished)
@@ -422,9 +427,13 @@ async function upsertVariants(productId: string, storeId: string, variants: Shop
       title: variant.title,
       sku: variant.sku,
       price: Number(variant.price ?? 0),
+      cost: variant.inventoryItem?.unitCost?.amount != null ? Number(variant.inventoryItem.unitCost.amount) : null,
       inventoryItemId: variant.inventoryItem?.id ? getLegacyId(variant.inventoryItem.id) : null,
       inventoryQuantity: variant.inventoryQuantity ?? 0,
       inventoryTracked: variant.inventoryItem?.tracked ?? true,
+      inventoryPolicy: variant.inventoryPolicy ?? 'DENY',
+      imageUrl: variant.image?.url ?? null,
+      optionValues: variant.selectedOptions ?? [],
       position: variant.position ?? 0,
     };
 
