@@ -7,7 +7,9 @@ import useRequest from '@/hooks/useRequest';
 import type { StoreRow } from '@/models/store.model.server';
 import StoresTable from './StoresTable';
 import AddStoreModal from './AddStoreModal';
+import UpdateAppModal from './UpdateAppModal';
 import { useShopifyConnect } from './useShopifyConnect';
+import { useUpdateApp } from './useUpdateApp';
 
 type ApiResponse<T> = { success: boolean; message: string; data: T };
 
@@ -67,6 +69,22 @@ export default function StoresPage() {
   }, [searchParams, loadStores]);
 
   const connect = useShopifyConnect({ loadStores });
+
+  const [updatedApps, setUpdatedApps] = useState<Record<string, string>>({});
+  const handleAppUpdated = useCallback((storeId: string, url: string) => {
+    setUpdatedApps((prev) => ({ ...prev, [storeId]: url }));
+  }, []);
+  const updateApp = useUpdateApp({ onUpdated: handleAppUpdated });
+
+  const handleUpdateApp = (id: string) => {
+    const store = stores.find((item) => item.id === id);
+    if (store) void updateApp.startUpdate({ id: store.id, name: store.name, storeDomain: store.storeDomain });
+  };
+
+  const handleReauthorize = (id: string) => {
+    const url = updatedApps[id];
+    if (url) window.open(url, '_blank', 'noopener,noreferrer');
+  };
 
   const handleDisconnect = async (id: string) => {
     const store = stores.find((item) => item.id === id);
@@ -251,9 +269,13 @@ export default function StoresPage() {
           onDelete={(id) => void handleDelete(id)}
           onLogoUpload={(id, file) => void handleLogoUpload(id, file)}
           onLogoRemove={(id) => void handleLogoRemove(id)}
+          onUpdateApp={handleUpdateApp}
+          onReauthorize={handleReauthorize}
           disconnectingIds={disconnectingIds}
           deletingIds={deletingIds}
           uploadingLogoIds={uploadingLogoIds}
+          updatingIds={updateApp.targetStore && !updateApp.done ? [updateApp.targetStore.id] : []}
+          updatedIds={Object.keys(updatedApps)}
           logoErrors={logoErrors}
         />
       </div>
@@ -294,6 +316,24 @@ export default function StoresPage() {
         onCopyInstallUrl={connect.handleCopyInstallUrl}
         onStartOver={connect.resetConnectFlow}
         appManagementTokenExpiresAt={connect.appManagementTokenExpiresAt}
+      />
+
+      <UpdateAppModal
+        isOpen={!!updateApp.targetStore}
+        storeName={updateApp.targetStore?.name ?? updateApp.targetStore?.storeDomain ?? ''}
+        userCode={updateApp.userCode}
+        authorizationUrl={updateApp.authorizationUrl}
+        copyCodeText={updateApp.copyCodeText}
+        timeLeft={updateApp.timeLeft}
+        isStarting={updateApp.isStarting}
+        isAuthorizing={updateApp.isAuthorizing}
+        isUpdating={updateApp.isUpdating}
+        error={updateApp.error}
+        done={updateApp.done}
+        onCopyCode={updateApp.copyCode}
+        onCopyAuthorizationUrl={updateApp.copyAuthorizationUrl}
+        onAuthorize={updateApp.authorize}
+        onClose={updateApp.close}
       />
     </main>
   );

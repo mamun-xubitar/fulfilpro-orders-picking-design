@@ -18,9 +18,13 @@ interface StoresTableProps {
   onDelete: (id: string) => void;
   onLogoUpload: (id: string, file: File) => void;
   onLogoRemove: (id: string) => void;
+  onUpdateApp: (id: string) => void;
+  onReauthorize: (id: string) => void;
   disconnectingIds: string[];
   deletingIds: string[];
   uploadingLogoIds: string[];
+  updatingIds: string[];
+  updatedIds: string[];
   logoErrors: Record<string, string>;
 }
 
@@ -49,9 +53,13 @@ export default function StoresTable({
   onDelete,
   onLogoUpload,
   onLogoRemove,
+  onUpdateApp,
+  onReauthorize,
   disconnectingIds,
   deletingIds,
   uploadingLogoIds,
+  updatingIds,
+  updatedIds,
   logoErrors,
 }: StoresTableProps) {
   const [storePendingLogoRemoval, setStorePendingLogoRemoval] = useState<StoreRow | null>(null);
@@ -71,7 +79,7 @@ export default function StoresTable({
   return (
     <>
       <div className="overflow-x-auto">
-        <table className="min-w-[820px] w-full text-sm">
+        <table className="min-w-[940px] w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Store Name</th>
@@ -97,7 +105,9 @@ export default function StoresTable({
               const isDisconnecting = disconnectingIds.includes(store.id);
               const isDeleting = deletingIds.includes(store.id);
               const isUploadingLogo = uploadingLogoIds.includes(store.id);
-              const isBusy = isDisconnecting || isDeleting || isUploadingLogo;
+              const isUpdatingApp = updatingIds.includes(store.id);
+              const isUpdated = updatedIds.includes(store.id);
+              const isBusy = isDisconnecting || isDeleting || isUploadingLogo || isUpdatingApp;
               const logoInputId = `store-logo-${store.id}`;
               const logoSrc = logoUrl(store.logoPath);
 
@@ -184,13 +194,32 @@ export default function StoresTable({
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1.5">
                       {store.status === 'connected' && (
-                        <button
-                          onClick={() => onDisconnect(store.id)}
-                          disabled={isBusy}
-                          className="px-2.5 py-1 text-xs border border-amber-300 text-amber-600 rounded-lg hover:bg-amber-50 transition-colors duration-150 disabled:opacity-50 cursor-pointer"
-                        >
-                          {isDisconnecting ? 'Disconnecting…' : 'Disconnect'}
-                        </button>
+                        <>
+                          {store.hasApp && (
+                            <button
+                              onClick={() => onUpdateApp(store.id)}
+                              disabled={isBusy || isUpdated}
+                              className="px-2.5 py-1 text-xs border border-blue-200 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors duration-150 disabled:opacity-50 cursor-pointer"
+                            >
+                              {isUpdated ? 'Updated ✓' : isUpdatingApp ? 'Updating…' : 'Update App'}
+                            </button>
+                          )}
+                          {isUpdated && (
+                            <button
+                              onClick={() => onReauthorize(store.id)}
+                              className="px-2.5 py-1 text-xs border border-green-300 text-green-700 rounded-lg hover:bg-green-50 transition-colors duration-150 cursor-pointer"
+                            >
+                              Re-authorize
+                            </button>
+                          )}
+                          <button
+                            onClick={() => onDisconnect(store.id)}
+                            disabled={isBusy}
+                            className="px-2.5 py-1 text-xs border border-amber-300 text-amber-600 rounded-lg hover:bg-amber-50 transition-colors duration-150 disabled:opacity-50 cursor-pointer"
+                          >
+                            {isDisconnecting ? 'Disconnecting…' : 'Disconnect'}
+                          </button>
+                        </>
                       )}
                       {store.status !== 'connected' && (
                         <>

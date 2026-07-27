@@ -4,6 +4,7 @@ import {
   normalizeShopDomain,
   resolveShopDomain,
 } from '@/lib/shopify-auth.server';
+import { updateAppScopes } from '@/lib/shopify-partner.server';
 import { mkdir, unlink, writeFile } from 'fs/promises';
 import path from 'path';
 import { randomUUID } from 'crypto';
@@ -168,6 +169,55 @@ export class StoreController {
 
     await model.update(id, { status: 'pending' });
     return { data: { installUrl }, message: 'Install link generated' };
+  }
+
+  async updateApp(id: string, body: unknown) {
+    const { appManagementToken, appManagementTokenExpiresAt } = body as Record<string, string>;
+    if (!appManagementToken) {
+      return { error: { message: 'appManagementToken is required', status: 400 } };
+    }
+
+    const store = await model.findById(id);
+    if (!store) return { error: { message: 'Store not found', status: 404 } };
+    if (!store.appId) {
+      return { error: { message: 'This store has no Shopify app to update.', status: 400 } };
+    }
+
+    const baseScopes = process.env.SHOPIFY_SCOPES?.split(',').map((s) => s.trim()).filter(Boolean) || [];
+    const extraScopes = process.env.EXTRA_SCOPES?.split(',').map((s) => s.trim()).filter(Boolean) || [];
+
+    try {
+      const res = await updateAppScopes({
+        appId: store.appId,
+        appManagementToken,
+        newScopes: [...baseScopes, ...extraScopes],
+        message: 'Update app scopes and URLs',
+      });
+      if (!res.success) {
+        return { error: { message: res.errors?.join(', ') || 'Failed to update app', status: 500 } };
+      }
+    } catch (error) {
+      return {
+        error: {
+          message: error instanceof Error ? error.message : 'Failed to update app',
+          status: 500,
+        },
+      };
+    }
+
+    await model.updateStoreWithTokens(
+      appManagementToken,
+      appManagementTokenExpiresAt,
+      store.storeDomain
+    );
+
+    return {
+      data: {
+        status: 'updated',
+        reauthorizeUrl: generateInstallLink(store.storeDomain, store.clientId),
+      },
+      message: 'App updated successfully.',
+    };
   }
 
   async delete(id: string) {

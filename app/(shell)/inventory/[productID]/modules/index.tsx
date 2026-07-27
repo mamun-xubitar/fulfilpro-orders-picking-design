@@ -35,7 +35,7 @@ export default function ProductDetailPage({ productId }: { productId: string }) 
         className="grid gap-4 transition-[grid-template-columns] duration-200 mb-6"
         style={{ gridTemplateColumns: p.siblingsPanel.panelExpanded ? '1fr 20rem' : '1fr 0rem' }}
       >
-        <div className="min-w-0 grid grid-cols-1 lg:grid-cols-[16rem_1fr] gap-4">
+        <div className="min-w-0 grid grid-cols-1 lg:grid-cols-[15rem_1fr] gap-4">
           <ProductGallery product={p.product} />
           <ProductDetailsPanel
             product={p.product}

@@ -10,6 +10,7 @@ export type StoreRow = {
   status: string;
   partnerStoreId: string | null;
   partnerStoreName: string | null;
+  hasApp: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -50,6 +51,7 @@ export class StoreModel {
       status: s.status,
       partnerStoreId: s.partnerStoreId,
       partnerStoreName: s.partnerStore?.name ?? null,
+      hasApp: !!s.appId,
       createdAt: s.createdAt.toISOString(),
       updatedAt: s.updatedAt.toISOString(),
     }));
