@@ -25,6 +25,7 @@ export function groupVariantsByColor(variants: VariantDetail[]): ColorGroup[] {
       existing.totalStock += variant.inventoryQuantity;
       existing.totalSold += variant.soldQuantity;
       existing.allContinueSelling = existing.allContinueSelling && variant.inventoryPolicy === 'CONTINUE';
+      if (!existing.imageUrl && variant.imageUrl) existing.imageUrl = variant.imageUrl;
     } else {
       groups.set(key, {
         key,
@@ -33,6 +34,7 @@ export function groupVariantsByColor(variants: VariantDetail[]): ColorGroup[] {
         totalStock: variant.inventoryQuantity,
         totalSold: variant.soldQuantity,
         allContinueSelling: variant.inventoryPolicy === 'CONTINUE',
+        imageUrl: variant.imageUrl,
       });
     }
   }

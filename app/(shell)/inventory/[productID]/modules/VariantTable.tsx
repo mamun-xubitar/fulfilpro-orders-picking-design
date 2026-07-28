@@ -1,5 +1,6 @@
 'use client';
 
+import CheckMarkBox from './CheckMarkBox';
 import VariantTableRow from './VariantTableRow';
 import type { VariantDetail } from './types';
 
@@ -12,6 +13,7 @@ type VariantTableProps = {
   onDeltaChange: (id: string, value: string) => void;
   hasPendingDeltas: boolean;
   onConfirmAdjust: () => void;
+  emptyMessage: string;
 };
 
 export default function VariantTable({
@@ -23,6 +25,7 @@ export default function VariantTable({
   onDeltaChange,
   hasPendingDeltas,
   onConfirmAdjust,
+  emptyMessage,
 }: VariantTableProps) {
   const allSelected = variants.length > 0 && variants.every((v) => selectedIds.has(v.id));
 
@@ -32,7 +35,9 @@ export default function VariantTable({
         <thead className="sticky top-0 bg-white">
           <tr className="border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wide">
             <th className="px-3 py-2 w-8">
-              <input type="checkbox" checked={allSelected} onChange={onToggleAll} className="rounded border-gray-300 text-blue-600 cursor-pointer" />
+              <button type="button" onClick={onToggleAll} className="cursor-pointer" aria-label="Select all variants">
+                <CheckMarkBox checked={allSelected} />
+              </button>
             </th>
             <th className="px-3 py-2">Variant</th>
             <th className="px-3 py-2">SKU</th>
@@ -69,7 +74,7 @@ export default function VariantTable({
           {variants.length === 0 && (
             <tr>
               <td colSpan={8} className="px-3 py-6 text-center text-sm text-gray-400">
-                No variants match the current filters.
+                {emptyMessage}
               </td>
             </tr>
           )}

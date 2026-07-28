@@ -78,6 +78,7 @@ export type ColorGroup = {
   totalStock: number;
   totalSold: number;
   allContinueSelling: boolean;
+  imageUrl: string | null;
 };
 
 export type ProductFieldsPayload = {

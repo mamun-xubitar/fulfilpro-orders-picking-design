@@ -30,7 +30,13 @@ export default function VariantsSection({ p }: VariantsSectionProps) {
       style={{ gridTemplateColumns: supplierPanelExpanded ? '1fr 20rem' : '1fr 0rem' }}
     >
       <div className="min-w-0 bg-white rounded-xl border border-gray-200 p-4 grid grid-cols-1 md:grid-cols-[12rem_1fr] gap-4 items-start">
-        <ColorList colorGroups={p.colorGroups} selectedColorKeys={p.selectedColorKeys} onToggleColor={p.toggleColor} />
+        <ColorList
+          colorGroups={p.colorGroups}
+          selectedColorKeys={p.selectedColorKeys}
+          onToggleColor={p.toggleColor}
+          allSelected={p.allColorsSelected}
+          onToggleAll={p.toggleAllColors}
+        />
 
         <div className="min-w-0">
           <div className="@container flex items-center gap-3 mb-3">
@@ -70,6 +76,11 @@ export default function VariantsSection({ p }: VariantsSectionProps) {
             onDeltaChange={p.stockAdjust.setDelta}
             hasPendingDeltas={p.stockAdjust.hasPendingDeltas}
             onConfirmAdjust={p.stockAdjust.openModal}
+            emptyMessage={
+              p.colorGroups.length > 0 && p.selectedColorKeys.size === 0
+                ? 'Select at least one color to see variants.'
+                : 'No variants match the current filters.'
+            }
           />
         </div>
       </div>

@@ -1,5 +1,6 @@
 'use client';
 
+import CheckMarkBox from './CheckMarkBox';
 import { getVariantColor, getVariantSize, getStockCellClass, formatCurrency } from './utils';
 import type { VariantDetail } from './types';
 
@@ -13,15 +14,21 @@ type VariantTableRowProps = {
 
 export default function VariantTableRow({ variant, selected, onToggleSelect, delta, onDeltaChange }: VariantTableRowProps) {
   return (
-    <tr className={`border-b border-gray-200 hover:bg-gray-50 ${getStockCellClass(variant)} ${selected ? 'bg-blue-50/50' : ''}`}>
+    <tr
+      onClick={() => onToggleSelect(variant.id)}
+      className={`cursor-pointer border-b border-gray-200 hover:bg-gray-50 ${getStockCellClass(variant)} ${selected ? 'bg-blue-50/50' : ''}`}
+    >
       <td className="px-3 py-2">
-        <input
-          type="checkbox"
-          checked={selected}
-          onChange={() => onToggleSelect(variant.id)}
-          className="rounded border-gray-300 text-blue-600 cursor-pointer"
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleSelect(variant.id);
+          }}
           aria-label={`Select ${variant.title ?? variant.sku ?? variant.id}`}
-        />
+        >
+          <CheckMarkBox checked={selected} />
+        </button>
       </td>
       <td className="px-3 py-2 text-sm text-gray-700">
         {getVariantColor(variant)} {getVariantSize(variant) && `/ ${getVariantSize(variant)}`}
@@ -30,7 +37,7 @@ export default function VariantTableRow({ variant, selected, onToggleSelect, del
       <td className="px-3 py-2 text-sm text-gray-700">{formatCurrency(variant.price)}</td>
       <td className="px-3 py-2 text-sm text-gray-700">{variant.cost != null ? formatCurrency(variant.cost) : '—'}</td>
       <td className={`px-3 py-2 text-sm text-gray-700`}>{variant.inventoryQuantity}</td>
-      <td className="px-3 py-2">
+      <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
         <input
           type="number"
           placeholder="±0"

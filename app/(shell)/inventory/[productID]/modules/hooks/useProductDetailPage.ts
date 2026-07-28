@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import useRequest from '@/hooks/useRequest';
 import { useProductDetailData } from './useProductDetailData';
 import { useFieldEdit } from './useFieldEdit';
@@ -16,6 +17,11 @@ export function useProductDetailPage(productID: string) {
   const stockAdjust = useStockAdjust({ productId: productID, locations: data.locations, bumpRefresh: data.bumpRefresh });
   const siblingsPanel = useStoreSiblings({ bumpRefresh: data.bumpRefresh });
   const { request: requestContinueToggle, loading: togglingContinue } = useRequest();
+  const { retainOnly } = selection;
+
+  useEffect(() => {
+    retainOnly(new Set(variantsView.filteredVariants.map((v) => v.id)));
+  }, [variantsView.filteredVariants, retainOnly]);
 
   const allContinueSelling = !!data.product && data.product.variants.length > 0 && data.product.variants.every((v) => v.inventoryPolicy === 'CONTINUE');
 

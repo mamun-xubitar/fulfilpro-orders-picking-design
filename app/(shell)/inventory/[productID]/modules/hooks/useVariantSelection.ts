@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import useRequest from '@/hooks/useRequest';
 import type { VariantDetail } from '../types';
 
@@ -26,12 +26,24 @@ export function useVariantSelection({ productId, bumpRefresh }: UseVariantSelect
   const toggleAll = (variants: VariantDetail[]) => {
     setSelectedIds((prev) => {
       const allSelected = variants.length > 0 && variants.every((v) => prev.has(v.id));
-      if (allSelected) return new Set();
-      return new Set(variants.map((v) => v.id));
+      const next = new Set(prev);
+      if (allSelected) {
+        variants.forEach((v) => next.delete(v.id));
+      } else {
+        variants.forEach((v) => next.add(v.id));
+      }
+      return next;
     });
   };
 
   const clearSelection = () => setSelectedIds(new Set());
+
+  const retainOnly = useCallback((visibleIds: Set<string>) => {
+    setSelectedIds((prev) => {
+      const next = new Set([...prev].filter((id) => visibleIds.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, []);
 
   const applyBulkVariantUpdate = (variants: Array<{ id: string; price?: number; inventoryPolicy?: 'DENY' | 'CONTINUE'; cost?: number | null }>) => {
     request({
@@ -80,6 +92,7 @@ export function useVariantSelection({ productId, bumpRefresh }: UseVariantSelect
     toggleVariant,
     toggleAll,
     clearSelection,
+    retainOnly,
     bulkSaving,
     applyBulkVariantUpdate,
     setPriceForSelection,
