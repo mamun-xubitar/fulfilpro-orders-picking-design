@@ -229,6 +229,10 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
       adminOnly: true,
       pickerHidden: true,
       adminDecoratorOnly: false,
+      children: [
+        { id: "suppliers", label: "Suppliers", href: "/inventory/suppliers" },
+        { id: "settings", label: "Settings", href: "/inventory/settings" },
+      ],
     },
     {
       id: "users", label: "Users", href: "/users",
@@ -253,6 +257,8 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
 
   const pageTitles: Record<string, string> = { orders: "Orders", decoration: "Decoration", "picking-list": "Picking List", "back-in-stock": "Back In Stock", tasks: "Tasks", tracking: "Tracking", stores: "Stores", inventory: "Inventory", users: "Users", profile: "Profile", settings: "Settings" };
   const activeId = pathname.split("/")[1] || "";
+  const activeChildId = pathname.split("/")[2] || "";
+  const activeChild = navItems.find((i) => i.id === activeId)?.children?.find((c) => c.id === activeChildId);
 
   const sidebarWidth = sidebarCollapsed ? "64px" : "240px";
   const user = session?.user;
@@ -448,23 +454,47 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
             if (item.pickerOnly && user?.role !== "admin" && !userIsOrderPicker) return null;
             const isActive = activeId === item.id;
             return (
-              <Link
-                key={item.id}
-                href={item.href}
-                onClick={() => setMobileSidebarOpen(false)}
-                className={`nav-item relative group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150 cursor-pointer ${isActive ? "bg-blue-600 text-white" : "text-gray-300 hover:bg-gray-700 hover:text-white"}`}
-                style={sidebarCollapsed ? { justifyContent: "center", paddingLeft: 0, paddingRight: 0 } : undefined}
-              >
-                <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  {item.icon}
-                </svg>
-                {!sidebarCollapsed && <span className="label-text">{item.label}</span>}
-                {sidebarCollapsed && (
-                  <span className="pointer-events-none absolute left-full top-1/2 ml-2 -translate-y-1/2 rounded bg-gray-700 px-2 py-1 text-xs text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-50">
-                    {item.label}
-                  </span>
-                )}
-              </Link>
+              <div key={item.id}>
+                <Link
+                  href={item.href}
+                  onClick={() => setMobileSidebarOpen(false)}
+                  className={`nav-item relative group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150 cursor-pointer ${isActive ? "bg-blue-600 text-white" : "text-gray-300 hover:bg-gray-700 hover:text-white"}`}
+                  style={sidebarCollapsed ? { justifyContent: "center", paddingLeft: 0, paddingRight: 0 } : undefined}
+                >
+                  <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    {item.icon}
+                  </svg>
+                  {!sidebarCollapsed && <span className="label-text">{item.label}</span>}
+                  {sidebarCollapsed && (
+                    <span className="pointer-events-none absolute left-full top-1/2 ml-2 -translate-y-1/2 rounded bg-gray-700 px-2 py-1 text-xs text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-50">
+                      {item.label}
+                    </span>
+                  )}
+                </Link>
+                {item.children && isActive && item.children.map((child) => {
+                  const isChildActive = activeChildId === child.id;
+                  return (
+                    <Link
+                      key={child.id}
+                      href={child.href}
+                      onClick={() => setMobileSidebarOpen(false)}
+                      className={`nav-item relative group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150 cursor-pointer ${isChildActive ? "bg-blue-600 text-white" : "text-gray-300 hover:bg-gray-700 hover:text-white"}`}
+                      style={sidebarCollapsed ? { justifyContent: "center", paddingLeft: 0, paddingRight: 0 } : { paddingLeft: "2.25rem" }}
+                    >
+                      {sidebarCollapsed ? (
+                        <span className="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0" />
+                      ) : (
+                        <span className="label-text">{child.label}</span>
+                      )}
+                      {sidebarCollapsed && (
+                        <span className="pointer-events-none absolute left-full top-1/2 ml-2 -translate-y-1/2 rounded bg-gray-700 px-2 py-1 text-xs text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-50">
+                          {child.label}
+                        </span>
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
             );
           })}
         </nav>
@@ -508,7 +538,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16"/>
               </svg>
             </button>
-            <h1 className="truncate text-lg font-semibold text-gray-900">{pageTitles[activeId] || ""}</h1>
+            <h1 className="truncate text-lg font-semibold text-gray-900">{activeChild?.label ?? pageTitles[activeId] ?? ""}</h1>
           </div>
           <div className="flex items-center gap-3 relative">
 
