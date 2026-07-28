@@ -10,9 +10,20 @@ type VariantTableProps = {
   onToggleAll: () => void;
   deltas: Record<string, number>;
   onDeltaChange: (id: string, value: string) => void;
+  hasPendingDeltas: boolean;
+  onConfirmAdjust: () => void;
 };
 
-export default function VariantTable({ variants, selectedIds, onToggleSelect, onToggleAll, deltas, onDeltaChange }: VariantTableProps) {
+export default function VariantTable({
+  variants,
+  selectedIds,
+  onToggleSelect,
+  onToggleAll,
+  deltas,
+  onDeltaChange,
+  hasPendingDeltas,
+  onConfirmAdjust,
+}: VariantTableProps) {
   const allSelected = variants.length > 0 && variants.every((v) => selectedIds.has(v.id));
 
   return (
@@ -28,7 +39,19 @@ export default function VariantTable({ variants, selectedIds, onToggleSelect, on
             <th className="px-3 py-2">Price</th>
             <th className="px-3 py-2">Cost</th>
             <th className="px-3 py-2">Stock</th>
-            <th className="px-3 py-2">Adjust</th>
+            <th className="px-3 py-2">
+              {hasPendingDeltas ? (
+                <button
+                  type="button"
+                  onClick={onConfirmAdjust}
+                  className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium normal-case tracking-normal px-2 py-1 rounded-lg cursor-pointer"
+                >
+                  Confirm
+                </button>
+              ) : (
+                'Adjust'
+              )}
+            </th>
             <th className="px-3 py-2 text-center">Policy</th>
           </tr>
         </thead>

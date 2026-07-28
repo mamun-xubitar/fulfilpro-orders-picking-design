@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { VariantDetail } from './types';
+import VariantBulkMenu from './VariantBulkMenu';
 
 type PopoverKind = 'price' | 'cost' | 'margin' | null;
 
@@ -42,8 +43,8 @@ export default function VariantBulkBar({
   };
 
   return (
-    <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 mb-3 text-sm">
-      <span className="text-blue-800 font-medium">{selectedVariants.length} selected</span>
+    <div className="flex items-center gap-3 text-sm min-w-0">
+      <span className="text-blue-800 font-medium whitespace-nowrap">{selectedVariants.length} selected</span>
 
       <BulkPopoverButton label="Price" open={openPopover === 'price'} onOpen={() => setOpenPopover('price')} onClose={() => setOpenPopover(null)}>
         <input
@@ -75,35 +76,45 @@ export default function VariantBulkBar({
         </button>
       </BulkPopoverButton>
 
-      {canSetMargin && (
-        <BulkPopoverButton label="Margin %" open={openPopover === 'margin'} onOpen={() => setOpenPopover('margin')} onClose={() => setOpenPopover(null)}>
-          <input
-            autoFocus
-            type="number"
-            step="0.1"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && submit(onSetMargin)}
-            className="w-24 border border-gray-300 rounded-lg px-2 py-1 text-xs outline-none"
-          />
-          <button type="button" onClick={() => submit(onSetMargin)} className="text-xs text-blue-600 hover:underline cursor-pointer">
-            Apply
-          </button>
-        </BulkPopoverButton>
-      )}
+      <div className="hidden @3xl:flex items-center gap-3">
+        {canSetMargin && (
+          <BulkPopoverButton label="Margin %" open={openPopover === 'margin'} onOpen={() => setOpenPopover('margin')} onClose={() => setOpenPopover(null)}>
+            <input
+              autoFocus
+              type="number"
+              step="0.1"
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && submit(onSetMargin)}
+              className="w-24 border border-gray-300 rounded-lg px-2 py-1 text-xs outline-none"
+            />
+            <button type="button" onClick={() => submit(onSetMargin)} className="text-xs text-blue-600 hover:underline cursor-pointer">
+              Apply
+            </button>
+          </BulkPopoverButton>
+        )}
 
-      <button type="button" onClick={() => onSetContinueSelling('CONTINUE')} className="text-blue-700 hover:underline cursor-pointer">
-        Continue selling
-      </button>
-      <button type="button" onClick={() => onSetContinueSelling('DENY')} className="text-blue-700 hover:underline cursor-pointer">
-        Stop selling
-      </button>
-      <button type="button" onClick={onRequestDelete} className="text-red-600 hover:underline cursor-pointer">
-        Delete
-      </button>
+        <button type="button" onClick={() => onSetContinueSelling('CONTINUE')} className="text-blue-700 hover:underline cursor-pointer">
+          Continue selling
+        </button>
+        <button type="button" onClick={() => onSetContinueSelling('DENY')} className="text-blue-700 hover:underline cursor-pointer">
+          Stop selling
+        </button>
+        <button type="button" onClick={onRequestDelete} className="text-red-600 hover:underline cursor-pointer">
+          Delete
+        </button>
+      </div>
+
+      <VariantBulkMenu
+        className="@3xl:hidden"
+        canSetMargin={canSetMargin}
+        onSetMargin={onSetMargin}
+        onSetContinueSelling={onSetContinueSelling}
+        onRequestDelete={onRequestDelete}
+      />
 
       {bulkSaving && <span className="text-xs text-gray-400">Saving…</span>}
-      <button type="button" onClick={onClear} className="ml-auto text-gray-400 hover:text-gray-600 cursor-pointer">
+      <button type="button" onClick={onClear} className="text-gray-400 hover:text-gray-600 cursor-pointer">
         Clear
       </button>
     </div>

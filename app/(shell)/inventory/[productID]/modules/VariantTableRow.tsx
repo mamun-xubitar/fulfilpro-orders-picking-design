@@ -13,7 +13,7 @@ type VariantTableRowProps = {
 
 export default function VariantTableRow({ variant, selected, onToggleSelect, delta, onDeltaChange }: VariantTableRowProps) {
   return (
-    <tr className={`border-b border-gray-100 hover:bg-gray-50 ${selected ? 'bg-blue-50/50' : ''}`}>
+    <tr className={`border-b border-gray-200 hover:bg-gray-50 ${getStockCellClass(variant)} ${selected ? 'bg-blue-50/50' : ''}`}>
       <td className="px-3 py-2">
         <input
           type="checkbox"
@@ -29,7 +29,7 @@ export default function VariantTableRow({ variant, selected, onToggleSelect, del
       <td className="px-3 py-2 text-sm text-gray-500">{variant.sku ?? '—'}</td>
       <td className="px-3 py-2 text-sm text-gray-700">{formatCurrency(variant.price)}</td>
       <td className="px-3 py-2 text-sm text-gray-700">{variant.cost != null ? formatCurrency(variant.cost) : '—'}</td>
-      <td className={`px-3 py-2 text-sm text-gray-700 ${getStockCellClass(variant)}`}>{variant.inventoryQuantity}</td>
+      <td className={`px-3 py-2 text-sm text-gray-700`}>{variant.inventoryQuantity}</td>
       <td className="px-3 py-2">
         <input
           type="number"

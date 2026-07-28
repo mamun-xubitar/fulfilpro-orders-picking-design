@@ -33,12 +33,24 @@ export default function VariantsSection({ p }: VariantsSectionProps) {
         <ColorList colorGroups={p.colorGroups} selectedColorKeys={p.selectedColorKeys} onToggleColor={p.toggleColor} />
 
         <div className="min-w-0">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-gray-900">Variants</h3>
+          <div className="@container flex items-center gap-3 mb-3">
+            <h3 className="text-sm font-semibold text-gray-900 shrink-0">Variants</h3>
+
+            <VariantBulkBar
+              selectedVariants={selectedVariants}
+              bulkSaving={p.selection.bulkSaving}
+              onSetPrice={p.selection.setPriceForSelection}
+              onSetCost={p.selection.setCostForSelection}
+              onSetMargin={onSetMargin}
+              onSetContinueSelling={p.selection.setContinueSellingForSelection}
+              onRequestDelete={p.selection.requestDelete}
+              onClear={p.selection.clearSelection}
+            />
+
             <select
               value={p.sizeFilter}
               onChange={(e) => p.setSizeFilter(e.target.value)}
-              className="border border-gray-300 rounded-lg px-2 py-1 text-xs outline-none"
+              className="ml-auto shrink-0 border border-gray-300 rounded-lg px-2 py-1 text-xs outline-none"
             >
               <option value="">All sizes</option>
               {p.sizeOptions.map((size) => (
@@ -47,28 +59,7 @@ export default function VariantsSection({ p }: VariantsSectionProps) {
                 </option>
               ))}
             </select>
-            {p.stockAdjust.hasPendingDeltas && (
-              <button
-                type="button"
-                onClick={p.stockAdjust.openModal}
-                className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-3 py-1.5 rounded-lg cursor-pointer"
-              >
-                Confirm adjust ({p.stockAdjust.totalDelta > 0 ? '+' : ''}
-                {p.stockAdjust.totalDelta})
-              </button>
-            )}
           </div>
-
-          <VariantBulkBar
-            selectedVariants={selectedVariants}
-            bulkSaving={p.selection.bulkSaving}
-            onSetPrice={p.selection.setPriceForSelection}
-            onSetCost={p.selection.setCostForSelection}
-            onSetMargin={onSetMargin}
-            onSetContinueSelling={p.selection.setContinueSellingForSelection}
-            onRequestDelete={p.selection.requestDelete}
-            onClear={p.selection.clearSelection}
-          />
 
           <VariantTable
             variants={p.filteredVariants}
@@ -77,6 +68,8 @@ export default function VariantsSection({ p }: VariantsSectionProps) {
             onToggleAll={() => p.selection.toggleAll(p.filteredVariants)}
             deltas={p.stockAdjust.deltas}
             onDeltaChange={p.stockAdjust.setDelta}
+            hasPendingDeltas={p.stockAdjust.hasPendingDeltas}
+            onConfirmAdjust={p.stockAdjust.openModal}
           />
         </div>
       </div>
