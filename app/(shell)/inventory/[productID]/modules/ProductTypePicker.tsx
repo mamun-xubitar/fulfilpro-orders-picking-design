@@ -6,9 +6,10 @@ import type { ApiResponse } from './types';
 type ProductTypePickerProps = {
   value: string;
   onChange: (value: string) => void;
+  source?: 'productTypes' | 'vendors';
 };
 
-export default function ProductTypePicker({ value, onChange }: ProductTypePickerProps) {
+export default function ProductTypePicker({ value, onChange, source = 'productTypes' }: ProductTypePickerProps) {
   const [open, setOpen] = useState(false);
   const [options, setOptions] = useState<string[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -16,11 +17,11 @@ export default function ProductTypePicker({ value, onChange }: ProductTypePicker
   useEffect(() => {
     fetch('/api/inventory/products/form-data')
       .then((res) => res.json())
-      .then((json: ApiResponse<{ productTypes: string[] }>) => {
-        if (json.success) setOptions(json.data.productTypes);
+      .then((json: ApiResponse<{ productTypes: string[]; vendors: string[] }>) => {
+        if (json.success) setOptions(json.data[source]);
       })
       .catch(() => {});
-  }, []);
+  }, [source]);
 
   useEffect(() => {
     const onClickOutside = (e: MouseEvent) => {
@@ -42,7 +43,7 @@ export default function ProductTypePicker({ value, onChange }: ProductTypePicker
           onChange(e.target.value);
           setOpen(true);
         }}
-        placeholder="Product type…"
+        placeholder={source === 'vendors' ? 'Vendor…' : 'Product type…'}
         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400"
       />
       {open && filtered.length > 0 && (

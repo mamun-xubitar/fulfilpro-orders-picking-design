@@ -45,6 +45,9 @@ export default function ProductDetailPage({ productId }: { productId: string }) 
             onResyncStock={p.bumpRefresh}
             resyncing={p.loading}
             onEditField={p.fieldEdit.openEdit}
+            supplierOptions={p.productSuppliers.supplierOptions}
+            savingSupplier={p.productSuppliers.savingSupplier}
+            onSelectSupplier={p.productSuppliers.selectSupplier}
           />
         </div>
         <StoreSiblingsPanel

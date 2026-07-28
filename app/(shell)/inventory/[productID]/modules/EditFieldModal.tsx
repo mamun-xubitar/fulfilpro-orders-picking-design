@@ -1,6 +1,6 @@
 'use client';
 
-import { ModalShell, ModalActions } from './ModalShell';
+import { ModalShell, ModalActions } from '@/components/ModalShell';
 import { STATUS_OPTIONS } from './constants';
 import CategoryPicker from './CategoryPicker';
 import ProductTypePicker from './ProductTypePicker';
@@ -10,6 +10,7 @@ import type { ProductStatusValue } from './types';
 
 const TITLES: Record<string, string> = {
   title: 'Edit title',
+  vendor: 'Edit vendor',
   description: 'Edit description',
   status: 'Edit status',
   category: 'Edit category',
@@ -30,7 +31,7 @@ export default function EditFieldModal({ edit }: { edit: ReturnType<typeof useFi
     <ModalShell
       title={TITLES[editing.field]}
       onClose={edit.closeEdit}
-      allowOverflow={editing.field === 'category' || editing.field === 'productType'}
+      allowOverflow={editing.field === 'category' || editing.field === 'productType' || editing.field === 'vendor'}
       wide={editing.field === 'description'}
     >
       {editing.field === 'title' && (
@@ -41,6 +42,8 @@ export default function EditFieldModal({ edit }: { edit: ReturnType<typeof useFi
           className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400"
         />
       )}
+
+      {editing.field === 'vendor' && <ProductTypePicker value={editing.value} onChange={edit.setValue} source="vendors" />}
 
       {editing.field === 'description' && (
         <>

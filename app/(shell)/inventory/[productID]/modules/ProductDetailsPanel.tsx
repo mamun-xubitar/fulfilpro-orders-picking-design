@@ -3,8 +3,9 @@
 import { STATUS_BADGE } from './constants';
 import { computeMargin, formatCurrency, groupVariantsByColor, getSizeBreakdown, htmlToPlainText } from './utils';
 import FieldChips from './FieldChips';
+import SupplierSelect from './SupplierSelect';
 import type { EditableField } from './hooks/useFieldEdit';
-import type { ProductDetail } from './types';
+import type { ProductDetail, SupplierOption } from './types';
 
 type ProductDetailsPanelProps = {
   product: ProductDetail;
@@ -14,6 +15,9 @@ type ProductDetailsPanelProps = {
   onResyncStock: () => void;
   resyncing: boolean;
   onEditField: (field: EditableField) => void;
+  supplierOptions: SupplierOption[];
+  savingSupplier: boolean;
+  onSelectSupplier: (supplierId: string) => void;
 };
 
 function summarizeRange(values: number[]) {
@@ -31,6 +35,9 @@ export default function ProductDetailsPanel({
   onResyncStock,
   resyncing,
   onEditField,
+  supplierOptions,
+  savingSupplier,
+  onSelectSupplier,
 }: ProductDetailsPanelProps) {
   const prices = product.variants.map((v) => v.price);
   const costs = product.variants.filter((v) => v.cost != null).map((v) => v.cost as number);
@@ -101,6 +108,19 @@ export default function ProductDetailsPanel({
             <FieldChips values={sizeLabels} />
           </Field>
         )}
+
+        <Field label="Vendor" onEdit={() => onEditField('vendor')}>
+          <span className="text-sm text-gray-900">{product.vendor || '—'}</span>
+        </Field>
+
+        <Field label="Supplier">
+          <SupplierSelect
+            options={supplierOptions}
+            suppliers={product.suppliers}
+            onSelect={onSelectSupplier}
+            saving={savingSupplier}
+          />
+        </Field>
 
         <Field label="Price" onEdit={() => onEditField('price')}>
           <span className="text-sm text-gray-900">{summarizeRange(prices)}</span>

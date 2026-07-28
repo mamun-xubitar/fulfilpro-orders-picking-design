@@ -7,6 +7,7 @@ type ShopifyUserError = { field: string[] | null; message: string };
 
 export type ProductFieldsUpdate = {
   title?: string;
+  vendor?: string;
   descriptionHtml?: string;
   tags?: string[];
   productType?: string;
@@ -135,6 +136,7 @@ export async function updateProductFields(productId: string, fields: ProductFiel
 
   const input: Record<string, unknown> = { id: gid };
   if (fields.title !== undefined) input.title = fields.title;
+  if (fields.vendor !== undefined) input.vendor = fields.vendor;
   if (fields.descriptionHtml !== undefined) input.descriptionHtml = fields.descriptionHtml;
   if (fields.tags !== undefined) input.tags = fields.tags;
   if (fields.productType !== undefined) input.productType = fields.productType;
@@ -153,6 +155,7 @@ export async function updateProductFields(productId: string, fields: ProductFiel
     where: { id: productId },
     data: {
       ...(fields.title !== undefined ? { title: fields.title } : {}),
+      ...(fields.vendor !== undefined ? { vendor: fields.vendor } : {}),
       ...(fields.descriptionHtml !== undefined ? { descriptionHtml: fields.descriptionHtml } : {}),
       ...(fields.tags !== undefined ? { tags: fields.tags } : {}),
       ...(fields.productType !== undefined ? { productType: fields.productType } : {}),

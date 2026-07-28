@@ -8,6 +8,7 @@ import { useProductVariants } from './useProductVariants';
 import { useVariantSelection } from './useVariantSelection';
 import { useStockAdjust } from './useStockAdjust';
 import { useStoreSiblings } from './useStoreSiblings';
+import { useProductSuppliers } from './useProductSuppliers';
 
 export function useProductDetailPage(productID: string) {
   const data = useProductDetailData(productID);
@@ -16,6 +17,7 @@ export function useProductDetailPage(productID: string) {
   const selection = useVariantSelection({ productId: productID, bumpRefresh: data.bumpRefresh });
   const stockAdjust = useStockAdjust({ productId: productID, locations: data.locations, bumpRefresh: data.bumpRefresh });
   const siblingsPanel = useStoreSiblings({ bumpRefresh: data.bumpRefresh });
+  const productSuppliers = useProductSuppliers({ productId: productID, bumpRefresh: data.bumpRefresh });
   const { request: requestContinueToggle, loading: togglingContinue } = useRequest();
   const { retainOnly } = selection;
 
@@ -45,6 +47,7 @@ export function useProductDetailPage(productID: string) {
     selection,
     stockAdjust,
     siblingsPanel,
+    productSuppliers,
     allContinueSelling,
     toggleAllContinueSelling,
     togglingContinue,

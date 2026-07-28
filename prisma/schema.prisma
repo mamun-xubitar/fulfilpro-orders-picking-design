@@ -64,6 +64,7 @@ model Store {
   shipmentTrackings           ShipmentTracking[]
   products                    Product[]
   orderLineItems              OrderLineItem[]
+  supplierCollections         SupplierCollection[]
 
   @@index([status])
   @@index([partnerStoreId])
@@ -425,6 +426,7 @@ model Product {
   store            Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
   variants         ProductVariant[]
   lineItems        OrderLineItem[]
+  supplierLinks    SupplierProduct[]
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
 
@@ -720,4 +722,45 @@ model TaskMessage {
   task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@index([taskId, createdAt])
+}
+
+model Supplier {
+  id           String   @id @default(uuid())
+  name         String
+  contactEmail String?
+  poEmail      String
+  description  String?
+  products     SupplierProduct[]
+  collections  SupplierCollection[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([name])
+}
+
+model SupplierProduct {
+  id         String   @id @default(uuid())
+  supplierId String
+  productId  String
+  linkedAt   DateTime @default(now())
+  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([supplierId, productId])
+  @@index([productId, linkedAt])
+}
+
+model SupplierCollection {
+  id           String   @id @default(uuid())
+  supplierId   String
+  storeId      String
+  collectionId String
+  title        String
+  handle       String?
+  createdAt    DateTime @default(now())
+  supplier     Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  store        Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([supplierId, storeId, collectionId])
+  @@index([storeId, collectionId])
 }

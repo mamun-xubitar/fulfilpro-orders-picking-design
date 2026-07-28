@@ -1,6 +1,6 @@
 'use client';
 
-import { ModalShell, ModalActions } from './ModalShell';
+import { ModalShell, ModalActions } from '@/components/ModalShell';
 import EditFieldModal from './EditFieldModal';
 import type { useProductDetailPage } from './hooks/useProductDetailPage';
 

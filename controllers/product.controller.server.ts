@@ -1,5 +1,6 @@
 import prisma from '@/lib/prisma.server';
 import { ProductModel } from '@/models/product.model.server';
+import { SupplierModel } from '@/models/supplier.model.server';
 import { enqueueProductSyncJob, getProductSyncStatus } from '@/lib/product-sync-jobs.server';
 import { enqueueJob } from '@/lib/background-jobs.server';
 import { deleteProductNow, type BulkProductAction, type BulkProductActionPayload } from '@/lib/product-bulk-actions.server';
@@ -17,6 +18,7 @@ import { getLegacyId } from '@/lib/shopify-graphql.server';
 import { ProductStatus } from '@prisma/client';
 
 const model = new ProductModel();
+const supplierModel = new SupplierModel();
 
 const SEARCH_FIELD_VALUES = new Set(['title', 'vendor', 'supplier', 'category', 'type', 'tag']);
 const STOCK_LEVEL_VALUES = new Set(['out_of_stock', 'not_tracked', 'in_stock']);
@@ -102,8 +104,8 @@ export class ProductController {
 
   async formData(session: Session, allowedStoreIds?: string[] | null) {
     if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
-    const data = await model.formData(allowedStoreIds);
-    return { data };
+    const [data, suppliers] = await Promise.all([model.formData(allowedStoreIds), supplierModel.listOptions()]);
+    return { data: { ...data, suppliers } };
   }
 
   async triggerSync(body: unknown, session: Session) {
@@ -236,7 +238,19 @@ export class ProductController {
 
     const siblings = product.handle ? await model.findSiblingsByHandle(product.handle, id) : [];
 
-    return { data: { product: { ...product, variants, collections }, locations, siblings, stale } };
+    const [attached, viaCollection] = await Promise.all([
+      supplierModel.findForProduct(id),
+      supplierModel.findByCollections(existing.storeId, collections.map((c) => c.id)),
+    ]);
+
+    return {
+      data: {
+        product: { ...product, variants, collections, suppliers: { attached, viaCollection } },
+        locations,
+        siblings,
+        stale,
+      },
+    };
   }
 
   async updateProduct(id: string, body: unknown, session: Session, allowedStoreIds?: string[] | null) {
@@ -247,6 +261,7 @@ export class ProductController {
     const value = (body ?? {}) as Record<string, unknown>;
     const fields: ProductFieldsUpdate = {};
     if (typeof value.title === 'string') fields.title = value.title.trim();
+    if (typeof value.vendor === 'string') fields.vendor = value.vendor.trim();
     if (typeof value.descriptionHtml === 'string') fields.descriptionHtml = value.descriptionHtml;
     if (Array.isArray(value.tags)) fields.tags = (value.tags as unknown[]).filter((t): t is string => typeof t === 'string');
     if (typeof value.productType === 'string') fields.productType = value.productType.trim();

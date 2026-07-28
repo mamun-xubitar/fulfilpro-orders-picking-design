@@ -29,6 +29,11 @@ export type ProductStatusValue = 'ACTIVE' | 'DRAFT' | 'ARCHIVED';
 
 export type ProductCollection = { id: string; title: string; handle: string | null };
 
+export type AttachedSupplier = { id: string; name: string; linkedAt: string };
+export type CollectionSupplier = { id: string; name: string; collectionTitle: string };
+export type ProductSuppliers = { attached: AttachedSupplier[]; viaCollection: CollectionSupplier[] };
+export type SupplierOption = { id: string; name: string };
+
 export type ProductDetail = {
   id: string;
   storeId: string;
@@ -47,6 +52,7 @@ export type ProductDetail = {
   onlineStoreUrl: string | null;
   salesChannels: SalesChannel[];
   collections: ProductCollection[];
+  suppliers: ProductSuppliers;
   totalInventory: number;
   store: { id: string; name: string; storeDomain: string };
   variants: VariantDetail[];
@@ -83,6 +89,7 @@ export type ColorGroup = {
 
 export type ProductFieldsPayload = {
   title?: string;
+  vendor?: string;
   descriptionHtml?: string;
   tags?: string[];
   productType?: string;
