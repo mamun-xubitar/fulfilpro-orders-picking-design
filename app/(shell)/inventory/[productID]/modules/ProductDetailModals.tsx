@@ -4,6 +4,7 @@ import { ModalShell, ModalActions } from '@/components/ModalShell';
 import EditFieldModal from './EditFieldModal';
 import CreatePoModal from './CreatePoModal';
 import PoDetailModal from './PoDetailModal';
+import PoReceiveModal from './PoReceiveModal';
 import type { useProductDetailPage } from './hooks/useProductDetailPage';
 
 type ProductDetailModalsProps = {
@@ -61,6 +62,8 @@ export default function ProductDetailModals({ p }: ProductDetailModalsProps) {
       )}
 
       <PoDetailModal po={p.purchaseOrders} />
+
+      <PoReceiveModal po={p.purchaseOrders} locations={p.locations} />
 
       {p.selection.deleteConfirmOpen && (
         <ModalShell

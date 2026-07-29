@@ -1,5 +1,5 @@
 import { COLOR_OPTION_NAMES, LOW_STOCK_THRESHOLD, OUT_OF_STOCK_THRESHOLD, SIZE_OPTION_NAMES } from './constants';
-import type { ColorGroup, GalleryEntry, ProductDetail, PurchaseOrderItemRow, PurchaseOrderStatus, SizeCount, VariantDetail } from './types';
+import type { ColorGroup, GalleryEntry, ProductDetail, PurchaseOrderItemRow, PurchaseOrderRow, PurchaseOrderStatus, SizeCount, VariantDetail } from './types';
 
 export function getVariantColor(variant: VariantDetail): string {
   const named = variant.optionValues.find((o) => COLOR_OPTION_NAMES.includes(o.name.trim().toLowerCase()));
@@ -185,7 +185,7 @@ export function buildPoEmail({
   po: PoEmailSource;
   storeName: string;
   onlineStoreUrl: string | null;
-}): { subject: string; body: string; compactBody: string } {
+}): { subject: string; body: string } {
   const totalUnits = po.items.reduce((sum, item) => sum + item.quantity, 0);
   const subject = `Purchase Order ${formatPoNumber(po.number)} — ${po.productTitle}`;
   const totalLine = `Total: ${totalUnits} units across ${po.items.length} variant${po.items.length === 1 ? '' : 's'}`;
@@ -199,18 +199,56 @@ export function buildPoEmail({
     ...(po.deliveryDate ? [`Delivery required by: ${formatPoDate(po.deliveryDate)}`] : []),
   ];
 
-  const itemLines = po.items.map((item) => `${item.variantTitle.padEnd(16)}${(item.sku ?? '-').padEnd(12)}${item.quantity}`);
+  const itemLines = po.items.map((item) => `- Qty: ${item.quantity} | Variant: ${item.variantTitle} | SKU: ${item.sku ?? '-'}`);
 
   const footerLines = [...(po.remark ? ['', `Remark: ${po.remark}`] : []), '', 'Thanks,', storeName];
 
   const body = [...headerLines, '', ...itemLines, '', totalLine, ...footerLines].join('\n');
-  const compactBody = [...headerLines, '', totalLine, '', 'Full item list follows separately.', ...footerLines].join('\n');
 
-  return { subject, body, compactBody };
+  return { subject, body };
 }
 
-export function buildMailtoHref({ to, subject, body, compactBody }: { to: string; subject: string; body: string; compactBody: string }): string {
-  const full = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  if (full.length <= 1800) return full;
-  return `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(compactBody)}`;
+export function buildMailtoHref({ to, subject, body }: { to: string; subject: string; body: string }): string {
+  return `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
+export function getItemRemaining(item: PurchaseOrderItemRow): number {
+  return Math.max(0, item.quantity - item.receivedQuantity);
+}
+
+export function hasOutstandingItems(po: PurchaseOrderRow): boolean {
+  return po.items.some((item) => item.receivedQuantity < item.quantity);
+}
+
+export function getPoUnits(po: PurchaseOrderRow): { ordered: number; received: number } {
+  return po.items.reduce(
+    (acc, item) => ({ ordered: acc.ordered + item.quantity, received: acc.received + item.receivedQuantity }),
+    { ordered: 0, received: 0 }
+  );
+}
+
+export function getPoOverdueDays(po: PurchaseOrderRow): number | null {
+  if (!po.deliveryDate) return null;
+  if (po.status === 'RECEIVED' || po.status === 'CANCELLED') return null;
+
+  const deliveryDate = new Date(po.deliveryDate);
+  const now = new Date();
+  const diffMs = now.getTime() - deliveryDate.getTime();
+  if (diffMs <= 0) return null;
+
+  return Math.floor(diffMs / (1000 * 60 * 60 * 24));
+}
+
+export function splitQuantityAcrossLocations(quantity: number, locationIds: string[]): Record<string, number> {
+  const result: Record<string, number> = {};
+  if (locationIds.length === 0) return result;
+
+  const base = Math.floor(quantity / locationIds.length);
+  let remainder = quantity - base * locationIds.length;
+
+  for (const locationId of locationIds) {
+    result[locationId] = base + (remainder > 0 ? 1 : 0);
+    if (remainder > 0) remainder -= 1;
+  }
+  return result;
 }

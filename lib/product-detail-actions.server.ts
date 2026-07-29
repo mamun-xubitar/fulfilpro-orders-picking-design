@@ -27,6 +27,10 @@ export type InventoryAdjustPayload = {
   changes: Array<{ variantId: string; delta: number }>;
 };
 
+export type InventoryReceivePayload = {
+  entries: Array<{ variantId: string; locationId: string; quantity: number }>;
+};
+
 export type TaxonomyCategory = { id: string; name: string; fullName: string; isLeaf: boolean };
 
 const PRODUCT_UPDATE_MUTATION = `
@@ -287,6 +291,70 @@ export async function adjustInventory(productId: string, payload: InventoryAdjus
     await prisma.productVariant.update({
       where: { id: change.variantId },
       data: { inventoryQuantity: { increment: totalDelta } },
+    });
+  }
+  await recomputeTotalInventory(productId);
+}
+
+/** Pushes each entry's own locationId + quantity to Shopify, for goods received against a purchase order. */
+export async function receiveInventory(productId: string, payload: InventoryReceivePayload) {
+  if (payload.entries.length === 0) return;
+  const product = await getProductForAction(productId);
+
+  const dbVariants = await prisma.productVariant.findMany({
+    where: { productId, id: { in: payload.entries.map((e) => e.variantId) } },
+  });
+  const byId = new Map(dbVariants.map((v) => [v.id, v]));
+
+  const activeItemGids = [
+    ...new Set(
+      payload.entries
+        .map((e) => byId.get(e.variantId))
+        .filter((v): v is NonNullable<typeof v> => !!v?.inventoryItemId)
+        .map((v) => toInventoryItemGid(v.inventoryItemId!))
+    ),
+  ];
+  const currentQuantities = await fetchCurrentAvailableQuantities(product, activeItemGids);
+
+  const shopifyChanges: Array<{ inventoryItemId: string; locationId: string; delta: number; changeFromQuantity: number | null }> = [];
+  for (const entry of payload.entries) {
+    const variant = byId.get(entry.variantId);
+    if (!variant?.inventoryItemId || entry.quantity === 0) continue;
+    const itemGid = toInventoryItemGid(variant.inventoryItemId);
+    const locationGid = toLocationGid(entry.locationId);
+    shopifyChanges.push({
+      inventoryItemId: itemGid,
+      locationId: locationGid,
+      delta: entry.quantity,
+      changeFromQuantity: currentQuantities.get(itemGid)?.get(locationGid) ?? null,
+    });
+  }
+  if (shopifyChanges.length === 0) return;
+
+  const data = await shopifyGraphQL<{ inventoryAdjustQuantities: { userErrors: (ShopifyUserError & { code?: string })[] } }>(
+    product.store.storeDomain,
+    product.store.accessToken!,
+    INVENTORY_ADJUST_MUTATION,
+    {
+      input: { reason: 'received', name: 'available', changes: shopifyChanges },
+      idempotencyKey: crypto.randomUUID(),
+    }
+  );
+  const errors = data.inventoryAdjustQuantities.userErrors;
+  if (errors.some((e) => e.code === 'CHANGE_FROM_QUANTITY_STALE')) {
+    throw new Error('Inventory quantity changed since this page was loaded. Please refresh and try again.');
+  }
+  assertNoUserErrors(errors);
+
+  const totalsByVariant = new Map<string, number>();
+  for (const entry of payload.entries) {
+    if (!byId.get(entry.variantId)?.inventoryItemId || entry.quantity === 0) continue;
+    totalsByVariant.set(entry.variantId, (totalsByVariant.get(entry.variantId) ?? 0) + entry.quantity);
+  }
+  for (const [variantId, total] of totalsByVariant) {
+    await prisma.productVariant.update({
+      where: { id: variantId },
+      data: { inventoryQuantity: { increment: total } },
     });
   }
   await recomputeTotalInventory(productId);

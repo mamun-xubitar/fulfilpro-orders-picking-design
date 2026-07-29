@@ -4,17 +4,20 @@ import { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import useRequest from '@/hooks/useRequest';
 import { usePagination, type PaginationState } from '@/hooks/usePagination';
-import { buildMailtoHref, buildPoEmail } from '../utils';
-import type { ApiResponse, ProductDetail, PurchaseOrderListResponse, PurchaseOrderRow, PurchaseOrderStatus } from '../types';
+import { buildMailtoHref, buildPoEmail, hasOutstandingItems } from '../utils';
+import { usePoReceive } from './usePoReceive';
+import type { ApiResponse, LocationOption, ProductDetail, PurchaseOrderListResponse, PurchaseOrderRow, PurchaseOrderStatus } from '../types';
 
 const DEFAULT_PAGINATION: PaginationState = { page: 1, pageSize: 10, total: 0, totalPages: 1, hasPrev: false, hasNext: false };
 
 type UsePurchaseOrdersArgs = {
   productId: string;
   product: ProductDetail | null;
+  locations: LocationOption[];
+  bumpRefresh: () => void;
 };
 
-export function usePurchaseOrders({ productId, product }: UsePurchaseOrdersArgs) {
+export function usePurchaseOrders({ productId, product, locations, bumpRefresh }: UsePurchaseOrdersArgs) {
   const [panelExpanded, setPanelExpanded] = useState(false);
   const togglePanel = () => setPanelExpanded((prev) => !prev);
 
@@ -84,8 +87,8 @@ export function usePurchaseOrders({ productId, product }: UsePurchaseOrdersArgs)
     buildPoEmail({ po, storeName: product?.store.name ?? '', onlineStoreUrl: product?.onlineStoreUrl ?? null });
 
   const sendEmailForPo = (po: PurchaseOrderRow) => {
-    const { subject, body, compactBody } = buildEmailFor(po);
-    window.location.href = buildMailtoHref({ to: po.poEmail, subject, body, compactBody });
+    const { subject, body } = buildEmailFor(po);
+    window.location.href = buildMailtoHref({ to: po.poEmail, subject, body });
   };
 
   const copyEmailBodyForPo = async (po: PurchaseOrderRow) => {
@@ -142,6 +145,16 @@ export function usePurchaseOrders({ productId, product }: UsePurchaseOrdersArgs)
     });
   };
 
+  const receive = usePoReceive({ poId: openPoId, locations, refreshList, bumpRefresh });
+
+  const handleStatusChange = (status: PurchaseOrderStatus) => {
+    if (status === 'RECEIVED' && openPo && hasOutstandingItems(openPo)) {
+      receive.openForOutstanding(openPo);
+      return;
+    }
+    updateStatus(status);
+  };
+
   return {
     panelExpanded,
     togglePanel,
@@ -174,9 +187,11 @@ export function usePurchaseOrders({ productId, product }: UsePurchaseOrdersArgs)
     openPoModal,
     closePo,
     updateStatus,
+    handleStatusChange,
     updatingStatus,
     sendEmailForPo,
     copyEmailBodyForPo,
+    receive,
   };
 }
 

@@ -4,9 +4,7 @@ import type { PurchaseOrderStatus } from './types';
 
 const STATUS_OPTIONS: Array<{ value: PurchaseOrderStatus | ''; label: string }> = [
   { value: '', label: 'All statuses' },
-  { value: 'DRAFT', label: 'Draft' },
   { value: 'REQUESTED', label: 'Requested' },
-  { value: 'CONFIRMED', label: 'Confirmed' },
   { value: 'PARTIALLY_RECEIVED', label: 'Partially received' },
   { value: 'RECEIVED', label: 'Received' },
   { value: 'CANCELLED', label: 'Cancelled' },

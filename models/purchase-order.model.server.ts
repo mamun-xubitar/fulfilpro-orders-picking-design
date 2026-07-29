@@ -7,6 +7,7 @@ export type PurchaseOrderItemRow = {
   variantTitle: string;
   sku: string | null;
   quantity: number;
+  receivedQuantity: number;
 };
 
 export type PurchaseOrderRow = {
@@ -116,6 +117,34 @@ export class PurchaseOrderModel {
     });
     return toPurchaseOrderRow(row);
   }
+
+  async receiveItems(id: string, receipts: Array<{ itemId: string; quantity: number }>, actor: { id: string; name: string }) {
+    return prisma.$transaction(async (tx) => {
+      for (const receipt of receipts) {
+        await tx.purchaseOrderItem.update({
+          where: { id: receipt.itemId },
+          data: { receivedQuantity: { increment: receipt.quantity } },
+        });
+      }
+
+      const items = await tx.purchaseOrderItem.findMany({ where: { purchaseOrderId: id } });
+      const status: PurchaseOrderStatus = items.every((item) => item.receivedQuantity >= item.quantity)
+        ? 'RECEIVED'
+        : 'PARTIALLY_RECEIVED';
+
+      const row = await tx.purchaseOrder.update({
+        where: { id },
+        data: {
+          status,
+          statusUpdatedById: actor.id,
+          statusUpdatedByName: actor.name,
+          statusUpdatedAt: new Date(),
+        },
+        include: { items: true },
+      });
+      return toPurchaseOrderRow(row);
+    });
+  }
 }
 
 function toPurchaseOrderRow(row: PurchaseOrderWithItems): PurchaseOrderRow {
@@ -143,6 +172,7 @@ function toPurchaseOrderRow(row: PurchaseOrderWithItems): PurchaseOrderRow {
       variantTitle: item.variantTitle,
       sku: item.sku,
       quantity: item.quantity,
+      receivedQuantity: item.receivedQuantity,
     })),
   };
 }

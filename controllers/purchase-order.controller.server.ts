@@ -1,5 +1,6 @@
 import prisma from '@/lib/prisma.server';
 import { PurchaseOrderModel } from '@/models/purchase-order.model.server';
+import { receiveInventory } from '@/lib/product-detail-actions.server';
 import { PurchaseOrderStatus } from '@prisma/client';
 
 const model = new PurchaseOrderModel();
@@ -133,5 +134,70 @@ export class PurchaseOrderController {
 
     const purchaseOrder = await model.updateStatus(id, status as PurchaseOrderStatus, actorFromSession(session));
     return { data: purchaseOrder, message: 'Purchase order updated' };
+  }
+
+  async receive(id: string, body: unknown, session: Session) {
+    if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
+
+    const po = await model.findById(id);
+    if (!po) return { error: { message: 'Purchase order not found', status: 404 } };
+    if (po.status === 'CANCELLED') return { error: { message: 'This purchase order is cancelled', status: 400 } };
+
+    const value = (body ?? {}) as Record<string, unknown>;
+    const rawAllocations = Array.isArray(value.allocations) ? value.allocations : [];
+
+    const errors: string[] = [];
+    const itemById = new Map(po.items.map((item) => [item.id, item]));
+    const allocations: Array<{ itemId: string; locationId: string; quantity: number }> = [];
+
+    for (const raw of rawAllocations) {
+      if (!raw || typeof raw !== 'object') continue;
+      const a = raw as Record<string, unknown>;
+      const itemId = typeof a.itemId === 'string' ? a.itemId.trim() : '';
+      const locationId = typeof a.locationId === 'string' ? a.locationId.trim() : '';
+      const quantity = Number(a.quantity);
+
+      const item = itemById.get(itemId);
+      if (!item) {
+        errors.push('itemId: One or more items do not belong to this purchase order');
+        continue;
+      }
+      if (!item.variantId) {
+        errors.push('items: This variant no longer exists in Shopify');
+        continue;
+      }
+      if (!locationId) {
+        errors.push('locationId: Location is required');
+        continue;
+      }
+      if (!Number.isFinite(quantity) || quantity < 1) {
+        errors.push('quantity: Quantity must be at least 1');
+        continue;
+      }
+      allocations.push({ itemId, locationId, quantity: Math.trunc(quantity) });
+    }
+    if (allocations.length === 0 && !errors.length) errors.push('allocations: Select at least one location with a quantity');
+
+    if (errors.length) return { error: { message: 'Validation failed', errors, status: 400 } };
+
+    const entries = allocations.map((a) => ({ variantId: itemById.get(a.itemId)!.variantId!, locationId: a.locationId, quantity: a.quantity }));
+
+    const receivedByItem = new Map<string, number>();
+    for (const a of allocations) {
+      receivedByItem.set(a.itemId, (receivedByItem.get(a.itemId) ?? 0) + a.quantity);
+    }
+
+    try {
+      await receiveInventory(po.productId, { entries });
+    } catch (error) {
+      return { error: { message: error instanceof Error ? error.message : 'Failed to receive inventory', status: 400 } };
+    }
+
+    const purchaseOrder = await model.receiveItems(
+      id,
+      [...receivedByItem.entries()].map(([itemId, quantity]) => ({ itemId, quantity })),
+      actorFromSession(session)
+    );
+    return { data: purchaseOrder, message: 'Inventory received' };
   }
 }

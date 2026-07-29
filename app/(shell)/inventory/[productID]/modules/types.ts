@@ -42,6 +42,7 @@ export type PurchaseOrderItemRow = {
   variantTitle: string;
   sku: string | null;
   quantity: number;
+  receivedQuantity: number;
 };
 
 export type PurchaseOrderRow = {

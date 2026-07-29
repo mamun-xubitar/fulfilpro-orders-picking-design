@@ -1,11 +1,12 @@
 'use client';
 
 import { ModalShell } from '@/components/ModalShell';
+import PoDetailItemsTable from './PoDetailItemsTable';
 import { formatPoNumber, getPoStatusChipClass } from './utils';
 import type { usePurchaseOrders } from './hooks/usePurchaseOrders';
 import type { PurchaseOrderStatus } from './types';
 
-const STATUS_OPTIONS: PurchaseOrderStatus[] = ['DRAFT', 'REQUESTED', 'CONFIRMED', 'PARTIALLY_RECEIVED', 'RECEIVED', 'CANCELLED'];
+const STATUS_OPTIONS: PurchaseOrderStatus[] = ['REQUESTED', 'RECEIVED', 'CANCELLED'];
 
 type PoDetailModalProps = {
   po: ReturnType<typeof usePurchaseOrders>;
@@ -68,35 +69,21 @@ export default function PoDetailModal({ po }: PoDetailModalProps) {
           </div>
         )}
 
-        <div className="border border-gray-200 rounded-lg overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                <th className="px-3 py-2">Variant</th>
-                <th className="px-3 py-2">SKU</th>
-                <th className="px-3 py-2">Qty</th>
-              </tr>
-            </thead>
-            <tbody>
-              {purchaseOrder.items.map((item) => (
-                <tr key={item.id} className="border-b border-gray-100 last:border-0">
-                  <td className="px-3 py-2 text-gray-900">{item.variantTitle}</td>
-                  <td className="px-3 py-2 text-gray-500">{item.sku ?? '-'}</td>
-                  <td className="px-3 py-2 text-gray-500">{item.quantity}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <PoDetailItemsTable items={purchaseOrder.items} po={po} />
 
         <div className="flex items-center gap-3">
           <label className="text-sm font-medium text-gray-700">Status</label>
           <select
             value={purchaseOrder.status}
-            onChange={(e) => po.updateStatus(e.target.value as PurchaseOrderStatus)}
+            onChange={(e) => po.handleStatusChange(e.target.value as PurchaseOrderStatus)}
             disabled={po.updatingStatus}
             className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm outline-none"
           >
+            {!STATUS_OPTIONS.includes(purchaseOrder.status) && (
+              <option value={purchaseOrder.status} disabled>
+                {purchaseOrder.status.replace(/_/g, ' ')}
+              </option>
+            )}
             {STATUS_OPTIONS.map((status) => (
               <option key={status} value={status}>
                 {status.replace(/_/g, ' ')}

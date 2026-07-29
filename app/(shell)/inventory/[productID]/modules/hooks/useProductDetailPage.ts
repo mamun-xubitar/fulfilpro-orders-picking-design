@@ -19,7 +19,7 @@ export function useProductDetailPage(productID: string) {
   const stockAdjust = useStockAdjust({ productId: productID, locations: data.locations, bumpRefresh: data.bumpRefresh });
   const siblingsPanel = useStoreSiblings({ bumpRefresh: data.bumpRefresh });
   const productSuppliers = useProductSuppliers({ productId: productID, bumpRefresh: data.bumpRefresh });
-  const purchaseOrders = usePurchaseOrders({ productId: productID, product: data.product });
+  const purchaseOrders = usePurchaseOrders({ productId: productID, product: data.product, locations: data.locations, bumpRefresh: data.bumpRefresh });
   const { request: requestContinueToggle, loading: togglingContinue } = useRequest();
   const { retainOnly } = selection;
 
