@@ -4,12 +4,14 @@ export function ModalShell({
   title,
   onClose,
   children,
+  footer,
   allowOverflow,
   wide,
 }: {
   title: string;
   onClose: () => void;
   children: React.ReactNode;
+  footer?: React.ReactNode;
   allowOverflow?: boolean;
   wide?: boolean;
 }) {
@@ -21,10 +23,10 @@ export function ModalShell({
       onClick={onClose}
     >
       <div
-        className={`w-full ${wide ? 'max-w-2xl' : 'max-w-md'} rounded-lg border border-gray-200 bg-white shadow-xl ${allowOverflow ? 'overflow-visible' : 'overflow-hidden'}`}
+        className={`w-full ${wide ? 'max-w-2xl' : 'max-w-md'} rounded-lg border border-gray-200 bg-white shadow-xl ${allowOverflow ? 'overflow-visible' : 'overflow-hidden flex flex-col max-h-[calc(100dvh-2rem)]'}`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between gap-4 border-b border-gray-200 px-5 py-4">
+        <div className="flex shrink-0 items-center justify-between gap-4 border-b border-gray-200 px-5 py-4">
           <h3 className="text-base font-semibold text-gray-900">{title}</h3>
           <button type="button" onClick={onClose} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600" aria-label="Close">
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -32,7 +34,8 @@ export function ModalShell({
             </svg>
           </button>
         </div>
-        <div className="px-5 py-4">{children}</div>
+        <div className={allowOverflow ? 'px-5 py-4' : 'flex-1 overflow-y-auto px-5 py-4'}>{children}</div>
+        {footer && <div className="shrink-0 border-t border-gray-200 px-5 py-4">{footer}</div>}
       </div>
     </div>
   );

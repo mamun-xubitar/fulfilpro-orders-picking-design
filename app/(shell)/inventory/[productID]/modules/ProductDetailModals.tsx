@@ -2,6 +2,8 @@
 
 import { ModalShell, ModalActions } from '@/components/ModalShell';
 import EditFieldModal from './EditFieldModal';
+import CreatePoModal from './CreatePoModal';
+import PoDetailModal from './PoDetailModal';
 import type { useProductDetailPage } from './hooks/useProductDetailPage';
 
 type ProductDetailModalsProps = {
@@ -12,7 +14,18 @@ export default function ProductDetailModals({ p }: ProductDetailModalsProps) {
   return (
     <>
       {p.stockAdjust.modalOpen && (
-        <ModalShell title="Adjust stock" onClose={p.stockAdjust.closeModal}>
+        <ModalShell
+          title="Adjust stock"
+          onClose={p.stockAdjust.closeModal}
+          footer={
+            <ModalActions
+              onCancel={p.stockAdjust.closeModal}
+              onConfirm={p.stockAdjust.apply}
+              confirmLabel={p.stockAdjust.adjusting ? 'Applying...' : 'Apply'}
+              disabled={p.stockAdjust.adjusting || p.stockAdjust.checkedLocationIds.size === 0}
+            />
+          }
+        >
           <p className="text-sm text-gray-500 mb-3">Select the locations to apply this adjustment to.</p>
           <ul className="space-y-2 mb-4 max-h-48 overflow-y-auto">
             {p.locations.map((location) => (
@@ -34,54 +47,73 @@ export default function ProductDetailModals({ p }: ProductDetailModalsProps) {
             {p.stockAdjust.totalDelta} across {p.stockAdjust.checkedLocationIds.size} location
             {p.stockAdjust.checkedLocationIds.size === 1 ? '' : 's'}
           </p>
-          <ModalActions
-            onCancel={p.stockAdjust.closeModal}
-            onConfirm={p.stockAdjust.apply}
-            confirmLabel={p.stockAdjust.adjusting ? 'Applying...' : 'Apply'}
-            disabled={p.stockAdjust.adjusting || p.stockAdjust.checkedLocationIds.size === 0}
-          />
         </ModalShell>
       )}
 
       <EditFieldModal edit={p.fieldEdit} />
 
+      {p.product && (
+        <CreatePoModal
+          po={p.purchaseOrders}
+          supplierOptions={p.productSuppliers.supplierOptions}
+          variants={p.product.variants.filter((v) => p.purchaseOrders.createVariantIds.includes(v.id))}
+        />
+      )}
+
+      <PoDetailModal po={p.purchaseOrders} />
+
       {p.selection.deleteConfirmOpen && (
-        <ModalShell title="Delete variant(s)" onClose={p.selection.cancelDelete}>
+        <ModalShell
+          title="Delete variant(s)"
+          onClose={p.selection.cancelDelete}
+          footer={
+            <ModalActions
+              onCancel={p.selection.cancelDelete}
+              onConfirm={p.selection.confirmDelete}
+              confirmLabel={p.selection.bulkSaving ? 'Deleting...' : 'Delete'}
+              disabled={p.selection.bulkSaving}
+              danger
+            />
+          }
+        >
           <p className="text-sm text-gray-600 mb-4">
             This permanently deletes {p.selection.selectedIds.size} variant(s) from Shopify. This cannot be undone.
           </p>
-          <ModalActions
-            onCancel={p.selection.cancelDelete}
-            onConfirm={p.selection.confirmDelete}
-            confirmLabel={p.selection.bulkSaving ? 'Deleting...' : 'Delete'}
-            disabled={p.selection.bulkSaving}
-            danger
-          />
         </ModalShell>
       )}
 
       {p.siblingsPanel.navigateTarget && (
-        <ModalShell title="Switch product" onClose={p.siblingsPanel.cancelNavigate}>
+        <ModalShell
+          title="Switch product"
+          onClose={p.siblingsPanel.cancelNavigate}
+          footer={
+            <ModalActions onCancel={p.siblingsPanel.cancelNavigate} onConfirm={p.siblingsPanel.confirmNavigate} confirmLabel="Open" disabled={false} />
+          }
+        >
           <p className="text-sm text-gray-600 mb-4">
             Open &quot;{p.siblingsPanel.navigateTarget.title}&quot; on {p.siblingsPanel.navigateTarget.store.name}?
           </p>
-          <ModalActions onCancel={p.siblingsPanel.cancelNavigate} onConfirm={p.siblingsPanel.confirmNavigate} confirmLabel="Open" disabled={false} />
         </ModalShell>
       )}
 
       {p.siblingsPanel.removeTarget && (
-        <ModalShell title="Remove product" onClose={p.siblingsPanel.cancelRemove}>
+        <ModalShell
+          title="Remove product"
+          onClose={p.siblingsPanel.cancelRemove}
+          footer={
+            <ModalActions
+              onCancel={p.siblingsPanel.cancelRemove}
+              onConfirm={p.siblingsPanel.confirmRemove}
+              confirmLabel={p.siblingsPanel.removing ? 'Removing...' : 'Remove'}
+              disabled={p.siblingsPanel.removing}
+              danger
+            />
+          }
+        >
           <p className="text-sm text-gray-600 mb-4">
             This permanently deletes &quot;{p.siblingsPanel.removeTarget.title}&quot; from {p.siblingsPanel.removeTarget.store.name} on Shopify. This
             cannot be undone.
           </p>
-          <ModalActions
-            onCancel={p.siblingsPanel.cancelRemove}
-            onConfirm={p.siblingsPanel.confirmRemove}
-            confirmLabel={p.siblingsPanel.removing ? 'Removing...' : 'Remove'}
-            disabled={p.siblingsPanel.removing}
-            danger
-          />
         </ModalShell>
       )}
     </>

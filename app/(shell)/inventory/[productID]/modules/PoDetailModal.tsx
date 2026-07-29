@@ -1,0 +1,113 @@
+'use client';
+
+import { ModalShell } from '@/components/ModalShell';
+import { formatPoNumber, getPoStatusChipClass } from './utils';
+import type { usePurchaseOrders } from './hooks/usePurchaseOrders';
+import type { PurchaseOrderStatus } from './types';
+
+const STATUS_OPTIONS: PurchaseOrderStatus[] = ['DRAFT', 'REQUESTED', 'CONFIRMED', 'PARTIALLY_RECEIVED', 'RECEIVED', 'CANCELLED'];
+
+type PoDetailModalProps = {
+  po: ReturnType<typeof usePurchaseOrders>;
+};
+
+export default function PoDetailModal({ po }: PoDetailModalProps) {
+  const purchaseOrder = po.openPo;
+  if (!purchaseOrder) return null;
+
+  return (
+    <ModalShell
+      title={formatPoNumber(purchaseOrder.number)}
+      onClose={po.closePo}
+      wide
+      footer={
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => po.sendEmailForPo(purchaseOrder)}
+            className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 cursor-pointer"
+          >
+            Send Email
+          </button>
+          <button
+            type="button"
+            onClick={() => po.copyEmailBodyForPo(purchaseOrder)}
+            className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 cursor-pointer"
+          >
+            Copy email body
+          </button>
+        </div>
+      }
+    >
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-3 text-sm">
+          <div>
+            <p className="text-xs text-gray-400">Supplier</p>
+            <p className="text-gray-900">{purchaseOrder.supplierName}</p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-400">PO email</p>
+            <p className="text-gray-900">{purchaseOrder.poEmail}</p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-400">Created by</p>
+            <p className="text-gray-900">
+              {purchaseOrder.createdByName} on {new Date(purchaseOrder.createdAt).toLocaleString()}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-400">Delivery date</p>
+            <p className="text-gray-900">{purchaseOrder.deliveryDate ? new Date(purchaseOrder.deliveryDate).toLocaleDateString() : '-'}</p>
+          </div>
+        </div>
+
+        {purchaseOrder.remark && (
+          <div>
+            <p className="text-xs text-gray-400">Remark</p>
+            <p className="text-sm text-gray-700 whitespace-pre-wrap">{purchaseOrder.remark}</p>
+          </div>
+        )}
+
+        <div className="border border-gray-200 rounded-lg overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                <th className="px-3 py-2">Variant</th>
+                <th className="px-3 py-2">SKU</th>
+                <th className="px-3 py-2">Qty</th>
+              </tr>
+            </thead>
+            <tbody>
+              {purchaseOrder.items.map((item) => (
+                <tr key={item.id} className="border-b border-gray-100 last:border-0">
+                  <td className="px-3 py-2 text-gray-900">{item.variantTitle}</td>
+                  <td className="px-3 py-2 text-gray-500">{item.sku ?? '-'}</td>
+                  <td className="px-3 py-2 text-gray-500">{item.quantity}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <label className="text-sm font-medium text-gray-700">Status</label>
+          <select
+            value={purchaseOrder.status}
+            onChange={(e) => po.updateStatus(e.target.value as PurchaseOrderStatus)}
+            disabled={po.updatingStatus}
+            className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm outline-none"
+          >
+            {STATUS_OPTIONS.map((status) => (
+              <option key={status} value={status}>
+                {status.replace(/_/g, ' ')}
+              </option>
+            ))}
+          </select>
+          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${getPoStatusChipClass(purchaseOrder.status)}`}>
+            {purchaseOrder.status.replace(/_/g, ' ')}
+          </span>
+        </div>
+      </div>
+    </ModalShell>
+  );
+}

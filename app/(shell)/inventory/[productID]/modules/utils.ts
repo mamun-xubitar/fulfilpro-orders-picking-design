@@ -1,5 +1,5 @@
 import { COLOR_OPTION_NAMES, LOW_STOCK_THRESHOLD, OUT_OF_STOCK_THRESHOLD, SIZE_OPTION_NAMES } from './constants';
-import type { ColorGroup, GalleryEntry, ProductDetail, SizeCount, VariantDetail } from './types';
+import type { ColorGroup, GalleryEntry, ProductDetail, PurchaseOrderItemRow, PurchaseOrderStatus, SizeCount, VariantDetail } from './types';
 
 export function getVariantColor(variant: VariantDetail): string {
   const named = variant.optionValues.find((o) => COLOR_OPTION_NAMES.includes(o.name.trim().toLowerCase()));
@@ -141,4 +141,76 @@ export function getSizeBreakdown(variants: VariantDetail[], colorKey: string | n
   return [...bySize.entries()]
     .sort((a, b) => a[1].minPosition - b[1].minPosition)
     .map(([size, { quantity }]) => ({ size, quantity }));
+}
+
+export function formatPoNumber(number: number): string {
+  return `PO-${String(number).padStart(5, '0')}`;
+}
+
+export function getPoStatusChipClass(status: PurchaseOrderStatus): string {
+  switch (status) {
+    case 'RECEIVED':
+      return 'bg-emerald-50 text-emerald-700 border border-emerald-200';
+    case 'PARTIALLY_RECEIVED':
+      return 'bg-blue-50 text-blue-700 border border-blue-200';
+    case 'CONFIRMED':
+      return 'bg-indigo-50 text-indigo-700 border border-indigo-200';
+    case 'CANCELLED':
+      return 'bg-red-50 text-red-700 border border-red-200';
+    case 'DRAFT':
+      return 'bg-gray-100 text-gray-600 border border-gray-200';
+    default:
+      return 'bg-amber-50 text-amber-800 border border-amber-200';
+  }
+}
+
+function formatPoDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+type PoEmailSource = {
+  number: number;
+  productTitle: string;
+  supplierName: string;
+  deliveryDate: string | null;
+  remark: string | null;
+  items: PurchaseOrderItemRow[];
+};
+
+export function buildPoEmail({
+  po,
+  storeName,
+  onlineStoreUrl,
+}: {
+  po: PoEmailSource;
+  storeName: string;
+  onlineStoreUrl: string | null;
+}): { subject: string; body: string; compactBody: string } {
+  const totalUnits = po.items.reduce((sum, item) => sum + item.quantity, 0);
+  const subject = `Purchase Order ${formatPoNumber(po.number)} — ${po.productTitle}`;
+  const totalLine = `Total: ${totalUnits} units across ${po.items.length} variant${po.items.length === 1 ? '' : 's'}`;
+
+  const headerLines = [
+    `Hi ${po.supplierName},`,
+    '',
+    'Please supply the following items for the product below.',
+    '',
+    `Product: ${po.productTitle}${onlineStoreUrl ? ` (${onlineStoreUrl})` : ''}`,
+    ...(po.deliveryDate ? [`Delivery required by: ${formatPoDate(po.deliveryDate)}`] : []),
+  ];
+
+  const itemLines = po.items.map((item) => `${item.variantTitle.padEnd(16)}${(item.sku ?? '-').padEnd(12)}${item.quantity}`);
+
+  const footerLines = [...(po.remark ? ['', `Remark: ${po.remark}`] : []), '', 'Thanks,', storeName];
+
+  const body = [...headerLines, '', ...itemLines, '', totalLine, ...footerLines].join('\n');
+  const compactBody = [...headerLines, '', totalLine, '', 'Full item list follows separately.', ...footerLines].join('\n');
+
+  return { subject, body, compactBody };
+}
+
+export function buildMailtoHref({ to, subject, body, compactBody }: { to: string; subject: string; body: string; compactBody: string }): string {
+  const full = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  if (full.length <= 1800) return full;
+  return `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(compactBody)}`;
 }

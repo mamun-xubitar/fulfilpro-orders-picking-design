@@ -9,6 +9,7 @@ type PopoverKind = 'price' | 'cost' | 'margin' | null;
 type VariantBulkBarProps = {
   selectedVariants: VariantDetail[];
   bulkSaving: boolean;
+  onCreatePo: () => void;
   onSetPrice: (price: number) => void;
   onSetCost: (cost: number) => void;
   onSetMargin: (marginPercent: number) => void;
@@ -20,6 +21,7 @@ type VariantBulkBarProps = {
 export default function VariantBulkBar({
   selectedVariants,
   bulkSaving,
+  onCreatePo,
   onSetPrice,
   onSetCost,
   onSetMargin,
@@ -45,6 +47,10 @@ export default function VariantBulkBar({
   return (
     <div className="flex items-center gap-3 text-sm min-w-0">
       <span className="text-blue-800 font-medium whitespace-nowrap">{selectedVariants.length} selected</span>
+
+      <button type="button" onClick={onCreatePo} className="text-blue-700 hover:underline cursor-pointer font-medium whitespace-nowrap">
+        + PO
+      </button>
 
       <BulkPopoverButton label="Price" open={openPopover === 'price'} onOpen={() => setOpenPopover('price')} onClose={() => setOpenPopover(null)}>
         <input

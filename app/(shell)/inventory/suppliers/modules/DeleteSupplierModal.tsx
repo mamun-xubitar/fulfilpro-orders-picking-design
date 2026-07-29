@@ -14,11 +14,14 @@ export default function DeleteSupplierModal({ target, loading, onConfirm, onCanc
   if (!target) return null;
 
   return (
-    <ModalShell title="Delete supplier" onClose={onCancel}>
+    <ModalShell
+      title="Delete supplier"
+      onClose={onCancel}
+      footer={<ModalActions onCancel={onCancel} onConfirm={onConfirm} confirmLabel={loading ? 'Deleting...' : 'Delete'} disabled={loading} danger />}
+    >
       <p className="text-sm text-gray-600 mb-4">
         This permanently deletes &quot;{target.name}&quot; and its {target.productCount} product and {target.collectionCount} collection connection(s). This cannot be undone.
       </p>
-      <ModalActions onCancel={onCancel} onConfirm={onConfirm} confirmLabel={loading ? 'Deleting...' : 'Delete'} disabled={loading} danger />
     </ModalShell>
   );
 }

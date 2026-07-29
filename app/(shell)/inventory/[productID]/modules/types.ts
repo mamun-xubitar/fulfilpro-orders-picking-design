@@ -32,7 +32,50 @@ export type ProductCollection = { id: string; title: string; handle: string | nu
 export type AttachedSupplier = { id: string; name: string; linkedAt: string };
 export type CollectionSupplier = { id: string; name: string; collectionTitle: string };
 export type ProductSuppliers = { attached: AttachedSupplier[]; viaCollection: CollectionSupplier[] };
-export type SupplierOption = { id: string; name: string };
+export type SupplierOption = { id: string; name: string; poEmail: string };
+
+export type PurchaseOrderStatus = 'DRAFT' | 'REQUESTED' | 'CONFIRMED' | 'PARTIALLY_RECEIVED' | 'RECEIVED' | 'CANCELLED';
+
+export type PurchaseOrderItemRow = {
+  id: string;
+  variantId: string | null;
+  variantTitle: string;
+  sku: string | null;
+  quantity: number;
+};
+
+export type PurchaseOrderRow = {
+  id: string;
+  number: number;
+  supplierId: string;
+  supplierName: string;
+  poEmail: string;
+  productId: string;
+  productTitle: string;
+  status: PurchaseOrderStatus;
+  deliveryDate: string | null;
+  remark: string | null;
+  createdById: string;
+  createdByName: string;
+  statusUpdatedById: string | null;
+  statusUpdatedByName: string | null;
+  statusUpdatedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  items: PurchaseOrderItemRow[];
+};
+
+export type PurchaseOrderListResponse = {
+  purchaseOrders: PurchaseOrderRow[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+    hasPrev: boolean;
+    hasNext: boolean;
+  };
+};
 
 export type ProductDetail = {
   id: string;

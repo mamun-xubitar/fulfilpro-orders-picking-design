@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import ColorList from './ColorList';
 import VariantTable from './VariantTable';
 import VariantBulkBar from './VariantBulkBar';
@@ -12,7 +11,6 @@ type VariantsSectionProps = {
 };
 
 export default function VariantsSection({ p }: VariantsSectionProps) {
-  const [supplierPanelExpanded, setSupplierPanelExpanded] = useState(false);
   if (!p.product) return null;
 
   const selectedVariants = p.product.variants.filter((v) => p.selection.selectedIds.has(v.id));
@@ -27,7 +25,7 @@ export default function VariantsSection({ p }: VariantsSectionProps) {
   return (
     <div
       className="grid gap-4 transition-[grid-template-columns] duration-200"
-      style={{ gridTemplateColumns: supplierPanelExpanded ? '1fr 20rem' : '1fr 0rem' }}
+      style={{ gridTemplateColumns: p.purchaseOrders.panelExpanded ? '1fr 20rem' : '1fr 0rem' }}
     >
       <div className="min-w-0 bg-white rounded-xl border border-gray-200 p-4 grid grid-cols-1 md:grid-cols-[12rem_1fr] gap-4 items-start">
         <ColorList
@@ -45,6 +43,7 @@ export default function VariantsSection({ p }: VariantsSectionProps) {
             <VariantBulkBar
               selectedVariants={selectedVariants}
               bulkSaving={p.selection.bulkSaving}
+              onCreatePo={() => p.purchaseOrders.openCreate(selectedVariants.map((v) => v.id))}
               onSetPrice={p.selection.setPriceForSelection}
               onSetCost={p.selection.setCostForSelection}
               onSetMargin={onSetMargin}
@@ -85,7 +84,7 @@ export default function VariantsSection({ p }: VariantsSectionProps) {
         </div>
       </div>
 
-      <SupplierPoPanel expanded={supplierPanelExpanded} onToggle={() => setSupplierPanelExpanded((prev) => !prev)} />
+      <SupplierPoPanel po={p.purchaseOrders} />
     </div>
   );
 }

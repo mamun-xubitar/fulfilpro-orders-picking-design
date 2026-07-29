@@ -12,27 +12,27 @@ datasource db {
 }
 
 model User {
-  id             String   @id @default(uuid())
-  name           String
-  email          String   @unique
-  password       String
-  role           String   @default("admin")
-  active         Boolean  @default(true)
-  isTempPassword Boolean  @default(true)
-  isLoggedIn     Boolean  @default(false)
-  lastLoginAt    DateTime?
-  lastLogoutAt   DateTime?
-  staffAccessDays Json     @default("[\"Mon\",\"Tue\",\"Wed\",\"Thu\",\"Fri\"]")
-  staffAccessStart String   @default("08:00")
-  staffAccessEnd   String   @default("16:00")
-  sessionTimeoutMinutes Int  @default(30)
+  id                       String               @id @default(uuid())
+  name                     String
+  email                    String               @unique
+  password                 String
+  role                     String               @default("admin")
+  active                   Boolean              @default(true)
+  isTempPassword           Boolean              @default(true)
+  isLoggedIn               Boolean              @default(false)
+  lastLoginAt              DateTime?
+  lastLogoutAt             DateTime?
+  staffAccessDays          Json                 @default("[\"Mon\",\"Tue\",\"Wed\",\"Thu\",\"Fri\"]")
+  staffAccessStart         String               @default("08:00")
+  staffAccessEnd           String               @default("16:00")
+  sessionTimeoutMinutes    Int                  @default(30)
   inactivityTimeoutMinutes Int?
-  allowedStoreIds Json     @default("[]")
-  loginAutoApproveDate String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  staffLoginApprovals StaffLoginApproval[]
-  notifications       Notification[]
+  allowedStoreIds          Json                 @default("[]")
+  loginAutoApproveDate     String?
+  createdAt                DateTime             @default(now())
+  updatedAt                DateTime             @updatedAt
+  staffLoginApprovals      StaffLoginApproval[]
+  notifications            Notification[]
 
   @@index([email])
   @@index([active])
@@ -40,14 +40,14 @@ model User {
 }
 
 model Store {
-  id                          String    @id @default(uuid())
-  storeDomain                 String    @unique
+  id                          String               @id @default(uuid())
+  storeDomain                 String               @unique
   name                        String?
   accessToken                 String?
   url                         String?
   email                       String?
   logoPath                    String?
-  status                      String    @default("pending")
+  status                      String               @default("pending")
   clientId                    String
   appId                       String?
   clientSecret                String
@@ -56,10 +56,10 @@ model Store {
   partnerStoreId              String?
   lastSyncedAt                DateTime?
   lastProductSyncedAt         DateTime?
-  partnerStore                Store?    @relation("PartnerStores", fields: [partnerStoreId], references: [id], onDelete: SetNull)
-  childStores                 Store[]   @relation("PartnerStores")
-  createdAt                   DateTime  @default(now())
-  updatedAt                   DateTime  @updatedAt
+  partnerStore                Store?               @relation("PartnerStores", fields: [partnerStoreId], references: [id], onDelete: SetNull)
+  childStores                 Store[]              @relation("PartnerStores")
+  createdAt                   DateTime             @default(now())
+  updatedAt                   DateTime             @updatedAt
   orders                      Order[]
   shipmentTrackings           ShipmentTracking[]
   products                    Product[]
@@ -71,46 +71,46 @@ model Store {
 }
 
 model Order {
-  id                String    @id @default(uuid())
-  number            String
-  cusName           String
-  cusEmail          String?
-  address           String?
-  address2          String?
-  phone             String?
-  city              String?
-  canceledAt        DateTime?
-  closedAt          DateTime?
-  canceled          Boolean   @default(false)
-  closed            Boolean   @default(false)
-  state             String?
-  zip               String?
-  fulfillmentStatus String?
-  boarcode          String?
-  currencyCode      String?
-  note              String?
-  lineItems         Json
-  shippingLines     Json?
-  fulfillmentItems  Json?
-  price             Float
-  country           String?
-  storeId           String
-  orderedAt         DateTime?
-  store             Store     @relation(fields: [storeId], references: [id])
-  messages          OrderMessage[]
-  notes             OrderNote[]
-  packingConfirmations OrderPackingConfirmation[]
-  pickingSlipPrints OrderPickingSlipPrint[]
-  backInStockRequests BackInStockRequest[]
-  stockAdjustment   OrderStockAdjustment?
-  lineItemDecorations LineItemDecoration[]
-  lineItemAssignments LineItemAssignment[]
-  lineItemWorks     LineItemWork[]
+  id                     String                     @id @default(uuid())
+  number                 String
+  cusName                String
+  cusEmail               String?
+  address                String?
+  address2               String?
+  phone                  String?
+  city                   String?
+  canceledAt             DateTime?
+  closedAt               DateTime?
+  canceled               Boolean                    @default(false)
+  closed                 Boolean                    @default(false)
+  state                  String?
+  zip                    String?
+  fulfillmentStatus      String?
+  boarcode               String?
+  currencyCode           String?
+  note                   String?
+  lineItems              Json
+  shippingLines          Json?
+  fulfillmentItems       Json?
+  price                  Float
+  country                String?
+  storeId                String
+  orderedAt              DateTime?
+  store                  Store                      @relation(fields: [storeId], references: [id])
+  messages               OrderMessage[]
+  notes                  OrderNote[]
+  packingConfirmations   OrderPackingConfirmation[]
+  pickingSlipPrints      OrderPickingSlipPrint[]
+  backInStockRequests    BackInStockRequest[]
+  stockAdjustment        OrderStockAdjustment?
+  lineItemDecorations    LineItemDecoration[]
+  lineItemAssignments    LineItemAssignment[]
+  lineItemWorks          LineItemWork[]
   decorationEditRequests DecorationEditRequest[]
-  shipmentTrackings ShipmentTracking[]
-  orderLineItems    OrderLineItem[]
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  shipmentTrackings      ShipmentTracking[]
+  orderLineItems         OrderLineItem[]
+  createdAt              DateTime                   @default(now())
+  updatedAt              DateTime                   @updatedAt
 
   @@unique([storeId, number])
 }
@@ -208,23 +208,23 @@ model DecorationEditRequest {
 }
 
 model OrderPackingConfirmation {
-  id                 String    @id @default(uuid())
-  orderId            String
-  orderNumber        String
-  lines              Json
-  notifyRecipients   Json?
-  notifyMessage      String?
-  pickerId           String?
-  pickerName         String?
-  pickerEmail        String?
-  confirmedAt        DateTime  @default(now())
-  canceledAt         DateTime?
-  canceledById       String?
-  canceledByName     String?
-  canceledByEmail    String?
+  id                     String    @id @default(uuid())
+  orderId                String
+  orderNumber            String
+  lines                  Json
+  notifyRecipients       Json?
+  notifyMessage          String?
+  pickerId               String?
+  pickerName             String?
+  pickerEmail            String?
+  confirmedAt            DateTime  @default(now())
+  canceledAt             DateTime?
+  canceledById           String?
+  canceledByName         String?
+  canceledByEmail        String?
   cancelNotifyRecipients Json?
-  cancelNotifyMessage String?
-  order              Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  cancelNotifyMessage    String?
+  order                  Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([orderId])
   @@index([confirmedAt])
@@ -265,20 +265,20 @@ model OrderItemPickingMetadata {
 }
 
 model OrderStockAdjustment {
-  id                String   @id @default(uuid())
-  orderId           String   @unique
-  orderNumber       String
-  status            String   @default("pending")
-  items             Json
-  lastEventType     String
-  lastEventAt       DateTime @default(now())
-  managedById       String?
-  managedByName     String?
-  managedByEmail    String?
-  note              String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  order             Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  id             String   @id @default(uuid())
+  orderId        String   @unique
+  orderNumber    String
+  status         String   @default("pending")
+  items          Json
+  lastEventType  String
+  lastEventAt    DateTime @default(now())
+  managedById    String?
+  managedByName  String?
+  managedByEmail String?
+  note           String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  order          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([status])
   @@index([lastEventAt])
@@ -341,7 +341,7 @@ model OrderNote {
 }
 
 model OrderMessage {
-  id          String   @id @default(uuid())
+  id          String           @id @default(uuid())
   orderId     String
   adminId     String?
   adminName   String
@@ -351,8 +351,8 @@ model OrderMessage {
   senderEmail String?
   type        OrderMessageType @default(orders)
   message     String
-  createdAt   DateTime @default(now())
-  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  createdAt   DateTime         @default(now())
+  order       Order            @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([orderId, type, createdAt])
   @@index([adminEmail])
@@ -401,7 +401,7 @@ enum ProductStatus {
 }
 
 model Product {
-  id               String          @id @default(uuid())
+  id               String            @id @default(uuid())
   storeId          String
   shopifyId        String
   title            String
@@ -410,25 +410,26 @@ model Product {
   productType      String?
   category         String?
   categoryId       String?
-  status           ProductStatus   @default(ACTIVE)
-  tags             String[]        @default([])
+  status           ProductStatus     @default(ACTIVE)
+  tags             String[]          @default([])
   imageUrl         String?
   descriptionHtml  String?
   images           Json?
   onlineStoreUrl   String?
   salesChannels    Json?
-  totalInventory   Int             @default(0)
-  soldQuantity     Int             @default(0)
-  soldAmount       Decimal         @default(0) @db.Decimal(14, 2)
+  totalInventory   Int               @default(0)
+  soldQuantity     Int               @default(0)
+  soldAmount       Decimal           @default(0) @db.Decimal(14, 2)
   shopifyCreatedAt DateTime?
   shopifyUpdatedAt DateTime?
   deletedAt        DateTime?
-  store            Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  store            Store             @relation(fields: [storeId], references: [id], onDelete: Cascade)
   variants         ProductVariant[]
   lineItems        OrderLineItem[]
   supplierLinks    SupplierProduct[]
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
+  purchaseOrders   PurchaseOrder[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 
   @@unique([storeId, shopifyId])
   @@index([storeId, status])
@@ -440,27 +441,28 @@ model Product {
 }
 
 model ProductVariant {
-  id                String   @id @default(uuid())
-  productId         String
-  storeId           String
-  shopifyId         String
-  title             String?
-  sku               String?
-  price             Decimal  @default(0) @db.Decimal(14, 2)
-  cost              Decimal? @db.Decimal(14, 2)
-  inventoryItemId   String?
-  inventoryQuantity Int      @default(0)
-  inventoryTracked  Boolean  @default(true)
-  inventoryPolicy   String   @default("DENY")
-  imageUrl          String?
-  optionValues      Json?
-  position          Int      @default(0)
-  soldQuantity      Int      @default(0)
-  soldAmount        Decimal  @default(0) @db.Decimal(14, 2)
-  product           Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  lineItems         OrderLineItem[]
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id                 String              @id @default(uuid())
+  productId          String
+  storeId            String
+  shopifyId          String
+  title              String?
+  sku                String?
+  price              Decimal             @default(0) @db.Decimal(14, 2)
+  cost               Decimal?            @db.Decimal(14, 2)
+  inventoryItemId    String?
+  inventoryQuantity  Int                 @default(0)
+  inventoryTracked   Boolean             @default(true)
+  inventoryPolicy    String              @default("DENY")
+  imageUrl           String?
+  optionValues       Json?
+  position           Int                 @default(0)
+  soldQuantity       Int                 @default(0)
+  soldAmount         Decimal             @default(0) @db.Decimal(14, 2)
+  product            Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
+  lineItems          OrderLineItem[]
+  purchaseOrderItems PurchaseOrderItem[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
 
   @@unique([storeId, shopifyId])
   @@index([productId])
@@ -518,42 +520,42 @@ model ProductSyncJob {
 }
 
 model AppSettings {
-  id                    String   @id @default("default")
-  timezone              String   @default("Australia/Sydney")
-  staffAccessDays       Json     @default("[\"Mon\",\"Tue\",\"Wed\",\"Thu\",\"Fri\"]")
-  staffAccessStart      String   @default("08:00")
-  staffAccessEnd        String   @default("16:00")
-  sessionTimeoutMinutes        Int      @default(30)
-  inactivityTimeoutMinutes     Int?
-  googleEmail           String?
-  googleAccessToken     String?
-  googleRefreshToken    String?
-  googleTokenExpiresAt  DateTime?
-  loginApprovalRecipientUserIds Json     @default("[]")
-  backInStockAdminRecipientUserIds Json  @default("[]")
-  stockAdjustmentRecipientUserIds Json   @default("[]")
-  fulfillmentRequestAllowedUserIds Json  @default("[]")
-  fulfillmentRequestDefaultUserIds Json  @default("[]")
-  pickingPackingAllowedUserIds Json      @default("[]")
-  pickingPackingDefaultUserIds Json      @default("[]")
-  directMessageAllowedUserIds Json       @default("[]")
-  directMessageDefaultUserIds Json       @default("[]")
-  backInStockRequesterUpdatesEnabled Boolean @default(true)
-  decorationDigestMode             String  @default("global_time")
-  decorationDigestTime             String  @default("17:00")
-  decorationDigestRecipientUserIds Json    @default("[]")
-  taskReminderTimes                Json    @default("[\"08:00\",\"12:00\",\"16:00\"]")
-  embroideryKeywords               Json    @default("[\"embroider\",\"emb\"]")
-  printKeywords                    Json    @default("[\"print\"]")
-  seventrackApiKey                 String?
-  trackingAutoRegisterEnabled      Boolean @default(false)
-  trackingPendingAlertDays         Int     @default(7)
-  trackingPendingAlertUserIds      Json    @default("[]")
-  trackingPickupReminderDays       Json    @default("[]")
-  taskVisibilityByUser              Json    @default("{}")
-  decorationCrossVisibilityEnabled  Boolean @default(false)
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  id                                 String    @id @default("default")
+  timezone                           String    @default("Australia/Sydney")
+  staffAccessDays                    Json      @default("[\"Mon\",\"Tue\",\"Wed\",\"Thu\",\"Fri\"]")
+  staffAccessStart                   String    @default("08:00")
+  staffAccessEnd                     String    @default("16:00")
+  sessionTimeoutMinutes              Int       @default(30)
+  inactivityTimeoutMinutes           Int?
+  googleEmail                        String?
+  googleAccessToken                  String?
+  googleRefreshToken                 String?
+  googleTokenExpiresAt               DateTime?
+  loginApprovalRecipientUserIds      Json      @default("[]")
+  backInStockAdminRecipientUserIds   Json      @default("[]")
+  stockAdjustmentRecipientUserIds    Json      @default("[]")
+  fulfillmentRequestAllowedUserIds   Json      @default("[]")
+  fulfillmentRequestDefaultUserIds   Json      @default("[]")
+  pickingPackingAllowedUserIds       Json      @default("[]")
+  pickingPackingDefaultUserIds       Json      @default("[]")
+  directMessageAllowedUserIds        Json      @default("[]")
+  directMessageDefaultUserIds        Json      @default("[]")
+  backInStockRequesterUpdatesEnabled Boolean   @default(true)
+  decorationDigestMode               String    @default("global_time")
+  decorationDigestTime               String    @default("17:00")
+  decorationDigestRecipientUserIds   Json      @default("[]")
+  taskReminderTimes                  Json      @default("[\"08:00\",\"12:00\",\"16:00\"]")
+  embroideryKeywords                 Json      @default("[\"embroider\",\"emb\"]")
+  printKeywords                      Json      @default("[\"print\"]")
+  seventrackApiKey                   String?
+  trackingAutoRegisterEnabled        Boolean   @default(false)
+  trackingPendingAlertDays           Int       @default(7)
+  trackingPendingAlertUserIds        Json      @default("[]")
+  trackingPickupReminderDays         Json      @default("[]")
+  taskVisibilityByUser               Json      @default("{}")
+  decorationCrossVisibilityEnabled   Boolean   @default(false)
+  createdAt                          DateTime  @default(now())
+  updatedAt                          DateTime  @updatedAt
 }
 
 model FulfillmentEditRequest {
@@ -685,14 +687,14 @@ model BackgroundJob {
 }
 
 model Task {
-  id                   String      @id @default(uuid())
+  id                   String        @id @default(uuid())
   title                String
   description          String
-  status               TaskStatus  @default(PENDING)
+  status               TaskStatus    @default(PENDING)
   dueDate              DateTime
-  dueType              TaskDueType @default(CUSTOM)
+  dueType              TaskDueType   @default(CUSTOM)
   completedAt          DateTime?
-  proofFiles           Json        @default("[]")
+  proofFiles           Json          @default("[]")
   assignerId           String
   assignerName         String
   assignerEmail        String
@@ -701,8 +703,8 @@ model Task {
   assigneeEmail        String
   lastReadByAssignerAt DateTime?
   lastReadByAssigneeAt DateTime?
-  createdAt            DateTime    @default(now())
-  updatedAt            DateTime    @updatedAt
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
   messages             TaskMessage[]
 
   @@index([assigneeId, status])
@@ -725,17 +727,67 @@ model TaskMessage {
 }
 
 model Supplier {
-  id           String   @id @default(uuid())
-  name         String
-  contactEmail String?
-  poEmail      String
-  description  String?
-  products     SupplierProduct[]
-  collections  SupplierCollection[]
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id             String               @id @default(uuid())
+  name           String
+  contactEmail   String?
+  poEmail        String
+  description    String?
+  products       SupplierProduct[]
+  collections    SupplierCollection[]
+  purchaseOrders PurchaseOrder[]
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
 
   @@index([name])
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  REQUESTED
+  CONFIRMED
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CANCELLED
+}
+
+model PurchaseOrder {
+  id                  String              @id @default(uuid())
+  number              Int                 @unique @default(autoincrement())
+  supplierId          String
+  supplierName        String
+  poEmail             String
+  productId           String
+  productTitle        String
+  status              PurchaseOrderStatus @default(REQUESTED)
+  deliveryDate        DateTime?
+  remark              String?
+  createdById         String
+  createdByName       String
+  statusUpdatedById   String?
+  statusUpdatedByName String?
+  statusUpdatedAt     DateTime?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  supplier            Supplier            @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  product             Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
+  items               PurchaseOrderItem[]
+
+  @@index([productId, createdAt])
+  @@index([supplierId])
+  @@index([status])
+}
+
+model PurchaseOrderItem {
+  id              String          @id @default(uuid())
+  purchaseOrderId String
+  variantId       String?
+  variantTitle    String
+  sku             String?
+  quantity        Int
+  purchaseOrder   PurchaseOrder   @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  variant         ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+
+  @@index([purchaseOrderId])
 }
 
 model SupplierProduct {

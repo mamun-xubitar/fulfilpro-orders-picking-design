@@ -12,7 +12,7 @@ export type SupplierRow = {
   updatedAt: string;
 };
 
-export type SupplierOption = { id: string; name: string };
+export type SupplierOption = { id: string; name: string; poEmail: string };
 
 export type SupplierConnectionProduct = {
   id: string;
@@ -84,7 +84,7 @@ export class SupplierModel {
   }
 
   async listOptions(): Promise<SupplierOption[]> {
-    const rows = await prisma.supplier.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } });
+    const rows = await prisma.supplier.findMany({ select: { id: true, name: true, poEmail: true }, orderBy: { name: 'asc' } });
     return rows;
   }
 

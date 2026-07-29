@@ -18,7 +18,18 @@ export default function AddEditSupplierModal({ open, editSupplier, form, set, er
   if (!open) return null;
 
   return (
-    <ModalShell title={editSupplier ? 'Edit supplier' : 'Add supplier'} onClose={onClose}>
+    <ModalShell
+      title={editSupplier ? 'Edit supplier' : 'Add supplier'}
+      onClose={onClose}
+      footer={
+        <ModalActions
+          onCancel={onClose}
+          onConfirm={onSubmit}
+          confirmLabel={loading ? 'Saving...' : editSupplier ? 'Save changes' : 'Add supplier'}
+          disabled={loading}
+        />
+      }
+    >
       <div className="space-y-4">
         <Field label="Name" error={errors.name}>
           <input
@@ -61,15 +72,6 @@ export default function AddEditSupplierModal({ open, editSupplier, form, set, er
         </Field>
 
         {errors.general && <p className="text-sm text-red-600">{errors.general}</p>}
-      </div>
-
-      <div className="mt-4">
-        <ModalActions
-          onCancel={onClose}
-          onConfirm={onSubmit}
-          confirmLabel={loading ? 'Saving...' : editSupplier ? 'Save changes' : 'Add supplier'}
-          disabled={loading}
-        />
       </div>
     </ModalShell>
   );

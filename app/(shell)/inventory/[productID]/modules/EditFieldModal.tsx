@@ -33,6 +33,14 @@ export default function EditFieldModal({ edit }: { edit: ReturnType<typeof useFi
       onClose={edit.closeEdit}
       allowOverflow={editing.field === 'category' || editing.field === 'productType' || editing.field === 'vendor'}
       wide={editing.field === 'description'}
+      footer={
+        <ModalActions
+          onCancel={edit.closeEdit}
+          onConfirm={edit.save}
+          confirmLabel={edit.saving ? (isMoney ? 'Applying...' : 'Saving...') : isMoney ? 'Apply to all' : 'Save'}
+          disabled={edit.saving || moneyInvalid}
+        />
+      }
     >
       {editing.field === 'title' && (
         <input
@@ -90,15 +98,6 @@ export default function EditFieldModal({ edit }: { edit: ReturnType<typeof useFi
           />
         </>
       )}
-
-      <div className="mt-4">
-        <ModalActions
-          onCancel={edit.closeEdit}
-          onConfirm={edit.save}
-          confirmLabel={edit.saving ? (isMoney ? 'Applying...' : 'Saving...') : isMoney ? 'Apply to all' : 'Save'}
-          disabled={edit.saving || moneyInvalid}
-        />
-      </div>
     </ModalShell>
   );
 }
