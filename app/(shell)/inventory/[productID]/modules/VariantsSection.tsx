@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo } from 'react';
 import ColorList from './ColorList';
+import ExpandCollapseButton from './ExpandCollapseButton';
 import VariantTable from './VariantTable';
 import VariantBulkBar from './VariantBulkBar';
 import SupplierPoPanel from './SupplierPoPanel';
@@ -73,6 +74,12 @@ export default function VariantsSection({ p }: VariantsSectionProps) {
                 </option>
               ))}
             </select>
+
+            <ExpandCollapseButton
+              expanded={p.purchaseOrders.panelExpanded}
+              onToggle={p.purchaseOrders.togglePanel}
+              label="purchase orders panel"
+            />
           </div>
 
           <VariantTable

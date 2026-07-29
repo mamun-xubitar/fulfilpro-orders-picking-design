@@ -13,15 +13,7 @@ export default function SupplierPoPanel({ po }: SupplierPoPanelProps) {
   const hasFilters = po.statusFilter !== '' || po.dateTo !== '';
 
   return (
-    <div className="relative min-w-0">
-      <button
-        type="button"
-        onClick={po.togglePanel}
-        className="absolute -left-7 top-4 z-10 flex items-center gap-1 bg-gray-900 text-white text-xs rounded-l-lg px-2 py-2 cursor-pointer [writing-mode:vertical-rl]"
-      >
-        Supplier PO
-      </button>
-
+    <div className="min-w-0">
       {po.panelExpanded && (
         <div className="bg-white rounded-xl border border-gray-200 p-4 h-full flex flex-col">
           <h3 className="text-sm font-semibold text-gray-900 mb-3">Purchase orders</h3>
