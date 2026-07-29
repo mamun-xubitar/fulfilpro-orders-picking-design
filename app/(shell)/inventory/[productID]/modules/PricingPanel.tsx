@@ -3,7 +3,7 @@
 import { formatAud, formatForeign, toAud } from './utils';
 import type { useProductPricing } from './hooks/useProductPricing';
 
-type PricingPanelProps = ReturnType<typeof useProductPricing>;
+type PricingPanelProps = ReturnType<typeof useProductPricing> & { expanded: boolean };
 
 const MONEY_FIELDS: { key: 'buyingPrice' | 'freight' | 'misc'; label: string }[] = [
   { key: 'buyingPrice', label: 'Buying price' },
@@ -12,6 +12,7 @@ const MONEY_FIELDS: { key: 'buyingPrice' | 'freight' | 'misc'; label: string }[]
 ];
 
 export default function PricingPanel(p: PricingPanelProps) {
+  if (!p.expanded) return <div className="min-w-0" />;
   if (p.loading) return <PricingSkeleton />;
 
   const foreign = p.form.currencyCode;

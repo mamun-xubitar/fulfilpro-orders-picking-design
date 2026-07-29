@@ -16,6 +16,14 @@ export function useProductDetailPage(productID: string) {
   const data = useProductDetailData(productID);
   const [detailsExpanded, setDetailsExpanded] = useState(true);
   const toggleDetailsExpanded = () => setDetailsExpanded((prev) => !prev);
+  const [isNarrowScreen, setIsNarrowScreen] = useState(false);
+
+  useEffect(() => {
+    const checkWidth = () => setIsNarrowScreen(window.innerWidth <= 1500);
+    checkWidth();
+    window.addEventListener('resize', checkWidth);
+    return () => window.removeEventListener('resize', checkWidth);
+  }, []);
   const pricing = useProductPricing({ productId: productID, product: data.product, bumpRefresh: data.bumpRefresh });
   const fieldEdit = useFieldEdit({ product: data.product, bumpRefresh: data.bumpRefresh });
   const variantsView = useProductVariants(data.product);
@@ -60,6 +68,7 @@ export function useProductDetailPage(productID: string) {
     togglingContinue,
     detailsExpanded,
     toggleDetailsExpanded,
+    isNarrowScreen,
     pricing,
   };
 }

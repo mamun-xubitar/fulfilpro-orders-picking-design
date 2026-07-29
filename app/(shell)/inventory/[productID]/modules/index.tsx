@@ -27,13 +27,16 @@ export default function ProductDetailPage({ productId }: { productId: string }) 
     );
   }
 
+  const pricingExpanded = !p.isNarrowScreen || !p.detailsExpanded;
+  const pricingColumn = p.isNarrowScreen ? (p.detailsExpanded ? '0rem' : '23rem') : '23rem';
+
   return (
     <main className="flex-1 p-4 md:p-6 pb-24">
       <ProductHeader product={p.product} stale={p.stale} onResync={p.bumpRefresh} refreshing={p.loading} />
 
       <div
         className="grid gap-4 transition-[grid-template-columns] duration-200 mb-6"
-        style={{ gridTemplateColumns: p.detailsExpanded ? '1fr 23rem 0rem' : '1fr 23rem 20rem' }}
+        style={{ gridTemplateColumns: p.detailsExpanded ? `1fr ${pricingColumn} 0rem` : '1fr 23rem 20rem' }}
       >
         <div className="min-w-0">
           <ProductDetailsPanel
@@ -51,7 +54,7 @@ export default function ProductDetailPage({ productId }: { productId: string }) 
             onToggleExpand={p.toggleDetailsExpanded}
           />
         </div>
-        <PricingPanel {...p.pricing} />
+        <PricingPanel {...p.pricing} expanded={pricingExpanded} />
         <StoreSiblingsPanel
           siblings={p.siblings}
           expanded={!p.detailsExpanded}
