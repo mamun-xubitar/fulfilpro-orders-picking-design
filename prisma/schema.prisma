@@ -554,6 +554,7 @@ model AppSettings {
   trackingPickupReminderDays         Json      @default("[]")
   taskVisibilityByUser               Json      @default("{}")
   decorationCrossVisibilityEnabled   Boolean   @default(false)
+  globalMarginPercent                Decimal   @default(0) @db.Decimal(6, 2)
   createdAt                          DateTime  @default(now())
   updatedAt                          DateTime  @updatedAt
 }
@@ -724,6 +725,14 @@ model TaskMessage {
   task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@index([taskId, createdAt])
+}
+
+model CurrencyRate {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  rate      Decimal  @db.Decimal(14, 6)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Supplier {

@@ -1,4 +1,5 @@
 import prisma from '@/lib/prisma.server';
+import { Prisma } from '@prisma/client';
 import {
   getNormalizedEmailRuleSettings,
   listEmailRuleUsers,
@@ -50,6 +51,7 @@ export type AppSettingsRow = {
   };
   taskVisibilityByUser: Record<string, string[]>;
   decorationCrossVisibilityEnabled: boolean;
+  globalMarginPercent: number;
   updatedAt: string;
 };
 
@@ -82,6 +84,7 @@ export type UpdateAppSettingsData = Partial<{
   printKeywords: string[];
   taskVisibilityByUser: Record<string, string[]>;
   decorationCrossVisibilityEnabled: boolean;
+  globalMarginPercent: number;
 }>;
 
 const SETTINGS_ID = 'default';
@@ -118,6 +121,7 @@ const DEFAULT_SETTINGS = {
   printKeywords: ['print'] as string[],
   taskVisibilityByUser: {} as Record<string, string[]>,
   decorationCrossVisibilityEnabled: false,
+  globalMarginPercent: 0,
 };
 
 type GoogleTokenData = {
@@ -229,6 +233,7 @@ async function toSettingsRow(settings: {
   printKeywords?: unknown;
   taskVisibilityByUser?: unknown;
   decorationCrossVisibilityEnabled?: boolean;
+  globalMarginPercent?: Prisma.Decimal | number;
   updatedAt: Date;
 }): Promise<AppSettingsRow> {
   const { activeUsers, activeAdminUsers } = await listEmailRuleUsers();
@@ -282,6 +287,7 @@ async function toSettingsRow(settings: {
     },
     taskVisibilityByUser: normalizeVisibilityMap(settings.taskVisibilityByUser),
     decorationCrossVisibilityEnabled: settings.decorationCrossVisibilityEnabled ?? false,
+    globalMarginPercent: Number(settings.globalMarginPercent ?? 0),
     updatedAt: settings.updatedAt.toISOString(),
   };
 }
