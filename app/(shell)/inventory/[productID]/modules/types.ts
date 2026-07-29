@@ -160,3 +160,42 @@ export type GalleryEntry = {
 };
 
 export type SizeCount = { size: string; quantity: number };
+
+export type ProductPricingRow = {
+  currencyCode: string;
+  exchangeRate: number;
+  buyingPrice: number;
+  freight: number;
+  misc: number;
+  marginPercent: number;
+  tax: number;
+};
+
+export type CurrencyOption = { code: string; rate: number };
+
+export type ProductPricingResponse = {
+  pricing: ProductPricingRow | null;
+  globalMarginPercent: number;
+  baseCurrency: string;
+  currencies: { id: string; code: string; rate: number }[];
+};
+
+export type PricingForm = {
+  currencyCode: string;
+  exchangeRate: string;
+  buyingPrice: string;
+  freight: string;
+  misc: string;
+  marginPercent: string;
+  tax: string;
+};
+
+export const EMPTY_PRICING_FORM: PricingForm = {
+  currencyCode: 'AUD',
+  exchangeRate: '1',
+  buyingPrice: '0',
+  freight: '0',
+  misc: '0',
+  marginPercent: '0',
+  tax: '0',
+};

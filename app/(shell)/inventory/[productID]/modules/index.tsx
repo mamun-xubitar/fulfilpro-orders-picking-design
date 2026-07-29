@@ -5,6 +5,7 @@ import ProductHeader from './ProductHeader';
 import ProductGallery from './ProductGallery';
 import ProductDetailsPanel from './ProductDetailsPanel';
 import StoreSiblingsPanel from './StoreSiblingsPanel';
+import PricingPanel from './PricingPanel';
 import VariantsSection from './VariantsSection';
 import ProductDetailModals from './ProductDetailModals';
 
@@ -33,7 +34,7 @@ export default function ProductDetailPage({ productId }: { productId: string }) 
 
       <div
         className="grid gap-4 transition-[grid-template-columns] duration-200 mb-6"
-        style={{ gridTemplateColumns: p.siblingsPanel.panelExpanded ? '1fr 20rem' : '1fr 0rem' }}
+        style={{ gridTemplateColumns: p.detailsExpanded ? '1fr 23rem 0rem' : '1fr 23rem 20rem' }}
       >
         <div className="min-w-0 grid grid-cols-1 lg:grid-cols-[15rem_1fr] gap-4">
           <ProductGallery product={p.product} />
@@ -48,12 +49,14 @@ export default function ProductDetailPage({ productId }: { productId: string }) 
             supplierOptions={p.productSuppliers.supplierOptions}
             savingSupplier={p.productSuppliers.savingSupplier}
             onSelectSupplier={p.productSuppliers.selectSupplier}
+            expanded={p.detailsExpanded}
+            onToggleExpand={p.toggleDetailsExpanded}
           />
         </div>
+        <PricingPanel {...p.pricing} />
         <StoreSiblingsPanel
           siblings={p.siblings}
-          expanded={p.siblingsPanel.panelExpanded}
-          onToggle={p.siblingsPanel.togglePanel}
+          expanded={!p.detailsExpanded}
           onNavigate={p.siblingsPanel.requestNavigate}
           onRemove={p.siblingsPanel.requestRemove}
         />

@@ -5,22 +5,13 @@ import type { SiblingProduct } from './types';
 type StoreSiblingsPanelProps = {
   siblings: SiblingProduct[];
   expanded: boolean;
-  onToggle: () => void;
   onNavigate: (sibling: SiblingProduct) => void;
   onRemove: (sibling: SiblingProduct) => void;
 };
 
-export default function StoreSiblingsPanel({ siblings, expanded, onToggle, onNavigate, onRemove }: StoreSiblingsPanelProps) {
+export default function StoreSiblingsPanel({ siblings, expanded, onNavigate, onRemove }: StoreSiblingsPanelProps) {
   return (
     <div className="relative min-w-0">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="absolute -left-7 top-4 z-10 flex items-center gap-1 bg-gray-900 text-white text-xs rounded-l-lg px-2 py-2 cursor-pointer [writing-mode:vertical-rl]"
-      >
-        Other stores{siblings.length > 0 ? ` (${siblings.length})` : ''}
-      </button>
-
       {expanded && (
         <div className="bg-white rounded-xl border border-gray-200 p-4 h-full overflow-y-auto">
           <h3 className="text-sm font-semibold text-gray-900 mb-3">Other stores</h3>

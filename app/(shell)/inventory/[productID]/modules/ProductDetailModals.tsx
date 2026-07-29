@@ -6,6 +6,7 @@ import EditFieldModal from './EditFieldModal';
 import CreatePoModal from './CreatePoModal';
 import PoDetailModal from './PoDetailModal';
 import PoReceiveModal from './PoReceiveModal';
+import { formatAud } from './utils';
 import type { useProductDetailPage } from './hooks/useProductDetailPage';
 
 type ProductDetailModalsProps = {
@@ -84,6 +85,26 @@ export default function ProductDetailModals({ p }: ProductDetailModalsProps) {
         >
           <p className="text-sm text-gray-600 mb-4">
             This permanently deletes {p.selection.selectedIds.size} variant(s) from Shopify. This cannot be undone.
+          </p>
+        </ModalShell>
+      )}
+
+      {p.pricing.confirmTarget && p.product && (
+        <ModalShell
+          title="Use price"
+          onClose={p.pricing.cancelUsePrice}
+          footer={
+            <ModalActions
+              onCancel={p.pricing.cancelUsePrice}
+              onConfirm={p.pricing.confirmUsePrice}
+              confirmLabel={p.pricing.applying ? 'Applying...' : 'Apply'}
+              disabled={p.pricing.applying}
+            />
+          }
+        >
+          <p className="text-sm text-gray-600 mb-4">
+            Set price to {formatAud(p.pricing.confirmTarget.sellingIncTax)} and cost to {formatAud(p.pricing.confirmTarget.totalBuying)} on all{' '}
+            {p.product.variants.length} variant{p.product.variants.length === 1 ? '' : 's'}? This updates Shopify.
           </p>
         </ModalShell>
       )}

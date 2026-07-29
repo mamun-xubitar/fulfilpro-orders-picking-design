@@ -18,6 +18,8 @@ type ProductDetailsPanelProps = {
   supplierOptions: SupplierOption[];
   savingSupplier: boolean;
   onSelectSupplier: (supplierId: string) => void;
+  expanded: boolean;
+  onToggleExpand: () => void;
 };
 
 function summarizeRange(values: number[]) {
@@ -38,6 +40,8 @@ export default function ProductDetailsPanel({
   supplierOptions,
   savingSupplier,
   onSelectSupplier,
+  expanded,
+  onToggleExpand,
 }: ProductDetailsPanelProps) {
   const prices = product.variants.map((v) => v.price);
   const costs = product.variants.filter((v) => v.cost != null).map((v) => v.cost as number);
@@ -52,6 +56,35 @@ export default function ProductDetailsPanel({
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-4">
+      <div className="flex justify-end mb-2">
+        <button
+          type="button"
+          onClick={onToggleExpand}
+          className="p-1 text-gray-400 hover:text-gray-700 rounded-lg hover:bg-gray-100 cursor-pointer"
+          title={expanded ? 'Collapse' : 'Expand'}
+          aria-label={expanded ? 'Collapse details panel' : 'Expand details panel'}
+        >
+          {expanded ? (
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M15 9h4.5M15 9V4.5M15 9l5.25-5.25M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25"
+              />
+            </svg>
+          ) : (
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 20.25h-4.5m4.5 0v-4.5m0 4.5L15 15"
+              />
+            </svg>
+          )}
+        </button>
+      </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Title" full onEdit={() => onEditField('title')}>
           <span className="text-sm text-gray-900">{product.title}</span>

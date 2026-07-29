@@ -428,6 +428,7 @@ model Product {
   lineItems        OrderLineItem[]
   supplierLinks    SupplierProduct[]
   purchaseOrders   PurchaseOrder[]
+  pricing          ProductPricing?
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
 
@@ -468,6 +469,21 @@ model ProductVariant {
   @@index([productId])
   @@index([sku])
   @@index([storeId])
+}
+
+model ProductPricing {
+  id            String   @id @default(uuid())
+  productId     String   @unique
+  currencyCode  String   @default("AUD")
+  exchangeRate  Decimal  @default(1) @db.Decimal(14, 6)
+  buyingPrice   Decimal  @default(0) @db.Decimal(14, 2)
+  freight       Decimal  @default(0) @db.Decimal(14, 2)
+  misc          Decimal  @default(0) @db.Decimal(14, 2)
+  marginPercent Decimal  @default(0) @db.Decimal(6, 2)
+  tax           Decimal  @default(0) @db.Decimal(14, 2)
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 model OrderLineItem {

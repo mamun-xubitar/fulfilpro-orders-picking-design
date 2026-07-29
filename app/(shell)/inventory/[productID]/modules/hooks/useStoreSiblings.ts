@@ -11,12 +11,9 @@ type UseStoreSiblingsArgs = {
 
 export function useStoreSiblings({ bumpRefresh }: UseStoreSiblingsArgs) {
   const router = useRouter();
-  const [panelExpanded, setPanelExpanded] = useState(false);
   const [navigateTarget, setNavigateTarget] = useState<SiblingProduct | null>(null);
   const [removeTarget, setRemoveTarget] = useState<SiblingProduct | null>(null);
   const { request, loading: removing } = useRequest();
-
-  const togglePanel = () => setPanelExpanded((prev) => !prev);
 
   const requestNavigate = (sibling: SiblingProduct) => setNavigateTarget(sibling);
   const cancelNavigate = () => setNavigateTarget(null);
@@ -41,8 +38,6 @@ export function useStoreSiblings({ bumpRefresh }: UseStoreSiblingsArgs) {
   };
 
   return {
-    panelExpanded,
-    togglePanel,
     navigateTarget,
     requestNavigate,
     cancelNavigate,

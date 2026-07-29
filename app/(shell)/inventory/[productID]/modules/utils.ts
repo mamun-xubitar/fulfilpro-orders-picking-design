@@ -58,6 +58,31 @@ export function computeMargin(price: number, cost: number | null): number | null
   return ((price - cost) / price) * 100;
 }
 
+export function computePricing(v: {
+  buyingPrice: number;
+  freight: number;
+  misc: number;
+  exchangeRate: number;
+  marginPercent: number;
+  tax: number;
+}): { totalBuying: number; sellingPrice: number; sellingIncTax: number } {
+  const totalBuying = (v.buyingPrice + v.freight + v.misc) * v.exchangeRate;
+  const sellingPrice = totalBuying * (1 + v.marginPercent / 100);
+  return { totalBuying, sellingPrice, sellingIncTax: sellingPrice + v.tax };
+}
+
+export function formatAud(n: number): string {
+  return `${n.toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} AU$`;
+}
+
+export function formatForeign(n: number, code: string): string {
+  return `${n.toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${code}`;
+}
+
+export function toAud(value: number, exchangeRate: number): number {
+  return value * exchangeRate;
+}
+
 export function normalizeImageUrl(url: string): string {
   try {
     const parsed = new URL(url);

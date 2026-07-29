@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import useRequest from '@/hooks/useRequest';
 import { useProductDetailData } from './useProductDetailData';
 import { useFieldEdit } from './useFieldEdit';
@@ -10,9 +10,13 @@ import { useStockAdjust } from './useStockAdjust';
 import { useStoreSiblings } from './useStoreSiblings';
 import { useProductSuppliers } from './useProductSuppliers';
 import { usePurchaseOrders } from './usePurchaseOrders';
+import { useProductPricing } from './useProductPricing';
 
 export function useProductDetailPage(productID: string) {
   const data = useProductDetailData(productID);
+  const [detailsExpanded, setDetailsExpanded] = useState(true);
+  const toggleDetailsExpanded = () => setDetailsExpanded((prev) => !prev);
+  const pricing = useProductPricing({ productId: productID, product: data.product, bumpRefresh: data.bumpRefresh });
   const fieldEdit = useFieldEdit({ product: data.product, bumpRefresh: data.bumpRefresh });
   const variantsView = useProductVariants(data.product);
   const selection = useVariantSelection({ productId: productID, bumpRefresh: data.bumpRefresh });
@@ -54,5 +58,8 @@ export function useProductDetailPage(productID: string) {
     allContinueSelling,
     toggleAllContinueSelling,
     togglingContinue,
+    detailsExpanded,
+    toggleDetailsExpanded,
+    pricing,
   };
 }
