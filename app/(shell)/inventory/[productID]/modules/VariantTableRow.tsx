@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import CheckMarkBox from './CheckMarkBox';
 import { getVariantColor, getVariantSize, getStockCellClass, formatCurrency } from './utils';
 import type { VariantDetail } from './types';
@@ -12,7 +13,7 @@ type VariantTableRowProps = {
   onDeltaChange: (id: string, value: string) => void;
 };
 
-export default function VariantTableRow({ variant, selected, onToggleSelect, delta, onDeltaChange }: VariantTableRowProps) {
+function VariantTableRow({ variant, selected, onToggleSelect, delta, onDeltaChange }: VariantTableRowProps) {
   return (
     <tr
       onClick={() => onToggleSelect(variant.id)}
@@ -56,3 +57,5 @@ export default function VariantTableRow({ variant, selected, onToggleSelect, del
     </tr>
   );
 }
+
+export default memo(VariantTableRow);

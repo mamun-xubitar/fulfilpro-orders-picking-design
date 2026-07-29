@@ -1,5 +1,6 @@
 'use client';
 
+import { useCallback, useMemo } from 'react';
 import ColorList from './ColorList';
 import VariantTable from './VariantTable';
 import VariantBulkBar from './VariantBulkBar';
@@ -11,9 +12,17 @@ type VariantsSectionProps = {
 };
 
 export default function VariantsSection({ p }: VariantsSectionProps) {
-  if (!p.product) return null;
+  const { filteredVariants, selection } = p;
+  const { toggleAll } = selection;
 
-  const selectedVariants = p.product.variants.filter((v) => p.selection.selectedIds.has(v.id));
+  const selectedVariants = useMemo(
+    () => (p.product ? p.product.variants.filter((v) => selection.selectedIds.has(v.id)) : []),
+    [p.product, selection.selectedIds],
+  );
+
+  const onToggleAll = useCallback(() => toggleAll(filteredVariants), [toggleAll, filteredVariants]);
+
+  if (!p.product) return null;
 
   const onSetMargin = (marginPercent: number) => {
     const updates = selectedVariants
@@ -67,10 +76,10 @@ export default function VariantsSection({ p }: VariantsSectionProps) {
           </div>
 
           <VariantTable
-            variants={p.filteredVariants}
+            variants={filteredVariants}
             selectedIds={p.selection.selectedIds}
             onToggleSelect={p.selection.toggleVariant}
-            onToggleAll={() => p.selection.toggleAll(p.filteredVariants)}
+            onToggleAll={onToggleAll}
             deltas={p.stockAdjust.deltas}
             onDeltaChange={p.stockAdjust.setDelta}
             hasPendingDeltas={p.stockAdjust.hasPendingDeltas}

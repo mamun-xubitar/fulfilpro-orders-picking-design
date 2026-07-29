@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import { ModalShell, ModalActions } from '@/components/ModalShell';
 import EditFieldModal from './EditFieldModal';
 import CreatePoModal from './CreatePoModal';
@@ -12,6 +13,12 @@ type ProductDetailModalsProps = {
 };
 
 export default function ProductDetailModals({ p }: ProductDetailModalsProps) {
+  const createPoVariantIds = p.purchaseOrders.createVariantIds;
+  const createPoVariants = useMemo(
+    () => (p.product ? p.product.variants.filter((v) => createPoVariantIds.includes(v.id)) : []),
+    [p.product, createPoVariantIds],
+  );
+
   return (
     <>
       {p.stockAdjust.modalOpen && (
@@ -54,11 +61,7 @@ export default function ProductDetailModals({ p }: ProductDetailModalsProps) {
       <EditFieldModal edit={p.fieldEdit} />
 
       {p.product && (
-        <CreatePoModal
-          po={p.purchaseOrders}
-          supplierOptions={p.productSuppliers.supplierOptions}
-          variants={p.product.variants.filter((v) => p.purchaseOrders.createVariantIds.includes(v.id))}
-        />
+        <CreatePoModal po={p.purchaseOrders} supplierOptions={p.productSuppliers.supplierOptions} variants={createPoVariants} />
       )}
 
       <PoDetailModal po={p.purchaseOrders} />

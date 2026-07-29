@@ -14,16 +14,16 @@ export function useVariantSelection({ productId, bumpRefresh }: UseVariantSelect
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const { request, loading: bulkSaving } = useRequest();
 
-  const toggleVariant = (id: string) => {
+  const toggleVariant = useCallback((id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
-  };
+  }, []);
 
-  const toggleAll = (variants: VariantDetail[]) => {
+  const toggleAll = useCallback((variants: VariantDetail[]) => {
     setSelectedIds((prev) => {
       const allSelected = variants.length > 0 && variants.every((v) => prev.has(v.id));
       const next = new Set(prev);
@@ -34,7 +34,7 @@ export function useVariantSelection({ productId, bumpRefresh }: UseVariantSelect
       }
       return next;
     });
-  };
+  }, []);
 
   const clearSelection = () => setSelectedIds(new Set());
 

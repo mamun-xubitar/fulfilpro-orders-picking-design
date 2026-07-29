@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import CheckMarkBox from './CheckMarkBox';
 import VariantTableRow from './VariantTableRow';
 import type { VariantDetail } from './types';
@@ -16,7 +17,7 @@ type VariantTableProps = {
   emptyMessage: string;
 };
 
-export default function VariantTable({
+function VariantTable({
   variants,
   selectedIds,
   onToggleSelect,
@@ -83,3 +84,5 @@ export default function VariantTable({
     </div>
   );
 }
+
+export default memo(VariantTable);

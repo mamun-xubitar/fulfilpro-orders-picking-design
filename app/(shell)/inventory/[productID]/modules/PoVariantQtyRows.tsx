@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import type { VariantDetail } from './types';
 
 type PoVariantQtyRowsProps = {
@@ -8,7 +9,7 @@ type PoVariantQtyRowsProps = {
   onQuantityChange: (variantId: string, value: string) => void;
 };
 
-export default function PoVariantQtyRows({ variants, quantities, onQuantityChange }: PoVariantQtyRowsProps) {
+function PoVariantQtyRows({ variants, quantities, onQuantityChange }: PoVariantQtyRowsProps) {
   return (
     <div className="max-h-56 overflow-y-auto border border-gray-200 rounded-lg">
       <table className="w-full text-sm">
@@ -42,3 +43,5 @@ export default function PoVariantQtyRows({ variants, quantities, onQuantityChang
     </div>
   );
 }
+
+export default memo(PoVariantQtyRows);

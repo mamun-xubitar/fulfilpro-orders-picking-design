@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import useRequest from '@/hooks/useRequest';
 import type { LocationOption } from '../types';
 
@@ -16,7 +16,7 @@ export function useStockAdjust({ productId, locations, bumpRefresh }: UseStockAd
   const [checkedLocationIds, setCheckedLocationIds] = useState<Set<string>>(new Set());
   const { request, loading: adjusting } = useRequest();
 
-  const setDelta = (variantId: string, value: string) => {
+  const setDelta = useCallback((variantId: string, value: string) => {
     const parsed = value.trim() === '' ? 0 : Number(value);
     setDeltas((prev) => {
       const next = { ...prev };
@@ -24,15 +24,15 @@ export function useStockAdjust({ productId, locations, bumpRefresh }: UseStockAd
       else next[variantId] = parsed;
       return next;
     });
-  };
+  }, []);
 
   const hasPendingDeltas = Object.keys(deltas).length > 0;
   const totalDelta = Object.values(deltas).reduce((sum, d) => sum + d, 0);
 
-  const openModal = () => {
+  const openModal = useCallback(() => {
     setCheckedLocationIds(new Set(locations.map((l) => l.id)));
     setModalOpen(true);
-  };
+  }, [locations]);
 
   const closeModal = () => setModalOpen(false);
 

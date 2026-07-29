@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import { ModalShell, ModalActions } from '@/components/ModalShell';
 import PoVariantQtyRows from './PoVariantQtyRows';
 import type { usePurchaseOrders } from './hooks/usePurchaseOrders';
@@ -11,7 +12,7 @@ type CreatePoModalProps = {
   variants: VariantDetail[];
 };
 
-export default function CreatePoModal({ po, supplierOptions, variants }: CreatePoModalProps) {
+function CreatePoModal({ po, supplierOptions, variants }: CreatePoModalProps) {
   if (!po.createOpen) return null;
 
   const selectedSupplier = supplierOptions.find((s) => s.id === po.supplierId) ?? null;
@@ -75,6 +76,8 @@ export default function CreatePoModal({ po, supplierOptions, variants }: CreateP
     </ModalShell>
   );
 }
+
+export default memo(CreatePoModal);
 
 function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
   return (
