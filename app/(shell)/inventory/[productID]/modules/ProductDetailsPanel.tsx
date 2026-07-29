@@ -5,6 +5,7 @@ import { computeMargin, formatCurrency, groupVariantsByColor, getSizeBreakdown, 
 import ExpandCollapseButton from './ExpandCollapseButton';
 import FieldChips from './FieldChips';
 import SupplierSelect from './SupplierSelect';
+import ProductGallery from './ProductGallery';
 import type { EditableField } from './hooks/useFieldEdit';
 import type { ProductDetail, SupplierOption } from './types';
 
@@ -56,154 +57,196 @@ export default function ProductDetailsPanel({
       : null;
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4">
-      <div className="flex justify-end mb-2">
+    <div className="w-full rounded-xl border border-gray-200 bg-white">
+      <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
+        <div className="flex items-center gap-1.5">
+          <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9"
+            />
+          </svg>
+          <h3 className="text-sm font-semibold text-gray-900">Product details</h3>
+        </div>
         <ExpandCollapseButton expanded={expanded} onToggle={onToggleExpand} label="details panel" />
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Field label="Title" full onEdit={() => onEditField('title')}>
-          <span className="text-sm text-gray-900">{product.title}</span>
-        </Field>
 
-        <Field label="Description" full onEdit={() => onEditField('description')}>
-          <p className="text-sm text-gray-700 line-clamp-3 flex-1 min-w-0">
-            {product.descriptionHtml ? htmlToPlainText(product.descriptionHtml) || '—' : '—'}
-          </p>
-        </Field>
+      <div className="p-4">
+        <div className="grid grid-cols-1 lg:grid-cols-[15rem_1fr] gap-4">
+          <ProductGallery product={product} />
+          <div className="min-w-0">
+            <StackedField label="Title" onEdit={() => onEditField('title')}>
+              <span className="text-[13px] font-semibold text-gray-600">{product.title}</span>
+            </StackedField>
 
-        <Field label="SKU">
-          <div className="text-sm text-gray-700 py-2">{skus.length === 0 ? '—' : skus.length === 1 ? skus[0] : 'Mixed'}</div>
-        </Field>
-
-        <Field label="Status" onEdit={() => onEditField('status')}>
-          <span className="text-sm text-gray-900">{STATUS_BADGE[product.status].label}</span>
-        </Field>
-
-        <Field label="Category" onEdit={() => onEditField('category')}>
-          <span className="text-sm text-gray-900">{product.category ?? '—'}</span>
-        </Field>
-
-        <Field label="Product type" onEdit={() => onEditField('productType')}>
-          <span className="text-sm text-gray-900">{product.productType || '—'}</span>
-        </Field>
-
-        <Field label="Tags" full onEdit={() => onEditField('tags')}>
-          {product.tags.length === 0 ? (
-            <span className="text-sm text-gray-500">—</span>
-          ) : (
-            <div className="flex flex-wrap gap-1.5">
-              {product.tags.map((tag) => (
-                <span key={tag} className="bg-gray-100 text-gray-700 text-xs rounded-full px-2 py-0.5">
-                  {tag}
-                </span>
-              ))}
-            </div>
-          )}
-        </Field>
-
-        <Field label="Collections" full>
-          <FieldChips values={product.collections.map((c) => c.title)} />
-        </Field>
-
-        {hasColors && (
-          <Field label="Colors">
-            <FieldChips values={colorLabels} />
-          </Field>
-        )}
-
-        {sizeLabels.length > 0 && (
-          <Field label="Sizes">
-            <FieldChips values={sizeLabels} />
-          </Field>
-        )}
-
-        <Field label="Vendor" onEdit={() => onEditField('vendor')}>
-          <span className="text-sm text-gray-900">{product.vendor || '—'}</span>
-        </Field>
-
-        <Field label="Supplier">
-          <SupplierSelect
-            options={supplierOptions}
-            suppliers={product.suppliers}
-            onSelect={onSelectSupplier}
-            saving={savingSupplier}
-          />
-        </Field>
-
-        <Field label="Price" onEdit={() => onEditField('price')}>
-          <span className="text-sm text-gray-900">{summarizeRange(prices)}</span>
-        </Field>
-
-        <Field label="Cost" onEdit={() => onEditField('cost')}>
-          <span className="text-sm text-gray-900">{summarizeRange(costs)}</span>
-        </Field>
-
-        {avgMargin != null && (
-          <Field label="Margin">
-            <div className="text-sm text-gray-700 py-2">{avgMargin.toFixed(1)}%</div>
-          </Field>
-        )}
-
-        <Field label="Stock">
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-700">{product.totalInventory} in stock</span>
-            <button
-              type="button"
-              onClick={onResyncStock}
-              disabled={resyncing}
-              className="p-1 text-gray-400 hover:text-gray-700 rounded-lg hover:bg-gray-100 disabled:opacity-50 cursor-pointer"
-              title="Resync stock"
-            >
-              <svg className={`w-4 h-4 ${resyncing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-            </button>
+            <StackedField label="Description" onEdit={() => onEditField('description')}>
+              <p className="text-[13px] font-semibold text-gray-600 line-clamp-3">
+                {product.descriptionHtml ? htmlToPlainText(product.descriptionHtml) || '—' : '—'}
+              </p>
+            </StackedField>
           </div>
-        </Field>
+        </div>
 
-        <Field label="Continue selling when out of stock">
-          <button
-            type="button"
-            onClick={onToggleContinueSelling}
-            disabled={togglingContinue}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer disabled:opacity-50 ${
-              allContinueSelling ? 'bg-blue-600' : 'bg-gray-300'
-            }`}
-          >
-            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${allContinueSelling ? 'translate-x-6' : 'translate-x-1'}`} />
-          </button>
-        </Field>
+        <div className="mt-4 border-t border-gray-200 pt-4 grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-5 divide-gray-200">
+          <div className="space-y-5 border-r border-gray-200 pr-4 lg:pr-8">
+            <FieldGroup title="Identity">
+              <Row label="Status" onEdit={() => onEditField('status')}>
+                {STATUS_BADGE[product.status].label}
+              </Row>
+              <Row label="SKU">{skus.length === 0 ? '—' : skus.length === 1 ? skus[0] : 'Mixed'}</Row>
+            </FieldGroup>
+
+            <FieldGroup title="Classification">
+              <Row label="Category" onEdit={() => onEditField('category')}>
+                {product.category ?? '—'}
+              </Row>
+              <Row label="Product type" onEdit={() => onEditField('productType')}>
+                {product.productType || '—'}
+              </Row>
+              <Row label="Vendor" onEdit={() => onEditField('vendor')}>
+                {product.vendor || '—'}
+              </Row>
+              <Row label="Supplier">
+                <SupplierSelect
+                  options={supplierOptions}
+                  suppliers={product.suppliers}
+                  onSelect={onSelectSupplier}
+                  saving={savingSupplier}
+                />
+              </Row>
+            </FieldGroup>
+
+            <FieldGroup title="Others" className="lg:col-span-2">
+              <StackedField label="Tags" onEdit={() => onEditField('tags')}>
+                <FieldChips values={product.tags} />
+              </StackedField>
+              <StackedField label="Collections">
+                <FieldChips values={product.collections.map((c) => c.title)} />
+              </StackedField>
+            </FieldGroup>
+          </div>
+
+          <div className="space-y-5">
+            <FieldGroup title="Pricing">
+              <Row label="Price" onEdit={() => onEditField('price')}>
+                {summarizeRange(prices)}
+              </Row>
+              <Row label="Cost" onEdit={() => onEditField('cost')}>
+                {summarizeRange(costs)}
+              </Row>
+              {avgMargin != null && <Row label="Margin">{avgMargin.toFixed(1)}%</Row>}
+            </FieldGroup>
+
+            <FieldGroup title="Inventory">
+              <Row label="Stock">
+                <span className="inline-flex items-center gap-2">
+                  <span>{product.totalInventory} in stock</span>
+                  <button
+                    type="button"
+                    onClick={onResyncStock}
+                    disabled={resyncing}
+                    className="p-1 -my-1 text-gray-400 hover:text-gray-700 rounded-lg hover:bg-gray-100 disabled:opacity-50 cursor-pointer"
+                    title="Resync stock"
+                  >
+                    <svg className={`w-3.5 h-3.5 ${resyncing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                      />
+                    </svg>
+                  </button>
+                </span>
+              </Row>
+              <Row label="Continue selling when out of stock">
+                <button
+                  type="button"
+                  onClick={onToggleContinueSelling}
+                  disabled={togglingContinue}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer disabled:opacity-50 ${
+                    allContinueSelling ? 'bg-blue-600' : 'bg-gray-300'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      allContinueSelling ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </Row>
+            </FieldGroup>
+            <FieldGroup title="Options" className="lg:col-span-2">
+              {hasColors && (
+                <StackedField label="Colors">
+                  <FieldChips values={colorLabels} />
+                </StackedField>
+              )}
+              {sizeLabels.length > 0 && (
+                <StackedField label="Sizes">
+                  <FieldChips values={sizeLabels} />
+                </StackedField>
+              )}
+            </FieldGroup>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
-function Field({ label, full, onEdit, children }: { label: string; full?: boolean; onEdit?: () => void; children: React.ReactNode }) {
+function FieldGroup({ title, children, className }: { title: string; children: React.ReactNode; className?: string }) {
   return (
-    <div className={full ? 'sm:col-span-2' : ''}>
-      <label className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
-      {onEdit ? (
-        <div className="flex items-center gap-2">
-          {children}
-          <button
-            type="button"
-            onClick={onEdit}
-            className="p-1 text-gray-400 hover:text-gray-700 rounded-lg hover:bg-gray-100 disabled:opacity-50 cursor-pointer"
-            aria-label={`Edit ${label}`}
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125"
-              />
-            </svg>
-          </button>
-        </div>
-      ) : (
-        children
-      )}
+    <div>
+      <h4 className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-1">{title}</h4>
+      <div className={`divide-y divide-gray-100 ${className || ''}`}>{children}</div>
     </div>
+  );
+}
+
+function Row({ label, onEdit, children }: { label: string; onEdit?: () => void; children: React.ReactNode }) {
+  return (
+    <div className="py-2.5 flex items-center justify-between gap-2">
+      <span className="flex items-center gap-1 min-w-0 text-[13px] font-medium text-gray-600">
+        <EditIcon label={label} onEdit={onEdit} />
+        <span className="truncate">{label}</span>
+      </span>
+      <span className="text-[13px] font-semibold text-gray-900 text-right">{children}</span>
+    </div>
+  );
+}
+
+function StackedField({ label, onEdit, children }: { label: string; onEdit?: () => void; children: React.ReactNode }) {
+  return (
+    <div className="py-2.5">
+      <span className="flex items-center gap-1 min-w-0 text-[13px] font-medium text-gray-600 mb-1.5">
+        <EditIcon label={label} onEdit={onEdit} />
+        <span className="truncate">{label}</span>
+      </span>
+      <div>{children}</div>
+    </div>
+  );
+}
+
+function EditIcon({ label, onEdit }: { label: string; onEdit?: () => void }) {
+  if (!onEdit) return <span className="w-4 shrink-0" />;
+  return (
+    <button
+      type="button"
+      onClick={onEdit}
+      className="shrink-0 p-0.5 -ml-0.5 text-gray-400 hover:text-gray-700 rounded hover:bg-gray-100 cursor-pointer"
+      aria-label={`Edit ${label}`}
+    >
+      <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125"
+        />
+      </svg>
+    </button>
   );
 }

@@ -19,7 +19,7 @@ export default function SupplierSelect({ options, suppliers, onSelect, saving }:
       value={value}
       onChange={(e) => onSelect(e.target.value)}
       disabled={saving}
-      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer disabled:opacity-50"
+      className="w-full border border-gray-300 rounded-lg px-2 py-1 text-[13px] outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer disabled:opacity-50"
     >
       <option value="">— Select supplier —</option>
       {options.map((option) => {

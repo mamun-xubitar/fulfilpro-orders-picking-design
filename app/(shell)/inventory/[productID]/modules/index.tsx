@@ -2,7 +2,6 @@
 
 import { useProductDetailPage } from './hooks/useProductDetailPage';
 import ProductHeader from './ProductHeader';
-import ProductGallery from './ProductGallery';
 import ProductDetailsPanel from './ProductDetailsPanel';
 import StoreSiblingsPanel from './StoreSiblingsPanel';
 import PricingPanel from './PricingPanel';
@@ -36,8 +35,7 @@ export default function ProductDetailPage({ productId }: { productId: string }) 
         className="grid gap-4 transition-[grid-template-columns] duration-200 mb-6"
         style={{ gridTemplateColumns: p.detailsExpanded ? '1fr 23rem 0rem' : '1fr 23rem 20rem' }}
       >
-        <div className="min-w-0 grid grid-cols-1 lg:grid-cols-[15rem_1fr] gap-4">
-          <ProductGallery product={p.product} />
+        <div className="min-w-0">
           <ProductDetailsPanel
             product={p.product}
             allContinueSelling={p.allContinueSelling}

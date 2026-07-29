@@ -15,7 +15,7 @@ export default function GalleryThumbRail({ entries, activeKey, onSelect, expande
   const otherEntries = entries.filter((e) => e.kind !== 'color');
 
   const thumbSize = expanded ? 80 : 56;
-  const thumbClass = expanded ? 'w-20 h-20' : 'w-14 h-14';
+  const thumbClass = expanded ? 'w-14 h-14' : 'w-10 h-10';
   const headerClass = expanded ? 'text-xs font-semibold text-white/70 px-1' : 'text-xs font-semibold text-gray-500 px-1';
   const labelClass = expanded ? 'text-[10px] text-white/70 truncate w-full text-center' : 'text-[10px] text-gray-500 truncate w-full text-center';
 
@@ -32,7 +32,7 @@ export default function GalleryThumbRail({ entries, activeKey, onSelect, expande
   );
 
   return (
-    <div className={`flex flex-col gap-3 overflow-y-auto ${expanded ? 'max-h-full' : 'max-h-[19rem]'}`}>
+    <div className={`flex flex-col gap-3 overflow-y-auto ${expanded ? 'max-h-full' : 'max-h-40'}`}>
       {colorEntries.length > 0 && (
         <div className="flex flex-col gap-2">
           <span className={headerClass}>Colors</span>
