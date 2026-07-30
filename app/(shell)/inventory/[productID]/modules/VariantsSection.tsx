@@ -91,6 +91,7 @@ export default function VariantsSection({ p }: VariantsSectionProps) {
             onDeltaChange={p.stockAdjust.setDelta}
             hasPendingDeltas={p.stockAdjust.hasPendingDeltas}
             onConfirmAdjust={p.stockAdjust.openModal}
+            lowStockThreshold={p.lowStockThreshold}
             emptyMessage={
               p.colorGroups.length > 0 && p.selectedColorKeys.size === 0
                 ? 'Select at least one color to see variants.'

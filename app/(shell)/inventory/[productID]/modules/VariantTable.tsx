@@ -15,6 +15,7 @@ type VariantTableProps = {
   hasPendingDeltas: boolean;
   onConfirmAdjust: () => void;
   emptyMessage: string;
+  lowStockThreshold: number;
 };
 
 function VariantTable({
@@ -27,6 +28,7 @@ function VariantTable({
   hasPendingDeltas,
   onConfirmAdjust,
   emptyMessage,
+  lowStockThreshold,
 }: VariantTableProps) {
   const allSelected = variants.length > 0 && variants.every((v) => selectedIds.has(v.id));
 
@@ -70,6 +72,7 @@ function VariantTable({
               onToggleSelect={onToggleSelect}
               delta={deltas[variant.id]}
               onDeltaChange={onDeltaChange}
+              lowStockThreshold={lowStockThreshold}
             />
           ))}
           {variants.length === 0 && (

@@ -6,6 +6,7 @@ import type { ApiResponse, CurrencyRateRow } from '../types';
 export function useInventorySettingsData() {
   const [currencies, setCurrencies] = useState<CurrencyRateRow[]>([]);
   const [globalMarginPercent, setGlobalMarginPercent] = useState(0);
+  const [lowStockThreshold, setLowStockThreshold] = useState(10);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [refreshToken, setRefreshToken] = useState(0);
@@ -20,6 +21,7 @@ export function useInventorySettingsData() {
         const res = await fetch('/api/inventory/settings');
         const json = (await res.json()) as ApiResponse<{
           globalMarginPercent: number;
+          lowStockThreshold: number;
           baseCurrency: string;
           currencies: CurrencyRateRow[];
         }>;
@@ -31,6 +33,7 @@ export function useInventorySettingsData() {
 
         setCurrencies(json.data.currencies);
         setGlobalMarginPercent(json.data.globalMarginPercent);
+        setLowStockThreshold(json.data.lowStockThreshold);
       } catch (err) {
         if (cancelled) return;
         setError(err instanceof Error ? err.message : 'Failed to load inventory settings');
@@ -49,5 +52,5 @@ export function useInventorySettingsData() {
 
   const bumpRefresh = () => setRefreshToken((prev) => prev + 1);
 
-  return { currencies, setCurrencies, globalMarginPercent, loading, error, bumpRefresh };
+  return { currencies, setCurrencies, globalMarginPercent, lowStockThreshold, loading, error, bumpRefresh };
 }

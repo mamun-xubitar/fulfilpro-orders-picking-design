@@ -2,6 +2,7 @@
 
 import { useInventorySettingsPage } from './hooks/useInventorySettingsPage';
 import MarginCard from './MarginCard';
+import LowStockCard from './LowStockCard';
 import CurrencyRatesCard from './CurrencyRatesCard';
 import AddEditCurrencyModal from './AddEditCurrencyModal';
 import DeleteCurrencyModal from './DeleteCurrencyModal';
@@ -20,6 +21,14 @@ export default function InventorySettingsPage() {
           savingMargin={p.savingMargin}
           marginErrors={p.marginErrors}
           onSave={p.saveMargin}
+        />
+
+        <LowStockCard
+          lowStockInput={p.lowStockInput}
+          setLowStockInput={p.setLowStockInput}
+          savingLowStock={p.savingLowStock}
+          lowStockErrors={p.lowStockErrors}
+          onSave={p.saveLowStock}
         />
 
         <CurrencyRatesCard

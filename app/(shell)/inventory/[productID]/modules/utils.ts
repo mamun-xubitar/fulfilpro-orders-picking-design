@@ -1,4 +1,4 @@
-import { COLOR_OPTION_NAMES, LOW_STOCK_THRESHOLD, OUT_OF_STOCK_THRESHOLD, SIZE_OPTION_NAMES } from './constants';
+import { COLOR_OPTION_NAMES, OUT_OF_STOCK_THRESHOLD, SIZE_OPTION_NAMES } from './constants';
 import type { ColorGroup, GalleryEntry, ProductDetail, PurchaseOrderItemRow, PurchaseOrderRow, PurchaseOrderStatus, SizeCount, VariantDetail } from './types';
 
 export function getVariantColor(variant: VariantDetail): string {
@@ -42,10 +42,10 @@ export function groupVariantsByColor(variants: VariantDetail[]): ColorGroup[] {
   return [...groups.values()].sort((a, b) => a.label.localeCompare(b.label));
 }
 
-export function getStockCellClass(variant: VariantDetail): string {
+export function getStockCellClass(variant: VariantDetail, lowStockThreshold: number): string {
   if (variant.inventoryPolicy === 'CONTINUE') return '';
   if (variant.inventoryQuantity < OUT_OF_STOCK_THRESHOLD) return 'bg-red-100';
-  if (variant.inventoryQuantity < LOW_STOCK_THRESHOLD) return 'bg-red-50';
+  if (variant.inventoryQuantity <= lowStockThreshold) return 'bg-red-50';
   return '';
 }
 

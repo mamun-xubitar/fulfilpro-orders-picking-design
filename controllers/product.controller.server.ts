@@ -1,6 +1,7 @@
 import prisma from '@/lib/prisma.server';
 import { ProductModel } from '@/models/product.model.server';
 import { SupplierModel } from '@/models/supplier.model.server';
+import { SettingsModel } from '@/models/settings.model.server';
 import { enqueueProductSyncJob, getProductSyncStatus } from '@/lib/product-sync-jobs.server';
 import { enqueueJob } from '@/lib/background-jobs.server';
 import { deleteProductNow, type BulkProductAction, type BulkProductActionPayload } from '@/lib/product-bulk-actions.server';
@@ -19,6 +20,7 @@ import { ProductStatus } from '@prisma/client';
 
 const model = new ProductModel();
 const supplierModel = new SupplierModel();
+const settingsModel = new SettingsModel();
 
 const SEARCH_FIELD_VALUES = new Set(['title', 'vendor', 'supplier', 'category', 'type', 'tag']);
 const STOCK_LEVEL_VALUES = new Set(['out_of_stock', 'not_tracked', 'in_stock']);
@@ -238,9 +240,10 @@ export class ProductController {
 
     const siblings = product.handle ? await model.findSiblingsByHandle(product.handle, id) : [];
 
-    const [attached, viaCollection] = await Promise.all([
+    const [attached, viaCollection, settings] = await Promise.all([
       supplierModel.findForProduct(id),
       supplierModel.findByCollections(existing.storeId, collections.map((c) => c.id)),
+      settingsModel.get(),
     ]);
 
     return {
@@ -249,6 +252,7 @@ export class ProductController {
         locations,
         siblings,
         stale,
+        lowStockThreshold: settings.lowStockThreshold,
       },
     };
   }

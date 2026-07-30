@@ -52,6 +52,7 @@ export type AppSettingsRow = {
   taskVisibilityByUser: Record<string, string[]>;
   decorationCrossVisibilityEnabled: boolean;
   globalMarginPercent: number;
+  lowStockThreshold: number;
   updatedAt: string;
 };
 
@@ -85,6 +86,7 @@ export type UpdateAppSettingsData = Partial<{
   taskVisibilityByUser: Record<string, string[]>;
   decorationCrossVisibilityEnabled: boolean;
   globalMarginPercent: number;
+  lowStockThreshold: number;
 }>;
 
 const SETTINGS_ID = 'default';
@@ -122,6 +124,7 @@ const DEFAULT_SETTINGS = {
   taskVisibilityByUser: {} as Record<string, string[]>,
   decorationCrossVisibilityEnabled: false,
   globalMarginPercent: 0,
+  lowStockThreshold: 10,
 };
 
 type GoogleTokenData = {
@@ -234,6 +237,7 @@ async function toSettingsRow(settings: {
   taskVisibilityByUser?: unknown;
   decorationCrossVisibilityEnabled?: boolean;
   globalMarginPercent?: Prisma.Decimal | number;
+  lowStockThreshold?: number;
   updatedAt: Date;
 }): Promise<AppSettingsRow> {
   const { activeUsers, activeAdminUsers } = await listEmailRuleUsers();
@@ -288,6 +292,7 @@ async function toSettingsRow(settings: {
     taskVisibilityByUser: normalizeVisibilityMap(settings.taskVisibilityByUser),
     decorationCrossVisibilityEnabled: settings.decorationCrossVisibilityEnabled ?? false,
     globalMarginPercent: Number(settings.globalMarginPercent ?? 0),
+    lowStockThreshold: settings.lowStockThreshold ?? DEFAULT_SETTINGS.lowStockThreshold,
     updatedAt: settings.updatedAt.toISOString(),
   };
 }

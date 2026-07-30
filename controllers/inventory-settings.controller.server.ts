@@ -1,5 +1,6 @@
 import { CurrencyRateModel } from '@/models/currency-rate.model.server';
 import { SettingsModel } from '@/models/settings.model.server';
+import type { UpdateAppSettingsData } from '@/models/settings.model.server';
 
 const currencyModel = new CurrencyRateModel();
 const settingsModel = new SettingsModel();
@@ -21,26 +22,41 @@ export class InventorySettingsController {
     return {
       data: {
         globalMarginPercent: settings.globalMarginPercent,
+        lowStockThreshold: settings.lowStockThreshold,
         baseCurrency: 'AUD',
         currencies,
       },
     };
   }
 
-  async updateMargin(body: unknown, session: Session) {
+  async update(body: unknown, session: Session) {
     if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
 
     const value = (body ?? {}) as Record<string, unknown>;
-    const globalMarginPercent = typeof value.globalMarginPercent === 'number' ? value.globalMarginPercent : NaN;
-
+    const updateData: UpdateAppSettingsData = {};
     const errors: string[] = [];
-    if (!Number.isFinite(globalMarginPercent)) errors.push('globalMarginPercent: Margin is required');
-    else if (globalMarginPercent < 0 || globalMarginPercent > 100) errors.push('globalMarginPercent: Margin must be between 0 and 100');
+
+    if ('globalMarginPercent' in value) {
+      const margin = Number(value.globalMarginPercent);
+      if (!Number.isFinite(margin)) errors.push('globalMarginPercent: Margin is required');
+      else if (margin < 0 || margin > 100) errors.push('globalMarginPercent: Margin must be between 0 and 100');
+      else updateData.globalMarginPercent = Math.round(margin * 100) / 100;
+    }
+
+    if ('lowStockThreshold' in value) {
+      const threshold = Number(value.lowStockThreshold);
+      if (!Number.isInteger(threshold) || threshold < 0) errors.push('lowStockThreshold: Must be 0 or a whole number');
+      else updateData.lowStockThreshold = threshold;
+    }
+
     if (errors.length) return { error: { message: 'Validation failed', errors, status: 400 } };
+    if (!Object.keys(updateData).length) return { error: { message: 'No settings to update', status: 400 } };
 
-    const settings = await settingsModel.update({ globalMarginPercent: Math.round(globalMarginPercent * 100) / 100 });
-
-    return { data: { globalMarginPercent: settings.globalMarginPercent }, message: 'Margin saved' };
+    const settings = await settingsModel.update(updateData);
+    return {
+      data: { globalMarginPercent: settings.globalMarginPercent, lowStockThreshold: settings.lowStockThreshold },
+      message: 'Settings saved',
+    };
   }
 
   async createCurrency(body: unknown, session: Session) {

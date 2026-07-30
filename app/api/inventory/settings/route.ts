@@ -19,7 +19,7 @@ export async function GET() {
 export async function PATCH(request: NextRequest) {
   const session = await auth();
   const body = await request.json().catch(() => ({}));
-  const result = await controller.updateMargin(body, session);
+  const result = await controller.update(body, session);
   if ('error' in result) {
     const { error } = result as ErrResult;
     return apiError({ message: error.message, errors: error.errors, status: error.status });

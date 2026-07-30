@@ -11,13 +11,14 @@ type VariantTableRowProps = {
   onToggleSelect: (id: string) => void;
   delta: number | undefined;
   onDeltaChange: (id: string, value: string) => void;
+  lowStockThreshold: number;
 };
 
-function VariantTableRow({ variant, selected, onToggleSelect, delta, onDeltaChange }: VariantTableRowProps) {
+function VariantTableRow({ variant, selected, onToggleSelect, delta, onDeltaChange, lowStockThreshold }: VariantTableRowProps) {
   return (
     <tr
       onClick={() => onToggleSelect(variant.id)}
-      className={`cursor-pointer border-b border-gray-200 hover:bg-gray-50 ${getStockCellClass(variant)} ${selected ? 'bg-blue-50/50' : ''}`}
+      className={`cursor-pointer border-b border-gray-200 hover:bg-gray-50 ${getStockCellClass(variant, lowStockThreshold)} ${selected ? 'bg-blue-50/50' : ''}`}
     >
       <td className="px-3 py-2">
         <button

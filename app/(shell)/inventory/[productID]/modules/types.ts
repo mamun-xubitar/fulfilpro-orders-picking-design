@@ -117,6 +117,7 @@ export type ProductDetailResponse = {
   locations: LocationOption[];
   siblings: SiblingProduct[];
   stale: boolean;
+  lowStockThreshold: number;
 };
 
 export type TaxonomyCategory = { id: string; name: string; fullName: string; isLeaf: boolean };

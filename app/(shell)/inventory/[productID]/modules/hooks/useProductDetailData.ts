@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { LOW_STOCK_THRESHOLD } from '../constants';
 import type { ApiResponse, LocationOption, ProductDetail, ProductDetailResponse, SiblingProduct } from '../types';
 
 export function useProductDetailData(productId: string) {
@@ -8,6 +9,7 @@ export function useProductDetailData(productId: string) {
   const [locations, setLocations] = useState<LocationOption[]>([]);
   const [siblings, setSiblings] = useState<SiblingProduct[]>([]);
   const [stale, setStale] = useState(false);
+  const [lowStockThreshold, setLowStockThreshold] = useState(LOW_STOCK_THRESHOLD);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [refreshToken, setRefreshToken] = useState(0);
@@ -31,6 +33,7 @@ export function useProductDetailData(productId: string) {
         setLocations(json.data.locations);
         setSiblings(json.data.siblings);
         setStale(json.data.stale);
+        setLowStockThreshold(json.data.lowStockThreshold);
       } catch (err) {
         if (cancelled) return;
         setError(err instanceof Error ? err.message : 'Failed to load product');
@@ -49,5 +52,5 @@ export function useProductDetailData(productId: string) {
 
   const bumpRefresh = () => setRefreshToken((prev) => prev + 1);
 
-  return { product, setProduct, locations, siblings, stale, loading, error, bumpRefresh };
+  return { product, setProduct, locations, siblings, stale, lowStockThreshold, loading, error, bumpRefresh };
 }
