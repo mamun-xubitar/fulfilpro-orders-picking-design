@@ -67,6 +67,10 @@ export default function LoginManager({ isAdmin }: { isAdmin: boolean }) {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
 
+  function toggleSelectAll() {
+    setSelectedIds((prev) => (prev.length === users.length ? [] : users.map((u) => u.id)));
+  }
+
   function handleSave() {
     save({
       url: "/api/auth/login-auto-approvals",
@@ -100,6 +104,17 @@ export default function LoginManager({ isAdmin }: { isAdmin: boolean }) {
             <div className="space-y-1 px-5 py-4 max-h-96 overflow-y-auto">
               {users.length === 0 && (
                 <p className="text-sm text-gray-400 text-center py-6">No staff users found</p>
+              )}
+              {users.length > 0 && (
+                <label className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-gray-50 border-b border-gray-100 mb-1">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.length === users.length}
+                    onChange={toggleSelectAll}
+                    className="cursor-pointer rounded border-gray-300 text-blue-600"
+                  />
+                  <span className="font-medium text-gray-900">Select all</span>
+                </label>
               )}
               {users.map((u) => (
                 <label key={u.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-gray-50">
