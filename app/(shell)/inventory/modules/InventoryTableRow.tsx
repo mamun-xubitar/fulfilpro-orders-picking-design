@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { STATUS_BADGE } from './constants';
 import { formatCurrency, getShopifyThumbnailUrl } from './utils';
+import { truncate } from '@/lib/utils/common';
 import type { ProductRow } from './types';
 
 type InventoryTableRowProps = {
@@ -35,9 +36,13 @@ export default function InventoryTableRow({ product, selected, onToggleSelect, o
             ) : null}
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-medium text-gray-900 truncate">{product.title}</p>
+            <p className="text-sm font-medium text-gray-900 truncate" title={product.title}>
+              {truncate(product.title, 50)}
+            </p>
             {product.tags.length > 0 && (
-              <p className="text-xs text-gray-400 truncate">{product.tags.join(', ')}</p>
+              <p className="text-xs text-gray-400 truncate" title={product.tags.join(', ')}>
+                {truncate(product.tags.join(', '), 50)}
+              </p>
             )}
           </div>
         </div>
@@ -55,8 +60,11 @@ export default function InventoryTableRow({ product, selected, onToggleSelect, o
       <td className="px-4 py-3 text-sm text-gray-700">{product.store.name}</td>
       <td className="px-4 py-3 text-sm text-gray-700">{product.category ?? '—'}</td>
       <td className="px-4 py-3 text-sm text-gray-700">{product.productType ?? '—'}</td>
-      <td className="px-4 py-3 text-sm text-gray-700">
-        {product.salesChannels.length > 0 ? product.salesChannels.map((c) => c.name).join(', ') : '—'}
+      <td
+        className="px-4 py-3 text-sm text-gray-700"
+        title={product.salesChannels.length > 0 ? product.salesChannels.map((c) => c.name).join(', ') : undefined}
+      >
+        {product.salesChannels.length > 0 ? truncate(product.salesChannels.map((c) => c.name).join(', '), 30) : '—'}
       </td>
       <td className="px-4 py-3 text-sm text-gray-700">{product.vendor ?? '—'}</td>
       <td className="px-4 py-3">
@@ -67,7 +75,8 @@ export default function InventoryTableRow({ product, selected, onToggleSelect, o
             className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
           >
             <svg className="w-5.5 h-5.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
             </svg>
           </Link>
           {product.onlineStoreUrl && (

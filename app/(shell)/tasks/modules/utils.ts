@@ -46,7 +46,3 @@ export function deriveTaskState(status: string, dueDate: string): TaskState {
 export function taskRowKey(taskId: string): string {
   return `task-${taskId}`;
 }
-
-export function truncate(text: string, max: number): string {
-  return text.length > max ? text.slice(0, max).trimEnd() + '…' : text;
-}

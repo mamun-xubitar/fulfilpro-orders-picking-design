@@ -112,7 +112,7 @@ export default function PricingPanel(p: PricingPanelProps) {
 
             <PricingRow label="Tax" error={p.errors?.tax} editing={p.editing}>
               {p.editing ? (
-                <PricingInput value={p.form.tax} onChange={p.set('tax')} suffix="AU$" invalid={!!p.errors?.tax} />
+                <PricingInput value={p.form.tax} onChange={p.set('tax')} suffix="AUD" invalid={!!p.errors?.tax} />
               ) : (
                 <span>{formatAud(Number(p.form.tax) || 0)}</span>
               )}

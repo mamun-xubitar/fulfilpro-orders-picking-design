@@ -58,6 +58,10 @@ export function computeMargin(price: number, cost: number | null): number | null
   return ((price - cost) / price) * 100;
 }
 
+export function firstVariantCost(variants: { cost: number | null; position: number }[]): number | null {
+  return [...variants].sort((a, b) => a.position - b.position).find((v) => v.cost != null)?.cost ?? null;
+}
+
 export function computePricing(v: {
   buyingPrice: number;
   freight: number;
@@ -72,7 +76,7 @@ export function computePricing(v: {
 }
 
 export function formatAud(n: number): string {
-  return `${n.toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} AU$`;
+  return `${n.toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} AUD`;
 }
 
 export function formatForeign(n: number, code: string): string {

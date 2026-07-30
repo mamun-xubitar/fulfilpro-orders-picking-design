@@ -2,7 +2,8 @@
 
 import type { TaskRow } from './types';
 import { DUE_TYPE_STYLES, STATE_STYLES } from './constants';
-import { formatDueDate, taskRowKey, truncate } from './utils';
+import { formatDueDate, taskRowKey } from './utils';
+import { truncate } from '@/lib/utils/common';
 import TaskRowActions from './TaskRowActions';
 
 type Props = {

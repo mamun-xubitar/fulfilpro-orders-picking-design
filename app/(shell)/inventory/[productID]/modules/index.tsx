@@ -13,7 +13,7 @@ export default function ProductDetailPage({ productId }: { productId: string }) 
 
   if (p.loading && !p.product) {
     return (
-      <main className="flex-1 p-4 md:p-6">
+      <main className="flex-1 w-full flex flex-col items-center justify-center">
         <div className="animate-pulse text-sm text-gray-400">Loading product…</div>
       </main>
     );

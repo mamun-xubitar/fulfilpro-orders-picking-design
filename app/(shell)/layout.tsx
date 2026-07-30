@@ -231,7 +231,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
       adminDecoratorOnly: false,
       children: [
         { id: "suppliers", label: "Suppliers", href: "/inventory/suppliers" },
-        { id: "settings", label: "Settings", href: "/inventory/settings" },
+        { id: "config", label: "Configuration", href: "/inventory/config" },
       ],
     },
     {

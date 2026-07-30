@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import useRequest from '@/hooks/useRequest';
-import { computePricing } from '../utils';
+import { computePricing, firstVariantCost } from '../utils';
 import { EMPTY_PRICING_FORM } from '../types';
 import type { ApiResponse, CurrencyOption, PricingForm, ProductDetail, ProductPricingResponse } from '../types';
 
@@ -22,11 +22,14 @@ export function useProductPricing({ productId, product, bumpRefresh }: UseProduc
   const [form, setForm] = useState<PricingForm>(EMPTY_PRICING_FORM);
   const [currencyOptions, setCurrencyOptions] = useState<CurrencyOption[]>([{ code: 'AUD', rate: 1 }]);
   const [confirmTarget, setConfirmTarget] = useState<{ sellingIncTax: number; totalBuying: number } | null>(null);
+  const [hasSavedPricing, setHasSavedPricing] = useState(false);
+  const seededFromCostRef = useRef(false);
   const { request: saveRequest, loading: saving, errors } = useRequest();
   const { request: applyRequest, loading: applying } = useRequest();
 
   useEffect(() => {
     let cancelled = false;
+    seededFromCostRef.current = false;
 
     const fetchPricing = async () => {
       setLoading(true);
@@ -40,6 +43,7 @@ export function useProductPricing({ productId, product, bumpRefresh }: UseProduc
         setCurrencyOptions(options);
 
         const { pricing } = json.data;
+        setHasSavedPricing(Boolean(pricing));
         setForm(
           pricing
             ? {
@@ -66,6 +70,14 @@ export function useProductPricing({ productId, product, bumpRefresh }: UseProduc
       cancelled = true;
     };
   }, [productId]);
+
+  useEffect(() => {
+    if (loading || hasSavedPricing || seededFromCostRef.current || !product) return;
+    const cost = firstVariantCost(product.variants);
+    if (cost == null) return;
+    seededFromCostRef.current = true;
+    setForm((prev) => ({ ...prev, buyingPrice: String(cost) }));
+  }, [loading, hasSavedPricing, product]);
 
   const set = (field: keyof PricingForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const value = e.target.value;
@@ -115,7 +127,10 @@ export function useProductPricing({ productId, product, bumpRefresh }: UseProduc
         if (!Number.isFinite(Number(form.tax)) || Number(form.tax) < 0) validationErrors.tax = 'Enter a value of 0 or more';
         return validationErrors;
       },
-      onSuccess: () => setEditing(false),
+      onSuccess: () => {
+        setEditing(false);
+        setHasSavedPricing(true);
+      },
     });
   };
 
