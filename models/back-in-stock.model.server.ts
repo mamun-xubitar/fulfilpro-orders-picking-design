@@ -1,5 +1,5 @@
 import prisma from '@/lib/prisma.server';
-import { sendGoogleMail } from '@/lib/google-mail.server';
+import { sendAppMail } from '@/lib/email.server';
 import {
   isBackInStockRequesterUpdatesEnabled,
   resolveHiddenRecipientEmails,
@@ -412,7 +412,7 @@ async function notifyAdmins(request: { orderNumber: string; requesterName: strin
 
   if (recipients.length > 0) {
     const row = { ...request, items: toItems(request.items) };
-    await sendGoogleMail({
+    await sendAppMail({
       to: recipients,
       subject: `Back in stock request for Order #${request.orderNumber}`,
       text: buildRequestText(row),
@@ -435,7 +435,7 @@ async function notifyRequester(request: { orderNumber: string; requesterId: stri
   if (!requesterUpdatesEnabled) return;
 
   const items = toItems(request.items);
-  await sendGoogleMail({
+  await sendAppMail({
     to: [request.requesterEmail],
     subject: `Back in stock update for Order #${request.orderNumber}`,
     text: [

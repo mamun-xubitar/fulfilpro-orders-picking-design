@@ -1,7 +1,7 @@
 import prisma from '@/lib/prisma.server';
 import { TaskModel, type TaskState2 } from '@/models/task.model.server';
 import { createNotification } from '@/lib/notifications.server';
-import { sendGoogleMail } from '@/lib/google-mail.server';
+import { sendAppMail } from '@/lib/email.server';
 import { computeUrgentDueDate } from '@/lib/auth-policy.server';
 import { getTaskVisibleUserIds, getTaskVisibleUsers } from '@/lib/task-visibility.server';
 import type { SavedFile } from '@/lib/uploads.server';
@@ -294,7 +294,7 @@ async function fireTaskEvent(
   const html = buildTaskEmail({ taskId, taskTitle, body, recipientName });
 
   await Promise.all([
-    sendGoogleMail({ to: [recipientEmail], subject, html, text: body }).catch(() => {}),
+    sendAppMail({ to: [recipientEmail], subject, html, text: body }).catch(() => {}),
     createNotification({ recipientId, type, title, body, taskId }),
   ]);
 }
@@ -312,7 +312,7 @@ async function fireMessageEvent(
   const html = buildTaskEmail({ taskId, taskTitle, body, recipientName: '' });
 
   await Promise.all([
-    sendGoogleMail({ to: [recipientEmail], subject, html, text: body }).catch(() => {}),
+    sendAppMail({ to: [recipientEmail], subject, html, text: body }).catch(() => {}),
     createNotification({ recipientId, type: 'task_message', title: 'New task message', body, taskId }),
   ]);
 }

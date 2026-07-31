@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import prisma from '@/lib/prisma.server';
-import { sendGoogleMail } from '@/lib/google-mail.server';
+import { sendAppMail } from '@/lib/email.server';
 import { resolveHiddenRecipientEmails, resolveHiddenRecipientIds } from '@/lib/email-rules.server';
 import { createNotification } from '@/lib/notifications.server';
 
@@ -133,7 +133,7 @@ async function sendApprovalEmail({
     </div>
   `;
 
-  await sendGoogleMail({
+  await sendAppMail({
     to: recipients,
     subject,
     text,

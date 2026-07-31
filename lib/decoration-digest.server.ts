@@ -1,5 +1,5 @@
 import prisma from '@/lib/prisma.server';
-import { sendGoogleMail } from '@/lib/google-mail.server';
+import { sendAppMail } from '@/lib/email.server';
 import { normalizeUserIdList } from '@/lib/email-rules.server';
 import { normalizeWorkComments, type DecorationWorkComment } from '@/models/decoration.model.server';
 import { getRoleLabel } from '@/lib/roles';
@@ -73,7 +73,7 @@ export async function runDecorationDigest(options: { workerId?: string; now?: Da
   }`;
 
   try {
-    await sendGoogleMail({ to: recipients, subject, html, text });
+    await sendAppMail({ to: recipients, subject, html, text });
   } catch (error) {
     return { sent: false, reason: 'send_failed', error: error instanceof Error ? error.message : String(error) };
   }

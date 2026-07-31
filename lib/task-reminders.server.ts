@@ -1,5 +1,5 @@
 import prisma from '@/lib/prisma.server';
-import { sendGoogleMail } from '@/lib/google-mail.server';
+import { sendAppMail } from '@/lib/email.server';
 import { createNotification } from '@/lib/notifications.server';
 import { TaskModel } from '@/models/task.model.server';
 
@@ -45,7 +45,7 @@ export async function runTaskReminderCheck(now: Date) {
     const html = buildReminderEmail(assignee.assigneeName, total, assignee.pending, assignee.overdue, assignee.seriouslyLate);
 
     await Promise.all([
-      sendGoogleMail({ to: [assignee.assigneeEmail], subject, html, text: body }).catch(() => {}),
+      sendAppMail({ to: [assignee.assigneeEmail], subject, html, text: body }).catch(() => {}),
       createNotification({
         recipientId: assignee.assigneeId,
         type: 'task_reminder',

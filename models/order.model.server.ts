@@ -17,7 +17,7 @@ import {
   type LineDecorationSummary,
 } from '@/models/decoration.model.server';
 import { TrackingModel, type TrackingSummary } from '@/models/tracking.model.server';
-import { sendGoogleMail } from '@/lib/google-mail.server';
+import { sendAppMail } from '@/lib/email.server';
 import {
   resolveHiddenRecipientEmails,
   resolveHiddenRecipientIds,
@@ -1099,7 +1099,7 @@ export class OrderModel {
 
     const senderName = params.sender?.name?.trim() || null;
     const senderEmail = params.sender?.email?.trim() || null;
-    await sendGoogleMail({
+    await sendAppMail({
       to: [recipient.email],
       subject: `Order ${order.number} message`,
       text: buildOrderMessageEmailText({ order, message: params.message, senderName, senderEmail }),
@@ -1959,7 +1959,7 @@ async function notifyAdminsAboutStockAdjustment(params: {
   ]);
 
   if (recipients.length > 0) {
-    await sendGoogleMail({
+    await sendAppMail({
       to: recipients,
       subject: `Stock adjustment needed for Order #${params.order.number}`,
       text: buildStockAdjustmentEmailText(params.order, items, params.eventType, params.originUrl),

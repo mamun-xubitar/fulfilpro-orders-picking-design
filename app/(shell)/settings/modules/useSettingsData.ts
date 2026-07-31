@@ -18,6 +18,7 @@ export type DecorationRescanJob = {
 
 const SECTION_LABELS: Record<string, string> = {
   timezone: 'Timezone',
+  emailProvider: 'Email Sending',
   emailRules: 'Email Sending Rules',
   decorationDigest: 'Decoration Work Digest',
   tracking: 'Shipment Tracking',
@@ -59,8 +60,13 @@ const DEFAULT_DECORATION_KEYWORDS: AppSettingsRow['decorationKeywords'] = {
   print: ['print'],
 };
 
+const DEFAULT_MAILERSEND: AppSettingsRow['mailersend'] = {
+  apiToken: null,
+  fromEmail: null,
+};
+
 type ApiResponse<T> = { success: boolean; message: string; data: T };
-export type SettingsSection = 'timezone' | 'emailRules' | 'decorationDigest' | 'tracking' | 'decorationKeywords' | 'taskVisibility' | 'decorationVisibility';
+export type SettingsSection = 'timezone' | 'emailProvider' | 'emailRules' | 'decorationDigest' | 'tracking' | 'decorationKeywords' | 'taskVisibility' | 'decorationVisibility';
 
 async function getJson<T>(url: string, init?: RequestInit) {
   const res = await fetch(url, init);
@@ -94,11 +100,17 @@ export function useSettingsData() {
   const [googleConnecting, setGoogleConnecting] = useState(false);
   const [googleDisconnecting, setGoogleDisconnecting] = useState(false);
   const [googleStatus, setGoogleStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [emailProvider, setEmailProvider] = useState<AppSettingsRow['emailProvider']>('google');
+  const [mailersend, setMailersend] = useState<AppSettingsRow['mailersend']>(DEFAULT_MAILERSEND);
+  const [testingEmail, setTestingEmail] = useState(false);
+  const [testStatus, setTestStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const applySettings = (settings: AppSettingsRow) => {
     setTz(settings.timezone);
     setGoogleEmail(settings.googleEmail);
     setGoogleConnected(settings.googleConnected);
+    setEmailProvider(settings.emailProvider);
+    setMailersend(settings.mailersend);
     setEmailRules(settings.emailRules);
     setDecorationDigest(settings.decorationDigest);
     setTracking(settings.shipmentTracking);
@@ -113,6 +125,12 @@ export function useSettingsData() {
     let payload: Record<string, unknown>;
     if (section === 'timezone') {
       payload = { timezone: tz };
+    } else if (section === 'emailProvider') {
+      payload = {
+        emailProvider,
+        mailersendApiToken: mailersend.apiToken,
+        mailersendFromEmail: mailersend.fromEmail,
+      };
     } else if (section === 'decorationDigest') {
       payload = {
         decorationDigestMode: decorationDigest.mode,
@@ -287,6 +305,19 @@ export function useSettingsData() {
     }
   };
 
+  const sendTestEmail = async () => {
+    setTestStatus(null);
+    setTestingEmail(true);
+    try {
+      await getJson<null>('/api/settings/email/test', { method: 'POST' });
+      setTestStatus({ type: 'success', message: 'Test email sent.' });
+    } catch (err) {
+      setTestStatus({ type: 'error', message: err instanceof Error ? err.message : 'Failed to send test email' });
+    } finally {
+      setTestingEmail(false);
+    }
+  };
+
   useEffect(() => {
     let cancelled = false;
     const mountTimer = window.setTimeout(() => { if (!cancelled) setMounted(true); }, 0);
@@ -341,6 +372,8 @@ export function useSettingsData() {
     loading, mounted,
     savingSection, error,
     googleEmail, googleConnected, googleConnecting, googleDisconnecting, googleStatus,
+    emailProvider, setEmailProvider, mailersend, setMailersend,
+    testingEmail, testStatus, sendTestEmail,
     save, connectGoogle, disconnectGoogle,
   };
 }

@@ -17,6 +17,8 @@ export type AppSettingsRow = {
   googleEmail: string | null;
   googleConnected: boolean;
   googleTokenExpiresAt: string | null;
+  emailProvider: 'google' | 'mailersend';
+  mailersend: { apiToken: string | null; fromEmail: string | null };
   emailRules: {
     loginApprovalRecipientUserIds: string[];
     backInStockAdminRecipientUserIds: string[];
@@ -87,6 +89,9 @@ export type UpdateAppSettingsData = Partial<{
   decorationCrossVisibilityEnabled: boolean;
   globalMarginPercent: number;
   lowStockThreshold: number;
+  emailProvider: string;
+  mailersendApiToken: string | null;
+  mailersendFromEmail: string | null;
 }>;
 
 const SETTINGS_ID = 'default';
@@ -101,6 +106,9 @@ const DEFAULT_SETTINGS = {
   googleAccessToken: null,
   googleRefreshToken: null,
   googleTokenExpiresAt: null,
+  emailProvider: 'google',
+  mailersendApiToken: null,
+  mailersendFromEmail: null,
   loginApprovalRecipientUserIds: [] as string[],
   backInStockAdminRecipientUserIds: [] as string[],
   stockAdjustmentRecipientUserIds: [] as string[],
@@ -214,6 +222,9 @@ async function toSettingsRow(settings: {
   googleEmail: string | null;
   googleRefreshToken: string | null;
   googleTokenExpiresAt: Date | null;
+  emailProvider?: string;
+  mailersendApiToken?: string | null;
+  mailersendFromEmail?: string | null;
   loginApprovalRecipientUserIds: unknown;
   backInStockAdminRecipientUserIds: unknown;
   stockAdjustmentRecipientUserIds: unknown;
@@ -257,6 +268,11 @@ async function toSettingsRow(settings: {
     googleEmail: settings.googleEmail,
     googleConnected: Boolean(settings.googleEmail && settings.googleRefreshToken),
     googleTokenExpiresAt: settings.googleTokenExpiresAt?.toISOString() ?? null,
+    emailProvider: settings.emailProvider === 'mailersend' ? 'mailersend' : 'google',
+    mailersend: {
+      apiToken: settings.mailersendApiToken ?? null,
+      fromEmail: settings.mailersendFromEmail ?? null,
+    },
     emailRules: {
       loginApprovalRecipientUserIds: normalizeUserIdList(emailRules.loginApprovalRecipientUserIds),
       backInStockAdminRecipientUserIds: normalizeUserIdList(emailRules.backInStockAdminRecipientUserIds),

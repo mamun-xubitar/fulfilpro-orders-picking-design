@@ -1,5 +1,5 @@
 import prisma from '@/lib/prisma.server';
-import { sendGoogleMail } from '@/lib/google-mail.server';
+import { sendAppMail } from '@/lib/email.server';
 import { getRoleLabel } from '@/lib/roles';
 import { createNotification } from '@/lib/notifications.server';
 
@@ -78,7 +78,7 @@ export class DecorationEditRequestModel {
       const approvePath = `${base}/api/decoration/edit-requests/${request.id}/approve?token=${approveToken}`;
       const rejectPath = `${base}/api/decoration/edit-requests/${request.id}/reject?token=${rejectToken}`;
       try {
-        await sendGoogleMail({
+        await sendAppMail({
           to: admins.map((a) => a.email),
           subject: `Edit access request — Order #${params.orderNumber}`,
           text: buildEmailText({ request: toRow(request), productTitle: params.productTitle, approvePath, rejectPath }),

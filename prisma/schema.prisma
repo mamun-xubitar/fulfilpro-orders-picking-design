@@ -547,6 +547,9 @@ model AppSettings {
   googleAccessToken                  String?
   googleRefreshToken                 String?
   googleTokenExpiresAt               DateTime?
+  emailProvider                      String    @default("google")
+  mailersendApiToken                 String?
+  mailersendFromEmail                String?
   loginApprovalRecipientUserIds      Json      @default("[]")
   backInStockAdminRecipientUserIds   Json      @default("[]")
   stockAdjustmentRecipientUserIds    Json      @default("[]")

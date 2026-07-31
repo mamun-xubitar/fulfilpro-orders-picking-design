@@ -1,5 +1,5 @@
 import prisma from '@/lib/prisma.server';
-import { sendGoogleMail } from '@/lib/google-mail.server';
+import { sendAppMail } from '@/lib/email.server';
 import { createNotification } from '@/lib/notifications.server';
 import { refreshTrackingAndApply } from '@/lib/background-jobs.server';
 import { normalizeUserIdList } from '@/lib/email-rules.server';
@@ -62,7 +62,7 @@ export async function runPendingShipmentCheck(now: Date) {
   const text = `${stillPending.length} shipment(s) have been pending for more than ${alertDays} days:\n\n${trackingList}`;
 
   try {
-    await sendGoogleMail({ to: recipients.map((r) => r.email), subject, html, text });
+    await sendAppMail({ to: recipients.map((r) => r.email), subject, html, text });
   } catch (error) {
     console.error('Failed to send pending shipment alert email', error);
   }
@@ -143,7 +143,7 @@ export async function runPickupReminderCheck(now: Date) {
       const text = `Your parcel for order #${tracking.order.number} (tracking: ${tracking.trackingNumber}) has been available for pickup since ${pickupDate.toDateString()}. Please collect it at your earliest convenience.`;
 
       try {
-        await sendGoogleMail({ to: [tracking.order.cusEmail], subject, html, text });
+        await sendAppMail({ to: [tracking.order.cusEmail], subject, html, text });
         await prisma.shipmentTracking.update({
           where: { id: tracking.id },
           data: {

@@ -1,6 +1,6 @@
 import { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma.server';
-import { sendGoogleMail } from '@/lib/google-mail.server';
+import { sendAppMail } from '@/lib/email.server';
 import { OrderModel } from '@/models/order.model.server';
 import { resolvePickerRecipientOptions } from '@/lib/email-rules.server';
 import { createNotification } from '@/lib/notifications.server';
@@ -1036,7 +1036,7 @@ async function sendPackingEmail(params: {
   const actor = params.actor?.name || params.actor?.email || 'Order picker';
   const url = params.originUrl ? `${params.originUrl}/picking-list?search=${encodeURIComponent(params.order.number)}` : '';
   const note = params.message ? `\n\nMessage:\n${params.message}` : '';
-  await sendGoogleMail({
+  await sendAppMail({
     to: params.recipients.map((recipient) => recipient.email),
     subject: `Order ${params.order.number} packing ${params.type}`,
     text: `${actor} ${verb} items for order ${params.order.number} (${params.order.cusName}).\n\n${lines}${note}${url ? `\n\n${url}` : ''}`,

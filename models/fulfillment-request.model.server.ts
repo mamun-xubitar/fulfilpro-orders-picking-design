@@ -1,5 +1,5 @@
 import prisma from '@/lib/prisma.server';
-import { sendGoogleMail } from '@/lib/google-mail.server';
+import { sendAppMail } from '@/lib/email.server';
 import { resolvePickerRecipientOptions } from '@/lib/email-rules.server';
 import { createNotification } from '@/lib/notifications.server';
 
@@ -76,7 +76,7 @@ export class FulfillmentEditRequestModel {
     const rejectPath = `${process.env.APP_URL?.replace(/\/$/, '') || params.originUrl}/api/fulfillment-requests/${request.id}/reject?token=${rejectToken}`;
 
     try {
-      await sendGoogleMail({
+      await sendAppMail({
         to: admins.map((a) => a.email),
         subject: `Permission request: ${params.requestType === 'edit' ? 'Edit' : 'Cancel'} fulfillment for Order #${params.orderNumber}`,
         text: buildRequestEmailText({ request: toRow(request), approvePath, rejectPath }),

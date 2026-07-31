@@ -1,5 +1,6 @@
 import { SettingsModel, type UpdateAppSettingsData } from '@/models/settings.model.server';
 import { listEmailRuleUsers, normalizeUserIdList } from '@/lib/email-rules.server';
+import { sendAppMail } from '@/lib/email.server';
 
 const model = new SettingsModel();
 
@@ -25,6 +26,7 @@ const TIMEZONES = new Set([
 const DAYS = new Set(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
 const SESSION_TIMEOUTS = new Set([15, 30, 60, 120, 240, 480, 720, 1440, 2880, 10080]);
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 type UserScope = 'active_user' | 'active_admin';
 
@@ -338,6 +340,49 @@ export class SettingsController {
       }
     }
 
+    if ('emailProvider' in data) {
+      if (data.emailProvider !== 'google' && data.emailProvider !== 'mailersend') {
+        errors.push('emailProvider: Must be "google" or "mailersend"');
+      } else {
+        updateData.emailProvider = data.emailProvider;
+      }
+    }
+
+    if ('mailersendApiToken' in data) {
+      if (data.mailersendApiToken !== null && typeof data.mailersendApiToken !== 'string') {
+        errors.push('mailersendApiToken: Must be a string or null');
+      } else {
+        const trimmed = typeof data.mailersendApiToken === 'string' ? data.mailersendApiToken.trim() : null;
+        updateData.mailersendApiToken = trimmed || null;
+      }
+    }
+
+    if ('mailersendFromEmail' in data) {
+      if (data.mailersendFromEmail !== null && typeof data.mailersendFromEmail !== 'string') {
+        errors.push('mailersendFromEmail: Must be a string or null');
+      } else {
+        const trimmed = typeof data.mailersendFromEmail === 'string' ? data.mailersendFromEmail.trim() : null;
+        if (trimmed && !EMAIL_PATTERN.test(trimmed)) {
+          errors.push('mailersendFromEmail: Enter a valid email address');
+        } else {
+          updateData.mailersendFromEmail = trimmed || null;
+        }
+      }
+    }
+
+    if (updateData.emailProvider) {
+      const current = await model.get();
+      if (updateData.emailProvider === 'mailersend') {
+        const apiToken = 'mailersendApiToken' in updateData ? updateData.mailersendApiToken : current.mailersend.apiToken;
+        const fromEmail = 'mailersendFromEmail' in updateData ? updateData.mailersendFromEmail : current.mailersend.fromEmail;
+        if (!apiToken || !fromEmail) {
+          errors.push('emailProvider: Configure the MailerSend API token and from email before activating it');
+        }
+      } else if (updateData.emailProvider === 'google' && !current.googleConnected) {
+        errors.push('emailProvider: Connect a Google account before activating it');
+      }
+    }
+
     if ('trackingAutoRegisterEnabled' in data) {
       if (typeof data.trackingAutoRegisterEnabled !== 'boolean') {
         errors.push('trackingAutoRegisterEnabled: Must be true or false');
@@ -423,6 +468,20 @@ export class SettingsController {
 
     const settings = await model.update(updateData);
     return { data: settings, message: 'Settings saved' };
+  }
+
+  async sendTestEmail(recipient: string) {
+    try {
+      await sendAppMail({
+        to: [recipient],
+        subject: 'Test email from Order Fulfillment',
+        html: '<p>This is a test email to confirm your email provider settings are working.</p>',
+        text: 'This is a test email to confirm your email provider settings are working.',
+      });
+      return { message: `Test email sent to ${recipient}` };
+    } catch (err) {
+      return { error: { message: err instanceof Error ? err.message : 'Failed to send test email', status: 400 } };
+    }
   }
 }
 

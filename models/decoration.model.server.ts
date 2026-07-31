@@ -1,5 +1,5 @@
 import prisma from '@/lib/prisma.server';
-import { sendGoogleMail } from '@/lib/google-mail.server';
+import { sendAppMail } from '@/lib/email.server';
 import {
   ADMIN_ROLE,
   DECORATOR_ROLES,
@@ -572,7 +572,7 @@ async function sendAssignmentEmail(params: {
   if (ordersLink) textParts.push(`Open: ${ordersLink}`);
 
   try {
-    await sendGoogleMail({
+    await sendAppMail({
       to: [params.to],
       subject: `New ${roleLabel} task — Order ${params.orderNumber}`,
       html,
