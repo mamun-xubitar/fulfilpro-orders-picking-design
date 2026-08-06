@@ -13,6 +13,7 @@ import { isDecoratorRole, getDecoratorCategories } from '@/lib/roles';
 import {
   getAssignmentsByOrder,
   getDecorationSummariesByOrder,
+  toLineDecorationState,
   type AssignmentRow,
   type LineDecorationSummary,
 } from '@/models/decoration.model.server';
@@ -1350,25 +1351,14 @@ function toOrderRow(row: {
     storeDomain: row.store.storeDomain,
     items: lineItems.map((item) => {
       const summary = summaries?.get(item.id);
-      const doneQty = summary?.doneQty ?? 0;
       const fulfilledQty = viewerIsDecorator ? (fulfilledByLine.get(item.id) ?? 0) : 0;
-      const remaining = Math.max(0, item.qty - doneQty - fulfilledQty);
-      const fullyDone = item.qty > 0 && doneQty >= item.qty;
       return {
         ...item,
         packedQuantity: packedByLine.get(item.id) ?? 0,
         isEmbroidery: decorations?.get(item.id)?.isEmbroidery ?? false,
         isPrint: decorations?.get(item.id)?.isPrint ?? false,
         assignments: assignments?.get(item.id) ?? [],
-        decoration: {
-          doneQty,
-          remaining,
-          fullyDone,
-          locked: fullyDone && !(summary?.hasActiveGrant ?? false),
-          hasPendingRequest: summary?.hasPendingRequest ?? false,
-          hasActiveGrant: summary?.hasActiveGrant ?? false,
-          works: summary?.works ?? [],
-        },
+        decoration: toLineDecorationState(summary, item.qty, fulfilledQty),
       };
     }),
     shippingLines: toShippingLines(row.shippingLines),

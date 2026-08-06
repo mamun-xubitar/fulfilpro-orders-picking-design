@@ -34,12 +34,14 @@ export class DecorationController {
   ) {
     const { quantityDone, comments } = parseWorkInput(body);
     await model.createWork({ orderId, lineItemId, worker, quantityDone, comments });
-    return { data: { orderId, lineItemId }, message: 'Marked as done' };
+    const decoration = await model.getLineDecorationState(orderId, lineItemId, { id: worker.id, role: worker.role });
+    return { data: { orderId, lineItemId, decoration }, message: 'Marked as done' };
   }
 
   async removeWork(orderId: string, lineItemId: string, workId: string, viewer: { id: string; role: string }) {
     await model.deleteWork({ orderId, lineItemId, workId, viewer });
-    return { data: { orderId, lineItemId }, message: 'Work removed' };
+    const decoration = await model.getLineDecorationState(orderId, lineItemId, viewer);
+    return { data: { orderId, lineItemId, decoration }, message: 'Work removed' };
   }
 
   async requestEditAccess(

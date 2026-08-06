@@ -123,6 +123,34 @@ export type LineDecorationSummary = {
   hasActiveGrant: boolean;
 };
 
+export type LineDecorationState = {
+  doneQty: number;
+  remaining: number;
+  fullyDone: boolean;
+  locked: boolean;
+  hasPendingRequest: boolean;
+  hasActiveGrant: boolean;
+  works: DecorationWorkRecord[];
+};
+
+export function toLineDecorationState(
+  summary: LineDecorationSummary | undefined,
+  qty: number,
+  fulfilledQty: number,
+): LineDecorationState {
+  const doneQty = summary?.doneQty ?? 0;
+  const fullyDone = qty > 0 && doneQty >= qty;
+  return {
+    doneQty,
+    remaining: Math.max(0, qty - doneQty - fulfilledQty),
+    fullyDone,
+    locked: fullyDone && !(summary?.hasActiveGrant ?? false),
+    hasPendingRequest: summary?.hasPendingRequest ?? false,
+    hasActiveGrant: summary?.hasActiveGrant ?? false,
+    works: summary?.works ?? [],
+  };
+}
+
 export function normalizeWorkComments(value: unknown): DecorationWorkComment[] {
   if (!Array.isArray(value)) return [];
   return value
@@ -520,6 +548,20 @@ export class DecorationModel {
 
     await prisma.lineItemWork.delete({ where: { id: workId } });
     return { orderId, lineItemId };
+  }
+
+  async getLineDecorationState(
+    orderId: string,
+    lineItemId: string,
+    viewer: { id?: string | null; role?: string | null },
+  ): Promise<LineDecorationState> {
+    const { qty, fulfilledQty } = await getLineItemContext(orderId, lineItemId);
+    const summaries = await getDecorationSummariesByOrder([orderId], viewer);
+    return toLineDecorationState(
+      summaries.get(orderId)?.get(lineItemId),
+      qty,
+      isDecoratorRole(viewer.role) ? fulfilledQty : 0,
+    );
   }
 }
 

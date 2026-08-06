@@ -3,6 +3,7 @@ import { toast } from 'react-toastify';
 import type {
   ApiResponse,
   DecorationFileRef,
+  DecorationLineSummary,
   OrderItem,
   OrderRow,
   WorkDetailsModalState,
@@ -27,6 +28,14 @@ export function useDecorationWork({ setOrders, blockTestModeAction, bumpRefresh 
     setOrders((prev) => prev.map((o) => (
       o.id === orderId
         ? { ...o, items: o.items.map((it) => (it.id === lineItemId ? { ...it, ...flags } : it)) }
+        : o
+    )));
+  };
+
+  const applyItemDecorationSummary = (orderId: string, lineItemId: string, decoration: DecorationLineSummary) => {
+    setOrders((prev) => prev.map((o) => (
+      o.id === orderId
+        ? { ...o, items: o.items.map((it) => (it.id === lineItemId ? { ...it, decoration } : it)) }
         : o
     )));
   };
@@ -109,11 +118,11 @@ export function useDecorationWork({ setOrders, blockTestModeAction, bumpRefresh 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ quantityDone, comments: cleanedComments }),
       });
-      const json = (await res.json()) as ApiResponse<unknown>;
+      const json = (await res.json()) as ApiResponse<{ orderId: string; lineItemId: string; decoration: DecorationLineSummary }>;
       if (!res.ok || !json.success) throw new Error(getApiErrorMessage(json, 'Failed to mark as done'));
       toast.success('Marked as done.');
       setWorkModal(null);
-      bumpRefresh();
+      applyItemDecorationSummary(order.id, item.id, json.data.decoration);
     } catch (err) {
       setWorkModal((prev) => (prev ? { ...prev, saving: false, error: err instanceof Error ? err.message : 'Failed to mark as done' } : prev));
     }
@@ -123,11 +132,11 @@ export function useDecorationWork({ setOrders, blockTestModeAction, bumpRefresh 
     if (blockTestModeAction()) return;
     try {
       const res = await fetch(`/api/orders/${order.id}/line-items/${encodeURIComponent(item.id)}/work/${workId}`, { method: 'DELETE' });
-      const json = (await res.json()) as ApiResponse<unknown>;
+      const json = (await res.json()) as ApiResponse<{ orderId: string; lineItemId: string; decoration: DecorationLineSummary }>;
       if (!res.ok || !json.success) throw new Error(getApiErrorMessage(json, 'Failed to remove work'));
       toast.success('Work removed.');
       setWorkDetails(null);
-      bumpRefresh();
+      applyItemDecorationSummary(order.id, item.id, json.data.decoration);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to remove work');
     }
@@ -252,7 +261,7 @@ export function useDecorationWork({ setOrders, blockTestModeAction, bumpRefresh 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ quantityDone: draft.quantityDone, comments: cleanedComments }),
       });
-      const json = (await res.json()) as ApiResponse<unknown>;
+      const json = (await res.json()) as ApiResponse<{ orderId: string; lineItemId: string; decoration: DecorationLineSummary }>;
       if (!res.ok || !json.success) throw new Error(getApiErrorMessage(json, 'Failed to mark as done'));
       toast.success('Marked as done.');
       setWorkDrafts((prev) => {
@@ -260,7 +269,7 @@ export function useDecorationWork({ setOrders, blockTestModeAction, bumpRefresh 
         delete next[key];
         return next;
       });
-      bumpRefresh();
+      applyItemDecorationSummary(order.id, item.id, json.data.decoration);
     } catch (err) {
       setWorkDrafts((prev) => {
         const cur = prev[key] ?? defaultWorkDraft(item);
