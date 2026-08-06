@@ -48,6 +48,17 @@ export type NotifyModalState = {
 };
 
 export function rowItemKey(orderId: string, itemIndex: number) { return `${orderId}:${itemIndex}`; }
+export function getShopifyThumbnailUrl(imageUrl: string, size = 40) {
+  try {
+    const url = new URL(imageUrl);
+    url.searchParams.set('width', String(size));
+    url.searchParams.set('height', String(size));
+    url.searchParams.set('crop', 'center');
+    return url.toString();
+  } catch {
+    return imageUrl;
+  }
+}
 export function getRemaining(item: PickingItem) { return Math.max(0, item.qty - item.packedQuantity); }
 export function getRemainingForPrint(item: Pick<PickingItem, 'qty' | 'packedQuantity'>) { return Math.max(0, item.qty - item.packedQuantity); }
 export function clampNumber(value: string, max: number, min = 0) {

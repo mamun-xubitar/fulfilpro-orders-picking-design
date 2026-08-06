@@ -4,7 +4,7 @@
 
 import { Fragment, type Dispatch, type SetStateAction } from 'react';
 import { formatShippingMoney, getShippingDiscountCodes, getShippingLineFinalPrice } from '../../orders/modules/utils';
-import { type PickingOrder, type PickingItem, rowItemKey, getRemaining, clampNumber, formatDateTime, getVariantText } from './usePickingListPage';
+import { type PickingOrder, type PickingItem, rowItemKey, getRemaining, clampNumber, formatDateTime, getVariantText, getShopifyThumbnailUrl } from './usePickingListPage';
 
 type OrderRowProps = {
   order: PickingOrder;
@@ -159,7 +159,7 @@ function ItemsSection({ order, isAdmin, fullChecks, partialValues, setFullChecks
                 <tr key={`${order.id}-item-${item.id}-${itemIndex}`} className={`${itemClass} transition-colors duration-100`}>
                   <td className="py-2 pr-3">
                     <div className="flex items-center gap-2">
-                      <div className="h-10 w-10 overflow-hidden rounded border border-gray-200 bg-gray-100">{item.imageUrl ? <img src={item.imageUrl} alt="" className="h-full w-full object-cover" /> : null}</div>
+                      <div className="h-10 w-10 overflow-hidden rounded border border-gray-200 bg-gray-100">{item.imageUrl ? <img src={getShopifyThumbnailUrl(item.imageUrl, 40)} alt="" className="h-full w-full object-cover" /> : null}</div>
                       <div className="min-w-0"><div className="break-words font-medium text-gray-800">{item.name}</div>{getVariantText(item) && <div className="break-words text-gray-400">{getVariantText(item)}</div>}</div>
                     </div>
                   </td>
