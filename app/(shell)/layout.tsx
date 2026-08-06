@@ -6,6 +6,9 @@ import { signOut, useSession } from "next-auth/react";
 import { isDecoratorRole, isOrderPickerRole, isRestrictedSessionRole } from "@/lib/roles";
 import NotificationBell from "@/app/(shell)/NotificationBell";
 import LoginManager from "@/app/(shell)/LoginManager";
+import LoginManagerModal from "@/app/(shell)/LoginManagerModal";
+import LoginManagerNavTrigger from "@/app/(shell)/LoginManagerNavTrigger";
+import useLoginManager from "@/app/(shell)/useLoginManager";
 import TasksButton from "@/app/(shell)/TasksButton";
 
 type SessionPolicy = {
@@ -262,6 +265,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
 
   const sidebarWidth = sidebarCollapsed ? "64px" : "240px";
   const user = session?.user;
+  const loginManager = useLoginManager(user?.role === "admin");
   const initials = getInitials(user?.name ?? user?.email ?? "");
   const isStaff = isRestrictedSessionRole(user?.role);
   const loginAt = user?.loginAt ?? now;
@@ -405,6 +409,19 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
         </div>
       )}
 
+      {loginManager.open && (
+        <LoginManagerModal
+          today={loginManager.today}
+          users={loginManager.users}
+          selectedIds={loginManager.selectedIds}
+          saving={loginManager.saving}
+          onToggleUser={loginManager.toggleUser}
+          onToggleSelectAll={loginManager.toggleSelectAll}
+          onSave={loginManager.handleSave}
+          onClose={loginManager.handleClose}
+        />
+      )}
+
       {/* Sidebar */}
       {mobileSidebarOpen && (
         <button
@@ -455,22 +472,30 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
             const isActive = activeId === item.id;
             return (
               <div key={item.id}>
-                <Link
-                  href={item.href}
-                  onClick={() => setMobileSidebarOpen(false)}
-                  className={`nav-item relative group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150 cursor-pointer ${isActive ? "bg-blue-600 text-white" : "text-gray-300 hover:bg-gray-700 hover:text-white"}`}
-                  style={sidebarCollapsed ? { justifyContent: "center", paddingLeft: 0, paddingRight: 0 } : undefined}
-                >
-                  <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    {item.icon}
-                  </svg>
-                  {!sidebarCollapsed && <span className="label-text">{item.label}</span>}
-                  {sidebarCollapsed && (
+                <div className="relative group">
+                  <Link
+                    href={item.href}
+                    onClick={() => setMobileSidebarOpen(false)}
+                    className={`nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150 cursor-pointer ${isActive ? "bg-blue-600 text-white" : "text-gray-300 hover:bg-gray-700 hover:text-white"}`}
+                    style={sidebarCollapsed ? { justifyContent: "center", paddingLeft: 0, paddingRight: 0 } : undefined}
+                  >
+                    <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      {item.icon}
+                    </svg>
+                    {!sidebarCollapsed && <span className="label-text">{item.label}</span>}
+                  </Link>
+                  {item.id === "users" && user?.role === "admin" ? (
+                    <LoginManagerNavTrigger
+                      collapsed={sidebarCollapsed}
+                      label={item.label}
+                      onOpen={() => loginManager.setOpen(true)}
+                    />
+                  ) : sidebarCollapsed ? (
                     <span className="pointer-events-none absolute left-full top-1/2 ml-2 -translate-y-1/2 rounded bg-gray-700 px-2 py-1 text-xs text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-50">
                       {item.label}
                     </span>
-                  )}
-                </Link>
+                  ) : null}
+                </div>
                 {item.children && isActive && item.children.map((child) => {
                   const isChildActive = activeChildId === child.id;
                   return (
@@ -543,7 +568,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
           <div className="flex items-center gap-3 relative">
 
             <TasksButton isAdmin={user?.role === "admin"} />
-            <LoginManager isAdmin={user?.role === "admin"} />
+            <LoginManager isAdmin={user?.role === "admin"} onOpen={() => loginManager.setOpen(true)} />
             <NotificationBell isAdmin={user?.role === "admin"} />
             <span className="text-sm text-gray-600 hidden sm:block">{user?.name}</span>
             <button
