@@ -10,7 +10,7 @@ type OrderRowActionsProps = {
   userIsAdmin: boolean;
   refreshingOrderIds: Record<string, boolean>;
   printingOrderId: string | null;
-  setExpandedIds: React.Dispatch<React.SetStateAction<Set<string>>>;
+  toggleExpanded: (id: string) => void;
   refreshSingleOrder: (order: OrderRow) => void;
   printPackingSlipLabel: (order: OrderRow) => void;
   openMessageModal: (order: OrderRow) => void;
@@ -41,7 +41,7 @@ export default function OrderRowActions({
   userIsAdmin,
   refreshingOrderIds,
   printingOrderId,
-  setExpandedIds,
+  toggleExpanded,
   refreshSingleOrder,
   printPackingSlipLabel,
   openMessageModal,
@@ -57,15 +57,7 @@ export default function OrderRowActions({
           <button
             onClick={(e) => {
               e.stopPropagation();
-              setExpandedIds((prev) => {
-                const next = new Set(prev);
-                if (next.has(order.id)) {
-                  next.delete(order.id);
-                } else {
-                  next.add(order.id);
-                }
-                return next;
-              });
+              toggleExpanded(order.id);
             }}
             className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-blue-600 transition-colors duration-150 cursor-pointer text-lg font-medium"
           >

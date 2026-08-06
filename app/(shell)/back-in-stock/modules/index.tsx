@@ -55,7 +55,7 @@ export default function BackInStockPage() {
                 const draft = d.adminDrafts[request.id] ?? createAdminDraft(request);
                 return (
                   <Fragment key={request.id}>
-                    <tr className="border-b border-gray-100">
+                    <tr onClick={() => d.setExpandedId(expanded ? null : request.id)} className="border-b border-gray-100 cursor-pointer hover:bg-gray-50">
                       <td className="px-4 py-3 font-mono font-medium text-gray-900">#{request.orderNumber}</td>
                       <td className="px-4 py-3">
                         <div className="font-medium text-gray-800">{request.requesterName}</div>
@@ -69,7 +69,7 @@ export default function BackInStockPage() {
                       <td className="px-4 py-3 text-gray-600">{request.items.length}</td>
                       <td className="px-4 py-3 text-gray-500">{new Date(request.updatedAt).toLocaleString()}</td>
                       <td className="px-4 py-3">
-                        <button onClick={() => d.setExpandedId(expanded ? null : request.id)} className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50">
+                        <button onClick={(e) => { e.stopPropagation(); d.setExpandedId(expanded ? null : request.id); }} className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50">
                           {expanded ? 'Hide' : 'Details'}
                         </button>
                       </td>

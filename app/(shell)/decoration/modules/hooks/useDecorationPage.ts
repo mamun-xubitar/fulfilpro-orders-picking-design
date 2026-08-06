@@ -170,6 +170,7 @@ export function useDecorationPage() {
     refreshingOrderIds: data.refreshingOrderIds,
     refreshSingleOrder: data.refreshSingleOrder,
     handleToggleExpandAll: data.handleToggleExpandAll,
+    toggleExpanded: data.toggleExpanded,
     blockTestModeAction,
     // sync (not exposed in toolbar but needed for internal wiring)
     syncing: sync.syncing,

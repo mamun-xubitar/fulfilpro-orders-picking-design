@@ -177,6 +177,7 @@ export function useOrdersPage() {
     handleRefresh,
     refreshSingleOrder: data.refreshSingleOrder,
     handleToggleExpandAll: data.handleToggleExpandAll,
+    toggleExpanded: data.toggleExpanded,
     blockTestModeAction,
     // sync
     syncing: sync.syncing,

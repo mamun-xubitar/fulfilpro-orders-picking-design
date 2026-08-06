@@ -43,8 +43,8 @@ export default function OrderRow({ order, isAdmin, isPicker, isExpanded, isSelec
 
   return (
     <Fragment>
-      <tr className={`${rowClass} transition-colors duration-100`}>
-        <td className="px-3 py-3"><input type="checkbox" checked={isSelected} onChange={onSelect} className="rounded border-gray-300 text-blue-600" /></td>
+      <tr onClick={onToggleExpand} className={`${rowClass} cursor-pointer transition-colors duration-100`}>
+        <td className="px-3 py-3"><input type="checkbox" checked={isSelected} onChange={onSelect} onClick={(e) => e.stopPropagation()} className="rounded border-gray-300 text-blue-600" /></td>
         <td className="px-3 py-3 font-mono font-medium text-gray-900">{order.number}</td>
         <td className="px-3 py-3 text-gray-600">{order.storeName}</td>
         <td className="px-3 py-3 text-gray-700">{order.customer}</td>

@@ -31,6 +31,7 @@ export default function OrderFulfillmentInfoCell({ fulfillmentInfo, userIsDecora
                         href={info.trackingUrl}
                         target="_blank"
                         rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
                         className="text-blue-600 hover:text-blue-800 hover:underline"
                       >
                         {info.trackingNumber}

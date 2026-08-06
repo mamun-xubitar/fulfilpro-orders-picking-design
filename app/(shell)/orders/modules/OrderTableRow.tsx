@@ -35,7 +35,8 @@ export default function OrderTableRow({
 }: OrderTableRowProps) {
   return (
     <tr
-      className={`border-b border-gray-200 ${isExpanded ? 'border-l-4 border-l-blue-500' : ''} ${hasBackInStockSignal ? 'bg-amber-50 hover:bg-amber-100' : status.row ?? getOrderDecorationRowTint(order) ?? 'hover:bg-gray-50'} transition-colors duration-100`}
+      onClick={() => p.toggleExpanded(order.id)}
+      className={`border-b border-gray-200 cursor-pointer ${isExpanded ? 'border-l-4 border-l-blue-500' : ''} ${hasBackInStockSignal ? 'bg-amber-50 hover:bg-amber-100' : status.row ?? getOrderDecorationRowTint(order) ?? 'hover:bg-gray-50'} transition-colors duration-100`}
     >
       <td className="hidden sm:table-cell px-4 py-3 text-gray-400 text-xs">
         {(p.pagination.page - 1) * p.pagination.pageSize + index + 1}
@@ -86,7 +87,7 @@ export default function OrderTableRow({
         userIsAdmin={p.userIsAdmin}
         refreshingOrderIds={p.refreshingOrderIds}
         printingOrderId={p.printingOrderId}
-        setExpandedIds={p.setExpandedIds}
+        toggleExpanded={p.toggleExpanded}
         refreshSingleOrder={p.refreshSingleOrder}
         printPackingSlipLabel={p.printPackingSlipLabel}
         openMessageModal={p.openMessageModal}

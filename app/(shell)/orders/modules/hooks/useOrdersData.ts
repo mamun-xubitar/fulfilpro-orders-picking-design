@@ -106,6 +106,18 @@ export function useOrdersData({ queryString, search, setPagination, blockTestMod
     });
   };
 
+  const toggleExpanded = (id: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
   return {
     orders,
     setOrders,
@@ -123,5 +135,6 @@ export function useOrdersData({ queryString, search, setPagination, blockTestMod
     refreshingOrderIds,
     refreshSingleOrder,
     handleToggleExpandAll,
+    toggleExpanded,
   };
 }
