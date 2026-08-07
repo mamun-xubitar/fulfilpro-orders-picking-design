@@ -60,7 +60,6 @@ export default function DecorationTable({ p }: DecorationTableProps) {
           const statusKey = order.status.toLowerCase();
           const status = STATUS_MAP[statusKey] ?? STATUS_MAP.pending;
           const isExpanded = expandedIds.has(order.id);
-          const isPrevExpanded = index > 0 ? expandedIds.has(orders[index - 1].id) : false;
           const orderAddressLines = getOrderAddressLines(order);
           const fulfillmentInfo = getFulfillmentInfo(order);
           const isFullyFulfilled = isOrderFullyFulfilled(order);
@@ -70,7 +69,7 @@ export default function DecorationTable({ p }: DecorationTableProps) {
           const hasDecorationWork = order.items.some((i) => (i.decoration?.works?.length ?? 0) > 0);
           return (
             <Fragment key={order.id}>
-              {isExpanded && isPrevExpanded && (
+              {index > 0 && (
                 <tr><td colSpan={ordersColSpan} className="h-2 p-0 bg-white" /></tr>
               )}
               <DecorationTableRow

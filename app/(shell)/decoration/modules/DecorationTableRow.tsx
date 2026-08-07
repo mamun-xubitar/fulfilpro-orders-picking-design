@@ -38,7 +38,7 @@ export default function DecorationTableRow({
   return (
     <tr
       onClick={() => p.toggleExpanded(order.id)}
-      className={`border-b border-gray-200 cursor-pointer ${isExpanded ? 'border-l-4 border-l-blue-500' : ''} ${hasBackInStockSignal ? 'bg-amber-50 hover:bg-amber-100' : status.row ?? getOrderDecorationRowTint(order) ?? 'hover:bg-gray-50'} transition-colors duration-100`}
+      className={`border-b border-gray-200 border-l-4 border-l-blue-500 cursor-pointer ${hasBackInStockSignal ? 'bg-amber-50 hover:bg-amber-100' : status.row ?? getOrderDecorationRowTint(order) ?? 'hover:bg-gray-50'} transition-colors duration-100`}
     >
       <td className="hidden sm:table-cell px-4 py-3 text-gray-400 text-xs">
         {(p.pagination.page - 1) * p.pagination.pageSize + index + 1}

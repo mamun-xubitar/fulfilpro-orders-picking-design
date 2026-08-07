@@ -13,7 +13,7 @@ type DecorationAttachmentsRowProps = {
 
 export default function DecorationAttachmentsRow({ p, order }: DecorationAttachmentsRowProps) {
   return (
-    <tr>
+    <tr className="border-l-4 border-l-blue-500">
       <td colSpan={p.ordersColSpan} className="px-4 py-2 bg-gray-50 border-b border-gray-200">
         <OrderDecorationFiles
           attachments={order.decorationAttachments}

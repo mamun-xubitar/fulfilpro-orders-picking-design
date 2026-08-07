@@ -11,6 +11,7 @@ import type { DecorationCategory } from '@/lib/roles';
 import { getFulfilledQty, getDecorationRowTint, getDecorationRelevantItems, getReferenceItems } from '../../orders/modules/utils';
 import DecoratorWorkForm from './DecoratorWorkForm';
 import ReferenceProductsSection from './ReferenceProductsSection';
+import OrderDecorationFiles from './OrderDecorationFiles';
 
 type Props = {
   order: OrderRow;
@@ -82,6 +83,19 @@ export default function DecoratorFulfillmentPanel({
       </div>
       
       <ReferenceProductsSection order={order} items={refItems} />
+
+      <div className="mb-3 rounded-lg border border-gray-200 bg-white p-3">
+        <OrderDecorationFiles
+          attachments={order.decorationAttachments}
+          remarksValue={getAttachmentRemarksValue(order)}
+          uploadingFields={getUploadingAttachmentFields(order.id)}
+          savingRemarks={isSavingAttachmentRemarks(order.id)}
+          onUpload={(field, files) => onUploadAttachmentFiles(order, field, files)}
+          onRemoveFile={(field, index) => onRemoveAttachmentFile(order, field, index)}
+          onRemarksChange={(value) => onAttachmentRemarksChange(order.id, value)}
+          onRemarksBlur={() => onAttachmentRemarksCommit(order)}
+        />
+      </div>
 
       {items.length === 0 ? (
         <p className="text-sm text-gray-400">No items for you on this order.</p>
@@ -170,14 +184,6 @@ export default function DecoratorFulfillmentPanel({
                     onRemoveRow={(i) => onDraftRemoveRow(requestKey, item, i)}
                     onField={(i, field, v) => onDraftField(requestKey, item, i, field, v)}
                     onSubmit={() => onDraftSubmit(order, item)}
-                    attachments={order.decorationAttachments}
-                    remarksValue={getAttachmentRemarksValue(order)}
-                    uploadingFields={getUploadingAttachmentFields(order.id)}
-                    savingRemarks={isSavingAttachmentRemarks(order.id)}
-                    onAttachmentUpload={(field, files) => onUploadAttachmentFiles(order, field, files)}
-                    onAttachmentRemoveFile={(field, index) => onRemoveAttachmentFile(order, field, index)}
-                    onAttachmentRemarksChange={(value) => onAttachmentRemarksChange(order.id, value)}
-                    onAttachmentRemarksBlur={() => onAttachmentRemarksCommit(order)}
                   />
                 )}
                 {!locked && remaining <= 0 && (

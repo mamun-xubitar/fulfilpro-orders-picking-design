@@ -1,13 +1,9 @@
 'use client';
 
 import type {
-  FileAttachmentField,
-  OrderAttachmentField,
-  OrderDecorationAttachments,
   OrderItem,
   WorkDraftState,
 } from '../../orders/modules/types';
-import OrderDecorationFiles from './OrderDecorationFiles';
 
 type DecoratorWorkFormProps = {
   draft: WorkDraftState;
@@ -17,14 +13,6 @@ type DecoratorWorkFormProps = {
   onRemoveRow: (index: number) => void;
   onField: (index: number, field: 'sizes' | 'colors' | 'remarks' | 'location', value: string) => void;
   onSubmit: () => void;
-  attachments: OrderDecorationAttachments;
-  remarksValue: string;
-  uploadingFields: Set<OrderAttachmentField>;
-  savingRemarks: boolean;
-  onAttachmentUpload: (field: FileAttachmentField, files: FileList | null) => void;
-  onAttachmentRemoveFile: (field: FileAttachmentField, index: number) => void;
-  onAttachmentRemarksChange: (value: string) => void;
-  onAttachmentRemarksBlur: () => void;
 };
 
 export default function DecoratorWorkForm({
@@ -35,14 +23,6 @@ export default function DecoratorWorkForm({
   onRemoveRow,
   onField,
   onSubmit,
-  attachments,
-  remarksValue,
-  uploadingFields,
-  savingRemarks,
-  onAttachmentUpload,
-  onAttachmentRemoveFile,
-  onAttachmentRemarksChange,
-  onAttachmentRemarksBlur,
 }: DecoratorWorkFormProps) {
   const maxQty = item.decoration?.remaining ?? item.qty;
 
@@ -90,28 +70,14 @@ export default function DecoratorWorkForm({
       </div>
 
       {draft.error && <p className="text-xs text-red-500">{draft.error}</p>}
-      <div className="flex items-end gap-3">
-        <div className="flex-1">
-          <OrderDecorationFiles
-            attachments={attachments}
-            remarksValue={remarksValue}
-            uploadingFields={uploadingFields}
-            savingRemarks={savingRemarks}
-            onUpload={onAttachmentUpload}
-            onRemoveFile={onAttachmentRemoveFile}
-            onRemarksChange={onAttachmentRemarksChange}
-            onRemarksBlur={onAttachmentRemarksBlur}
-          />
-        </div>
-        <button
-          type="button"
-          onClick={onSubmit}
-          disabled={draft.saving}
-          className="px-4 rounded-lg bg-emerald-600 text-white py-2 text-xs font-semibold hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150"
-        >
-          {draft.saving ? 'Saving…' : 'Confirm done'}
-        </button>
-      </div>
+      <button
+        type="button"
+        onClick={onSubmit}
+        disabled={draft.saving}
+        className="px-4 rounded-lg bg-emerald-600 text-white py-2 text-xs font-semibold hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150"
+      >
+        {draft.saving ? 'Saving…' : 'Confirm done'}
+      </button>
     </div>
   );
 }
