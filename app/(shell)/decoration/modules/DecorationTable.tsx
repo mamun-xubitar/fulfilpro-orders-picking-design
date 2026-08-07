@@ -7,6 +7,7 @@ import { getFulfillmentInfo, getOrderAddressLines, isOrderFullyFulfilled } from 
 import DecorationTableRow from './DecorationTableRow';
 import DecorationExpandedRow from './DecorationExpandedRow';
 import DecorationAttachmentsRow from './DecorationAttachmentsRow';
+import SortableColumnHeader from '../../orders/modules/SortableColumnHeader';
 
 type DecorationPageBundle = ReturnType<typeof useDecorationPage>;
 
@@ -15,17 +16,17 @@ type DecorationTableProps = {
 };
 
 export default function DecorationTable({ p }: DecorationTableProps) {
-  const { orders, loading, error, expandedIds, ordersColSpan, userIsAdmin } = p;
+  const { orders, loading, error, expandedIds, ordersColSpan, userIsAdmin, sort, dir, handleSortChange } = p;
   return (
     <table className="min-w-[900px] w-full text-sm">
       <thead>
         <tr className="bg-gray-50 border-b border-gray-200">
           <th className="hidden sm:table-cell px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-10">#</th>
-          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Order No.</th>
+          <SortableColumnHeader label="Order No." sortKey="number" sort={sort} dir={dir} onSortChange={handleSortChange} />
           {userIsAdmin && (
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Store</th>
           )}
-          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Customer</th>
+          <SortableColumnHeader label="Customer" sortKey="customer" sort={sort} dir={dir} onSortChange={handleSortChange} />
           <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Ordered At</th>
           <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
           {userIsAdmin && (
