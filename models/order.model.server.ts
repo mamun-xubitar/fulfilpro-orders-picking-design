@@ -343,8 +343,10 @@ export class OrderModel {
     crossDecorationVisibility?: boolean;
     page: number;
     pageSize: number;
+    sort?: 'number' | 'customer';
+    dir?: 'asc' | 'desc';
   }) {
-    const { search, searchField, storeIds = [], period = 'all', dateFrom, dateTo, fulfillmentStatuses = [], packingStatuses = [], viewerId, viewerRole, decorationView, crossDecorationVisibility, page, pageSize } = params;
+    const { search, searchField, storeIds = [], period = 'all', dateFrom, dateTo, fulfillmentStatuses = [], packingStatuses = [], viewerId, viewerRole, decorationView, crossDecorationVisibility, page, pageSize, sort = 'number', dir = 'desc' } = params;
     const viewer = { id: viewerId, role: viewerRole };
     const viewerIsDecorator = isDecoratorRole(viewerRole);
     const tokens = (search?.trim() ?? '').split(/\s+/).filter(Boolean);
@@ -455,6 +457,8 @@ export class OrderModel {
         crossDecorationVisibility,
         page: filterByPacking ? 1 : page,
         pageSize: filterByPacking ? 10000 : pageSize,
+        sort,
+        dir,
       });
 
       const rows = searchPage.ids.length > 0
@@ -490,7 +494,7 @@ export class OrderModel {
       const allRows = await prisma.order.findMany({
         where,
         include: listInclude,
-        orderBy: { orderedAt: 'desc' },
+        orderBy: buildOrdersOrderBy(sort, dir),
       });
       const packingSet = new Set(packingStatuses);
       const messageCounts = await getOrderMessageCounts(allRows.map((row) => row.id), 'orders');
@@ -512,7 +516,7 @@ export class OrderModel {
       prisma.order.findMany({
         where,
         include: listInclude,
-        orderBy: { orderedAt: 'desc' },
+        orderBy: buildOrdersOrderBy(sort, dir),
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),
@@ -1376,6 +1380,11 @@ function toOrderRow(row: {
   };
 }
 
+function buildOrdersOrderBy(sort: 'number' | 'customer', dir: 'asc' | 'desc'): Prisma.OrderOrderByWithRelationInput {
+  if (sort === 'customer') return { cusName: dir };
+  return { number: dir };
+}
+
 type DecoratorSortable = {
   items: Array<{ isEmbroidery?: boolean; isPrint?: boolean; assignments?: unknown[]; decoration?: { remaining: number } }>;
 };
@@ -2125,14 +2134,19 @@ async function getRankedOrderSearchPage(params: {
   crossDecorationVisibility?: boolean;
   page: number;
   pageSize: number;
+  sort: 'number' | 'customer';
+  dir: 'asc' | 'desc';
 }) {
   const whereSql = buildRankedOrderSearchWhereSql(params);
   const rankSql = buildOrderSearchRankSql(params.tokens);
+  const sortSql = buildSearchOrderBySql(params.sort, params.dir);
   const skip = (params.page - 1) * params.pageSize;
   const rows = await prisma.$queryRaw<{ total: number; ids: string[] }[]>(Prisma.sql`
     WITH filtered AS (
       SELECT
         o.id,
+        o."number",
+        o."cusName",
         o."orderedAt",
         o."createdAt",
         ${rankSql} AS "searchRank"
@@ -2141,16 +2155,16 @@ async function getRankedOrderSearchPage(params: {
       WHERE ${whereSql}
     ),
     paged AS (
-      SELECT id, "searchRank", "orderedAt", "createdAt"
+      SELECT id, "number", "cusName", "searchRank", "orderedAt", "createdAt"
       FROM filtered
-      ORDER BY "searchRank" ASC, "orderedAt" DESC NULLS LAST, "createdAt" DESC, id ASC
+      ORDER BY ${sortSql}, "searchRank" ASC, "orderedAt" DESC NULLS LAST, "createdAt" DESC, id ASC
       OFFSET ${skip}
       LIMIT ${params.pageSize}
     )
     SELECT
       (SELECT COUNT(*)::integer FROM filtered) AS total,
       COALESCE(
-        array_agg(paged.id ORDER BY paged."searchRank" ASC, paged."orderedAt" DESC NULLS LAST, paged."createdAt" DESC, paged.id ASC)
+        array_agg(paged.id ORDER BY ${sortSql}, paged."searchRank" ASC, paged."orderedAt" DESC NULLS LAST, paged."createdAt" DESC, paged.id ASC)
           FILTER (WHERE paged.id IS NOT NULL),
         ARRAY[]::text[]
       ) AS ids
@@ -2266,6 +2280,12 @@ function buildFieldConditionsForToken(token: string, searchField?: string): Pris
         ...getStatusSqlConditionsForToken(token),
       ];
   }
+}
+
+function buildSearchOrderBySql(sort: 'number' | 'customer', dir: 'asc' | 'desc') {
+  const direction = dir === 'asc' ? Prisma.sql`ASC` : Prisma.sql`DESC`;
+  const column = sort === 'customer' ? Prisma.sql`"cusName"` : Prisma.sql`"number"`;
+  return Prisma.sql`${column} ${direction}`;
 }
 
 function buildOrderSearchRankSql(tokens: string[]) {
