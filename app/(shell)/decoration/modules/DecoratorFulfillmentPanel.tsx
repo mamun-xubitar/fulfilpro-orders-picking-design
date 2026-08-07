@@ -1,6 +1,12 @@
 'use client';
 
-import type { OrderItem, OrderRow, WorkDraftState } from '../../orders/modules/types';
+import type {
+  FileAttachmentField,
+  OrderAttachmentField,
+  OrderItem,
+  OrderRow,
+  WorkDraftState,
+} from '../../orders/modules/types';
 import type { DecorationCategory } from '@/lib/roles';
 import { getFulfilledQty, getDecorationRowTint, getDecorationRelevantItems, getReferenceItems } from '../../orders/modules/utils';
 import DecoratorWorkForm from './DecoratorWorkForm';
@@ -18,9 +24,14 @@ type Props = {
   onDraftAddRow: (key: string, item: OrderItem) => void;
   onDraftRemoveRow: (key: string, item: OrderItem, index: number) => void;
   onDraftField: (key: string, item: OrderItem, index: number, field: 'sizes' | 'colors' | 'remarks' | 'location', value: string) => void;
-  onDraftUpload: (key: string, item: OrderItem, index: number, files: FileList | null) => void;
-  onDraftRemoveFile: (key: string, item: OrderItem, index: number, fileIndex: number) => void;
   onDraftSubmit: (order: OrderRow, item: OrderItem) => void;
+  getUploadingAttachmentFields: (orderId: string) => Set<OrderAttachmentField>;
+  isSavingAttachmentRemarks: (orderId: string) => boolean;
+  onUploadAttachmentFiles: (order: OrderRow, field: FileAttachmentField, files: FileList | null) => void;
+  onRemoveAttachmentFile: (order: OrderRow, field: FileAttachmentField, index: number) => void;
+  getAttachmentRemarksValue: (order: OrderRow) => string;
+  onAttachmentRemarksChange: (orderId: string, value: string) => void;
+  onAttachmentRemarksCommit: (order: OrderRow) => void;
   showAll?: boolean;
   canAssign?: boolean;
   onAssign?: (order: OrderRow, item: OrderItem) => void;
@@ -46,9 +57,14 @@ export default function DecoratorFulfillmentPanel({
   onDraftAddRow,
   onDraftRemoveRow,
   onDraftField,
-  onDraftUpload,
-  onDraftRemoveFile,
   onDraftSubmit,
+  getUploadingAttachmentFields,
+  isSavingAttachmentRemarks,
+  onUploadAttachmentFiles,
+  onRemoveAttachmentFile,
+  getAttachmentRemarksValue,
+  onAttachmentRemarksChange,
+  onAttachmentRemarksCommit,
   showAll = false,
   canAssign = false,
   onAssign,
@@ -153,9 +169,15 @@ export default function DecoratorFulfillmentPanel({
                     onAddRow={() => onDraftAddRow(requestKey, item)}
                     onRemoveRow={(i) => onDraftRemoveRow(requestKey, item, i)}
                     onField={(i, field, v) => onDraftField(requestKey, item, i, field, v)}
-                    onUpload={(i, files) => onDraftUpload(requestKey, item, i, files)}
-                    onRemoveFile={(i, fi) => onDraftRemoveFile(requestKey, item, i, fi)}
                     onSubmit={() => onDraftSubmit(order, item)}
+                    attachments={order.decorationAttachments}
+                    remarksValue={getAttachmentRemarksValue(order)}
+                    uploadingFields={getUploadingAttachmentFields(order.id)}
+                    savingRemarks={isSavingAttachmentRemarks(order.id)}
+                    onAttachmentUpload={(field, files) => onUploadAttachmentFiles(order, field, files)}
+                    onAttachmentRemoveFile={(field, index) => onRemoveAttachmentFile(order, field, index)}
+                    onAttachmentRemarksChange={(value) => onAttachmentRemarksChange(order.id, value)}
+                    onAttachmentRemarksBlur={() => onAttachmentRemarksCommit(order)}
                   />
                 )}
                 {!locked && remaining <= 0 && (

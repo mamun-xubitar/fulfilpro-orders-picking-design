@@ -14,6 +14,7 @@ import {
   getAssignmentsByOrder,
   getDecorationSummariesByOrder,
   toLineDecorationState,
+  toOrderAttachments,
   type AssignmentRow,
   type LineDecorationSummary,
 } from '@/models/decoration.model.server';
@@ -438,6 +439,7 @@ export class OrderModel {
         },
       },
       stockAdjustment: true,
+      decorationAttachment: true,
       packingConfirmations: { select: { id: true, lines: true, confirmedAt: true, canceledAt: true }, orderBy: { confirmedAt: 'desc' as const } },
     } satisfies Prisma.OrderInclude;
 
@@ -671,6 +673,7 @@ export class OrderModel {
           },
         },
         packingConfirmations: { select: { id: true, lines: true, confirmedAt: true, canceledAt: true }, orderBy: { confirmedAt: 'desc' as const } },
+        decorationAttachment: true,
       },
     });
 
@@ -1309,6 +1312,12 @@ function toOrderRow(row: {
     updatedAt: Date;
   } | null;
   packingConfirmations?: Array<{ id: string; lines: Prisma.JsonValue; confirmedAt: Date; canceledAt: Date | null }>;
+  decorationAttachment?: {
+    files: Prisma.JsonValue;
+    customerDesign: Prisma.JsonValue;
+    customerRemarks: string | null;
+    photos: Prisma.JsonValue;
+  } | null;
 }, messageCount: number, decorations?: Map<string, { isEmbroidery: boolean; isPrint: boolean }>, assignments?: Map<string, AssignmentRow[]>, summaries?: Map<string, LineDecorationSummary>, trackings?: TrackingSummary[], viewerIsDecorator = false) {
   const lineItems = toLineItems(row.lineItems);
   const itemCount = lineItems.reduce((sum, item) => sum + Math.max(0, item.qty), 0);
@@ -1369,6 +1378,7 @@ function toOrderRow(row: {
     stockRequestCount: getStockRequestBadgeCount(row),
     backInStockStatus: getBackInStockStatus(row.backInStockRequests ?? []),
     stockAdjustment: row.stockAdjustment ? toStockAdjustmentRow(row.stockAdjustment) : null,
+    decorationAttachments: toOrderAttachments(row.decorationAttachment),
     packingStatus,
     packedQuantity,
     totalQuantity,

@@ -284,8 +284,6 @@ export function useOrdersPage() {
     addDraftCommentRow: decorWork.addDraftCommentRow,
     removeDraftCommentRow: decorWork.removeDraftCommentRow,
     updateDraftCommentField: decorWork.updateDraftCommentField,
-    uploadDraftFiles: decorWork.uploadDraftFiles,
-    removeDraftFile: decorWork.removeDraftFile,
     submitDraftWork: decorWork.submitDraftWork,
     // assignments
     assignModal: assignments.assignModal,

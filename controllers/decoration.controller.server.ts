@@ -1,4 +1,9 @@
-import { DecorationModel, type DecorationWorkComment } from '@/models/decoration.model.server';
+import {
+  DecorationModel,
+  normalizeFileRefs,
+  type DecorationWorkComment,
+  type OrderDecorationAttachments,
+} from '@/models/decoration.model.server';
 import { DecorationEditRequestModel } from '@/models/decoration-request.model.server';
 
 const model = new DecorationModel();
@@ -73,6 +78,12 @@ export class DecorationController {
     return requestModel.rejectByToken(requestId, token);
   }
 
+  async updateOrderAttachments(orderId: string, body: unknown) {
+    const patch = parseOrderAttachmentsInput(body);
+    const attachments = await model.upsertOrderAttachments(orderId, patch);
+    return { data: { orderId, attachments }, message: 'Attachments updated' };
+  }
+
   async actOnRequest(requestId: string, action: string, admin: { id: string; name: string }) {
     if (action === 'approve') {
       const request = await requestModel.approveById(requestId, admin.id, admin.name);
@@ -93,6 +104,22 @@ function parseWorkInput(body: unknown): { quantityDone: number; comments: Decora
   if (!Number.isFinite(quantityDone) || quantityDone < 1) throw new Error('Quantity must be at least 1');
   const comments = Array.isArray(value.comments) ? (value.comments as DecorationWorkComment[]) : [];
   return { quantityDone, comments };
+}
+
+function parseOrderAttachmentsInput(body: unknown): Partial<OrderDecorationAttachments> {
+  if (!body || typeof body !== 'object') throw new Error('Attachment data is required');
+  const value = body as Record<string, unknown>;
+  const patch: Partial<OrderDecorationAttachments> = {};
+
+  if ('files' in value) patch.files = normalizeFileRefs(value.files);
+  if ('customerDesign' in value) patch.customerDesign = normalizeFileRefs(value.customerDesign);
+  if ('photos' in value) patch.photos = normalizeFileRefs(value.photos);
+  if ('customerRemarks' in value) {
+    patch.customerRemarks = typeof value.customerRemarks === 'string' ? value.customerRemarks.trim() : '';
+  }
+
+  if (Object.keys(patch).length === 0) throw new Error('No attachment fields provided');
+  return patch;
 }
 
 function parseReason(body: unknown): string {

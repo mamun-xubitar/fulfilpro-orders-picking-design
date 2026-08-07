@@ -1,7 +1,12 @@
 import prisma from '@/lib/prisma.server';
 import { sendAppMail } from '@/lib/email.server';
 import { normalizeUserIdList } from '@/lib/email-rules.server';
-import { normalizeWorkComments, type DecorationWorkComment } from '@/models/decoration.model.server';
+import {
+  normalizeWorkComments,
+  toOrderAttachments,
+  type DecorationWorkComment,
+  type OrderDecorationAttachments,
+} from '@/models/decoration.model.server';
 import { getRoleLabel } from '@/lib/roles';
 
 export type DigestResult =
@@ -66,7 +71,7 @@ export async function runDecorationDigest(options: { workerId?: string; now?: Da
 
   const groups = groupByWorker(rows);
   const totalDone = rows.reduce((sum, r) => sum + r.quantityDone, 0);
-  const { html, text } = buildEmail(groups, orderContext, totalDone, now);
+  const { html, text } = buildEmail(groups, orderContext, totalDone, now, rows);
 
   const subject = `Decoration work digest — ${formatDate(now)}${
     groups.length === 1 ? ` — ${groups[0].workerName}` : ''
@@ -101,12 +106,15 @@ async function resolveRecipients(): Promise<string[]> {
   return users.map((u) => u.email).filter(Boolean);
 }
 
-type OrderContext = Map<string, { customer: string; items: Map<string, { title: string; qty: number }> }>;
+type OrderContext = Map<
+  string,
+  { customer: string; items: Map<string, { title: string; qty: number }>; attachments: OrderDecorationAttachments }
+>;
 
 async function loadOrderContext(orderIds: string[]): Promise<OrderContext> {
   const orders = await prisma.order.findMany({
     where: { id: { in: orderIds } },
-    select: { id: true, cusName: true, lineItems: true },
+    select: { id: true, cusName: true, lineItems: true, decorationAttachment: true },
   });
 
   const context: OrderContext = new Map();
@@ -123,7 +131,11 @@ async function loadOrderContext(orderIds: string[]): Promise<OrderContext> {
         items.set(id, { title, qty });
       }
     }
-    context.set(order.id, { customer: order.cusName, items });
+    context.set(order.id, {
+      customer: order.cusName,
+      items,
+      attachments: toOrderAttachments(order.decorationAttachment),
+    });
   }
   return context;
 }
@@ -145,7 +157,8 @@ function buildEmail(
   groups: ReturnType<typeof groupByWorker>,
   context: OrderContext,
   totalDone: number,
-  now: Date
+  now: Date,
+  rows: WorkRow[]
 ) {
   const sections = groups.map((group) => {
     const groupTotal = group.rows.reduce((sum, r) => sum + r.quantityDone, 0);
@@ -158,10 +171,6 @@ function buildEmail(
         const colors = joinComments(row.comments, 'colors');
         const remarks = joinComments(row.comments, 'remarks');
         const location = joinComments(row.comments, 'location');
-        const files = row.comments
-          .flatMap((c) => c.files ?? [])
-          .map((f) => `<a href="${escapeHtml(f.url)}">${escapeHtml(f.name)}</a>`)
-          .join('<br>');
         return `
           <tr>
             <td style="${TD}">${escapeHtml(row.orderNumber)}</td>
@@ -172,7 +181,6 @@ function buildEmail(
             <td style="${TD}">${colors || '—'}</td>
             <td style="${TD}">${remarks || '—'}</td>
             <td style="${TD}">${location || '—'}</td>
-            <td style="${TD}">${files || '—'}</td>
           </tr>`;
       })
       .join('');
@@ -185,7 +193,7 @@ function buildEmail(
       <table style="border-collapse:collapse;width:100%;font-size:12px;">
         <thead>
           <tr>
-            ${['Order', 'Customer', 'Product', 'Qty (done/total)', 'Sizes', 'Colors', 'Remarks', 'Location', 'Files']
+            ${['Order', 'Customer', 'Product', 'Qty (done/total)', 'Sizes', 'Colors', 'Remarks', 'Location']
               .map((h) => `<th style="${TH}">${h}</th>`)
               .join('')}
           </tr>
@@ -194,11 +202,14 @@ function buildEmail(
       </table>`;
   });
 
+  const attachmentsHtml = buildAttachmentsSection(rows, context);
+
   const html = `
     <div style="font-family:Arial,sans-serif;color:#111;">
       <h2 style="font-size:18px;margin-bottom:4px;">Decoration Work Digest</h2>
       <p style="color:#666;margin-top:0;">${escapeHtml(formatDate(now))} · ${totalDone} item(s) completed</p>
       ${sections.join('')}
+      ${attachmentsHtml}
     </div>`;
 
   const text = groups
@@ -212,7 +223,100 @@ function buildEmail(
     })
     .join('\n\n');
 
-  return { html, text: `Decoration Work Digest — ${formatDate(now)}\nTotal done: ${totalDone}\n\n${text}` };
+  const attachmentsText = buildAttachmentsText(rows, context);
+
+  return {
+    html,
+    text: `Decoration Work Digest — ${formatDate(now)}\nTotal done: ${totalDone}\n\n${text}${attachmentsText}`,
+  };
+}
+
+function dedupeOrders(rows: WorkRow[]): Map<string, string> {
+  const orders = new Map<string, string>();
+  for (const row of rows) {
+    if (!orders.has(row.orderId)) orders.set(row.orderId, row.orderNumber);
+  }
+  return orders;
+}
+
+function hasAttachments(attachments: OrderDecorationAttachments) {
+  return (
+    attachments.files.length > 0 ||
+    attachments.customerDesign.length > 0 ||
+    attachments.photos.length > 0 ||
+    Boolean(attachments.customerRemarks)
+  );
+}
+
+function buildAttachmentsSection(rows: WorkRow[], context: OrderContext): string {
+  const orders = dedupeOrders(rows);
+  const blocks = [...orders.entries()]
+    .map(([orderId, orderNumber]) => {
+      const order = context.get(orderId);
+      if (!order || !hasAttachments(order.attachments)) return '';
+
+      const fields: Array<[string, string]> = [
+        ['Files', renderFileLinks(order.attachments.files)],
+        ['Customer design', renderFileLinks(order.attachments.customerDesign)],
+        ['Photo', renderFileLinks(order.attachments.photos)],
+        ['Customer remarks', order.attachments.customerRemarks ? escapeHtml(order.attachments.customerRemarks) : ''],
+      ].filter(([, value]) => Boolean(value)) as Array<[string, string]>;
+
+      const fieldRows = fields
+        .map(
+          ([label, value]) => `
+            <tr>
+              <td style="${TD}font-weight:600;width:140px;">${escapeHtml(label)}</td>
+              <td style="${TD}">${value}</td>
+            </tr>`
+        )
+        .join('');
+
+      return `
+        <h3 style="margin:20px 0 6px;font-size:15px;color:#111;">
+          ${escapeHtml(orderNumber)}
+          <span style="font-weight:400;color:#666;">· ${escapeHtml(order.customer)}</span>
+        </h3>
+        <table style="border-collapse:collapse;width:100%;font-size:12px;">
+          <tbody>${fieldRows}</tbody>
+        </table>`;
+    })
+    .filter(Boolean);
+
+  if (blocks.length === 0) return '';
+
+  return `<h2 style="font-size:18px;margin:28px 0 4px;">Order attachments</h2>${blocks.join('')}`;
+}
+
+function buildAttachmentsText(rows: WorkRow[], context: OrderContext): string {
+  const orders = dedupeOrders(rows);
+  const blocks = [...orders.entries()]
+    .map(([orderId, orderNumber]) => {
+      const order = context.get(orderId);
+      if (!order || !hasAttachments(order.attachments)) return '';
+
+      const lines: string[] = [`${orderNumber} (${order.customer}):`];
+      if (order.attachments.files.length) lines.push(`  Files: ${order.attachments.files.map((f) => f.name).join(', ')}`);
+      if (order.attachments.customerDesign.length)
+        lines.push(`  Customer design: ${order.attachments.customerDesign.map((f) => f.name).join(', ')}`);
+      if (order.attachments.photos.length) lines.push(`  Photo: ${order.attachments.photos.map((f) => f.name).join(', ')}`);
+      if (order.attachments.customerRemarks) lines.push(`  Customer remarks: ${order.attachments.customerRemarks}`);
+      return lines.join('\n');
+    })
+    .filter(Boolean);
+
+  if (blocks.length === 0) return '';
+
+  return `\n\nOrder attachments:\n\n${blocks.join('\n\n')}`;
+}
+
+function renderFileLinks(files: Array<{ name: string; url: string }>) {
+  return files.map((f) => `<a href="${escapeHtml(absoluteUrl(f.url))}">${escapeHtml(f.name)}</a>`).join('<br>');
+}
+
+function absoluteUrl(url: string) {
+  const appUrl = (process.env.APP_URL ?? process.env.AUTH_URL ?? process.env.NEXTAUTH_URL ?? '').replace(/\/$/, '');
+  return /^https?:\/\//.test(url) ? url : `${appUrl}${url}`;
 }
 
 const TH = 'border:1px solid #ddd;padding:6px 8px;background:#f5f5f5;text-align:left;font-size:11px;text-transform:uppercase;color:#555;';

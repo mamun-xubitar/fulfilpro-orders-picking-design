@@ -6,6 +6,7 @@ import { STATUS_MAP } from '../../orders/modules/constants';
 import { getFulfillmentInfo, getOrderAddressLines, isOrderFullyFulfilled } from '../../orders/modules/utils';
 import DecorationTableRow from './DecorationTableRow';
 import DecorationExpandedRow from './DecorationExpandedRow';
+import DecorationAttachmentsRow from './DecorationAttachmentsRow';
 
 type DecorationPageBundle = ReturnType<typeof useDecorationPage>;
 
@@ -82,6 +83,7 @@ export default function DecorationTable({ p }: DecorationTableProps) {
                 isFullyFulfilled={isFullyFulfilled}
                 hasBackInStockSignal={hasBackInStockSignal}
               />
+              {userIsAdmin && !isExpanded && <DecorationAttachmentsRow p={p} order={order} />}
               {isExpanded && (
                 <DecorationExpandedRow
                   p={p}

@@ -206,38 +206,6 @@ export function useDecorationWork({ setOrders, blockTestModeAction, bumpRefresh 
     });
   };
 
-  const uploadDraftFiles = async (key: string, item: OrderItem, index: number, fileList: FileList | null) => {
-    if (!fileList || fileList.length === 0) return;
-    setWorkDrafts((prev) => {
-      const cur = prev[key] ?? defaultWorkDraft(item);
-      return { ...prev, [key]: { ...cur, comments: cur.comments.map((c, i) => (i === index ? { ...c, uploading: true } : c)) } };
-    });
-    try {
-      const fd = new FormData();
-      Array.from(fileList).forEach((f) => fd.append('files', f));
-      const res = await fetch('/api/decoration/uploads', { method: 'POST', body: fd });
-      const json = (await res.json()) as ApiResponse<{ files: DecorationFileRef[] }>;
-      if (!res.ok || !json.success) throw new Error(getApiErrorMessage(json, 'Upload failed'));
-      setWorkDrafts((prev) => {
-        const cur = prev[key] ?? defaultWorkDraft(item);
-        return { ...prev, [key]: { ...cur, comments: cur.comments.map((c, i) => (i === index ? { ...c, files: [...c.files, ...json.data.files], uploading: false } : c)) } };
-      });
-    } catch (err) {
-      setWorkDrafts((prev) => {
-        const cur = prev[key] ?? defaultWorkDraft(item);
-        return { ...prev, [key]: { ...cur, comments: cur.comments.map((c, i) => (i === index ? { ...c, uploading: false } : c)) } };
-      });
-      toast.error(err instanceof Error ? err.message : 'Upload failed');
-    }
-  };
-
-  const removeDraftFile = (key: string, item: OrderItem, index: number, fileIndex: number) => {
-    setWorkDrafts((prev) => {
-      const cur = prev[key] ?? defaultWorkDraft(item);
-      return { ...prev, [key]: { ...cur, comments: cur.comments.map((c, i) => (i === index ? { ...c, files: c.files.filter((_, fi) => fi !== fileIndex) } : c)) } };
-    });
-  };
-
   const submitDraftWork = async (order: OrderRow, item: OrderItem) => {
     if (blockTestModeAction()) return;
     const key = `${order.id}:${item.id}`;
@@ -302,8 +270,6 @@ export function useDecorationWork({ setOrders, blockTestModeAction, bumpRefresh 
     addDraftCommentRow,
     removeDraftCommentRow,
     updateDraftCommentField,
-    uploadDraftFiles,
-    removeDraftFile,
     submitDraftWork,
   };
 }
