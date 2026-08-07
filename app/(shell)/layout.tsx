@@ -1,15 +1,14 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
-import { usePathname, useRouter } from "next/navigation";
-import Link from "next/link";
-import { signOut, useSession } from "next-auth/react";
-import { isDecoratorRole, isOrderPickerRole, isRestrictedSessionRole } from "@/lib/roles";
-import NotificationBell from "@/app/(shell)/NotificationBell";
-import LoginManager from "@/app/(shell)/LoginManager";
 import LoginManagerModal from "@/app/(shell)/LoginManagerModal";
 import LoginManagerNavTrigger from "@/app/(shell)/LoginManagerNavTrigger";
-import useLoginManager from "@/app/(shell)/useLoginManager";
+import NotificationBell from "@/app/(shell)/NotificationBell";
 import TasksButton from "@/app/(shell)/TasksButton";
+import useLoginManager from "@/app/(shell)/useLoginManager";
+import { isDecoratorRole, isOrderPickerRole, isRestrictedSessionRole } from "@/lib/roles";
+import { signOut, useSession } from "next-auth/react";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 
 type SessionPolicy = {
   forceLogout: boolean;
@@ -568,7 +567,6 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
           <div className="flex items-center gap-3 relative">
 
             <TasksButton isAdmin={user?.role === "admin"} />
-            <LoginManager isAdmin={user?.role === "admin"} onOpen={() => loginManager.setOpen(true)} />
             <NotificationBell isAdmin={user?.role === "admin"} />
             <span className="text-sm text-gray-600 hidden sm:block">{user?.name}</span>
             <button
