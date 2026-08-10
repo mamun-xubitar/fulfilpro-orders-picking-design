@@ -1267,6 +1267,11 @@ function toOrderNoteRow(note: {
   };
 }
 
+function toSafeISOString(value: Date | null | undefined) {
+  if (!value || Number.isNaN(value.getTime())) return null;
+  return value.toISOString();
+}
+
 function toOrderRow(row: {
   id: string;
   number: string;
@@ -1354,11 +1359,11 @@ function toOrderRow(row: {
     state: row.state,
     country: row.country,
     closed: row.closed,
-    closedAt: row.closedAt?.toISOString() ?? null,
+    closedAt: toSafeISOString(row.closedAt),
     canceled: row.canceled,
-    canceledAt: row.canceledAt?.toISOString() ?? null,
+    canceledAt: toSafeISOString(row.canceledAt),
     status: getDisplayStatus(row),
-    orderedAt: row.orderedAt?.toISOString(),
+    orderedAt: toSafeISOString(row.orderedAt) ?? undefined,
     storeId: row.store.id,
     storeName: row.store.name ?? row.store.storeDomain,
     storeDomain: row.store.storeDomain,
