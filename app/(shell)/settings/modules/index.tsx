@@ -7,6 +7,7 @@ import GeneralTab from "./GeneralTab";
 import DecorationTab from "./DecorationTab";
 import TrackingTab from "./TrackingTab";
 import TasksTab from "./TasksTab";
+import MessagesTab from "./MessagesTab";
 import { SETTINGS_TABS, type SettingsTabId } from "./constants";
 
 export default function SettingsPage() {
@@ -62,6 +63,7 @@ export default function SettingsPage() {
           {activeTab === "decoration" && <DecorationTab s={s} />}
           {activeTab === "tracking" && <TrackingTab s={s} activeUsers={activeUsers} />}
           {activeTab === "tasks" && <TasksTab s={s} activeUsers={activeUsers} />}
+          {activeTab === "messages" && <MessagesTab s={s} activeUsers={activeUsers} />}
 
           {s.loading && <div className="text-sm text-center text-gray-500 pb-2">Loading settings...</div>}
           {s.error && <div className="text-sm text-center text-red-600 pb-2">{s.error}</div>}

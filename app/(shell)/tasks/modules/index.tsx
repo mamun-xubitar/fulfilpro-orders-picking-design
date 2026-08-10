@@ -10,6 +10,7 @@ import ProofFilesModal from './ProofFilesModal';
 import TaskDetailsModal from './TaskDetailsModal';
 import TaskMessagesModal from './TaskMessagesModal';
 import TaskReportTab from './TaskReportTab';
+import ChatModal from '@/components/ChatModal';
 import { DEFAULT_PAGE_SIZE } from './constants';
 
 function TasksPageInner() {
@@ -30,6 +31,7 @@ function TasksPageInner() {
         tabCounts={p.tabCounts}
         users={p.users}
         onAdd={p.openAdd}
+        onChat={p.chat.openPicker}
       />
 
       {p.tab === 'completed' ? (
@@ -88,6 +90,14 @@ function TasksPageInner() {
         currentUserId={userId}
         onSend={p.sendMessage}
         onClose={p.closeMessages}
+      />
+
+      <ChatModal
+        {...p.chat}
+        currentUserId={userId}
+        onSelectUser={p.chat.selectUser}
+        onSend={p.chat.sendMessage}
+        onClose={p.chat.close}
       />
     </main>
   );

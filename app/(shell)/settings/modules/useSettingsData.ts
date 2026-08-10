@@ -25,6 +25,7 @@ const SECTION_LABELS: Record<string, string> = {
   decorationKeywords: 'Product Keywords',
   taskVisibility: 'Tasks',
   decorationVisibility: 'Decoration Visibility',
+  messageVisibility: 'Messages',
 };
 
 const DEFAULT_EMAIL_RULES: AppSettingsRow['emailRules'] = {
@@ -66,7 +67,7 @@ const DEFAULT_MAILERSEND: AppSettingsRow['mailersend'] = {
 };
 
 type ApiResponse<T> = { success: boolean; message: string; data: T };
-export type SettingsSection = 'timezone' | 'emailProvider' | 'emailRules' | 'decorationDigest' | 'tracking' | 'decorationKeywords' | 'taskVisibility' | 'decorationVisibility';
+export type SettingsSection = 'timezone' | 'emailProvider' | 'emailRules' | 'decorationDigest' | 'tracking' | 'decorationKeywords' | 'taskVisibility' | 'decorationVisibility' | 'messageVisibility';
 
 async function getJson<T>(url: string, init?: RequestInit) {
   const res = await fetch(url, init);
@@ -82,6 +83,7 @@ export function useSettingsData() {
   const [tracking, setTracking] = useState<AppSettingsRow['shipmentTracking']>(DEFAULT_TRACKING);
   const [decorationKeywords, setDecorationKeywords] = useState<AppSettingsRow['decorationKeywords']>(DEFAULT_DECORATION_KEYWORDS);
   const [taskVisibility, setTaskVisibility] = useState<Record<string, string[]>>({});
+  const [messageVisibility, setMessageVisibility] = useState<Record<string, string[]>>({});
   const [decorationCrossVisibilityEnabled, setDecorationCrossVisibilityEnabled] = useState(false);
   const [rescanJob, setRescanJob] = useState<DecorationRescanJob | null>(null);
   const [rescanning, setRescanning] = useState(false);
@@ -116,6 +118,7 @@ export function useSettingsData() {
     setTracking(settings.shipmentTracking);
     setDecorationKeywords(settings.decorationKeywords);
     setTaskVisibility(settings.taskVisibilityByUser);
+    setMessageVisibility(settings.messageVisibilityByUser);
     setDecorationCrossVisibilityEnabled(settings.decorationCrossVisibilityEnabled);
   };
 
@@ -152,6 +155,8 @@ export function useSettingsData() {
       };
     } else if (section === 'taskVisibility') {
       payload = { taskVisibilityByUser: taskVisibility };
+    } else if (section === 'messageVisibility') {
+      payload = { messageVisibilityByUser: messageVisibility };
     } else if (section === 'decorationVisibility') {
       payload = { decorationCrossVisibilityEnabled };
     } else {
@@ -366,6 +371,7 @@ export function useSettingsData() {
     tracking, setTracking,
     decorationKeywords, setDecorationKeywords,
     taskVisibility, setTaskVisibility,
+    messageVisibility, setMessageVisibility,
     decorationCrossVisibilityEnabled, setDecorationCrossVisibilityEnabled,
     rescanning, rescanDecorations, rescanActive, rescanProgress, rescanError, lastScanned, rescanJob,
     saveMsg, showSaveMsg,

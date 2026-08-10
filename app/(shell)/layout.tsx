@@ -1,15 +1,18 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
-import { usePathname, useRouter } from "next/navigation";
-import Link from "next/link";
-import { signOut, useSession } from "next-auth/react";
-import { isDecoratorRole, isOrderPickerRole, isRestrictedSessionRole } from "@/lib/roles";
-import NotificationBell from "@/app/(shell)/NotificationBell";
 import LoginManager from "@/app/(shell)/LoginManager";
 import LoginManagerModal from "@/app/(shell)/LoginManagerModal";
 import LoginManagerNavTrigger from "@/app/(shell)/LoginManagerNavTrigger";
-import useLoginManager from "@/app/(shell)/useLoginManager";
+import MessagesChatButton from "@/app/(shell)/MessagesChatButton";
+import NotificationBell from "@/app/(shell)/NotificationBell";
 import TasksButton from "@/app/(shell)/TasksButton";
+import useLoginManager from "@/app/(shell)/useLoginManager";
+import { isDecoratorRole, isOrderPickerRole, isRestrictedSessionRole } from "@/lib/roles";
+import { signOut, useSession } from "next-auth/react";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+
+const MESSAGES_POLL_INTERVAL_MS = 15_000;
 
 type SessionPolicy = {
   forceLogout: boolean;
@@ -37,6 +40,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [policy, setPolicy] = useState<SessionPolicy | null>(null);
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0);
   const [now, setNow] = useState(() => Date.now());
   const [sessionWarningDismissed, setSessionWarningDismissed] = useState(false);
   const [blockedActionMessage, setBlockedActionMessage] = useState("");
@@ -87,6 +91,30 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
     }, 1000);
 
     return () => window.clearInterval(intervalId);
+  }, [status]);
+
+  useEffect(() => {
+    if (status !== "authenticated") return;
+    let cancelled = false;
+
+    async function loadUnreadMessageCount() {
+      try {
+        const data = await getJson<{ unreadCount: number }>("/api/conversations/unread-count");
+        if (!cancelled) setUnreadMessageCount(data.unreadCount);
+      } catch {
+        // Keep the last known count if the poll fails briefly.
+      }
+    }
+
+    void loadUnreadMessageCount();
+    const messagesInterval = window.setInterval(() => {
+      void loadUnreadMessageCount();
+    }, MESSAGES_POLL_INTERVAL_MS);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(messagesInterval);
+    };
   }, [status]);
 
   useEffect(() => {
@@ -213,6 +241,13 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
       adminDecoratorOnly: false,
     },
     {
+      id: "messages", label: "Messages", href: "/messages",
+      icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />,
+      adminOnly: false,
+      pickerHidden: false,
+      adminDecoratorOnly: false,
+    },
+    {
       id: "tracking", label: "Tracking", href: "/tracking",
       icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z M15 11a3 3 0 11-6 0 3 3 0 016 0z" />,
       adminOnly: false,
@@ -258,7 +293,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
     },
   ];
 
-  const pageTitles: Record<string, string> = { orders: "Orders", decoration: "Decoration", "picking-list": "Picking List", "back-in-stock": "Back In Stock", tasks: "Tasks", tracking: "Tracking", stores: "Stores", inventory: "Inventory", users: "Users", profile: "Profile", settings: "Settings" };
+  const pageTitles: Record<string, string> = { orders: "Orders", decoration: "Decoration", "picking-list": "Picking List", "back-in-stock": "Back In Stock", tasks: "Tasks", messages: "Messages", tracking: "Tracking", stores: "Stores", inventory: "Inventory", users: "Users", profile: "Profile", settings: "Settings" };
   const activeId = pathname.split("/")[1] || "";
   const activeChildId = pathname.split("/")[2] || "";
   const activeChild = navItems.find((i) => i.id === activeId)?.children?.find((c) => c.id === activeChildId);
@@ -464,7 +499,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
 
         <nav className="flex-1 py-4 space-y-1 px-2">
           {navItems.map((item) => {
-            if (userIsDecorator && item.id !== "decoration" && item.id !== "tasks") return null;
+            if (userIsDecorator && item.id !== "decoration" && item.id !== "tasks" && item.id !== "messages") return null;
             if (item.adminDecoratorOnly && user?.role !== "admin" && !userIsDecorator) return null;
             if (item.adminOnly && user?.role !== "admin") return null;
             if (item.pickerHidden && userIsOrderPicker) return null;
@@ -479,10 +514,22 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
                     className={`nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150 cursor-pointer ${isActive ? "bg-blue-600 text-white" : "text-gray-300 hover:bg-gray-700 hover:text-white"}`}
                     style={sidebarCollapsed ? { justifyContent: "center", paddingLeft: 0, paddingRight: 0 } : undefined}
                   >
-                    <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      {item.icon}
-                    </svg>
+                    <span className="relative flex-shrink-0">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        {item.icon}
+                      </svg>
+                      {item.id === "messages" && sidebarCollapsed && unreadMessageCount > 0 && (
+                        <span className="absolute -top-1 -right-1.5 min-w-[14px] h-3.5 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5 leading-none">
+                          {unreadMessageCount > 99 ? "99+" : unreadMessageCount}
+                        </span>
+                      )}
+                    </span>
                     {!sidebarCollapsed && <span className="label-text">{item.label}</span>}
+                    {item.id === "messages" && !sidebarCollapsed && unreadMessageCount > 0 && (
+                      <span className="ml-auto min-w-[16px] h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 leading-none">
+                        {unreadMessageCount > 99 ? "99+" : unreadMessageCount}
+                      </span>
+                    )}
                   </Link>
                   {item.id === "users" && user?.role === "admin" ? (
                     <LoginManagerNavTrigger
@@ -568,6 +615,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
           <div className="flex items-center gap-3 relative">
 
             <TasksButton isAdmin={user?.role === "admin"} />
+            {user?.id && <MessagesChatButton unreadCount={unreadMessageCount} currentUserId={user.id} />}
             <LoginManager isAdmin={user?.role === "admin"} onOpen={() => loginManager.setOpen(true)} />
             <NotificationBell isAdmin={user?.role === "admin"} />
             <span className="text-sm text-gray-600 hidden sm:block">{user?.name}</span>

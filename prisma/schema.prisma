@@ -572,6 +572,7 @@ model AppSettings {
   trackingPendingAlertUserIds        Json      @default("[]")
   trackingPickupReminderDays         Json      @default("[]")
   taskVisibilityByUser               Json      @default("{}")
+  messageVisibilityByUser            Json      @default("{}")
   decorationCrossVisibilityEnabled   Boolean   @default(false)
   globalMarginPercent                Decimal   @default(0) @db.Decimal(6, 2)
   lowStockThreshold                  Int       @default(10)
@@ -745,6 +746,42 @@ model TaskMessage {
   task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@index([taskId, createdAt])
+}
+
+model Conversation {
+  id                String        @id @default(uuid())
+  user1Id           String
+  user1Name         String
+  user1Email        String
+  user2Id           String
+  user2Name         String
+  user2Email        String
+  lastMessageAt     DateTime?
+  lastMessageText   String?
+  lastReadByUser1At DateTime?
+  lastReadByUser2At DateTime?
+  unreadCountUser1  Int           @default(0)
+  unreadCountUser2  Int           @default(0)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  messages          ChatMessage[]
+
+  @@unique([user1Id, user2Id])
+  @@index([user1Id])
+  @@index([user2Id])
+}
+
+model ChatMessage {
+  id             String       @id @default(uuid())
+  conversationId String
+  senderId       String
+  senderName     String
+  senderEmail    String
+  message        String
+  createdAt      DateTime     @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
 }
 
 model CurrencyRate {
