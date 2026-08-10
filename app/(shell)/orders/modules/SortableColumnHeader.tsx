@@ -1,11 +1,11 @@
 'use client';
 
-type SortKey = 'number' | 'customer';
+type SortKey = 'number' | 'customer' | 'orderedAt';
 
 type SortableColumnHeaderProps = {
   label: string;
   sortKey: SortKey;
-  sort: SortKey;
+  sort: SortKey | null;
   dir: 'asc' | 'desc';
   onSortChange: (key: SortKey) => void;
   className?: string;
@@ -18,7 +18,7 @@ export default function SortableColumnHeader({ label, sortKey, sort, dir, onSort
     <th className={className ?? 'px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide'}>
       <button
         onClick={() => onSortChange(sortKey)}
-        className="group flex items-center gap-2 hover:text-gray-800 cursor-pointer"
+        className="group flex items-center gap-2 uppercase hover:text-gray-800 cursor-pointer"
       >
         {label}
         <svg className="w-4 h-4 min-w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">

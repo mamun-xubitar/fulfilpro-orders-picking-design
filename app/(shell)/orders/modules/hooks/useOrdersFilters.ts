@@ -28,7 +28,7 @@ export function useOrdersFilters({ userIsDecorator, decorationView = false }: { 
   });
   const [hoverDate, setHoverDate] = useState<string | null>(null);
   const [period, setPeriod] = useState<(typeof PERIODS)[number]['value']>('all');
-  const [sort, setSort] = useState<'number' | 'customer'>('number');
+  const [sort, setSort] = useState<'number' | 'customer' | 'orderedAt' | null>(null);
   const [dir, setDir] = useState<'asc' | 'desc'>('desc');
   const [pagination, setPagination] = useState<Pagination>(DEFAULT_PAGINATION);
   const [syncStoreDropdownOpen, setSyncStoreDropdownOpen] = useState(false);
@@ -68,12 +68,14 @@ export function useOrdersFilters({ userIsDecorator, decorationView = false }: { 
     fulfillmentStatuses.forEach((s) => params.append('status', s));
     packingStatuses.forEach((s) => params.append('packingStatus', s));
     if (decorationView) params.set('decorationView', '1');
-    params.set('sort', sort);
-    params.set('dir', dir);
+    if (sort) {
+      params.set('sort', sort);
+      params.set('dir', dir);
+    }
     return params.toString();
   }, [pagination.page, pagination.pageSize, period, search, searchField, storeIds, dateFrom, dateTo, fulfillmentStatuses, packingStatuses, decorationView, sort, dir]);
 
-  const handleSortChange = (key: 'number' | 'customer') => {
+  const handleSortChange = (key: 'number' | 'customer' | 'orderedAt') => {
     if (sort === key) {
       setDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
     } else {

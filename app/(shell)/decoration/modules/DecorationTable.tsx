@@ -27,7 +27,7 @@ export default function DecorationTable({ p }: DecorationTableProps) {
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Store</th>
           )}
           <SortableColumnHeader label="Customer" sortKey="customer" sort={sort} dir={dir} onSortChange={handleSortChange} />
-          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Ordered At</th>
+          <SortableColumnHeader label="Ordered At" sortKey="orderedAt" sort={sort} dir={dir} onSortChange={handleSortChange} />
           <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
           {userIsAdmin && (
             <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Stock Adjustment</th>
