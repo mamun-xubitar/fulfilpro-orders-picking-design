@@ -199,7 +199,11 @@ function buildConversationEmail(params: { senderName: string; senderEmail: strin
                 <table role="presentation" cellpadding="0" cellspacing="0" border="0">
                   <tr>
                     <td style="padding-right:12px;">
-                      <div style="width:44px;height:44px;border-radius:50%;background-color:#dbeafe;color:#2563eb;font-family:Arial,sans-serif;font-size:18px;font-weight:700;text-align:center;line-height:44px;">${escapeHtml(initials(params.senderName))}</div>
+                      <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:44px;height:44px;">
+                        <tr>
+                          <td width="44" height="44" align="center" valign="middle" bgcolor="#dbeafe" style="width:44px;height:44px;border-radius:50%;background-color:#dbeafe;color:#2563eb;font-family:Arial,sans-serif;font-size:18px;font-weight:700;text-align:center;vertical-align:middle;">${escapeHtml(initials(params.senderName))}</td>
+                        </tr>
+                      </table>
                     </td>
                     <td>
                       <p style="margin:0;font-family:Arial,sans-serif;font-size:15px;font-weight:600;color:#111827;">${escapeHtml(params.senderName)}</p>
