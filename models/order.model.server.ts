@@ -344,10 +344,10 @@ export class OrderModel {
     crossDecorationVisibility?: boolean;
     page: number;
     pageSize: number;
-    sort?: 'number' | 'customer';
+    sort?: 'number' | 'customer' | 'orderedAt';
     dir?: 'asc' | 'desc';
   }) {
-    const { search, searchField, storeIds = [], period = 'all', dateFrom, dateTo, fulfillmentStatuses = [], packingStatuses = [], viewerId, viewerRole, decorationView, crossDecorationVisibility, page, pageSize, sort = 'number', dir = 'desc' } = params;
+    const { search, searchField, storeIds = [], period = 'all', dateFrom, dateTo, fulfillmentStatuses = [], packingStatuses = [], viewerId, viewerRole, decorationView, crossDecorationVisibility, page, pageSize, sort, dir = 'desc' } = params;
     const viewer = { id: viewerId, role: viewerRole };
     const viewerIsDecorator = isDecoratorRole(viewerRole);
     const tokens = (search?.trim() ?? '').split(/\s+/).filter(Boolean);
@@ -1395,9 +1395,11 @@ function toOrderRow(row: {
   };
 }
 
-function buildOrdersOrderBy(sort: 'number' | 'customer', dir: 'asc' | 'desc'): Prisma.OrderOrderByWithRelationInput {
+function buildOrdersOrderBy(sort: 'number' | 'customer' | 'orderedAt' | undefined, dir: 'asc' | 'desc'): Prisma.OrderOrderByWithRelationInput {
   if (sort === 'customer') return { cusName: dir };
-  return { number: dir };
+  if (sort === 'number') return { number: dir };
+  if (sort === 'orderedAt') return { orderedAt: dir };
+  return { orderedAt: 'desc' };
 }
 
 type DecoratorSortable = {
@@ -2149,12 +2151,12 @@ async function getRankedOrderSearchPage(params: {
   crossDecorationVisibility?: boolean;
   page: number;
   pageSize: number;
-  sort: 'number' | 'customer';
+  sort?: 'number' | 'customer' | 'orderedAt';
   dir: 'asc' | 'desc';
 }) {
   const whereSql = buildRankedOrderSearchWhereSql(params);
   const rankSql = buildOrderSearchRankSql(params.tokens);
-  const sortSql = buildSearchOrderBySql(params.sort, params.dir);
+  const orderBySql = buildSearchOrderBySql(params.sort, params.dir);
   const skip = (params.page - 1) * params.pageSize;
   const rows = await prisma.$queryRaw<{ total: number; ids: string[] }[]>(Prisma.sql`
     WITH filtered AS (
@@ -2172,14 +2174,14 @@ async function getRankedOrderSearchPage(params: {
     paged AS (
       SELECT id, "number", "cusName", "searchRank", "orderedAt", "createdAt"
       FROM filtered
-      ORDER BY ${sortSql}, "searchRank" ASC, "orderedAt" DESC NULLS LAST, "createdAt" DESC, id ASC
+      ORDER BY ${orderBySql}
       OFFSET ${skip}
       LIMIT ${params.pageSize}
     )
     SELECT
       (SELECT COUNT(*)::integer FROM filtered) AS total,
       COALESCE(
-        array_agg(paged.id ORDER BY ${sortSql}, paged."searchRank" ASC, paged."orderedAt" DESC NULLS LAST, paged."createdAt" DESC, paged.id ASC)
+        array_agg(paged.id ORDER BY ${orderBySql})
           FILTER (WHERE paged.id IS NOT NULL),
         ARRAY[]::text[]
       ) AS ids
@@ -2297,10 +2299,14 @@ function buildFieldConditionsForToken(token: string, searchField?: string): Pris
   }
 }
 
-function buildSearchOrderBySql(sort: 'number' | 'customer', dir: 'asc' | 'desc') {
+function buildSearchOrderBySql(sort: 'number' | 'customer' | 'orderedAt' | undefined, dir: 'asc' | 'desc') {
+  if (!sort) {
+    return Prisma.sql`"searchRank" ASC, "orderedAt" DESC NULLS LAST, "createdAt" DESC, id ASC`;
+  }
   const direction = dir === 'asc' ? Prisma.sql`ASC` : Prisma.sql`DESC`;
+  if (sort === 'orderedAt') return Prisma.sql`"orderedAt" ${direction} NULLS LAST, "searchRank" ASC, "createdAt" DESC, id ASC`;
   const column = sort === 'customer' ? Prisma.sql`"cusName"` : Prisma.sql`"number"`;
-  return Prisma.sql`${column} ${direction}`;
+  return Prisma.sql`${column} ${direction}, "searchRank" ASC, "orderedAt" DESC NULLS LAST, "createdAt" DESC, id ASC`;
 }
 
 function buildOrderSearchRankSql(tokens: string[]) {

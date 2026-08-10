@@ -8,7 +8,7 @@ const model = new OrderModel();
 type Period = 'all' | 'week' | 'month' | 'year';
 
 const SEARCH_FIELD_VALUES = new Set(['number', 'customer', 'address', 'lineItem']);
-const SORTABLE_ORDER_FIELDS = new Set(['number', 'customer']);
+const SORTABLE_ORDER_FIELDS = new Set(['number', 'customer', 'orderedAt']);
 
 export class OrderController {
   async list(searchParams: URLSearchParams, viewerId?: string, allowedStoreIds?: string[] | null, viewerRole?: string) {
@@ -25,7 +25,8 @@ export class OrderController {
     const page = normalizePositiveInt(searchParams.get('page'), 1);
     const pageSize = clamp(normalizePositiveInt(searchParams.get('pageSize'), 20), 5, 100);
     const decorationView = searchParams.get('decorationView') === '1';
-    const sort = SORTABLE_ORDER_FIELDS.has(searchParams.get('sort') ?? '') ? (searchParams.get('sort') as 'number' | 'customer') : 'number';
+    const sortParam = searchParams.get('sort');
+    const sort = sortParam && SORTABLE_ORDER_FIELDS.has(sortParam) ? (sortParam as 'number' | 'customer' | 'orderedAt') : undefined;
     const dir = searchParams.get('dir') === 'asc' ? 'asc' : 'desc';
     const crossDecorationVisibility = await getDecorationCrossVisibility();
 

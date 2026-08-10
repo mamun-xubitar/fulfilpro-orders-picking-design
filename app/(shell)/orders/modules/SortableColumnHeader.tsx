@@ -1,11 +1,11 @@
 'use client';
 
-type SortKey = 'number' | 'customer';
+type SortKey = 'number' | 'customer' | 'orderedAt';
 
 type SortableColumnHeaderProps = {
   label: string;
   sortKey: SortKey;
-  sort: SortKey;
+  sort: SortKey | null;
   dir: 'asc' | 'desc';
   onSortChange: (key: SortKey) => void;
   className?: string;
