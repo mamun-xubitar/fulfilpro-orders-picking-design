@@ -92,6 +92,7 @@ const DECORATOR_ALLOWED_API_ROUTES = [
   '/api/decoration/edit-requests',
   '/api/tasks',
   '/api/tasks/.*',
+  '/api/orders/[^/]+/decoration-attachments'
 ]
 
 function matchesRoute(pathname: string, routes: string[]) {
