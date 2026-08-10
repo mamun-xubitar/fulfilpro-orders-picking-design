@@ -103,6 +103,7 @@ model Order {
   pickingSlipPrints      OrderPickingSlipPrint[]
   backInStockRequests    BackInStockRequest[]
   stockAdjustment        OrderStockAdjustment?
+  decorationAttachment   OrderDecorationAttachment?
   lineItemDecorations    LineItemDecoration[]
   lineItemAssignments    LineItemAssignment[]
   lineItemWorks          LineItemWork[]
@@ -282,6 +283,18 @@ model OrderStockAdjustment {
 
   @@index([status])
   @@index([lastEventAt])
+}
+
+model OrderDecorationAttachment {
+  id              String   @id @default(uuid())
+  orderId         String   @unique
+  files           Json     @default("[]")
+  customerDesign  Json     @default("[]")
+  customerRemarks String?
+  photos          Json     @default("[]")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
 }
 
 model BackInStockRequest {

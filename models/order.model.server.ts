@@ -14,6 +14,7 @@ import {
   getAssignmentsByOrder,
   getDecorationSummariesByOrder,
   toLineDecorationState,
+  toOrderAttachments,
   type AssignmentRow,
   type LineDecorationSummary,
 } from '@/models/decoration.model.server';
@@ -343,8 +344,10 @@ export class OrderModel {
     crossDecorationVisibility?: boolean;
     page: number;
     pageSize: number;
+    sort?: 'number' | 'customer' | 'orderedAt';
+    dir?: 'asc' | 'desc';
   }) {
-    const { search, searchField, storeIds = [], period = 'all', dateFrom, dateTo, fulfillmentStatuses = [], packingStatuses = [], viewerId, viewerRole, decorationView, crossDecorationVisibility, page, pageSize } = params;
+    const { search, searchField, storeIds = [], period = 'all', dateFrom, dateTo, fulfillmentStatuses = [], packingStatuses = [], viewerId, viewerRole, decorationView, crossDecorationVisibility, page, pageSize, sort, dir = 'desc' } = params;
     const viewer = { id: viewerId, role: viewerRole };
     const viewerIsDecorator = isDecoratorRole(viewerRole);
     const tokens = (search?.trim() ?? '').split(/\s+/).filter(Boolean);
@@ -438,6 +441,7 @@ export class OrderModel {
         },
       },
       stockAdjustment: true,
+      decorationAttachment: true,
       packingConfirmations: { select: { id: true, lines: true, confirmedAt: true, canceledAt: true }, orderBy: { confirmedAt: 'desc' as const } },
     } satisfies Prisma.OrderInclude;
 
@@ -455,6 +459,8 @@ export class OrderModel {
         crossDecorationVisibility,
         page: filterByPacking ? 1 : page,
         pageSize: filterByPacking ? 10000 : pageSize,
+        sort,
+        dir,
       });
 
       const rows = searchPage.ids.length > 0
@@ -490,7 +496,7 @@ export class OrderModel {
       const allRows = await prisma.order.findMany({
         where,
         include: listInclude,
-        orderBy: { orderedAt: 'desc' },
+        orderBy: buildOrdersOrderBy(sort, dir),
       });
       const packingSet = new Set(packingStatuses);
       const messageCounts = await getOrderMessageCounts(allRows.map((row) => row.id), 'orders');
@@ -512,7 +518,7 @@ export class OrderModel {
       prisma.order.findMany({
         where,
         include: listInclude,
-        orderBy: { orderedAt: 'desc' },
+        orderBy: buildOrdersOrderBy(sort, dir),
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),
@@ -671,6 +677,7 @@ export class OrderModel {
           },
         },
         packingConfirmations: { select: { id: true, lines: true, confirmedAt: true, canceledAt: true }, orderBy: { confirmedAt: 'desc' as const } },
+        decorationAttachment: true,
       },
     });
 
@@ -1260,6 +1267,11 @@ function toOrderNoteRow(note: {
   };
 }
 
+function toSafeISOString(value: Date | null | undefined) {
+  if (!value || Number.isNaN(value.getTime())) return null;
+  return value.toISOString();
+}
+
 function toOrderRow(row: {
   id: string;
   number: string;
@@ -1309,6 +1321,12 @@ function toOrderRow(row: {
     updatedAt: Date;
   } | null;
   packingConfirmations?: Array<{ id: string; lines: Prisma.JsonValue; confirmedAt: Date; canceledAt: Date | null }>;
+  decorationAttachment?: {
+    files: Prisma.JsonValue;
+    customerDesign: Prisma.JsonValue;
+    customerRemarks: string | null;
+    photos: Prisma.JsonValue;
+  } | null;
 }, messageCount: number, decorations?: Map<string, { isEmbroidery: boolean; isPrint: boolean }>, assignments?: Map<string, AssignmentRow[]>, summaries?: Map<string, LineDecorationSummary>, trackings?: TrackingSummary[], viewerIsDecorator = false) {
   const lineItems = toLineItems(row.lineItems);
   const itemCount = lineItems.reduce((sum, item) => sum + Math.max(0, item.qty), 0);
@@ -1341,11 +1359,11 @@ function toOrderRow(row: {
     state: row.state,
     country: row.country,
     closed: row.closed,
-    closedAt: row.closedAt?.toISOString() ?? null,
+    closedAt: toSafeISOString(row.closedAt),
     canceled: row.canceled,
-    canceledAt: row.canceledAt?.toISOString() ?? null,
+    canceledAt: toSafeISOString(row.canceledAt),
     status: getDisplayStatus(row),
-    orderedAt: row.orderedAt?.toISOString(),
+    orderedAt: toSafeISOString(row.orderedAt) ?? undefined,
     storeId: row.store.id,
     storeName: row.store.name ?? row.store.storeDomain,
     storeDomain: row.store.storeDomain,
@@ -1369,11 +1387,19 @@ function toOrderRow(row: {
     stockRequestCount: getStockRequestBadgeCount(row),
     backInStockStatus: getBackInStockStatus(row.backInStockRequests ?? []),
     stockAdjustment: row.stockAdjustment ? toStockAdjustmentRow(row.stockAdjustment) : null,
+    decorationAttachments: toOrderAttachments(row.decorationAttachment),
     packingStatus,
     packedQuantity,
     totalQuantity,
     trackings: trackings ?? [],
   };
+}
+
+function buildOrdersOrderBy(sort: 'number' | 'customer' | 'orderedAt' | undefined, dir: 'asc' | 'desc'): Prisma.OrderOrderByWithRelationInput {
+  if (sort === 'customer') return { cusName: dir };
+  if (sort === 'number') return { number: dir };
+  if (sort === 'orderedAt') return { orderedAt: dir };
+  return { orderedAt: 'desc' };
 }
 
 type DecoratorSortable = {
@@ -2125,14 +2151,19 @@ async function getRankedOrderSearchPage(params: {
   crossDecorationVisibility?: boolean;
   page: number;
   pageSize: number;
+  sort?: 'number' | 'customer' | 'orderedAt';
+  dir: 'asc' | 'desc';
 }) {
   const whereSql = buildRankedOrderSearchWhereSql(params);
   const rankSql = buildOrderSearchRankSql(params.tokens);
+  const orderBySql = buildSearchOrderBySql(params.sort, params.dir);
   const skip = (params.page - 1) * params.pageSize;
   const rows = await prisma.$queryRaw<{ total: number; ids: string[] }[]>(Prisma.sql`
     WITH filtered AS (
       SELECT
         o.id,
+        o."number",
+        o."cusName",
         o."orderedAt",
         o."createdAt",
         ${rankSql} AS "searchRank"
@@ -2141,16 +2172,16 @@ async function getRankedOrderSearchPage(params: {
       WHERE ${whereSql}
     ),
     paged AS (
-      SELECT id, "searchRank", "orderedAt", "createdAt"
+      SELECT id, "number", "cusName", "searchRank", "orderedAt", "createdAt"
       FROM filtered
-      ORDER BY "searchRank" ASC, "orderedAt" DESC NULLS LAST, "createdAt" DESC, id ASC
+      ORDER BY ${orderBySql}
       OFFSET ${skip}
       LIMIT ${params.pageSize}
     )
     SELECT
       (SELECT COUNT(*)::integer FROM filtered) AS total,
       COALESCE(
-        array_agg(paged.id ORDER BY paged."searchRank" ASC, paged."orderedAt" DESC NULLS LAST, paged."createdAt" DESC, paged.id ASC)
+        array_agg(paged.id ORDER BY ${orderBySql})
           FILTER (WHERE paged.id IS NOT NULL),
         ARRAY[]::text[]
       ) AS ids
@@ -2266,6 +2297,16 @@ function buildFieldConditionsForToken(token: string, searchField?: string): Pris
         ...getStatusSqlConditionsForToken(token),
       ];
   }
+}
+
+function buildSearchOrderBySql(sort: 'number' | 'customer' | 'orderedAt' | undefined, dir: 'asc' | 'desc') {
+  if (!sort) {
+    return Prisma.sql`"searchRank" ASC, "orderedAt" DESC NULLS LAST, "createdAt" DESC, id ASC`;
+  }
+  const direction = dir === 'asc' ? Prisma.sql`ASC` : Prisma.sql`DESC`;
+  if (sort === 'orderedAt') return Prisma.sql`"orderedAt" ${direction} NULLS LAST, "searchRank" ASC, "createdAt" DESC, id ASC`;
+  const column = sort === 'customer' ? Prisma.sql`"cusName"` : Prisma.sql`"number"`;
+  return Prisma.sql`${column} ${direction}, "searchRank" ASC, "orderedAt" DESC NULLS LAST, "createdAt" DESC, id ASC`;
 }
 
 function buildOrderSearchRankSql(tokens: string[]) {

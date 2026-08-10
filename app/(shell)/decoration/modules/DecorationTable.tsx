@@ -6,6 +6,8 @@ import { STATUS_MAP } from '../../orders/modules/constants';
 import { getFulfillmentInfo, getOrderAddressLines, isOrderFullyFulfilled } from '../../orders/modules/utils';
 import DecorationTableRow from './DecorationTableRow';
 import DecorationExpandedRow from './DecorationExpandedRow';
+import DecorationAttachmentsRow from './DecorationAttachmentsRow';
+import SortableColumnHeader from '../../orders/modules/SortableColumnHeader';
 
 type DecorationPageBundle = ReturnType<typeof useDecorationPage>;
 
@@ -14,18 +16,18 @@ type DecorationTableProps = {
 };
 
 export default function DecorationTable({ p }: DecorationTableProps) {
-  const { orders, loading, error, expandedIds, ordersColSpan, userIsAdmin } = p;
+  const { orders, loading, error, expandedIds, ordersColSpan, userIsAdmin, sort, dir, handleSortChange } = p;
   return (
     <table className="min-w-[900px] w-full text-sm">
       <thead>
         <tr className="bg-gray-50 border-b border-gray-200">
           <th className="hidden sm:table-cell px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-10">#</th>
-          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Order No.</th>
+          <SortableColumnHeader label="Order No." sortKey="number" sort={sort} dir={dir} onSortChange={handleSortChange} />
           {userIsAdmin && (
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Store</th>
           )}
-          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Customer</th>
-          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Ordered At</th>
+          <SortableColumnHeader label="Customer" sortKey="customer" sort={sort} dir={dir} onSortChange={handleSortChange} />
+          <SortableColumnHeader label="Ordered At" sortKey="orderedAt" sort={sort} dir={dir} onSortChange={handleSortChange} />
           <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
           {userIsAdmin && (
             <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Stock Adjustment</th>
@@ -59,7 +61,6 @@ export default function DecorationTable({ p }: DecorationTableProps) {
           const statusKey = order.status.toLowerCase();
           const status = STATUS_MAP[statusKey] ?? STATUS_MAP.pending;
           const isExpanded = expandedIds.has(order.id);
-          const isPrevExpanded = index > 0 ? expandedIds.has(orders[index - 1].id) : false;
           const orderAddressLines = getOrderAddressLines(order);
           const fulfillmentInfo = getFulfillmentInfo(order);
           const isFullyFulfilled = isOrderFullyFulfilled(order);
@@ -69,7 +70,7 @@ export default function DecorationTable({ p }: DecorationTableProps) {
           const hasDecorationWork = order.items.some((i) => (i.decoration?.works?.length ?? 0) > 0);
           return (
             <Fragment key={order.id}>
-              {isExpanded && isPrevExpanded && (
+              {index > 0 && (
                 <tr><td colSpan={ordersColSpan} className="h-2 p-0 bg-white" /></tr>
               )}
               <DecorationTableRow
@@ -82,6 +83,7 @@ export default function DecorationTable({ p }: DecorationTableProps) {
                 isFullyFulfilled={isFullyFulfilled}
                 hasBackInStockSignal={hasBackInStockSignal}
               />
+              {userIsAdmin && !isExpanded && <DecorationAttachmentsRow p={p} order={order} />}
               {isExpanded && (
                 <DecorationExpandedRow
                   p={p}

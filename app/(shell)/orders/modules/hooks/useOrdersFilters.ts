@@ -28,6 +28,8 @@ export function useOrdersFilters({ userIsDecorator, decorationView = false }: { 
   });
   const [hoverDate, setHoverDate] = useState<string | null>(null);
   const [period, setPeriod] = useState<(typeof PERIODS)[number]['value']>('all');
+  const [sort, setSort] = useState<'number' | 'customer' | 'orderedAt' | null>(null);
+  const [dir, setDir] = useState<'asc' | 'desc'>('desc');
   const [pagination, setPagination] = useState<Pagination>(DEFAULT_PAGINATION);
   const [syncStoreDropdownOpen, setSyncStoreDropdownOpen] = useState(false);
   const searchDropdownRef = useRef<HTMLDivElement>(null);
@@ -66,8 +68,22 @@ export function useOrdersFilters({ userIsDecorator, decorationView = false }: { 
     fulfillmentStatuses.forEach((s) => params.append('status', s));
     packingStatuses.forEach((s) => params.append('packingStatus', s));
     if (decorationView) params.set('decorationView', '1');
+    if (sort) {
+      params.set('sort', sort);
+      params.set('dir', dir);
+    }
     return params.toString();
-  }, [pagination.page, pagination.pageSize, period, search, searchField, storeIds, dateFrom, dateTo, fulfillmentStatuses, packingStatuses, decorationView]);
+  }, [pagination.page, pagination.pageSize, period, search, searchField, storeIds, dateFrom, dateTo, fulfillmentStatuses, packingStatuses, decorationView, sort, dir]);
+
+  const handleSortChange = (key: 'number' | 'customer' | 'orderedAt') => {
+    if (sort === key) {
+      setDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSort(key);
+      setDir('asc');
+    }
+    setPagination((prev) => ({ ...prev, page: 1 }));
+  };
 
   const handleStoreToggle = (id: string) => {
     setStoreIds((prev) => (prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]));
@@ -193,6 +209,7 @@ export function useOrdersFilters({ userIsDecorator, decorationView = false }: { 
     handlePackingStatusToggle, handleStoreToggle, handleStatusToggle,
     period, setPeriod, periodDropdownOpen, setPeriodDropdownOpen, periodDropdownRef,
     calendarNav, setCalendarNav, handlePeriodChange, handleCalendarDateClick,
+    sort, dir, handleSortChange,
     hasActiveFilters, handleClearFilters,
     pageNumbers, goToPage,
     syncStoreDropdownOpen, setSyncStoreDropdownOpen, syncStoreDropdownRef,

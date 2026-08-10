@@ -231,6 +231,9 @@ export function useOrdersPage() {
     setCalendarNav: filters.setCalendarNav,
     handlePeriodChange: filters.handlePeriodChange,
     handleCalendarDateClick: filters.handleCalendarDateClick,
+    sort: filters.sort,
+    dir: filters.dir,
+    handleSortChange: filters.handleSortChange,
     hasActiveFilters: filters.hasActiveFilters,
     handleClearFilters: filters.handleClearFilters,
     pagination: filters.pagination,
@@ -284,8 +287,6 @@ export function useOrdersPage() {
     addDraftCommentRow: decorWork.addDraftCommentRow,
     removeDraftCommentRow: decorWork.removeDraftCommentRow,
     updateDraftCommentField: decorWork.updateDraftCommentField,
-    uploadDraftFiles: decorWork.uploadDraftFiles,
-    removeDraftFile: decorWork.removeDraftFile,
     submitDraftWork: decorWork.submitDraftWork,
     // assignments
     assignModal: assignments.assignModal,

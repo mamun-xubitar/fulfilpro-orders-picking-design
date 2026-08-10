@@ -35,9 +35,14 @@ export default function DecorationExpandedRow({
           onDraftAddRow={p.addDraftCommentRow}
           onDraftRemoveRow={p.removeDraftCommentRow}
           onDraftField={p.updateDraftCommentField}
-          onDraftUpload={p.uploadDraftFiles}
-          onDraftRemoveFile={p.removeDraftFile}
           onDraftSubmit={p.submitDraftWork}
+          getUploadingAttachmentFields={p.getUploadingAttachmentFields}
+          isSavingAttachmentRemarks={p.isSavingAttachmentRemarks}
+          onUploadAttachmentFiles={p.uploadAttachmentFiles}
+          onRemoveAttachmentFile={p.removeAttachmentFile}
+          getAttachmentRemarksValue={p.getAttachmentRemarksValue}
+          onAttachmentRemarksChange={p.setAttachmentRemarksDraft}
+          onAttachmentRemarksCommit={p.commitAttachmentRemarks}
           showAll={p.decoratorUnscoped}
           canAssign={p.userIsAdmin}
           isAdmin={p.userIsAdmin}

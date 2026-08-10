@@ -1,8 +1,8 @@
 import { auth } from '@/auth';
-import { evaluateStaffAccess, getUserAuthPolicy, getSessionExpiresAt } from '@/lib/auth-policy.server';
+import { evaluateStaffAccess, getSessionExpiresAt, getUserAuthPolicy } from '@/lib/auth-policy.server';
 import { isOrderDecoratorRole, isOrderPickerRole, isRestrictedSessionRole, isStaffLikeRole, isTestUserRole } from '@/lib/roles';
-import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
 
 export const config = {
   matcher: [
@@ -92,12 +92,13 @@ const DECORATOR_ALLOWED_API_ROUTES = [
   '^/api/orders/[^/]+/messages$',
   '^/api/orders/[^/]+/line-items/[^/]+/work$',
   '^/api/orders/[^/]+/line-items/[^/]+/work/[^/]+$',
+  '/api/orders/[^/]+/decoration-attachments',
   '/api/decoration/uploads',
   '/api/decoration/edit-requests',
   '/api/tasks',
   '/api/tasks/.*',
   '/api/conversations',
-  '/api/conversations/.*',
+  '/api/conversations/.*'
 ]
 
 function matchesRoute(pathname: string, routes: string[]) {

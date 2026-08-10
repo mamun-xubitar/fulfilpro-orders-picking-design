@@ -186,6 +186,45 @@ export function normalizeWorkComments(value: unknown): DecorationWorkComment[] {
     .filter((c): c is DecorationWorkComment => Boolean(c));
 }
 
+export function normalizeFileRefs(value: unknown): DecorationFileRef[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((f) => {
+      if (!f || typeof f !== 'object') return null;
+      const fo = f as Record<string, unknown>;
+      const name = typeof fo.name === 'string' ? fo.name : '';
+      const url = typeof fo.url === 'string' ? fo.url : '';
+      if (!name || !url) return null;
+      const ref: DecorationFileRef = { name, url };
+      if (typeof fo.size === 'number') ref.size = fo.size;
+      if (typeof fo.mimeType === 'string') ref.mimeType = fo.mimeType;
+      return ref;
+    })
+    .filter((f): f is DecorationFileRef => Boolean(f));
+}
+
+export type OrderDecorationAttachments = {
+  files: DecorationFileRef[];
+  customerDesign: DecorationFileRef[];
+  customerRemarks: string;
+  photos: DecorationFileRef[];
+};
+
+export function toOrderAttachments(row?: {
+  files: unknown;
+  customerDesign: unknown;
+  customerRemarks: string | null;
+  photos: unknown;
+} | null): OrderDecorationAttachments {
+  if (!row) return { files: [], customerDesign: [], customerRemarks: '', photos: [] };
+  return {
+    files: normalizeFileRefs(row.files),
+    customerDesign: normalizeFileRefs(row.customerDesign),
+    customerRemarks: row.customerRemarks ?? '',
+    photos: normalizeFileRefs(row.photos),
+  };
+}
+
 function toWorkRecord(row: {
   id: string;
   workerId: string;
@@ -562,6 +601,36 @@ export class DecorationModel {
       qty,
       isDecoratorRole(viewer.role) ? fulfilledQty : 0,
     );
+  }
+
+  async upsertOrderAttachments(
+    orderId: string,
+    patch: Partial<OrderDecorationAttachments>,
+  ): Promise<OrderDecorationAttachments> {
+    const data: {
+      files?: object;
+      customerDesign?: object;
+      customerRemarks?: string | null;
+      photos?: object;
+    } = {};
+    if (patch.files !== undefined) data.files = patch.files;
+    if (patch.customerDesign !== undefined) data.customerDesign = patch.customerDesign;
+    if (patch.customerRemarks !== undefined) data.customerRemarks = patch.customerRemarks || null;
+    if (patch.photos !== undefined) data.photos = patch.photos;
+
+    const row = await prisma.orderDecorationAttachment.upsert({
+      where: { orderId },
+      create: {
+        orderId,
+        files: patch.files ?? [],
+        customerDesign: patch.customerDesign ?? [],
+        customerRemarks: patch.customerRemarks || null,
+        photos: patch.photos ?? [],
+      },
+      update: data,
+    });
+
+    return toOrderAttachments(row);
   }
 }
 

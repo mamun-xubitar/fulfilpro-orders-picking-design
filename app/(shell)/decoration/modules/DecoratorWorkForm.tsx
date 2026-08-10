@@ -1,6 +1,9 @@
 'use client';
 
-import type { OrderItem, WorkDraftState } from '../../orders/modules/types';
+import type {
+  OrderItem,
+  WorkDraftState,
+} from '../../orders/modules/types';
 
 type DecoratorWorkFormProps = {
   draft: WorkDraftState;
@@ -9,8 +12,6 @@ type DecoratorWorkFormProps = {
   onAddRow: () => void;
   onRemoveRow: (index: number) => void;
   onField: (index: number, field: 'sizes' | 'colors' | 'remarks' | 'location', value: string) => void;
-  onUpload: (index: number, files: FileList | null) => void;
-  onRemoveFile: (index: number, fileIndex: number) => void;
   onSubmit: () => void;
 };
 
@@ -21,8 +22,6 @@ export default function DecoratorWorkForm({
   onAddRow,
   onRemoveRow,
   onField,
-  onUpload,
-  onRemoveFile,
   onSubmit,
 }: DecoratorWorkFormProps) {
   const maxQty = item.decoration?.remaining ?? item.qty;
@@ -62,17 +61,6 @@ export default function DecoratorWorkForm({
               ))}
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <label className="inline-flex items-center gap-1 cursor-pointer text-xs text-blue-600 hover:text-blue-800">
-                <input type="file" multiple className="hidden" onChange={(e) => { void onUpload(ci, e.target.files); e.target.value = ''; }} />
-                📎 Add files
-              </label>
-              {comment.uploading && <span className="text-[11px] text-gray-400">Uploading…</span>}
-              {comment.files.map((file, fi) => (
-                <span key={fi} className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-600">
-                  <a href={file.url} target="_blank" rel="noopener noreferrer" className="hover:underline">{file.name}</a>
-                  <button type="button" onClick={() => onRemoveFile(ci, fi)} className="text-gray-400 hover:text-red-500">×</button>
-                </span>
-              ))}
               {draft.comments.length > 1 && (
                 <button type="button" onClick={() => onRemoveRow(ci)} className="ml-auto text-[11px] text-red-500 hover:text-red-700">Remove row</button>
               )}
@@ -85,7 +73,7 @@ export default function DecoratorWorkForm({
       <button
         type="button"
         onClick={onSubmit}
-        disabled={draft.saving || draft.comments.some((c) => c.uploading)}
+        disabled={draft.saving}
         className="px-4 rounded-lg bg-emerald-600 text-white py-2 text-xs font-semibold hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150"
       >
         {draft.saving ? 'Saving…' : 'Confirm done'}

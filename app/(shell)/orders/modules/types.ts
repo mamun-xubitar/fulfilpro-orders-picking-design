@@ -21,6 +21,14 @@ export type OrderItem = {
   decoration?: DecorationLineSummary;
 };
 export type DecorationFileRef = { name: string; url: string; size?: number; mimeType?: string };
+export type OrderDecorationAttachments = {
+  files: DecorationFileRef[];
+  customerDesign: DecorationFileRef[];
+  customerRemarks: string;
+  photos: DecorationFileRef[];
+};
+export type OrderAttachmentField = 'files' | 'customerDesign' | 'customerRemarks' | 'photos';
+export type FileAttachmentField = 'files' | 'customerDesign' | 'photos';
 export type DecorationWorkComment = {
   sizes?: string;
   colors?: string;
@@ -165,6 +173,7 @@ export type OrderRow = {
   stockRequestCount: number;
   backInStockStatus: BackInStockStatus | null;
   stockAdjustment: OrderStockAdjustment | null;
+  decorationAttachments: OrderDecorationAttachments;
   packingStatus: 'packed' | 'partially_packed' | 'not_packed';
   packedQuantity: number;
   totalQuantity: number;

@@ -19,6 +19,7 @@ import { useNameAttributes } from "../../../orders/modules/hooks/useNameAttribut
 import { useFulfillment } from "../../../orders/modules/hooks/useFulfillment";
 import { useFulfillmentRequests } from "../../../orders/modules/hooks/useFulfillmentRequests";
 import { useDecorationWork } from "../../../orders/modules/hooks/useDecorationWork";
+import { useOrderDecorationAttachments } from "../../../orders/modules/hooks/useOrderDecorationAttachments";
 import { useAssignments } from "../../../orders/modules/hooks/useAssignments";
 import { useOrderMessages } from "../../../orders/modules/hooks/useOrderMessages";
 import { useOrderNotes } from "../../../orders/modules/hooks/useOrderNotes";
@@ -117,6 +118,11 @@ export function useDecorationPage() {
     setOrders: data.setOrders,
     blockTestModeAction,
     bumpRefresh: data.bumpRefresh,
+  });
+
+  const decorAttachments = useOrderDecorationAttachments({
+    setOrders: data.setOrders,
+    blockTestModeAction,
   });
 
   const assignments = useAssignments({
@@ -218,6 +224,9 @@ export function useDecorationPage() {
     setCalendarNav: filters.setCalendarNav,
     handlePeriodChange: filters.handlePeriodChange,
     handleCalendarDateClick: filters.handleCalendarDateClick,
+    sort: filters.sort,
+    dir: filters.dir,
+    handleSortChange: filters.handleSortChange,
     pagination: filters.pagination,
     setPagination: filters.setPagination,
     pageNumbers: filters.pageNumbers,
@@ -269,8 +278,6 @@ export function useDecorationPage() {
     addDraftCommentRow: decorWork.addDraftCommentRow,
     removeDraftCommentRow: decorWork.removeDraftCommentRow,
     updateDraftCommentField: decorWork.updateDraftCommentField,
-    uploadDraftFiles: decorWork.uploadDraftFiles,
-    removeDraftFile: decorWork.removeDraftFile,
     submitDraftWork: decorWork.submitDraftWork,
     // assignments
     assignModal: assignments.assignModal,
@@ -296,6 +303,14 @@ export function useDecorationPage() {
     deleteWorkRecord: decorWork.deleteWorkRecord,
     requestEditAccess: decorWork.requestEditAccess,
     requestingAccessKey: decorWork.requestingAccessKey,
+    // order-wide decoration attachments
+    getUploadingAttachmentFields: decorAttachments.getUploadingFields,
+    isSavingAttachmentRemarks: decorAttachments.isSavingRemarks,
+    uploadAttachmentFiles: decorAttachments.uploadAttachmentFiles,
+    removeAttachmentFile: decorAttachments.removeAttachmentFile,
+    getAttachmentRemarksValue: decorAttachments.getRemarksValue,
+    setAttachmentRemarksDraft: decorAttachments.setRemarksDraft,
+    commitAttachmentRemarks: decorAttachments.commitRemarks,
     // fulfillment view / requests
     fulfillmentViewOrderId: fulfillmentRequests.fulfillmentViewOrderId,
     setFulfillmentViewOrderId: fulfillmentRequests.setFulfillmentViewOrderId,
