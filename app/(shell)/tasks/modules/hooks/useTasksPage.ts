@@ -3,6 +3,7 @@
 import { useSession } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useRef } from 'react';
+import { useChat } from '@/hooks/useChat';
 import { useTasksFilters } from './useTasksFilters';
 import { useTasksData } from './useTasksData';
 import { useRecurringTasks } from './useRecurringTasks';
@@ -32,6 +33,7 @@ export function useTasksPage() {
   const mutations = useTaskMutations({ bumpRefresh: bumpAllRefresh, setTasks: data.setTasks });
   const messages = useTaskMessages(data.setTasks);
   const report = useTaskReport(filters.tab === 'completed');
+  const chat = useChat();
 
   // Deep-link: open messages modal when ?openTask=<id> is in the URL
   useEffect(() => {
@@ -73,5 +75,7 @@ export function useTasksPage() {
     // report
     report: report.report,
     reportLoading: report.loading,
+    // chat
+    chat,
   };
 }

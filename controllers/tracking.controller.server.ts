@@ -77,7 +77,7 @@ export class TrackingController {
         const row = await model.upsertFromOrder({
           orderId: order.id,
           storeId: order.storeId,
-          orderNumber: order.number,
+          orderNumber: String(order.number),
           trackingNumber: a.number,
           carrier: a.carrier ?? null,
           registrationStatus: 'registered',
@@ -185,7 +185,7 @@ export class TrackingController {
       const row = await model.upsertFromOrder({
         orderId: order.id,
         storeId: order.storeId,
-        orderNumber: order.number,
+        orderNumber: String(order.number),
         trackingNumber: trimmedTrackingNumber,
         carrier: a?.carrier ?? carrier ?? null,
         registrationStatus: 'registered',

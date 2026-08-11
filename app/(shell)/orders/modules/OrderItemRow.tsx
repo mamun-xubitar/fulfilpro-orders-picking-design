@@ -34,7 +34,7 @@ export default function OrderItemRow({ p, order, item, itemIndex, restockItems, 
           const nameAttr = getNameAttribute(item);
           if (!nameAttr) return item.name;
           const k = nameKey(order.id, item.id);
-          const entry = { key: k, row: { orderNumber: order.number, productTitle: item.title ?? item.name, value: nameAttr.value } };
+          const entry = { key: k, row: { orderNumber: String(order.number), productTitle: item.title ?? item.name, value: nameAttr.value } };
           return (
             <div className="flex flex-col gap-0.5">
               <span>{item.name}</span>

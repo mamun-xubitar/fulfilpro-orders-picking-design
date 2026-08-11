@@ -43,7 +43,7 @@ export type BulkRegisterModalState = {
   storeDropdownOpen: boolean;
 };
 
-export type OrderSearchOption = { id: string; number: string; customer: string | null };
+export type OrderSearchOption = { id: string; number: number; customer: string | null };
 
 export type CarrierOption = { code: number; name: string };
 

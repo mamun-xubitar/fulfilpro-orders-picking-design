@@ -26,7 +26,7 @@ export type PickingItem = {
 };
 export type PackingConfirmation = { id: string; confirmedAt: string; canceledAt: string | null; lines: PickingLine[] };
 export type PickingOrder = {
-  id: string; number: string; customer: string; customerEmail: string | null;
+  id: string; number: number; customer: string; customerEmail: string | null;
   phone: string | null; address: string | null; address2: string | null;
   city: string | null; state: string | null; zip: string | null; country: string | null;
   note: string | null; canceled: boolean; closed: boolean; orderedAt: string;

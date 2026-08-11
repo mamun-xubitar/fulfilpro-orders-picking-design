@@ -296,7 +296,7 @@ export const orderNameEntries = (order: OrderRow): Array<{ key: string; row: Nam
   order.items.flatMap((item) => {
     const attr = getNameAttribute(item);
     if (!attr) return [];
-    return [{ key: nameKey(order.id, item.id), row: { orderNumber: order.number, productTitle: item.title ?? item.name, value: attr.value } }];
+    return [{ key: nameKey(order.id, item.id), row: { orderNumber: String(order.number), productTitle: item.title ?? item.name, value: attr.value } }];
   });
 
 export const emptyCommentDraft = (): WorkCommentDraft => ({ sizes: '', colors: '', remarks: '', location: '', files: [], uploading: false });

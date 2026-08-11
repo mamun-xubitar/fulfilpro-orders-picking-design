@@ -52,6 +52,7 @@ export type AppSettingsRow = {
     print: string[];
   };
   taskVisibilityByUser: Record<string, string[]>;
+  messageVisibilityByUser: Record<string, string[]>;
   decorationCrossVisibilityEnabled: boolean;
   globalMarginPercent: number;
   lowStockThreshold: number;
@@ -86,6 +87,7 @@ export type UpdateAppSettingsData = Partial<{
   embroideryKeywords: string[];
   printKeywords: string[];
   taskVisibilityByUser: Record<string, string[]>;
+  messageVisibilityByUser: Record<string, string[]>;
   decorationCrossVisibilityEnabled: boolean;
   globalMarginPercent: number;
   lowStockThreshold: number;
@@ -130,6 +132,7 @@ const DEFAULT_SETTINGS = {
   embroideryKeywords: ['embroider', 'emb'] as string[],
   printKeywords: ['print'] as string[],
   taskVisibilityByUser: {} as Record<string, string[]>,
+  messageVisibilityByUser: {} as Record<string, string[]>,
   decorationCrossVisibilityEnabled: false,
   globalMarginPercent: 0,
   lowStockThreshold: 10,
@@ -246,6 +249,7 @@ async function toSettingsRow(settings: {
   embroideryKeywords?: unknown;
   printKeywords?: unknown;
   taskVisibilityByUser?: unknown;
+  messageVisibilityByUser?: unknown;
   decorationCrossVisibilityEnabled?: boolean;
   globalMarginPercent?: Prisma.Decimal | number;
   lowStockThreshold?: number;
@@ -306,6 +310,7 @@ async function toSettingsRow(settings: {
       print: normalizeTags(settings.printKeywords, DEFAULT_SETTINGS.printKeywords),
     },
     taskVisibilityByUser: normalizeVisibilityMap(settings.taskVisibilityByUser),
+    messageVisibilityByUser: normalizeVisibilityMap(settings.messageVisibilityByUser),
     decorationCrossVisibilityEnabled: settings.decorationCrossVisibilityEnabled ?? false,
     globalMarginPercent: Number(settings.globalMarginPercent ?? 0),
     lowStockThreshold: settings.lowStockThreshold ?? DEFAULT_SETTINGS.lowStockThreshold,

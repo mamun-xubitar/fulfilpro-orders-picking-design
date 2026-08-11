@@ -443,8 +443,11 @@ function getLegacyId(gid: string) {
   return gid.split('/').at(-1) ?? gid;
 }
 
-function getOrderNumber(name: string) {
+function getOrderNumber(name: string): number {
   const normalized = name.trim().replace(/^#/, '');
   const numericOrderNumber = Number(normalized);
-  return Number.isFinite(numericOrderNumber) ? numericOrderNumber : normalized;
+  if (!Number.isFinite(numericOrderNumber)) {
+    throw new Error(`Order name "${name}" did not parse to a numeric order number`);
+  }
+  return numericOrderNumber;
 }

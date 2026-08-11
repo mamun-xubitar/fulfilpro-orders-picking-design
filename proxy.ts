@@ -1,8 +1,8 @@
 import { auth } from '@/auth';
-import { evaluateStaffAccess, getUserAuthPolicy, getSessionExpiresAt } from '@/lib/auth-policy.server';
+import { evaluateStaffAccess, getSessionExpiresAt, getUserAuthPolicy } from '@/lib/auth-policy.server';
 import { isOrderDecoratorRole, isOrderPickerRole, isRestrictedSessionRole, isStaffLikeRole, isTestUserRole } from '@/lib/roles';
-import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
 
 export const config = {
   matcher: [
@@ -29,7 +29,7 @@ const LOGIN_ROUTE = '/';
 const RESTRICTED_ROUTE = '/restricted';
 const SESSION_EXPIRED_ROUTE = '/session-expired';
 
-const STAFF_ALLOWED_PAGE_ROUTES = ['/orders', '/back-in-stock', '/profile', '/tasks', '/tracking'];
+const STAFF_ALLOWED_PAGE_ROUTES = ['/orders', '/back-in-stock', '/profile', '/tasks', '/tracking', '/messages'];
 const STAFF_ALLOWED_API_ROUTES = [
   '/api/orders',
   '/api/orders/.*',
@@ -47,12 +47,14 @@ const STAFF_ALLOWED_API_ROUTES = [
   '/api/tasks/.*',
   '/api/tracking',
   '/api/tracking/.*',
+  '/api/conversations',
+  '/api/conversations/.*',
 ];
 const STAFF_RESTRICTED_API_ROUTES = ['/api/auth/.*'];
 const STAFF_EXPIRED_API_ROUTES = ['/api/auth/.*'];
 const TEST_USER_MUTATION_BLOCKED_API_ROUTES = ['/api/orders', '/api/orders/.*', '/api/back-in-stock', '/api/back-in-stock/.*', '/api/fulfillment-requests', '/api/fulfillment-requests/.*', '/api/tasks', '/api/tasks/.*'];
 
-const PICKER_ALLOWED_PAGE_ROUTES = ['/picking-list', '/profile', '/tasks'];
+const PICKER_ALLOWED_PAGE_ROUTES = ['/picking-list', '/profile', '/tasks', '/messages'];
 const PICKER_ALLOWED_API_ROUTES = [
   '/api/picking-list',
   '/api/picking-list/.*',
@@ -71,10 +73,12 @@ const PICKER_ALLOWED_API_ROUTES = [
   '/api/notifications/.*',
   '/api/tasks',
   '/api/tasks/.*',
+  '/api/conversations',
+  '/api/conversations/.*',
 ];
 const TEST_MODE_MESSAGE = 'This action is not allowed in test mode.';
 
-const DECORATOR_ALLOWED_PAGE_ROUTES = ['/decoration', '/profile', '/tasks']
+const DECORATOR_ALLOWED_PAGE_ROUTES = ['/decoration', '/profile', '/tasks', '/messages']
 const DECORATOR_ALLOWED_API_ROUTES = [
   '/api/profile',
   '/api/profile/.*',
@@ -88,11 +92,13 @@ const DECORATOR_ALLOWED_API_ROUTES = [
   '^/api/orders/[^/]+/messages$',
   '^/api/orders/[^/]+/line-items/[^/]+/work$',
   '^/api/orders/[^/]+/line-items/[^/]+/work/[^/]+$',
+  '/api/orders/[^/]+/decoration-attachments',
   '/api/decoration/uploads',
   '/api/decoration/edit-requests',
   '/api/tasks',
   '/api/tasks/.*',
-  '/api/orders/[^/]+/decoration-attachments'
+  '/api/conversations',
+  '/api/conversations/.*'
 ]
 
 function matchesRoute(pathname: string, routes: string[]) {

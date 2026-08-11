@@ -15,6 +15,7 @@ type Props = {
   tabCounts: TabCounts;
   users: UserOption[];
   onAdd: () => void;
+  onChat: () => void;
 };
 
 function countFor(tab: TaskStateFilter, counts: TabCounts): number {
@@ -28,7 +29,7 @@ function countFor(tab: TaskStateFilter, counts: TabCounts): number {
 
 export default function TasksToolbar({
   tab, setTab, search, setSearch, filterAssigneeId, setFilterAssigneeId,
-  filterDueType, setFilterDueType, tabCounts, users, onAdd,
+  filterDueType, setFilterDueType, tabCounts, users, onAdd, onChat,
 }: Props) {
   return (
     <div className="flex flex-col gap-3 mb-4">
@@ -55,12 +56,20 @@ export default function TasksToolbar({
             );
           })}
         </div>
-        <button
-          onClick={onAdd}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors duration-150 cursor-pointer"
-        >
-          + Assign Task
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={onChat}
+            className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-gray-50 transition-colors duration-150 cursor-pointer"
+          >
+            + Chat
+          </button>
+          <button
+            onClick={onAdd}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors duration-150 cursor-pointer"
+          >
+            + Assign Task
+          </button>
+        </div>
       </div>
 
       <div className="flex gap-3 flex-wrap">

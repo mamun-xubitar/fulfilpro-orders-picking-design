@@ -462,6 +462,37 @@ export class SettingsController {
       }
     }
 
+    if ('messageVisibilityByUser' in data) {
+      const value = data.messageVisibilityByUser;
+      if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        errors.push('messageVisibilityByUser: Must be an object mapping user IDs to arrays of user IDs');
+      } else {
+        const { activeUsers } = await listEmailRuleUsers();
+        const activeUserIds = new Set(activeUsers.map((user) => user.id));
+        const entries = Object.entries(value as Record<string, unknown>);
+        const invalidKeys = entries.filter(([userId]) => !activeUserIds.has(userId));
+        if (invalidKeys.length > 0) {
+          errors.push('messageVisibilityByUser: Contains invalid user IDs as keys (must be active users)');
+        } else {
+          const map: Record<string, string[]> = {};
+          let hasInvalidValue = false;
+          for (const [userId, ids] of entries) {
+            const normalized = normalizeUserIdList(ids);
+            if (normalized.some((id) => !activeUserIds.has(id))) {
+              hasInvalidValue = true;
+              break;
+            }
+            map[userId] = normalized;
+          }
+          if (hasInvalidValue) {
+            errors.push('messageVisibilityByUser: Contains invalid IDs (must be active users)');
+          } else {
+            updateData.messageVisibilityByUser = map;
+          }
+        }
+      }
+    }
+
     if (errors.length) {
       return { error: { message: 'Validation failed', errors, status: 400 } };
     }

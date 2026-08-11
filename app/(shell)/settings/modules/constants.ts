@@ -1,4 +1,4 @@
-export type SettingsTabId = 'general' | 'notifications' | 'decoration' | 'tracking' | 'tasks';
+export type SettingsTabId = 'general' | 'notifications' | 'decoration' | 'tracking' | 'tasks' | 'messages';
 
 export const SETTINGS_TABS: Array<{ id: SettingsTabId; label: string }> = [
   { id: 'general', label: 'General' },
@@ -6,4 +6,5 @@ export const SETTINGS_TABS: Array<{ id: SettingsTabId; label: string }> = [
   { id: 'decoration', label: 'Decoration' },
   { id: 'tracking', label: 'Shipment Tracking' },
   { id: 'tasks', label: 'Tasks' },
+  { id: 'messages', label: 'Messages' },
 ];

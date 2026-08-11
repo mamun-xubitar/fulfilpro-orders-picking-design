@@ -1,15 +1,21 @@
-import prisma from '@/lib/prisma.server';
+import { detectDecoration, type DecorationKeywords } from '@/lib/decoration-detect';
+import { getDecorationKeywords } from '@/lib/decoration-keywords.server';
 import {
+  resolveHiddenRecipientUsers,
+  resolvePickerRecipientOptions,
+} from '@/lib/email-rules.server';
+import { sendAppMail } from '@/lib/email.server';
+import { createNotification } from '@/lib/notifications.server';
+import prisma from '@/lib/prisma.server';
+import { ADMIN_ROLE, getDecoratorCategories, isDecoratorRole } from '@/lib/roles';
+import {
+  cancelShopifyFulfillment,
   createShopifyFulfillment,
   updateShopifyFulfillmentTracking,
-  cancelShopifyFulfillment,
   type FulfillmentRequestLine,
   type FulfillmentTrackingInput,
 } from '@/lib/shopify-fulfillment.server';
 import { fetchShopifyOrderById } from '@/lib/shopify-order-fetch.server';
-import { detectDecoration, type DecorationKeywords } from '@/lib/decoration-detect';
-import { getDecorationKeywords } from '@/lib/decoration-keywords.server';
-import { isDecoratorRole, getDecoratorCategories, ADMIN_ROLE } from '@/lib/roles';
 import {
   getAssignmentsByOrder,
   getDecorationSummariesByOrder,
@@ -19,19 +25,13 @@ import {
   type LineDecorationSummary,
 } from '@/models/decoration.model.server';
 import { TrackingModel, type TrackingSummary } from '@/models/tracking.model.server';
-import { sendAppMail } from '@/lib/email.server';
-import {
-  resolveHiddenRecipientUsers,
-  resolvePickerRecipientOptions,
-} from '@/lib/email-rules.server';
-import { createNotification } from '@/lib/notifications.server';
 import { Prisma } from '@prisma/client';
 type OrderMessageTypeInput = 'orders' | 'picker';
 
 export type ShopifyOrderPayload = {
   id?: string | number;
   name?: string;
-  order_number: string | number;
+  order_number: number;
   email?: string | null;
   phone?: string | null;
   note?: string | null;
@@ -173,7 +173,7 @@ export class OrderModel {
     const { payload, storeId } = params;
     // console.log('Processing order webhook', JSON.stringify(payload, null, 2));
     const exists = await prisma.order.findUnique({
-      where: { storeId_number: {number: payload.order_number.toString(), storeId} },
+      where: { storeId_number: {number: payload.order_number, storeId} },
       select: { id: true },
     });
 
@@ -195,7 +195,7 @@ export class OrderModel {
     storeId: string;
   }) {
     const { payload, storeId } = params;
-    const number = `${payload.order_number}`;
+    const number = payload.order_number;
     const existing = await prisma.order.findUnique({
       where: {
         storeId_number: {
@@ -556,7 +556,7 @@ export class OrderModel {
         if (!nameAttr) return [];
         return [{
           orderId: order.id,
-          orderNumber: order.number,
+          orderNumber: String(order.number),
           lineItemId: item.id,
           productTitle: item.title ?? item.name,
           value: nameAttr.value,
@@ -741,7 +741,7 @@ export class OrderModel {
     const shopifyResult = await createShopifyFulfillment({
       shop: order.store.storeDomain,
       accessToken: order.store.accessToken,
-      orderNumber: order.number,
+      orderNumber: String(order.number),
       shopifyOrderId: currentFulfillmentItems.shopifyOrderId,
       notifyCustomer,
       trackingInfo,
@@ -1120,7 +1120,7 @@ export class OrderModel {
       title: 'New order message',
       body: `Message about Order #${order.number}`,
       orderId: order.id,
-      orderNumber: order.number,
+      orderNumber: String(order.number),
     }).catch(() => undefined);
 
     const savedMessage = await prisma.orderMessage.create({
@@ -1274,7 +1274,7 @@ function toSafeISOString(value: Date | null | undefined) {
 
 function toOrderRow(row: {
   id: string;
-  number: string;
+  number: number;
   cusName: string;
   note: string | null;
   boarcode: string | null;
@@ -1511,7 +1511,7 @@ function toOrderMessageRow(message: {
 function buildOrderCreateData(payload: ShopifyOrderPayload, storeId: string): Prisma.OrderUncheckedCreateInput {
   const data = buildOrderWriteData(payload, storeId, null);
   return {
-    number: `${payload.order_number}`,
+    number: payload.order_number,
     ...data,
   };
 }
@@ -1814,7 +1814,7 @@ type StockAdjustmentItem = {
 async function upsertStockAdjustmentTask(params: {
   order: {
     id: string;
-    number: string;
+    number: number;
   };
   lineItems: ReturnType<typeof toLineItems>;
   lines: Array<{ lineItemId: string; quantity: number }>;
@@ -1871,7 +1871,7 @@ async function upsertStockAdjustmentTask(params: {
     return prisma.orderStockAdjustment.update({
       where: { id: existing.id },
       data: {
-        orderNumber: params.order.number,
+        orderNumber: String(params.order.number),
         status,
         items: items as unknown as Prisma.InputJsonValue,
         lastEventType: params.eventType,
@@ -1883,7 +1883,7 @@ async function upsertStockAdjustmentTask(params: {
   return prisma.orderStockAdjustment.create({
     data: {
       orderId: params.order.id,
-      orderNumber: params.order.number,
+      orderNumber: String(params.order.number),
       status,
       items: items as unknown as Prisma.InputJsonValue,
       lastEventType: params.eventType,
@@ -1998,13 +1998,13 @@ async function notifyAdminsAboutStockAdjustment(params: {
       title: 'Stock adjustment needed',
       body: `Order #${params.order.number} — ${params.eventType.replace(/_/g, ' ')}`,
       orderId: params.order.id,
-      orderNumber: params.order.number,
+      orderNumber: String(params.order.number),
     })
   ));
 }
 
 function buildStockAdjustmentEmailText(order: OrderEmailDetails & { id: string }, items: StockAdjustmentItem[], eventType: StockAdjustmentEventType, originUrl: string | undefined, includeCustomerContact: boolean) {
-  const orderUrl = buildOrderSearchUrl(order.number, originUrl);
+  const orderUrl = buildOrderSearchUrl(String(order.number), originUrl);
   const address = [order.address, order.address2, order.city, order.state, order.zip, order.country].filter(Boolean).join(', ');
 
   return [
@@ -2025,7 +2025,7 @@ function buildStockAdjustmentEmailText(order: OrderEmailDetails & { id: string }
 }
 
 function buildStockAdjustmentEmailHtml(order: OrderEmailDetails & { id: string }, items: StockAdjustmentItem[], eventType: StockAdjustmentEventType, originUrl: string | undefined, includeCustomerContact: boolean) {
-  const orderUrl = buildOrderSearchUrl(order.number, originUrl);
+  const orderUrl = buildOrderSearchUrl(String(order.number), originUrl);
   const address = [order.address, order.address2, order.city, order.state, order.zip, order.country].filter(Boolean).join(', ');
 
   return `
@@ -2062,7 +2062,7 @@ function buildOrderSearchUrl(orderNumber: string, originUrl?: string) {
 
 type OrderEmailDetails = {
   id?: string;
-  number: string;
+  number: number;
   cusName: string;
   cusEmail: string | null;
   phone: string | null;
@@ -2275,7 +2275,7 @@ function buildTokenSearchSql(tokens: string[], searchField?: string) {
 function buildFieldConditionsForToken(token: string, searchField?: string): Prisma.Sql[] {
   switch (searchField) {
     case 'number':
-      return [ilikeContains(Prisma.sql`o."number"`, token)];
+      return [ilikeContains(Prisma.sql`o."number"::text`, token)];
     case 'customer':
       return [ilikeContains(Prisma.sql`o."cusName"`, token)];
     case 'address':
@@ -2290,7 +2290,7 @@ function buildFieldConditionsForToken(token: string, searchField?: string): Pris
       return [ilikeContains(Prisma.sql`o."lineItems"::text`, token)];
     default:
       return [
-        ilikeContains(Prisma.sql`o."number"`, token),
+        ilikeContains(Prisma.sql`o."number"::text`, token),
         ilikeContains(Prisma.sql`o."cusName"`, token),
         ilikeContains(Prisma.sql`o."cusEmail"`, token),
         ilikeContains(Prisma.sql`o."boarcode"`, token),
@@ -2320,11 +2320,11 @@ function buildSearchOrderBySql(sort: 'number' | 'customer' | 'orderedAt' | undef
 function buildOrderSearchRankSql(tokens: string[]) {
   const terms = uniqueSearchTerms(tokens);
   return Prisma.sql`CASE
-    WHEN ${anyTerm(terms, (term) => Prisma.sql`o."number" = ${term}`)} THEN 0
-    WHEN ${anyTerm(terms, (term) => ilikeStartsWith(Prisma.sql`o."number"`, term))} THEN 1
+    WHEN ${anyTerm(terms, (term) => Prisma.sql`o."number"::text = ${term}`)} THEN 0
+    WHEN ${anyTerm(terms, (term) => ilikeStartsWith(Prisma.sql`o."number"::text`, term))} THEN 1
     WHEN ${anyTerm(terms, (term) => ilikeExact(Prisma.sql`o."boarcode"`, term))} THEN 2
     WHEN ${anyTerm(terms, (term) => ilikeStartsWith(Prisma.sql`o."boarcode"`, term))} THEN 3
-    WHEN ${anyTerm(terms, (term) => ilikeContains(Prisma.sql`o."number"`, term))} THEN 4
+    WHEN ${anyTerm(terms, (term) => ilikeContains(Prisma.sql`o."number"::text`, term))} THEN 4
     WHEN ${anyTerm(terms, (term) => ilikeContains(Prisma.sql`o."boarcode"`, term))} THEN 5
     WHEN ${anyTerm(terms, (term) => Prisma.sql`(${ilikeExact(Prisma.sql`o."cusName"`, term)} OR ${ilikeExact(Prisma.sql`o."cusEmail"`, term)})`)} THEN 6
     WHEN ${anyTerm(terms, (term) => Prisma.sql`(${ilikeStartsWith(Prisma.sql`o."cusName"`, term)} OR ${ilikeStartsWith(Prisma.sql`o."cusEmail"`, term)})`)} THEN 7
