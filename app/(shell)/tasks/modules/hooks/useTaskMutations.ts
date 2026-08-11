@@ -138,8 +138,18 @@ export function useTaskMutations({ bumpRefresh, setTasks }: MutationsParams) {
     setEditTask(null);
   }, []);
 
+  const clearError = useCallback((field: string) => {
+    setErrors((prev) => {
+      if (!(field in prev)) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  }, [setErrors]);
+
   const set = (field: keyof TaskForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
+    clearError(field);
   };
 
   const toggleAssignee = useCallback((id: string) => {
@@ -147,15 +157,18 @@ export function useTaskMutations({ bumpRefresh, setTasks }: MutationsParams) {
       ...prev,
       assigneeIds: prev.assigneeIds.includes(id) ? prev.assigneeIds.filter((x) => x !== id) : [...prev.assigneeIds, id],
     }));
-  }, []);
+    clearError('assigneeIds');
+  }, [clearError]);
 
   const setSingleAssignee = useCallback((id: string) => {
     setForm((prev) => ({ ...prev, assigneeIds: id ? [id] : [] }));
-  }, []);
+    clearError('assigneeId');
+  }, [clearError]);
 
   const setDescriptionFor = useCallback((id: string, value: string) => {
     setForm((prev) => ({ ...prev, descriptions: { ...prev.descriptions, [id]: value } }));
-  }, []);
+    clearError(`descriptions.${id}`);
+  }, [clearError]);
 
   const togglePerAssigneeDescription = useCallback(() => {
     setForm((prev) => ({ ...prev, perAssigneeDescription: !prev.perAssigneeDescription }));

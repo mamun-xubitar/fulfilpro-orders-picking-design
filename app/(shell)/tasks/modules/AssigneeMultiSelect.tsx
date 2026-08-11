@@ -35,7 +35,7 @@ export default function AssigneeMultiSelect({ users, selectedIds, onToggle, erro
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="w-full border border-gray-300 rounded-lg px-3 py-1 text-sm text-left focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer bg-white flex items-center justify-between gap-2"
+        className="w-full border border-gray-300 rounded-lg px-3 py-1.75 text-sm text-left focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer bg-white flex items-center justify-between gap-2"
       >
         <span className={`truncate ${selectedUsers.length === 0 ? 'text-gray-400' : 'text-gray-800'}`}>{label}</span>
         <svg className={`w-4 h-4 text-black shrink-0 transition-transform duration-150 ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">

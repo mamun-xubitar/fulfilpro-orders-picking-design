@@ -44,14 +44,23 @@ export function useRecurringTasks(params: { active: boolean; queryString: string
     });
   }, []);
 
-  // Tracks which parentIds have an in-flight or completed children fetch. A ref (not
-  // state) so it updates synchronously and never becomes an effect dependency itself —
-  // depending on childrenByParent/childrenLoading here would re-run this effect every
-  // time it sets them, and on any failed fetch neither ever gets marked "settled",
-  // causing an endless refetch/loading-flicker loop.
+  // Tracks which parentIds have an in-flight or completed children fetch for the current
+  // refreshKey generation. A ref (not state) so it updates synchronously and never becomes
+  // an effect dependency itself — depending on childrenByParent/childrenLoading here would
+  // re-run this effect every time it sets them, and on any failed fetch neither ever gets
+  // marked "settled", causing an endless refetch/loading-flicker loop.
   const fetchedParentIds = useRef<Set<string>>(new Set());
+  const fetchedForRefreshKey = useRef(refreshKey);
 
   useEffect(() => {
+    if (fetchedForRefreshKey.current !== refreshKey) {
+      // A mutation happened (create/edit/delete/complete/stop) — the cached children are
+      // stale, so drop them and let any still-expanded groups refetch below.
+      fetchedForRefreshKey.current = refreshKey;
+      fetchedParentIds.current.clear();
+      setChildrenByParent({});
+    }
+
     expandedIds.forEach((parentId) => {
       if (fetchedParentIds.current.has(parentId)) return;
       fetchedParentIds.current.add(parentId);
@@ -67,7 +76,7 @@ export function useRecurringTasks(params: { active: boolean; queryString: string
         })
         .finally(() => setChildrenLoading((prev) => ({ ...prev, [parentId]: false })));
     });
-  }, [expandedIds]);
+  }, [expandedIds, refreshKey]);
 
   const { request: requestStop } = useRequest();
 
