@@ -22,6 +22,7 @@ function countFor(tab: TaskStateFilter, counts: TabCounts): number {
   if (tab === 'pending') return counts.pending;
   if (tab === 'overdue') return counts.overdue;
   if (tab === 'seriously_late') return counts.seriouslyLate;
+  if (tab === 'recurring') return counts.recurring;
   return counts.completed;
 }
 

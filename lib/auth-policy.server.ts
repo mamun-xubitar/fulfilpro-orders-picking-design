@@ -110,10 +110,10 @@ export async function getTodayInSettingsTz(): Promise<string> {
   return moment().tz(timezone).format('YYYY-MM-DD');
 }
 
-export async function computeUrgentDueDate(assigneeId: string): Promise<Date> {
+export async function computeUrgentDueDate(assigneeId: string, from: Date = new Date()): Promise<Date> {
   const policy = await getUserAuthPolicy(assigneeId);
   const [hours = '0', minutes = '0'] = policy.staffAccessEnd.split(':');
-  const now = moment().tz(policy.timezone);
+  const now = moment(from).tz(policy.timezone);
 
   let candidate = now.clone().hours(Number(hours)).minutes(Number(minutes)).seconds(0).milliseconds(0);
 

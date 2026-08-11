@@ -1,6 +1,7 @@
 export type TaskState = 'completed' | 'pending' | 'overdue' | 'seriously_late';
-export type TaskStateFilter = 'all' | 'pending' | 'overdue' | 'seriously_late' | 'completed';
+export type TaskStateFilter = 'all' | 'pending' | 'overdue' | 'seriously_late' | 'completed' | 'recurring';
 export type TaskDueType = 'STANDARD' | 'URGENT' | 'CUSTOM';
+export type TaskRecurrenceType = 'DAILY' | 'WEEKLY';
 
 export type SavedFile = {
   name: string;
@@ -27,6 +28,12 @@ export type TaskRow = {
   assigneeEmail: string;
   unreadCount: number;
   messageCount: number;
+  isRecurringParent: boolean;
+  recurrenceType: TaskRecurrenceType | null;
+  recurrenceEndDate: string | null;
+  recurrenceStoppedAt: string | null;
+  parentTaskId: string | null;
+  childCount?: number;
   createdAt: string;
   updatedAt: string;
 };
@@ -47,6 +54,7 @@ export type TabCounts = {
   overdue: number;
   seriouslyLate: number;
   completed: number;
+  recurring: number;
 };
 
 export type ReportRow = {
@@ -75,16 +83,24 @@ export type UserOption = {
 
 export type TaskForm = {
   title: string;
+  perAssigneeDescription: boolean;
   description: string;
+  descriptions: Record<string, string>;
   dueType: TaskDueType;
   dueDate: string;
-  assigneeId: string;
+  assigneeIds: string[];
+  recurrence: '' | TaskRecurrenceType;
+  recurrenceEndDate: string;
 };
 
 export const EMPTY_TASK_FORM: TaskForm = {
   title: '',
+  perAssigneeDescription: false,
   description: '',
+  descriptions: {},
   dueType: 'STANDARD',
   dueDate: '',
-  assigneeId: '',
+  assigneeIds: [],
+  recurrence: '',
+  recurrenceEndDate: '',
 };

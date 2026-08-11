@@ -36,28 +36,57 @@ function TasksPageInner() {
         <TaskReportTab report={p.report} loading={p.reportLoading} isAdmin={p.userIsAdmin} />
       ) : null}
 
-      <TasksTable
-        tasks={p.tasks}
-        loading={p.dataLoading}
-        total={p.total}
-        page={p.page}
-        pageSize={DEFAULT_PAGE_SIZE}
-        onPageChange={p.setPage}
-        currentUserId={userId}
-        isAdmin={p.userIsAdmin}
-        onEdit={p.openEdit}
-        onDelete={p.deleteTask}
-        onComplete={p.openComplete}
-        onMessages={p.openMessages}
-        onViewProofs={p.openProofs}
-        onView={p.openView}
-      />
+      {p.tab === 'recurring' ? (
+        <TasksTable
+          tasks={p.recurringParents}
+          loading={p.recurringLoading}
+          total={p.recurringTotal}
+          page={p.page}
+          pageSize={DEFAULT_PAGE_SIZE}
+          onPageChange={p.setPage}
+          currentUserId={userId}
+          isAdmin={p.userIsAdmin}
+          onEdit={p.openEdit}
+          onDelete={p.deleteTask}
+          onComplete={p.openComplete}
+          onMessages={p.openMessages}
+          onViewProofs={p.openProofs}
+          onView={p.openView}
+          expandable
+          expandedIds={p.expandedIds}
+          childrenByParent={p.childrenByParent}
+          childrenLoading={p.childrenLoading}
+          onToggleExpand={(task) => p.toggleExpand(task.id)}
+          onStopRecurring={p.stopRecurring}
+        />
+      ) : (
+        <TasksTable
+          tasks={p.tasks}
+          loading={p.dataLoading}
+          total={p.total}
+          page={p.page}
+          pageSize={DEFAULT_PAGE_SIZE}
+          onPageChange={p.setPage}
+          currentUserId={userId}
+          isAdmin={p.userIsAdmin}
+          onEdit={p.openEdit}
+          onDelete={p.deleteTask}
+          onComplete={p.openComplete}
+          onMessages={p.openMessages}
+          onViewProofs={p.openProofs}
+          onView={p.openView}
+        />
+      )}
 
       <AddEditTaskModal
         open={p.modalOpen}
         editTask={p.editTask}
         form={p.form}
         set={p.set}
+        toggleAssignee={p.toggleAssignee}
+        setSingleAssignee={p.setSingleAssignee}
+        setDescriptionFor={p.setDescriptionFor}
+        togglePerAssigneeDescription={p.togglePerAssigneeDescription}
         errors={p.errors}
         loading={p.loading}
         users={p.users}
