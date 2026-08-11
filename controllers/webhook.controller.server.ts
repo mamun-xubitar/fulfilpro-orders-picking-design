@@ -129,7 +129,7 @@ async function maybeEnqueueTrackingRegistration(
     const trackingNumbers = extractTrackingNumbers(fulfillmentItems);
     if (trackingNumbers.length === 0) return;
 
-    const orderNumber = `${payload.order_number}`;
+    const orderNumber = payload.order_number;
     const dbOrder = await prisma.order.findUnique({
       where: { storeId_number: { storeId, number: orderNumber } },
       select: { id: true },

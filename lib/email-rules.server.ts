@@ -76,6 +76,11 @@ export async function resolveHiddenRecipientIds(rule: HiddenRule): Promise<strin
   return users.map((user) => user.id);
 }
 
+export async function resolveHiddenRecipientUsers(rule: HiddenRule): Promise<EmailRuleUser[]> {
+  const settings = await getEmailSettings();
+  return resolveHiddenRecipients(rule, settings);
+}
+
 export async function resolvePickerRecipientOptions(rule: PickerRule): Promise<EmailRulePickerOptions> {
   const settings = await getEmailSettings();
   return resolvePickerRecipients(rule, settings);

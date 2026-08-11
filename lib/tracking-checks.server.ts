@@ -53,7 +53,7 @@ export async function runPendingShipmentCheck(now: Date) {
 
   const subject = `Pending shipment alert — ${stillPending.length} order(s) not yet in transit`;
   const html = buildPendingAlertEmail(stillPending.map((t) => ({
-    orderNumber: t.order.number,
+    orderNumber: String(t.order.number),
     trackingNumber: t.trackingNumber,
     shippedAt: t.shippedAt,
     status: t.status,
@@ -75,7 +75,7 @@ export async function runPendingShipmentCheck(now: Date) {
         title: 'Pending Shipment Alert',
         body: `Order #${tracking.order.number} tracking ${tracking.trackingNumber} has been pending for over ${alertDays} days.`,
         orderId: tracking.orderId,
-        orderNumber: tracking.order.number,
+        orderNumber: String(tracking.order.number),
       });
     }
   }
@@ -135,7 +135,7 @@ export async function runPickupReminderCheck(now: Date) {
 
       const subject = `Reminder: Your parcel is ready for pickup — Day ${offset}`;
       const html = buildPickupReminderEmail({
-        orderNumber: tracking.order.number,
+        orderNumber: String(tracking.order.number),
         trackingNumber: tracking.trackingNumber,
         availableSince: pickupDate,
         dayOffset: offset,

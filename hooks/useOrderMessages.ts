@@ -17,7 +17,7 @@ export type MessageRecord = {
   createdAt: string;
 };
 
-export type OrderRef = { id: string; number: string; customer: string };
+export type OrderRef = { id: string; number: number; customer: string };
 
 export type MessageModalState<O extends OrderRef = OrderRef> = {
   order: O;

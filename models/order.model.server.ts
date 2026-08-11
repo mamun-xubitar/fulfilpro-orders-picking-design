@@ -1,15 +1,21 @@
-import prisma from '@/lib/prisma.server';
+import { detectDecoration, type DecorationKeywords } from '@/lib/decoration-detect';
+import { getDecorationKeywords } from '@/lib/decoration-keywords.server';
 import {
+  resolveHiddenRecipientUsers,
+  resolvePickerRecipientOptions,
+} from '@/lib/email-rules.server';
+import { sendAppMail } from '@/lib/email.server';
+import { createNotification } from '@/lib/notifications.server';
+import prisma from '@/lib/prisma.server';
+import { ADMIN_ROLE, getDecoratorCategories, isDecoratorRole } from '@/lib/roles';
+import {
+  cancelShopifyFulfillment,
   createShopifyFulfillment,
   updateShopifyFulfillmentTracking,
-  cancelShopifyFulfillment,
   type FulfillmentRequestLine,
   type FulfillmentTrackingInput,
 } from '@/lib/shopify-fulfillment.server';
 import { fetchShopifyOrderById } from '@/lib/shopify-order-fetch.server';
-import { detectDecoration, type DecorationKeywords } from '@/lib/decoration-detect';
-import { getDecorationKeywords } from '@/lib/decoration-keywords.server';
-import { isDecoratorRole, getDecoratorCategories } from '@/lib/roles';
 import {
   getAssignmentsByOrder,
   getDecorationSummariesByOrder,
@@ -19,20 +25,13 @@ import {
   type LineDecorationSummary,
 } from '@/models/decoration.model.server';
 import { TrackingModel, type TrackingSummary } from '@/models/tracking.model.server';
-import { sendAppMail } from '@/lib/email.server';
-import {
-  resolveHiddenRecipientEmails,
-  resolveHiddenRecipientIds,
-  resolvePickerRecipientOptions,
-} from '@/lib/email-rules.server';
-import { createNotification } from '@/lib/notifications.server';
 import { Prisma } from '@prisma/client';
 type OrderMessageTypeInput = 'orders' | 'picker';
 
 export type ShopifyOrderPayload = {
   id?: string | number;
   name?: string;
-  order_number: string | number;
+  order_number: number;
   email?: string | null;
   phone?: string | null;
   note?: string | null;
@@ -174,7 +173,7 @@ export class OrderModel {
     const { payload, storeId } = params;
     // console.log('Processing order webhook', JSON.stringify(payload, null, 2));
     const exists = await prisma.order.findUnique({
-      where: { storeId_number: {number: payload.order_number.toString(), storeId} },
+      where: { storeId_number: {number: payload.order_number, storeId} },
       select: { id: true },
     });
 
@@ -196,7 +195,7 @@ export class OrderModel {
     storeId: string;
   }) {
     const { payload, storeId } = params;
-    const number = `${payload.order_number}`;
+    const number = payload.order_number;
     const existing = await prisma.order.findUnique({
       where: {
         storeId_number: {
@@ -557,7 +556,7 @@ export class OrderModel {
         if (!nameAttr) return [];
         return [{
           orderId: order.id,
-          orderNumber: order.number,
+          orderNumber: String(order.number),
           lineItemId: item.id,
           productTitle: item.title ?? item.name,
           value: nameAttr.value,
@@ -742,7 +741,7 @@ export class OrderModel {
     const shopifyResult = await createShopifyFulfillment({
       shop: order.store.storeDomain,
       accessToken: order.store.accessToken,
-      orderNumber: order.number,
+      orderNumber: String(order.number),
       shopifyOrderId: currentFulfillmentItems.shopifyOrderId,
       notifyCustomer,
       trackingInfo,
@@ -1107,11 +1106,12 @@ export class OrderModel {
 
     const senderName = params.sender?.name?.trim() || null;
     const senderEmail = params.sender?.email?.trim() || null;
+    const includeCustomerContact = recipient.role === ADMIN_ROLE;
     await sendAppMail({
       to: [recipient.email],
       subject: `Order ${order.number} message`,
-      text: buildOrderMessageEmailText({ order, message: params.message, senderName, senderEmail }),
-      html: buildOrderMessageEmailHtml({ order, message: params.message, senderName, senderEmail }),
+      text: buildOrderMessageEmailText({ order, message: params.message, senderName, senderEmail, includeCustomerContact }),
+      html: buildOrderMessageEmailHtml({ order, message: params.message, senderName, senderEmail, includeCustomerContact }),
     });
 
     void createNotification({
@@ -1120,7 +1120,7 @@ export class OrderModel {
       title: 'New order message',
       body: `Message about Order #${order.number}`,
       orderId: order.id,
-      orderNumber: order.number,
+      orderNumber: String(order.number),
     }).catch(() => undefined);
 
     const savedMessage = await prisma.orderMessage.create({
@@ -1274,7 +1274,7 @@ function toSafeISOString(value: Date | null | undefined) {
 
 function toOrderRow(row: {
   id: string;
-  number: string;
+  number: number;
   cusName: string;
   note: string | null;
   boarcode: string | null;
@@ -1511,7 +1511,7 @@ function toOrderMessageRow(message: {
 function buildOrderCreateData(payload: ShopifyOrderPayload, storeId: string): Prisma.OrderUncheckedCreateInput {
   const data = buildOrderWriteData(payload, storeId, null);
   return {
-    number: `${payload.order_number}`,
+    number: payload.order_number,
     ...data,
   };
 }
@@ -1730,20 +1730,22 @@ function buildOrderMessageEmailText({
   message,
   senderName,
   senderEmail,
+  includeCustomerContact,
 }: {
   order: OrderEmailDetails;
   message: string;
   senderName: string | null;
   senderEmail: string | null;
+  includeCustomerContact: boolean;
 }) {
   const items = toLineItems(order.lineItems);
   return [
     `Order ${order.number}`,
     `Store: ${order.store.name ?? order.store.storeDomain}`,
     `Customer: ${order.cusName}`,
-    order.cusEmail ? `Customer email: ${order.cusEmail}` : null,
-    order.phone ? `Phone: ${order.phone}` : null,
-    order.address ? `Address: ${[order.address, order.address2, order.city, order.state, order.zip, order.country].filter(Boolean).join(', ')}` : null,
+    includeCustomerContact && order.cusEmail ? `Customer email: ${order.cusEmail}` : null,
+    includeCustomerContact && order.phone ? `Phone: ${order.phone}` : null,
+    includeCustomerContact && order.address ? `Address: ${[order.address, order.address2, order.city, order.state, order.zip, order.country].filter(Boolean).join(', ')}` : null,
     `Status: ${getDisplayStatus(order)}`,
     senderName || senderEmail ? `Sent by: ${[senderName, senderEmail].filter(Boolean).join(' - ')}` : null,
     '',
@@ -1760,11 +1762,13 @@ function buildOrderMessageEmailHtml({
   message,
   senderName,
   senderEmail,
+  includeCustomerContact,
 }: {
   order: OrderEmailDetails;
   message: string;
   senderName: string | null;
   senderEmail: string | null;
+  includeCustomerContact: boolean;
 }) {
   const items = toLineItems(order.lineItems);
   const address = [order.address, order.address2, order.city, order.state, order.zip, order.country].filter(Boolean).join(', ');
@@ -1776,9 +1780,9 @@ function buildOrderMessageEmailHtml({
       <table style="border-collapse:collapse;margin-bottom:16px">
         <tr><td style="padding:3px 12px 3px 0;color:#6b7280">Store</td><td style="padding:3px 0">${escapeHtml(order.store.name ?? order.store.storeDomain)}</td></tr>
         <tr><td style="padding:3px 12px 3px 0;color:#6b7280">Customer</td><td style="padding:3px 0">${escapeHtml(order.cusName)}</td></tr>
-        ${order.cusEmail ? `<tr><td style="padding:3px 12px 3px 0;color:#6b7280">Customer email</td><td style="padding:3px 0">${escapeHtml(order.cusEmail)}</td></tr>` : ''}
-        ${order.phone ? `<tr><td style="padding:3px 12px 3px 0;color:#6b7280">Phone</td><td style="padding:3px 0">${escapeHtml(order.phone)}</td></tr>` : ''}
-        ${address ? `<tr><td style="padding:3px 12px 3px 0;color:#6b7280">Address</td><td style="padding:3px 0">${escapeHtml(address)}</td></tr>` : ''}
+        ${includeCustomerContact && order.cusEmail ? `<tr><td style="padding:3px 12px 3px 0;color:#6b7280">Customer email</td><td style="padding:3px 0">${escapeHtml(order.cusEmail)}</td></tr>` : ''}
+        ${includeCustomerContact && order.phone ? `<tr><td style="padding:3px 12px 3px 0;color:#6b7280">Phone</td><td style="padding:3px 0">${escapeHtml(order.phone)}</td></tr>` : ''}
+        ${includeCustomerContact && address ? `<tr><td style="padding:3px 12px 3px 0;color:#6b7280">Address</td><td style="padding:3px 0">${escapeHtml(address)}</td></tr>` : ''}
         <tr><td style="padding:3px 12px 3px 0;color:#6b7280">Status</td><td style="padding:3px 0">${escapeHtml(getDisplayStatus(order))}</td></tr>
         ${sender ? `<tr><td style="padding:3px 12px 3px 0;color:#6b7280">Sent by</td><td style="padding:3px 0">${escapeHtml(sender)}</td></tr>` : ''}
       </table>
@@ -1810,7 +1814,7 @@ type StockAdjustmentItem = {
 async function upsertStockAdjustmentTask(params: {
   order: {
     id: string;
-    number: string;
+    number: number;
   };
   lineItems: ReturnType<typeof toLineItems>;
   lines: Array<{ lineItemId: string; quantity: number }>;
@@ -1867,7 +1871,7 @@ async function upsertStockAdjustmentTask(params: {
     return prisma.orderStockAdjustment.update({
       where: { id: existing.id },
       data: {
-        orderNumber: params.order.number,
+        orderNumber: String(params.order.number),
         status,
         items: items as unknown as Prisma.InputJsonValue,
         lastEventType: params.eventType,
@@ -1879,7 +1883,7 @@ async function upsertStockAdjustmentTask(params: {
   return prisma.orderStockAdjustment.create({
     data: {
       orderId: params.order.id,
-      orderNumber: params.order.number,
+      orderNumber: String(params.order.number),
       status,
       items: items as unknown as Prisma.InputJsonValue,
       lastEventType: params.eventType,
@@ -1969,34 +1973,38 @@ async function notifyAdminsAboutStockAdjustment(params: {
   const items = toStockAdjustmentItems(params.adjustment.items).filter((item) => !item.managed);
   if (items.length === 0) return;
 
-  const [recipients, recipientIds] = await Promise.all([
-    resolveHiddenRecipientEmails('stock_adjustment'),
-    resolveHiddenRecipientIds('stock_adjustment'),
-  ]);
+  const recipients = await resolveHiddenRecipientUsers('stock_adjustment');
+  const subject = `Stock adjustment needed for Order #${params.order.number}`;
 
-  if (recipients.length > 0) {
+  const groups = [
+    { emails: recipients.filter((user) => user.role === ADMIN_ROLE).map((user) => user.email), includeCustomerContact: true },
+    { emails: recipients.filter((user) => user.role !== ADMIN_ROLE).map((user) => user.email), includeCustomerContact: false },
+  ];
+
+  for (const group of groups) {
+    if (group.emails.length === 0) continue;
     await sendAppMail({
-      to: recipients,
-      subject: `Stock adjustment needed for Order #${params.order.number}`,
-      text: buildStockAdjustmentEmailText(params.order, items, params.eventType, params.originUrl),
-      html: buildStockAdjustmentEmailHtml(params.order, items, params.eventType, params.originUrl),
+      to: group.emails,
+      subject,
+      text: buildStockAdjustmentEmailText(params.order, items, params.eventType, params.originUrl, group.includeCustomerContact),
+      html: buildStockAdjustmentEmailHtml(params.order, items, params.eventType, params.originUrl, group.includeCustomerContact),
     });
   }
 
-  await Promise.all(recipientIds.map((id) =>
+  await Promise.all(recipients.map((user) =>
     createNotification({
-      recipientId: id,
+      recipientId: user.id,
       type: 'stock_adjustment',
       title: 'Stock adjustment needed',
       body: `Order #${params.order.number} — ${params.eventType.replace(/_/g, ' ')}`,
       orderId: params.order.id,
-      orderNumber: params.order.number,
+      orderNumber: String(params.order.number),
     })
   ));
 }
 
-function buildStockAdjustmentEmailText(order: OrderEmailDetails & { id: string }, items: StockAdjustmentItem[], eventType: StockAdjustmentEventType, originUrl?: string) {
-  const orderUrl = buildOrderSearchUrl(order.number, originUrl);
+function buildStockAdjustmentEmailText(order: OrderEmailDetails & { id: string }, items: StockAdjustmentItem[], eventType: StockAdjustmentEventType, originUrl: string | undefined, includeCustomerContact: boolean) {
+  const orderUrl = buildOrderSearchUrl(String(order.number), originUrl);
   const address = [order.address, order.address2, order.city, order.state, order.zip, order.country].filter(Boolean).join(', ');
 
   return [
@@ -2007,17 +2015,17 @@ function buildStockAdjustmentEmailText(order: OrderEmailDetails & { id: string }
     `Order link: ${orderUrl}`,
     `Store: ${order.store.name ?? order.store.storeDomain}`,
     `Customer: ${order.cusName}`,
-    order.cusEmail ? `Customer email: ${order.cusEmail}` : null,
-    order.phone ? `Phone: ${order.phone}` : null,
-    address ? `Address: ${address}` : null,
+    includeCustomerContact && order.cusEmail ? `Customer email: ${order.cusEmail}` : null,
+    includeCustomerContact && order.phone ? `Phone: ${order.phone}` : null,
+    includeCustomerContact && address ? `Address: ${address}` : null,
     '',
     'Products:',
     ...items.map((item, index) => `${index + 1}. ${item.name}${item.sku ? ` (${item.sku})` : ''} - ${item.action === 'restore' ? 'restore' : 'decrease'} ${item.quantity}`),
   ].filter((line): line is string => line !== null).join('\n');
 }
 
-function buildStockAdjustmentEmailHtml(order: OrderEmailDetails & { id: string }, items: StockAdjustmentItem[], eventType: StockAdjustmentEventType, originUrl?: string) {
-  const orderUrl = buildOrderSearchUrl(order.number, originUrl);
+function buildStockAdjustmentEmailHtml(order: OrderEmailDetails & { id: string }, items: StockAdjustmentItem[], eventType: StockAdjustmentEventType, originUrl: string | undefined, includeCustomerContact: boolean) {
+  const orderUrl = buildOrderSearchUrl(String(order.number), originUrl);
   const address = [order.address, order.address2, order.city, order.state, order.zip, order.country].filter(Boolean).join(', ');
 
   return `
@@ -2028,9 +2036,9 @@ function buildStockAdjustmentEmailHtml(order: OrderEmailDetails & { id: string }
         <tr><td style="padding:3px 12px 3px 0;color:#6b7280">Order</td><td style="padding:3px 0">#${escapeHtml(order.number)}</td></tr>
         <tr><td style="padding:3px 12px 3px 0;color:#6b7280">Store</td><td style="padding:3px 0">${escapeHtml(order.store.name ?? order.store.storeDomain)}</td></tr>
         <tr><td style="padding:3px 12px 3px 0;color:#6b7280">Customer</td><td style="padding:3px 0">${escapeHtml(order.cusName)}</td></tr>
-        ${order.cusEmail ? `<tr><td style="padding:3px 12px 3px 0;color:#6b7280">Customer email</td><td style="padding:3px 0">${escapeHtml(order.cusEmail)}</td></tr>` : ''}
-        ${order.phone ? `<tr><td style="padding:3px 12px 3px 0;color:#6b7280">Phone</td><td style="padding:3px 0">${escapeHtml(order.phone)}</td></tr>` : ''}
-        ${address ? `<tr><td style="padding:3px 12px 3px 0;color:#6b7280">Address</td><td style="padding:3px 0">${escapeHtml(address)}</td></tr>` : ''}
+        ${includeCustomerContact && order.cusEmail ? `<tr><td style="padding:3px 12px 3px 0;color:#6b7280">Customer email</td><td style="padding:3px 0">${escapeHtml(order.cusEmail)}</td></tr>` : ''}
+        ${includeCustomerContact && order.phone ? `<tr><td style="padding:3px 12px 3px 0;color:#6b7280">Phone</td><td style="padding:3px 0">${escapeHtml(order.phone)}</td></tr>` : ''}
+        ${includeCustomerContact && address ? `<tr><td style="padding:3px 12px 3px 0;color:#6b7280">Address</td><td style="padding:3px 0">${escapeHtml(address)}</td></tr>` : ''}
       </table>
       <p style="margin:0 0 16px"><a href="${escapeHtml(orderUrl)}" style="color:#2563eb">Open order search</a></p>
       <table style="border-collapse:collapse;width:100%;font-size:14px">
@@ -2054,7 +2062,7 @@ function buildOrderSearchUrl(orderNumber: string, originUrl?: string) {
 
 type OrderEmailDetails = {
   id?: string;
-  number: string;
+  number: number;
   cusName: string;
   cusEmail: string | null;
   phone: string | null;
@@ -2267,7 +2275,7 @@ function buildTokenSearchSql(tokens: string[], searchField?: string) {
 function buildFieldConditionsForToken(token: string, searchField?: string): Prisma.Sql[] {
   switch (searchField) {
     case 'number':
-      return [ilikeContains(Prisma.sql`o."number"`, token)];
+      return [ilikeContains(Prisma.sql`o."number"::text`, token)];
     case 'customer':
       return [ilikeContains(Prisma.sql`o."cusName"`, token)];
     case 'address':
@@ -2282,7 +2290,7 @@ function buildFieldConditionsForToken(token: string, searchField?: string): Pris
       return [ilikeContains(Prisma.sql`o."lineItems"::text`, token)];
     default:
       return [
-        ilikeContains(Prisma.sql`o."number"`, token),
+        ilikeContains(Prisma.sql`o."number"::text`, token),
         ilikeContains(Prisma.sql`o."cusName"`, token),
         ilikeContains(Prisma.sql`o."cusEmail"`, token),
         ilikeContains(Prisma.sql`o."boarcode"`, token),
@@ -2312,11 +2320,11 @@ function buildSearchOrderBySql(sort: 'number' | 'customer' | 'orderedAt' | undef
 function buildOrderSearchRankSql(tokens: string[]) {
   const terms = uniqueSearchTerms(tokens);
   return Prisma.sql`CASE
-    WHEN ${anyTerm(terms, (term) => Prisma.sql`o."number" = ${term}`)} THEN 0
-    WHEN ${anyTerm(terms, (term) => ilikeStartsWith(Prisma.sql`o."number"`, term))} THEN 1
+    WHEN ${anyTerm(terms, (term) => Prisma.sql`o."number"::text = ${term}`)} THEN 0
+    WHEN ${anyTerm(terms, (term) => ilikeStartsWith(Prisma.sql`o."number"::text`, term))} THEN 1
     WHEN ${anyTerm(terms, (term) => ilikeExact(Prisma.sql`o."boarcode"`, term))} THEN 2
     WHEN ${anyTerm(terms, (term) => ilikeStartsWith(Prisma.sql`o."boarcode"`, term))} THEN 3
-    WHEN ${anyTerm(terms, (term) => ilikeContains(Prisma.sql`o."number"`, term))} THEN 4
+    WHEN ${anyTerm(terms, (term) => ilikeContains(Prisma.sql`o."number"::text`, term))} THEN 4
     WHEN ${anyTerm(terms, (term) => ilikeContains(Prisma.sql`o."boarcode"`, term))} THEN 5
     WHEN ${anyTerm(terms, (term) => Prisma.sql`(${ilikeExact(Prisma.sql`o."cusName"`, term)} OR ${ilikeExact(Prisma.sql`o."cusEmail"`, term)})`)} THEN 6
     WHEN ${anyTerm(terms, (term) => Prisma.sql`(${ilikeStartsWith(Prisma.sql`o."cusName"`, term)} OR ${ilikeStartsWith(Prisma.sql`o."cusEmail"`, term)})`)} THEN 7

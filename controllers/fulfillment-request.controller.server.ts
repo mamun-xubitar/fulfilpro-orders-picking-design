@@ -109,7 +109,9 @@ function parseCreateRequest(body: unknown) {
   const v = body as Record<string, unknown>;
 
   const orderId = typeof v.orderId === 'string' ? v.orderId.trim() : '';
-  const orderNumber = typeof v.orderNumber === 'string' ? v.orderNumber.trim() : '';
+  const orderNumber = typeof v.orderNumber === 'number'
+    ? String(v.orderNumber)
+    : typeof v.orderNumber === 'string' ? v.orderNumber.trim() : '';
   const fulfillmentId = typeof v.fulfillmentId === 'string' ? v.fulfillmentId.trim() : '';
   if (!orderId) throw new Error('orderId is required');
   if (!orderNumber) throw new Error('orderNumber is required');

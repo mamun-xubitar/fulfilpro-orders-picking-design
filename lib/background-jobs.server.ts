@@ -108,7 +108,7 @@ async function runRegisterTracking(payload: Record<string, unknown>) {
       const row = await trackingModel.upsertFromOrder({
         orderId: order.id,
         storeId: order.storeId,
-        orderNumber: order.number,
+        orderNumber: String(order.number),
         trackingNumber: accepted.number,
         carrier: accepted.carrier ?? null,
         registrationStatus: 'registered',
@@ -153,7 +153,7 @@ async function runBulkRegisterTracking(payload: Record<string, unknown>) {
           const row = await trackingModel.upsertFromOrder({
             orderId: order.id,
             storeId: order.storeId,
-            orderNumber: order.number,
+            orderNumber: String(order.number),
             trackingNumber: accepted.number,
             carrier: accepted.carrier ?? null,
             registrationStatus: 'registered',
