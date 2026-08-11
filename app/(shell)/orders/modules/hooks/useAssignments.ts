@@ -45,7 +45,7 @@ export function useAssignments({ setOrders, blockTestModeAction }: UseAssignment
     if (blockTestModeAction()) return;
     setAssignModal({
       orderId: order.id,
-      orderNumber: order.number,
+      orderNumber: String(order.number),
       lineItemId: item.id,
       productName: item.name || item.title || item.sku || 'Item',
       assignments: item.assignments ?? [],

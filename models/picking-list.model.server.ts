@@ -260,7 +260,7 @@ export class PickingListModel {
     const saved = await prisma.orderPackingConfirmation.create({
       data: {
         orderId: order.id,
-        orderNumber: order.number,
+        orderNumber: String(order.number),
         lines: normalizedLines as Prisma.InputJsonValue,
         notifyRecipients: recipients as Prisma.InputJsonValue,
         notifyMessage: params.notifyMessage || null,
@@ -354,7 +354,7 @@ export class PickingListModel {
     await prisma.orderPickingSlipPrint.createMany({
       data: params.orders.map((order) => ({
         orderId: order.orderId,
-        orderNumber: orderNumberById.get(order.orderId) ?? '',
+        orderNumber: String(orderNumberById.get(order.orderId) ?? ''),
         items: order.items as Prisma.InputJsonValue,
         pickerId: params.actor?.id ?? null,
         pickerName: params.actor?.name ?? null,
@@ -609,7 +609,7 @@ function buildPickingTokenSearchSql(tokens: string[], searchField?: string) {
 function buildPickingFieldConditionsForToken(token: string, searchField?: string): Prisma.Sql[] {
   switch (searchField) {
     case 'number':
-      return [ilikeContains(Prisma.sql`o."number"`, token)];
+      return [ilikeContains(Prisma.sql`o."number"::text`, token)];
     case 'customer':
       return [ilikeContains(Prisma.sql`o."cusName"`, token)];
     case 'address':
@@ -626,7 +626,7 @@ function buildPickingFieldConditionsForToken(token: string, searchField?: string
       return [ilikeContains(Prisma.sql`o."boarcode"`, token)];
     default:
       return [
-        ilikeContains(Prisma.sql`o."number"`, token),
+        ilikeContains(Prisma.sql`o."number"::text`, token),
         ilikeContains(Prisma.sql`o."cusName"`, token),
         ilikeContains(Prisma.sql`o."cusEmail"`, token),
         ilikeContains(Prisma.sql`o."boarcode"`, token),
@@ -646,11 +646,11 @@ function buildPickingFieldConditionsForToken(token: string, searchField?: string
 function buildPickingOrderSearchRankSql(tokens: string[]) {
   const terms = uniqueSearchTerms(tokens);
   return Prisma.sql`CASE
-    WHEN ${anyTerm(terms, (term) => Prisma.sql`o."number" = ${term}`)} THEN 0
-    WHEN ${anyTerm(terms, (term) => ilikeStartsWith(Prisma.sql`o."number"`, term))} THEN 1
+    WHEN ${anyTerm(terms, (term) => Prisma.sql`o."number"::text = ${term}`)} THEN 0
+    WHEN ${anyTerm(terms, (term) => ilikeStartsWith(Prisma.sql`o."number"::text`, term))} THEN 1
     WHEN ${anyTerm(terms, (term) => ilikeExact(Prisma.sql`o."boarcode"`, term))} THEN 2
     WHEN ${anyTerm(terms, (term) => ilikeStartsWith(Prisma.sql`o."boarcode"`, term))} THEN 3
-    WHEN ${anyTerm(terms, (term) => ilikeContains(Prisma.sql`o."number"`, term))} THEN 4
+    WHEN ${anyTerm(terms, (term) => ilikeContains(Prisma.sql`o."number"::text`, term))} THEN 4
     WHEN ${anyTerm(terms, (term) => ilikeContains(Prisma.sql`o."boarcode"`, term))} THEN 5
     WHEN ${anyTerm(terms, (term) => Prisma.sql`(${ilikeExact(Prisma.sql`o."cusName"`, term)} OR ${ilikeExact(Prisma.sql`o."cusEmail"`, term)})`)} THEN 6
     WHEN ${anyTerm(terms, (term) => Prisma.sql`(${ilikeStartsWith(Prisma.sql`o."cusName"`, term)} OR ${ilikeStartsWith(Prisma.sql`o."cusEmail"`, term)})`)} THEN 7
@@ -700,7 +700,7 @@ function buildLikePattern(value: string, mode: 'startsWith' | 'contains') {
 
 function toPickingOrderRow(order: {
   id: string;
-  number: string;
+  number: number;
   boarcode: string | null;
   cusName: string;
   cusEmail: string | null;
@@ -1019,7 +1019,7 @@ function toConfiguredRecipients(userIds: string[], allowedUsers: NotifyRecipient
 
 async function sendPackingEmail(params: {
   type: 'confirmed' | 'canceled';
-  order: { id: string; number: string; cusName: string; store: { name: string | null; storeDomain: string } };
+  order: { id: string; number: number; cusName: string; store: { name: string | null; storeDomain: string } };
   lines: PickingLineInput[];
   items: OrderItem[];
   recipients: NotifyRecipient[];
@@ -1050,7 +1050,7 @@ async function sendPackingEmail(params: {
       title: `Packing ${params.type}`,
       body: `Order #${params.order.number} packing ${params.type} by ${params.actor?.name || 'picker'}`,
       orderId: params.order.id,
-      orderNumber: params.order.number,
+      orderNumber: String(params.order.number),
     })
   ));
 }

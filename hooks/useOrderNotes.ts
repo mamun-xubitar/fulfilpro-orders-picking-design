@@ -17,7 +17,7 @@ export type NoteRecord = {
   updatedAt: string;
 };
 
-export type OrderRef = { id: string; number: string; customer: string };
+export type OrderRef = { id: string; number: number; customer: string };
 
 export type NoteModalState<O extends OrderRef = OrderRef> = {
   order: O;

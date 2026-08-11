@@ -143,7 +143,7 @@ export type TrackingSummary = {
 
 export type OrderRow = {
   id: string;
-  number: string;
+  number: number;
   customer: string;
   note: string | null;
   address: string | null;
@@ -247,7 +247,7 @@ export type BackInStockRequest = {
 };
 export type PackingSlipLabel = {
   id: string;
-  number: string;
+  number: number;
   customer: string;
   address: string | null;
   address2: string | null;

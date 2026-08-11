@@ -141,7 +141,7 @@ export class BackInStockModel {
     const request = await prisma.backInStockRequest.create({
       data: {
         orderId: order.id,
-        orderNumber: order.number,
+        orderNumber: String(order.number),
         requesterId: params.requester.id,
         requesterName: params.requester.name,
         requesterEmail: params.requester.email,

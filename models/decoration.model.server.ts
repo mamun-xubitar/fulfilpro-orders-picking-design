@@ -347,7 +347,7 @@ async function getLineItemContext(orderId: string, lineItemId: string) {
     }
   }
 
-  return { orderNumber: order.number, qty, fulfilledQty };
+  return { orderNumber: String(order.number), qty, fulfilledQty };
 }
 
 export class DecorationModel {
@@ -399,7 +399,7 @@ export class DecorationModel {
       where: { orderId_lineItemId_assigneeId: { orderId, lineItemId, assigneeId } },
       create: {
         orderId,
-        orderNumber: order.number,
+        orderNumber: String(order.number),
         lineItemId,
         assigneeId: assignee.id,
         assigneeName: assignee.name,
@@ -426,7 +426,7 @@ export class DecorationModel {
       to: assignee.email,
       assigneeName: assignee.name,
       role: assignee.role,
-      orderNumber: order.number,
+      orderNumber: String(order.number),
       productTitle,
       dueDate,
     });
@@ -437,7 +437,7 @@ export class DecorationModel {
       title: 'New assignment',
       body: `You've been assigned to Order #${order.number}${productTitle ? ` — ${productTitle}` : ''}${dueDate ? ` (due ${dueDate})` : ''}`,
       orderId,
-      orderNumber: order.number,
+      orderNumber: String(order.number),
       lineItemId,
     });
 
@@ -457,7 +457,7 @@ export class DecorationModel {
       select: { number: true, lineItems: true },
     });
     if (!order) throw new Error('Order not found');
-    return { orderNumber: order.number, productTitle: findLineItemTitle(order.lineItems, lineItemId) };
+    return { orderNumber: String(order.number), productTitle: findLineItemTitle(order.lineItems, lineItemId) };
   }
 
   async createWork(params: {

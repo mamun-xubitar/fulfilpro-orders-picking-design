@@ -72,7 +72,7 @@ model Store {
 
 model Order {
   id                     String                     @id @default(uuid())
-  number                 String
+  number                 Int
   cusName                String
   cusEmail               String?
   address                String?
