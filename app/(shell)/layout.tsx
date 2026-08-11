@@ -1,5 +1,5 @@
 "use client";
-import LoginManager from "@/app/(shell)/LoginManager";
+// import LoginManager from "@/app/(shell)/LoginManager";
 import LoginManagerModal from "@/app/(shell)/LoginManagerModal";
 import LoginManagerNavTrigger from "@/app/(shell)/LoginManagerNavTrigger";
 import MessagesChatButton from "@/app/(shell)/MessagesChatButton";
@@ -616,7 +616,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
 
             <TasksButton isAdmin={user?.role === "admin"} />
             {user?.id && <MessagesChatButton unreadCount={unreadMessageCount} currentUserId={user.id} />}
-            <LoginManager isAdmin={user?.role === "admin"} onOpen={() => loginManager.setOpen(true)} />
+            {/* <LoginManager isAdmin={user?.role === "admin"} onOpen={() => loginManager.setOpen(true)} /> */}
             <NotificationBell isAdmin={user?.role === "admin"} />
             <span className="text-sm text-gray-600 hidden sm:block">{user?.name}</span>
             <button
