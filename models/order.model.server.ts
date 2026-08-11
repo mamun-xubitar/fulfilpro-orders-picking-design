@@ -9,7 +9,7 @@ import {
 import { fetchShopifyOrderById } from '@/lib/shopify-order-fetch.server';
 import { detectDecoration, type DecorationKeywords } from '@/lib/decoration-detect';
 import { getDecorationKeywords } from '@/lib/decoration-keywords.server';
-import { isDecoratorRole, getDecoratorCategories } from '@/lib/roles';
+import { isDecoratorRole, getDecoratorCategories, ADMIN_ROLE } from '@/lib/roles';
 import {
   getAssignmentsByOrder,
   getDecorationSummariesByOrder,
@@ -21,8 +21,7 @@ import {
 import { TrackingModel, type TrackingSummary } from '@/models/tracking.model.server';
 import { sendAppMail } from '@/lib/email.server';
 import {
-  resolveHiddenRecipientEmails,
-  resolveHiddenRecipientIds,
+  resolveHiddenRecipientUsers,
   resolvePickerRecipientOptions,
 } from '@/lib/email-rules.server';
 import { createNotification } from '@/lib/notifications.server';
@@ -1107,11 +1106,12 @@ export class OrderModel {
 
     const senderName = params.sender?.name?.trim() || null;
     const senderEmail = params.sender?.email?.trim() || null;
+    const includeCustomerContact = recipient.role === ADMIN_ROLE;
     await sendAppMail({
       to: [recipient.email],
       subject: `Order ${order.number} message`,
-      text: buildOrderMessageEmailText({ order, message: params.message, senderName, senderEmail }),
-      html: buildOrderMessageEmailHtml({ order, message: params.message, senderName, senderEmail }),
+      text: buildOrderMessageEmailText({ order, message: params.message, senderName, senderEmail, includeCustomerContact }),
+      html: buildOrderMessageEmailHtml({ order, message: params.message, senderName, senderEmail, includeCustomerContact }),
     });
 
     void createNotification({
@@ -1730,20 +1730,22 @@ function buildOrderMessageEmailText({
   message,
   senderName,
   senderEmail,
+  includeCustomerContact,
 }: {
   order: OrderEmailDetails;
   message: string;
   senderName: string | null;
   senderEmail: string | null;
+  includeCustomerContact: boolean;
 }) {
   const items = toLineItems(order.lineItems);
   return [
     `Order ${order.number}`,
     `Store: ${order.store.name ?? order.store.storeDomain}`,
     `Customer: ${order.cusName}`,
-    order.cusEmail ? `Customer email: ${order.cusEmail}` : null,
-    order.phone ? `Phone: ${order.phone}` : null,
-    order.address ? `Address: ${[order.address, order.address2, order.city, order.state, order.zip, order.country].filter(Boolean).join(', ')}` : null,
+    includeCustomerContact && order.cusEmail ? `Customer email: ${order.cusEmail}` : null,
+    includeCustomerContact && order.phone ? `Phone: ${order.phone}` : null,
+    includeCustomerContact && order.address ? `Address: ${[order.address, order.address2, order.city, order.state, order.zip, order.country].filter(Boolean).join(', ')}` : null,
     `Status: ${getDisplayStatus(order)}`,
     senderName || senderEmail ? `Sent by: ${[senderName, senderEmail].filter(Boolean).join(' - ')}` : null,
     '',
@@ -1760,11 +1762,13 @@ function buildOrderMessageEmailHtml({
   message,
   senderName,
   senderEmail,
+  includeCustomerContact,
 }: {
   order: OrderEmailDetails;
   message: string;
   senderName: string | null;
   senderEmail: string | null;
+  includeCustomerContact: boolean;
 }) {
   const items = toLineItems(order.lineItems);
   const address = [order.address, order.address2, order.city, order.state, order.zip, order.country].filter(Boolean).join(', ');
@@ -1776,9 +1780,9 @@ function buildOrderMessageEmailHtml({
       <table style="border-collapse:collapse;margin-bottom:16px">
         <tr><td style="padding:3px 12px 3px 0;color:#6b7280">Store</td><td style="padding:3px 0">${escapeHtml(order.store.name ?? order.store.storeDomain)}</td></tr>
         <tr><td style="padding:3px 12px 3px 0;color:#6b7280">Customer</td><td style="padding:3px 0">${escapeHtml(order.cusName)}</td></tr>
-        ${order.cusEmail ? `<tr><td style="padding:3px 12px 3px 0;color:#6b7280">Customer email</td><td style="padding:3px 0">${escapeHtml(order.cusEmail)}</td></tr>` : ''}
-        ${order.phone ? `<tr><td style="padding:3px 12px 3px 0;color:#6b7280">Phone</td><td style="padding:3px 0">${escapeHtml(order.phone)}</td></tr>` : ''}
-        ${address ? `<tr><td style="padding:3px 12px 3px 0;color:#6b7280">Address</td><td style="padding:3px 0">${escapeHtml(address)}</td></tr>` : ''}
+        ${includeCustomerContact && order.cusEmail ? `<tr><td style="padding:3px 12px 3px 0;color:#6b7280">Customer email</td><td style="padding:3px 0">${escapeHtml(order.cusEmail)}</td></tr>` : ''}
+        ${includeCustomerContact && order.phone ? `<tr><td style="padding:3px 12px 3px 0;color:#6b7280">Phone</td><td style="padding:3px 0">${escapeHtml(order.phone)}</td></tr>` : ''}
+        ${includeCustomerContact && address ? `<tr><td style="padding:3px 12px 3px 0;color:#6b7280">Address</td><td style="padding:3px 0">${escapeHtml(address)}</td></tr>` : ''}
         <tr><td style="padding:3px 12px 3px 0;color:#6b7280">Status</td><td style="padding:3px 0">${escapeHtml(getDisplayStatus(order))}</td></tr>
         ${sender ? `<tr><td style="padding:3px 12px 3px 0;color:#6b7280">Sent by</td><td style="padding:3px 0">${escapeHtml(sender)}</td></tr>` : ''}
       </table>
@@ -1969,23 +1973,27 @@ async function notifyAdminsAboutStockAdjustment(params: {
   const items = toStockAdjustmentItems(params.adjustment.items).filter((item) => !item.managed);
   if (items.length === 0) return;
 
-  const [recipients, recipientIds] = await Promise.all([
-    resolveHiddenRecipientEmails('stock_adjustment'),
-    resolveHiddenRecipientIds('stock_adjustment'),
-  ]);
+  const recipients = await resolveHiddenRecipientUsers('stock_adjustment');
+  const subject = `Stock adjustment needed for Order #${params.order.number}`;
 
-  if (recipients.length > 0) {
+  const groups = [
+    { emails: recipients.filter((user) => user.role === ADMIN_ROLE).map((user) => user.email), includeCustomerContact: true },
+    { emails: recipients.filter((user) => user.role !== ADMIN_ROLE).map((user) => user.email), includeCustomerContact: false },
+  ];
+
+  for (const group of groups) {
+    if (group.emails.length === 0) continue;
     await sendAppMail({
-      to: recipients,
-      subject: `Stock adjustment needed for Order #${params.order.number}`,
-      text: buildStockAdjustmentEmailText(params.order, items, params.eventType, params.originUrl),
-      html: buildStockAdjustmentEmailHtml(params.order, items, params.eventType, params.originUrl),
+      to: group.emails,
+      subject,
+      text: buildStockAdjustmentEmailText(params.order, items, params.eventType, params.originUrl, group.includeCustomerContact),
+      html: buildStockAdjustmentEmailHtml(params.order, items, params.eventType, params.originUrl, group.includeCustomerContact),
     });
   }
 
-  await Promise.all(recipientIds.map((id) =>
+  await Promise.all(recipients.map((user) =>
     createNotification({
-      recipientId: id,
+      recipientId: user.id,
       type: 'stock_adjustment',
       title: 'Stock adjustment needed',
       body: `Order #${params.order.number} — ${params.eventType.replace(/_/g, ' ')}`,
@@ -1995,7 +2003,7 @@ async function notifyAdminsAboutStockAdjustment(params: {
   ));
 }
 
-function buildStockAdjustmentEmailText(order: OrderEmailDetails & { id: string }, items: StockAdjustmentItem[], eventType: StockAdjustmentEventType, originUrl?: string) {
+function buildStockAdjustmentEmailText(order: OrderEmailDetails & { id: string }, items: StockAdjustmentItem[], eventType: StockAdjustmentEventType, originUrl: string | undefined, includeCustomerContact: boolean) {
   const orderUrl = buildOrderSearchUrl(order.number, originUrl);
   const address = [order.address, order.address2, order.city, order.state, order.zip, order.country].filter(Boolean).join(', ');
 
@@ -2007,16 +2015,16 @@ function buildStockAdjustmentEmailText(order: OrderEmailDetails & { id: string }
     `Order link: ${orderUrl}`,
     `Store: ${order.store.name ?? order.store.storeDomain}`,
     `Customer: ${order.cusName}`,
-    order.cusEmail ? `Customer email: ${order.cusEmail}` : null,
-    order.phone ? `Phone: ${order.phone}` : null,
-    address ? `Address: ${address}` : null,
+    includeCustomerContact && order.cusEmail ? `Customer email: ${order.cusEmail}` : null,
+    includeCustomerContact && order.phone ? `Phone: ${order.phone}` : null,
+    includeCustomerContact && address ? `Address: ${address}` : null,
     '',
     'Products:',
     ...items.map((item, index) => `${index + 1}. ${item.name}${item.sku ? ` (${item.sku})` : ''} - ${item.action === 'restore' ? 'restore' : 'decrease'} ${item.quantity}`),
   ].filter((line): line is string => line !== null).join('\n');
 }
 
-function buildStockAdjustmentEmailHtml(order: OrderEmailDetails & { id: string }, items: StockAdjustmentItem[], eventType: StockAdjustmentEventType, originUrl?: string) {
+function buildStockAdjustmentEmailHtml(order: OrderEmailDetails & { id: string }, items: StockAdjustmentItem[], eventType: StockAdjustmentEventType, originUrl: string | undefined, includeCustomerContact: boolean) {
   const orderUrl = buildOrderSearchUrl(order.number, originUrl);
   const address = [order.address, order.address2, order.city, order.state, order.zip, order.country].filter(Boolean).join(', ');
 
@@ -2028,9 +2036,9 @@ function buildStockAdjustmentEmailHtml(order: OrderEmailDetails & { id: string }
         <tr><td style="padding:3px 12px 3px 0;color:#6b7280">Order</td><td style="padding:3px 0">#${escapeHtml(order.number)}</td></tr>
         <tr><td style="padding:3px 12px 3px 0;color:#6b7280">Store</td><td style="padding:3px 0">${escapeHtml(order.store.name ?? order.store.storeDomain)}</td></tr>
         <tr><td style="padding:3px 12px 3px 0;color:#6b7280">Customer</td><td style="padding:3px 0">${escapeHtml(order.cusName)}</td></tr>
-        ${order.cusEmail ? `<tr><td style="padding:3px 12px 3px 0;color:#6b7280">Customer email</td><td style="padding:3px 0">${escapeHtml(order.cusEmail)}</td></tr>` : ''}
-        ${order.phone ? `<tr><td style="padding:3px 12px 3px 0;color:#6b7280">Phone</td><td style="padding:3px 0">${escapeHtml(order.phone)}</td></tr>` : ''}
-        ${address ? `<tr><td style="padding:3px 12px 3px 0;color:#6b7280">Address</td><td style="padding:3px 0">${escapeHtml(address)}</td></tr>` : ''}
+        ${includeCustomerContact && order.cusEmail ? `<tr><td style="padding:3px 12px 3px 0;color:#6b7280">Customer email</td><td style="padding:3px 0">${escapeHtml(order.cusEmail)}</td></tr>` : ''}
+        ${includeCustomerContact && order.phone ? `<tr><td style="padding:3px 12px 3px 0;color:#6b7280">Phone</td><td style="padding:3px 0">${escapeHtml(order.phone)}</td></tr>` : ''}
+        ${includeCustomerContact && address ? `<tr><td style="padding:3px 12px 3px 0;color:#6b7280">Address</td><td style="padding:3px 0">${escapeHtml(address)}</td></tr>` : ''}
       </table>
       <p style="margin:0 0 16px"><a href="${escapeHtml(orderUrl)}" style="color:#2563eb">Open order search</a></p>
       <table style="border-collapse:collapse;width:100%;font-size:14px">
