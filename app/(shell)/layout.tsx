@@ -268,6 +268,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
       pickerHidden: true,
       adminDecoratorOnly: false,
       children: [
+        { id: "inventory-dev", label: "Inventory (New)", href: "/inventory/inventory-dev" },
         { id: "suppliers", label: "Suppliers", href: "/inventory/suppliers" },
         { id: "config", label: "Configuration", href: "/inventory/config" },
       ],
