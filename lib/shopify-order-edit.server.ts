@@ -11,11 +11,12 @@ export type CalculatedLine = {
   editableQuantity: number;
   restockable: boolean;
   hasVariant: boolean;
+  unitPrice: string;
 };
 
 export type OrderEditAction =
   | { kind: 'setQuantity'; lineItemId: string; quantity: number; restock: boolean }
-  | { kind: 'renameCustom'; lineItemId: string; title: string; quantity: number; price: string }
+  | { kind: 'renameCustom'; lineItemId: string; title: string; quantity: number }
   | { kind: 'addVariant'; variantId: string; quantity: number }
   | { kind: 'addCustomItem'; title: string; price: string; quantity: number };
 
@@ -26,6 +27,7 @@ const ORDER_EDIT_BEGIN_MUTATION = `
     orderEditBegin(id: $id) {
       calculatedOrder {
         id
+        originalOrder { presentmentCurrencyCode }
         lineItems(first: 100) {
           edges {
             node {
@@ -36,6 +38,7 @@ const ORDER_EDIT_BEGIN_MUTATION = `
               editableQuantity
               restockable
               variant { id }
+              discountedUnitPriceSet { presentmentMoney { amount } }
             }
           }
         }
@@ -81,6 +84,33 @@ const ORDER_EDIT_COMMIT_MUTATION = `
   }
 `;
 
+const ORDER_PRESENTMENT_CURRENCY_QUERY = `
+  query OrderPresentmentCurrency($id: ID!) {
+    order(id: $id) { presentmentCurrencyCode }
+  }
+`;
+
+/**
+ * Read-only lookup used to label prices in the UI before an edit session
+ * starts — does not open an orderEditBegin session like beginOrderEdit does.
+ */
+export async function getPresentmentCurrencyCode(params: {
+  shop: string;
+  accessToken: string;
+  shopifyOrderId: string;
+}): Promise<string> {
+  const data = await shopifyGraphQL<{ order: { presentmentCurrencyCode: string } | null }>(
+    params.shop,
+    params.accessToken,
+    ORDER_PRESENTMENT_CURRENCY_QUERY,
+    { id: params.shopifyOrderId }
+  );
+  if (!data.order) {
+    throw new Error('Order not found on Shopify');
+  }
+  return data.order.presentmentCurrencyCode;
+}
+
 type CalculatedOrderLineItemNode = {
   id: string;
   title: string;
@@ -89,16 +119,21 @@ type CalculatedOrderLineItemNode = {
   editableQuantity: number;
   restockable: boolean;
   variant: { id: string } | null;
+  discountedUnitPriceSet: { presentmentMoney: { amount: string } };
 };
 
 export async function beginOrderEdit(params: {
   shop: string;
   accessToken: string;
   shopifyOrderId: string;
-}): Promise<{ calculatedOrderId: string; lines: CalculatedLine[] }> {
+}): Promise<{ calculatedOrderId: string; presentmentCurrencyCode: string; lines: CalculatedLine[] }> {
   const data = await runOrderEditMutation<{
     orderEditBegin: {
-      calculatedOrder: { id: string; lineItems: { edges: Array<{ node: CalculatedOrderLineItemNode }> } } | null;
+      calculatedOrder: {
+        id: string;
+        originalOrder: { presentmentCurrencyCode: string };
+        lineItems: { edges: Array<{ node: CalculatedOrderLineItemNode }> };
+      } | null;
       userErrors: ShopifyUserError[];
     };
   }>(params.shop, params.accessToken, ORDER_EDIT_BEGIN_MUTATION, { id: params.shopifyOrderId });
@@ -118,9 +153,14 @@ export async function beginOrderEdit(params: {
     editableQuantity: node.editableQuantity,
     restockable: node.restockable,
     hasVariant: Boolean(node.variant),
+    unitPrice: node.discountedUnitPriceSet.presentmentMoney.amount,
   }));
 
-  return { calculatedOrderId: calculatedOrder.id, lines };
+  return {
+    calculatedOrderId: calculatedOrder.id,
+    presentmentCurrencyCode: calculatedOrder.originalOrder.presentmentCurrencyCode,
+    lines,
+  };
 }
 
 /**
@@ -132,23 +172,22 @@ export async function applyOrderEdit(params: {
   shop: string;
   accessToken: string;
   shopifyOrderId: string;
-  currencyCode: string;
   actions: OrderEditAction[];
   notifyCustomer?: boolean;
   staffNote?: string;
 }): Promise<{ orderId: string }> {
-  const { shop, accessToken, currencyCode } = params;
-  const { calculatedOrderId, lines } = await beginOrderEdit(params);
+  const { shop, accessToken } = params;
+  const { calculatedOrderId, presentmentCurrencyCode, lines } = await beginOrderEdit(params);
 
-  const resolveLineItemId = (lineItemId: string, expected?: { sku: string | null; title: string; quantity: number }) => {
+  const resolveLine = (lineItemId: string, expected?: { sku: string | null; title: string; quantity: number }) => {
     const byId = lines.find((line) => line.lineItemLegacyId === lineItemId);
-    if (byId) return byId.calculatedLineItemId;
+    if (byId) return byId;
 
     if (expected) {
       const byFallback = lines.find(
         (line) => line.sku === expected.sku && line.title === expected.title && line.quantity === expected.quantity
       );
-      if (byFallback) return byFallback.calculatedLineItemId;
+      if (byFallback) return byFallback;
     }
 
     throw new Error('Line item is no longer editable on this Shopify order — refresh and retry.');
@@ -156,21 +195,21 @@ export async function applyOrderEdit(params: {
 
   for (const action of params.actions) {
     if (action.kind === 'setQuantity') {
-      const calculatedLineItemId = resolveLineItemId(action.lineItemId);
+      const line = resolveLine(action.lineItemId);
       const data = await runOrderEditMutation<{ orderEditSetQuantity: { userErrors: ShopifyUserError[] } }>(
         shop,
         accessToken,
         ORDER_EDIT_SET_QUANTITY_MUTATION,
-        { id: calculatedOrderId, lineItemId: calculatedLineItemId, quantity: action.quantity, restock: action.restock }
+        { id: calculatedOrderId, lineItemId: line.calculatedLineItemId, quantity: action.quantity, restock: action.restock }
       );
       assertNoUserErrors(data.orderEditSetQuantity.userErrors);
     } else if (action.kind === 'renameCustom') {
-      const calculatedLineItemId = resolveLineItemId(action.lineItemId);
+      const line = resolveLine(action.lineItemId);
       const removeData = await runOrderEditMutation<{ orderEditSetQuantity: { userErrors: ShopifyUserError[] } }>(
         shop,
         accessToken,
         ORDER_EDIT_SET_QUANTITY_MUTATION,
-        { id: calculatedOrderId, lineItemId: calculatedLineItemId, quantity: 0, restock: false }
+        { id: calculatedOrderId, lineItemId: line.calculatedLineItemId, quantity: 0, restock: false }
       );
       assertNoUserErrors(removeData.orderEditSetQuantity.userErrors);
 
@@ -181,7 +220,7 @@ export async function applyOrderEdit(params: {
         {
           id: calculatedOrderId,
           title: action.title,
-          price: { amount: action.price, currencyCode },
+          price: { amount: line.unitPrice, currencyCode: presentmentCurrencyCode },
           quantity: action.quantity,
           requiresShipping: true,
           taxable: true,
@@ -204,7 +243,7 @@ export async function applyOrderEdit(params: {
         {
           id: calculatedOrderId,
           title: action.title,
-          price: { amount: action.price, currencyCode },
+          price: { amount: action.price, currencyCode: presentmentCurrencyCode },
           quantity: action.quantity,
           requiresShipping: true,
           taxable: true,

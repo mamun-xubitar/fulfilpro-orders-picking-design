@@ -143,10 +143,23 @@ export function useLineItemEditing({ setOrders, blockTestModeAction, userIsAdmin
       selectedVariantId: '',
       customTitle: '',
       customPrice: '',
+      currencyCode: null,
       quantity: 1,
       saving: false,
       error: '',
     });
+    void fetchAddLineItemCurrency(order.id);
+  };
+
+  const fetchAddLineItemCurrency = async (orderId: string) => {
+    try {
+      const res = await fetch(`/api/orders/${orderId}/currency`);
+      const json = (await res.json()) as ApiResponse<{ currencyCode: string }>;
+      if (!res.ok || !json.success) return;
+      setAddLineItemModal((prev) => (prev ? { ...prev, currencyCode: json.data.currencyCode } : prev));
+    } catch {
+      // Currency label is informational only — silently skip on failure.
+    }
   };
 
   const closeAddLineItemModal = () => {

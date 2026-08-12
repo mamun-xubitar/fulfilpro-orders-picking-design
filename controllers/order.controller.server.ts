@@ -407,6 +407,10 @@ export class OrderController {
     };
   }
 
+  async getPresentmentCurrency(orderId: string) {
+    return model.getPresentmentCurrency(orderId);
+  }
+
   async searchStoreVariants(orderId: string, query: string) {
     const order = await prisma.order.findUnique({ where: { id: orderId }, select: { storeId: true } });
     if (!order) {

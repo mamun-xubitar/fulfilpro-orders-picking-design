@@ -106,7 +106,9 @@ export default function AddLineItemModal({
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Price</label>
+              <label className="block text-xs font-medium text-gray-500 uppercase mb-1">
+                Price{modal.currencyCode ? ` (${modal.currencyCode})` : ''}
+              </label>
               <input
                 type="number"
                 min={0}

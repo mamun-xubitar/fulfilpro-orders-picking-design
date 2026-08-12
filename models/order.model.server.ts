@@ -16,7 +16,7 @@ import {
   type FulfillmentTrackingInput,
 } from '@/lib/shopify-fulfillment.server';
 import { fetchShopifyOrderById } from '@/lib/shopify-order-fetch.server';
-import { applyOrderEdit, type OrderEditAction } from '@/lib/shopify-order-edit.server';
+import { applyOrderEdit, getPresentmentCurrencyCode, type OrderEditAction } from '@/lib/shopify-order-edit.server';
 import { linkOrderLineItems } from '@/lib/product-order-link.server';
 import { syncSingleProduct } from '@/lib/shopify-product-sync.server';
 import {
@@ -1268,7 +1268,6 @@ export class OrderModel {
       shop: order.store.storeDomain,
       accessToken: order.store.accessToken!,
       shopifyOrderId,
-      currencyCode: order.currencyCode ?? 'AUD',
       actions: [{ kind: 'setQuantity', lineItemId, quantity: 0, restock }],
       staffNote: `Line item removed by ${options.actorName} via Order Fulfilment`,
     });
@@ -1301,14 +1300,13 @@ export class OrderModel {
     }
 
     const action: OrderEditAction = titleChanged
-      ? { kind: 'renameCustom', lineItemId, title: requestedTitle!, quantity, price: String(item.price ?? 0) }
+      ? { kind: 'renameCustom', lineItemId, title: requestedTitle!, quantity }
       : { kind: 'setQuantity', lineItemId, quantity, restock: isCustom ? false : Boolean(options.restock) };
 
     await applyOrderEdit({
       shop: order.store.storeDomain,
       accessToken: order.store.accessToken!,
       shopifyOrderId,
-      currencyCode: order.currencyCode ?? 'AUD',
       actions: [action],
       staffNote: `Line item updated by ${options.actorName} via Order Fulfilment`,
     });
@@ -1317,6 +1315,16 @@ export class OrderModel {
       renameFromId: titleChanged ? lineItemId : undefined,
       affectedProductShopifyIds: !titleChanged && item.productId ? [item.productId] : [],
     });
+  }
+
+  async getPresentmentCurrency(orderId: string) {
+    const { order, shopifyOrderId } = await this.loadOrderForEdit(orderId);
+    const currencyCode = await getPresentmentCurrencyCode({
+      shop: order.store.storeDomain,
+      accessToken: order.store.accessToken!,
+      shopifyOrderId,
+    });
+    return { currencyCode };
   }
 
   async addShopifyLineItem(orderId: string, options: {
@@ -1349,12 +1357,10 @@ export class OrderModel {
       if (!price || Number(price) < 0) throw new Error('Price must be zero or greater');
       action = { kind: 'addCustomItem', title, price, quantity };
     }
-    console.log("my order currency", order.currencyCode ?? 'AUD', order.currencyCode)
     await applyOrderEdit({
       shop: order.store.storeDomain,
       accessToken: order.store.accessToken!,
       shopifyOrderId,
-      currencyCode: order.currencyCode ?? 'AUD',
       actions: [action],
       staffNote: `Line item added by ${options.actorName} via Order Fulfilment`,
     });
@@ -1376,7 +1382,6 @@ export class OrderModel {
         closed: true,
         lineItems: true,
         fulfillmentItems: true,
-        currencyCode: true,
         store: { select: { storeDomain: true, accessToken: true } },
       },
     });

@@ -444,6 +444,7 @@ export type AddLineItemModalState = {
   selectedVariantId: string;
   customTitle: string;
   customPrice: string;
+  currencyCode: string | null;
   quantity: number;
   saving: boolean;
   error: string;
