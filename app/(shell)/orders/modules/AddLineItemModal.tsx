@@ -1,13 +1,14 @@
 'use client';
 
 import { ModalShell, ModalActions } from '@/components/ModalShell';
-import type { AddLineItemModalState } from './types';
+import VariantPicker from './VariantPicker';
+import type { AddLineItemModalState, VariantSearchResult } from './types';
 
 type Props = {
   modal: AddLineItemModalState | null;
   setMode: (mode: 'variant' | 'custom') => void;
   setQuery: (query: string) => void;
-  selectVariant: (variantShopifyId: string) => void;
+  selectVariant: (variant: VariantSearchResult | null) => void;
   setQuantity: (quantity: number) => void;
   setCustomTitle: (title: string) => void;
   setCustomPrice: (price: string) => void;
@@ -27,13 +28,14 @@ export default function AddLineItemModal({
   onConfirm,
 }: Props) {
   if (!modal) return null;
-  const { mode, query, results, searching, selectedVariantId, customTitle, customPrice, quantity, saving, error } = modal;
+  const { mode, query, results, searching, selectedVariant, customTitle, customPrice, quantity, saving, error } = modal;
 
   return (
     <ModalShell
       title="Add line item"
       onClose={onClose}
       wide
+      allowOverflow
       footer={<ModalActions onCancel={onClose} onConfirm={onConfirm} confirmLabel={saving ? 'Adding...' : 'Add'} disabled={saving} />}
     >
       <div className="space-y-4">
@@ -55,45 +57,15 @@ export default function AddLineItemModal({
         </div>
 
         {mode === 'variant' ? (
-          <div className="space-y-2">
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search by product title or SKU..."
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-            />
-            <div className="max-h-64 overflow-y-auto rounded-lg border border-gray-200 divide-y divide-gray-100">
-              {searching ? (
-                <p className="px-3 py-3 text-sm text-gray-400">Searching...</p>
-              ) : results.length === 0 ? (
-                <p className="px-3 py-3 text-sm text-gray-400">{query ? 'No products found.' : 'Start typing to search products.'}</p>
-              ) : (
-                results.map((result) => (
-                  <button
-                    key={result.variantShopifyId}
-                    type="button"
-                    onClick={() => selectVariant(result.variantShopifyId)}
-                    className={`flex w-full items-center gap-3 px-3 py-2 text-left cursor-pointer hover:bg-gray-50 ${selectedVariantId === result.variantShopifyId ? 'bg-blue-50' : ''}`}
-                  >
-                    {result.imageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={result.imageUrl} alt="" className="h-10 w-10 rounded object-cover flex-shrink-0" />
-                    ) : (
-                      <div className="h-10 w-10 rounded bg-gray-100 flex-shrink-0" />
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-gray-800 truncate">{result.productTitle}</p>
-                      <p className="text-xs text-gray-500 truncate">
-                        {result.variantTitle ? `${result.variantTitle} · ` : ''}{result.sku || 'No SKU'} · {result.inventoryQuantity} on hand
-                      </p>
-                    </div>
-                    <span className="text-sm font-medium text-gray-700 flex-shrink-0">${result.price.toFixed(2)}</span>
-                  </button>
-                ))
-              )}
-            </div>
-          </div>
+          <VariantPicker
+            query={query}
+            results={results}
+            searching={searching}
+            selectedVariant={selectedVariant}
+            currencyCode={modal.currencyCode}
+            setQuery={setQuery}
+            selectVariant={selectVariant}
+          />
         ) : (
           <div className="space-y-3">
             <div>

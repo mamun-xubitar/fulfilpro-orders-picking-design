@@ -140,7 +140,7 @@ export function useLineItemEditing({ setOrders, blockTestModeAction, userIsAdmin
       query: '',
       results: [],
       searching: false,
-      selectedVariantId: '',
+      selectedVariant: null,
       customTitle: '',
       customPrice: '',
       currencyCode: null,
@@ -183,8 +183,8 @@ export function useLineItemEditing({ setOrders, blockTestModeAction, userIsAdmin
     setAddLineItemModal((prev) => (prev ? { ...prev, customPrice } : prev));
   };
 
-  const selectAddLineItemVariant = (variantShopifyId: string) => {
-    setAddLineItemModal((prev) => (prev ? { ...prev, selectedVariantId: variantShopifyId } : prev));
+  const selectAddLineItemVariant = (variant: VariantSearchResult | null) => {
+    setAddLineItemModal((prev) => (prev ? { ...prev, selectedVariant: variant, error: '' } : prev));
   };
 
   const searchAddLineItemVariants = async (orderId: string, query: string) => {
@@ -213,9 +213,9 @@ export function useLineItemEditing({ setOrders, blockTestModeAction, userIsAdmin
 
   const submitAddLineItem = async () => {
     if (!addLineItemModal) return;
-    const { order, afterLineItemId, mode, selectedVariantId, customTitle, customPrice, quantity } = addLineItemModal;
+    const { order, afterLineItemId, mode, selectedVariant, customTitle, customPrice, quantity } = addLineItemModal;
 
-    if (mode === 'variant' && !selectedVariantId) {
+    if (mode === 'variant' && !selectedVariant) {
       setAddLineItemModal((prev) => (prev ? { ...prev, error: 'Select a product to add.' } : prev));
       return;
     }
@@ -231,7 +231,7 @@ export function useLineItemEditing({ setOrders, blockTestModeAction, userIsAdmin
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mode,
-          variantId: mode === 'variant' ? selectedVariantId : undefined,
+          variantId: mode === 'variant' ? selectedVariant?.variantShopifyId : undefined,
           title: mode === 'custom' ? customTitle : undefined,
           price: mode === 'custom' ? customPrice : undefined,
           quantity,

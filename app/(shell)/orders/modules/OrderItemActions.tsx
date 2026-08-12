@@ -29,7 +29,7 @@ export default function OrderItemActions({ p, order, item }: OrderItemActionsPro
   const addReason = locked ? lockedReason : 'Add line item after this row';
 
   return (
-    <div className="flex items-center justify-center gap-1">
+    <div className="flex items-center justify-center gap-0.5">
       <button
         type="button"
         onClick={() => p.openEditLineItemModal(order, item)}

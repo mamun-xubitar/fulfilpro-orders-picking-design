@@ -441,7 +441,7 @@ export type AddLineItemModalState = {
   query: string;
   results: VariantSearchResult[];
   searching: boolean;
-  selectedVariantId: string;
+  selectedVariant: VariantSearchResult | null;
   customTitle: string;
   customPrice: string;
   currencyCode: string | null;
