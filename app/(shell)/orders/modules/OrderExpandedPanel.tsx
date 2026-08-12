@@ -35,7 +35,7 @@ export default function OrderExpandedPanel({
         setFulfillmentViewOrderId={p.setFulfillmentViewOrderId}
         openStockModal={p.openStockModal}
       />
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,300px)_minmax(0,1fr)_minmax(0,400px)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,300px)_minmax(0,1fr)_minmax(0,280px)]">
         <OrderCustomerColumn order={order} orderAddressLines={orderAddressLines} />
 
         {p.fulfillmentViewOrderId === order.id ? (

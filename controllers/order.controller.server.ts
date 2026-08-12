@@ -1,9 +1,11 @@
 import { OrderModel, type FulfillmentLineInput } from '@/models/order.model.server';
+import { ProductModel } from '@/models/product.model.server';
 import { enqueueJob } from '@/lib/background-jobs.server';
 import prisma from '@/lib/prisma.server';
 import { getDecorationCrossVisibility } from '@/lib/decoration-visibility.server';
 
 const model = new OrderModel();
+const productModel = new ProductModel();
 
 type Period = 'all' | 'week' | 'month' | 'year';
 
@@ -351,6 +353,139 @@ export class OrderController {
       message: 'Note deleted',
     };
   }
+
+  async deleteLineItem(
+    orderId: string,
+    lineItemId: string,
+    body: unknown,
+    admin: { id?: string | null; name?: string | null; email?: string | null }
+  ) {
+    const { restock } = parseDeleteLineItemInput(body);
+    const result = await model.deleteShopifyLineItem(orderId, lineItemId, {
+      restock,
+      actorName: actorName(admin),
+    });
+
+    return {
+      data: result.row,
+      message: withWarning('Line item removed', result.warningMessage),
+    };
+  }
+
+  async updateLineItem(
+    orderId: string,
+    lineItemId: string,
+    body: unknown,
+    admin: { id?: string | null; name?: string | null; email?: string | null }
+  ) {
+    const parsed = parseUpdateLineItemInput(body);
+    const result = await model.updateShopifyLineItem(orderId, lineItemId, {
+      ...parsed,
+      actorName: actorName(admin),
+    });
+
+    return {
+      data: result.row,
+      message: withWarning('Line item updated', result.warningMessage),
+    };
+  }
+
+  async addLineItem(
+    orderId: string,
+    body: unknown,
+    admin: { id?: string | null; name?: string | null; email?: string | null }
+  ) {
+    const parsed = parseAddLineItemInput(body);
+    const result = await model.addShopifyLineItem(orderId, {
+      ...parsed,
+      actorName: actorName(admin),
+    });
+
+    return {
+      data: result.row,
+      message: withWarning('Line item added', result.warningMessage),
+    };
+  }
+
+  async searchStoreVariants(orderId: string, query: string) {
+    const order = await prisma.order.findUnique({ where: { id: orderId }, select: { storeId: true } });
+    if (!order) {
+      throw new Error('Order not found');
+    }
+
+    const results = await productModel.searchVariantsForStore({ storeId: order.storeId, query });
+
+    return { data: results };
+  }
+}
+
+function actorName(admin: { name?: string | null; email?: string | null }) {
+  return admin.name?.trim() || admin.email?.trim() || 'Admin';
+}
+
+function withWarning(message: string, warning?: string) {
+  return warning ? `${message}. ${warning}` : message;
+}
+
+function parseDeleteLineItemInput(body: unknown) {
+  const value = body && typeof body === 'object' ? (body as Record<string, unknown>) : {};
+  return { restock: value.restock !== false };
+}
+
+function parseUpdateLineItemInput(body: unknown) {
+  if (!body || typeof body !== 'object') {
+    throw new Error('Line item data is required');
+  }
+
+  const value = body as Record<string, unknown>;
+  const quantity = Number(value.quantity);
+  if (!Number.isFinite(quantity) || quantity < 0) {
+    throw new Error('Quantity must be zero or greater');
+  }
+
+  const title = typeof value.title === 'string' ? value.title : undefined;
+  const restock = typeof value.restock === 'boolean' ? value.restock : undefined;
+
+  return { quantity, title, restock };
+}
+
+function parseAddLineItemInput(body: unknown) {
+  if (!body || typeof body !== 'object') {
+    throw new Error('Line item data is required');
+  }
+
+  const value = body as Record<string, unknown>;
+  const mode = value.mode === 'custom' ? 'custom' as const : value.mode === 'variant' ? 'variant' as const : null;
+  if (!mode) {
+    throw new Error("mode must be either 'variant' or 'custom'");
+  }
+
+  const quantity = Number(value.quantity);
+  if (!Number.isFinite(quantity) || quantity <= 0) {
+    throw new Error('Quantity must be greater than zero');
+  }
+
+  const afterLineItemId = typeof value.afterLineItemId === 'string' ? value.afterLineItemId : undefined;
+
+  if (mode === 'variant') {
+    const variantId = typeof value.variantId === 'string' ? value.variantId.trim() : '';
+    if (!variantId) {
+      throw new Error('A variant must be selected');
+    }
+    return { mode, variantId, quantity, afterLineItemId };
+  }
+
+  const title = typeof value.title === 'string' ? value.title.trim() : '';
+  if (!title) {
+    throw new Error('Title is required');
+  }
+
+  const price = typeof value.price === 'string' ? value.price.trim() : '';
+  if (!price || Number(price) < 0) {
+    throw new Error('Price must be zero or greater');
+  }
+
+  return { mode, title, price, quantity, afterLineItemId };
 }
 
 function parseDecorationFlags(body: unknown) {

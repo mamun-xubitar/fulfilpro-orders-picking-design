@@ -4,6 +4,7 @@ import { getRoleLabel } from '@/lib/roles';
 import type { OrderItem, OrderRow, OrderStockAdjustmentItem } from './types';
 import type { OrdersPageBundle } from './ordersPageContext';
 import { applyDecorationTint, getFulfilledQty, getFulfillmentRowClass, getNameAttribute, nameKey } from './utils';
+import OrderItemActions from './OrderItemActions';
 
 type OrderItemRowProps = {
   p: OrdersPageBundle;
@@ -199,6 +200,11 @@ export default function OrderItemRow({ p, order, item, itemIndex, restockItems, 
           className="w-14 border border-blue-200 rounded px-1 py-0.5 text-center text-xs bg-white cursor-pointer disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
         />
       </td>
+      {p.userIsAdmin && (
+        <td className="py-1.5 text-center">
+          <OrderItemActions p={p} order={order} item={item} />
+        </td>
+      )}
     </tr>
   );
 }

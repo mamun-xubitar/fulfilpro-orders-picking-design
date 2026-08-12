@@ -29,7 +29,7 @@ export default function OrderActionsColumn({
   openMessageModal,
 }: OrderActionsColumnProps) {
   return (
-    <div className="w-full lg:max-w-[400px]">
+    <div className="w-full lg:max-w-[280px]">
       {(() => {
         const lockedFulfillment = isOrderFulfillmentLocked(order);
         const canConfirmFulfillment = !lockedFulfillment && getFulfillmentLines(order).length > 0;

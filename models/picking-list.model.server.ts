@@ -36,6 +36,7 @@ type OrderItem = {
   sku: string;
   vendor: string;
   qty: number;
+  position: number;
 };
 
 type ShippingLine = {
@@ -724,7 +725,9 @@ function toPickingOrderRow(order: {
   pickingSlipPrints: Array<{ printedAt: Date }>;
   _count: { notes: number };
 }, messageCount: number) {
-  const items = toLineItems(order.lineItems).map((item) => ({ ...item, metadata: { location: '', remark: '', note: '' } }));
+  const items = toLineItems(order.lineItems)
+    .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+    .map((item) => ({ ...item, metadata: { location: '', remark: '', note: '' } }));
   const activeConfirmations = order.packingConfirmations.filter((confirmation) => !confirmation.canceledAt);
   const packedByLine = getPackedByLine(activeConfirmations);
   const fulfilledByLine = getFulfilledByLine(order.fulfillmentItems);
@@ -803,7 +806,7 @@ async function getPickingMessageCounts(orderIds: string[]) {
 
 function toLineItems(value: Prisma.JsonValue): OrderItem[] {
   if (!Array.isArray(value)) return [];
-  return value.map((item) => {
+  return value.map((item, index) => {
     const obj = item && typeof item === 'object' ? item as Record<string, unknown> : {};
     return {
       id: typeof obj.id === 'string' ? obj.id : String(obj.id ?? ''),
@@ -817,6 +820,7 @@ function toLineItems(value: Prisma.JsonValue): OrderItem[] {
       sku: typeof obj.sku === 'string' ? obj.sku : '',
       vendor: typeof obj.vendor === 'string' ? obj.vendor : '',
       qty: typeof obj.qty === 'number' ? obj.qty : Number(obj.qty ?? 0),
+      position: typeof obj.position === 'number' ? obj.position : index,
     };
   });
 }

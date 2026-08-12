@@ -21,6 +21,7 @@ import { useFulfillment } from "./useFulfillment";
 import { useFulfillmentRequests } from "./useFulfillmentRequests";
 import { useDecorationWork } from "./useDecorationWork";
 import { useAssignments } from "./useAssignments";
+import { useLineItemEditing } from "./useLineItemEditing";
 import { useOrderMessages } from "./useOrderMessages";
 import { useOrderNotes } from "./useOrderNotes";
 import { useStockRequests } from "./useStockRequests";
@@ -122,6 +123,13 @@ export function useOrdersPage() {
   const assignments = useAssignments({
     setOrders: data.setOrders,
     blockTestModeAction,
+  });
+
+  const lineItemEditing = useLineItemEditing({
+    setOrders: data.setOrders,
+    blockTestModeAction,
+    userIsAdmin,
+    resetOrderSelections: fulfillment.resetOrderSelections,
   });
 
   const messages = useOrderMessages({
@@ -297,6 +305,29 @@ export function useOrdersPage() {
     removeAssignment: assignments.removeAssignment,
     decoratorUsers: assignments.decoratorUsers,
     decoratorUsersLoaded: assignments.decoratorUsersLoaded,
+    // line item editing
+    deleteLineItemModal: lineItemEditing.deleteLineItemModal,
+    openDeleteLineItemModal: lineItemEditing.openDeleteLineItemModal,
+    closeDeleteLineItemModal: lineItemEditing.closeDeleteLineItemModal,
+    setDeleteLineItemModal: lineItemEditing.setDeleteLineItemModal,
+    submitDeleteLineItem: lineItemEditing.submitDeleteLineItem,
+    editLineItemModal: lineItemEditing.editLineItemModal,
+    openEditLineItemModal: lineItemEditing.openEditLineItemModal,
+    closeEditLineItemModal: lineItemEditing.closeEditLineItemModal,
+    setEditLineItemQuantity: lineItemEditing.setEditLineItemQuantity,
+    setEditLineItemTitle: lineItemEditing.setEditLineItemTitle,
+    setEditLineItemRestock: lineItemEditing.setEditLineItemRestock,
+    submitEditLineItem: lineItemEditing.submitEditLineItem,
+    addLineItemModal: lineItemEditing.addLineItemModal,
+    openAddLineItemModal: lineItemEditing.openAddLineItemModal,
+    closeAddLineItemModal: lineItemEditing.closeAddLineItemModal,
+    setAddLineItemMode: lineItemEditing.setAddLineItemMode,
+    setAddLineItemQuantity: lineItemEditing.setAddLineItemQuantity,
+    setAddLineItemCustomTitle: lineItemEditing.setAddLineItemCustomTitle,
+    setAddLineItemCustomPrice: lineItemEditing.setAddLineItemCustomPrice,
+    selectAddLineItemVariant: lineItemEditing.selectAddLineItemVariant,
+    setAddLineItemQuery: lineItemEditing.setAddLineItemQuery,
+    submitAddLineItem: lineItemEditing.submitAddLineItem,
     // work
     workModal: decorWork.workModal,
     closeWorkModal: decorWork.closeWorkModal,

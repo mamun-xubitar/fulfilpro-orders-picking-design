@@ -14,6 +14,7 @@ export type OrderItem = {
   sku: string;
   vendor: string;
   qty: number;
+  position?: number;
   packedQuantity?: number;
   isEmbroidery?: boolean;
   isPrint?: boolean;
@@ -396,6 +397,54 @@ export type RequestPermissionModalState = {
   selectedAdminIds: string[];
   reason: string;
   loadingAdmins: boolean;
+  saving: boolean;
+  error: string;
+};
+
+export type DeleteLineItemModalState = {
+  order: OrderRow;
+  item: OrderItem;
+  restockable: boolean;
+  restock: boolean;
+  saving: boolean;
+  error: string;
+};
+
+export type EditLineItemModalState = {
+  order: OrderRow;
+  item: OrderItem;
+  titleEditable: boolean;
+  title: string;
+  quantity: number;
+  minQuantity: number;
+  restockable: boolean;
+  restock: boolean;
+  saving: boolean;
+  error: string;
+};
+
+export type VariantSearchResult = {
+  variantShopifyId: string;
+  productShopifyId: string;
+  productTitle: string;
+  variantTitle: string | null;
+  sku: string | null;
+  price: number;
+  inventoryQuantity: number;
+  imageUrl: string | null;
+};
+
+export type AddLineItemModalState = {
+  order: OrderRow;
+  afterLineItemId: string;
+  mode: 'variant' | 'custom';
+  query: string;
+  results: VariantSearchResult[];
+  searching: boolean;
+  selectedVariantId: string;
+  customTitle: string;
+  customPrice: string;
+  quantity: number;
   saving: boolean;
   error: string;
 };

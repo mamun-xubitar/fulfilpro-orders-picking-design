@@ -54,6 +54,7 @@ export default function OrderItemsTable({ p, order, restockItems, hasRestock, ha
               </label>
             </th>
             <th className="text-center py-1 text-gray-400 font-medium">Partial</th>
+            {p.userIsAdmin && <th className="text-center py-1 text-gray-400 font-medium">Actions</th>}
           </tr>
         </thead>
         <tbody>

@@ -16,6 +16,9 @@ import {
   type FulfillmentTrackingInput,
 } from '@/lib/shopify-fulfillment.server';
 import { fetchShopifyOrderById } from '@/lib/shopify-order-fetch.server';
+import { applyOrderEdit, type OrderEditAction } from '@/lib/shopify-order-edit.server';
+import { linkOrderLineItems } from '@/lib/product-order-link.server';
+import { syncSingleProduct } from '@/lib/shopify-product-sync.server';
 import {
   getAssignmentsByOrder,
   getDecorationSummariesByOrder,
@@ -132,6 +135,7 @@ export type ShopifyOrderPayload = {
     vendor?: string | null;
     quantity?: number | null;
     fulfillable_quantity?: number | null;
+    current_quantity?: number | null;
     properties?: Array<{ name?: string | null; value?: string | number | null }> | null;
     custom_attributes?: Array<{ name?: string | null; value?: string | number | null }> | null;
     image?: { src?: string | null; url?: string | null } | null;
@@ -206,6 +210,7 @@ export class OrderModel {
       select: {
         id: true,
         fulfillmentItems: true,
+        lineItems: true,
       },
     });
 
@@ -220,7 +225,7 @@ export class OrderModel {
     }
     await prisma.order.update({
       where: { id: existing.id },
-      data: buildOrderUpdateData(payload, storeId, existing.fulfillmentItems),
+      data: buildOrderUpdateData(payload, storeId, existing.fulfillmentItems, existing.lineItems),
     });
     await this.syncLineItemDecorations(existing.id);
 
@@ -1243,6 +1248,279 @@ export class OrderModel {
 
     return { id: existing.id };
   }
+
+  async deleteShopifyLineItem(orderId: string, lineItemId: string, options: { restock: boolean; actorName: string }) {
+    const { order, shopifyOrderId } = await this.loadOrderForEdit(orderId);
+    const lineItems = toLineItems(order.lineItems);
+    const item = lineItems.find((line) => line.id === lineItemId);
+    if (!item) {
+      throw new Error('Line item not found on this order');
+    }
+
+    const fulfilledQty = getFulfilledQuantityByLineItem(toFulfillmentItems(order.fulfillmentItems).confirmations).get(lineItemId) ?? 0;
+    if (fulfilledQty > 0) {
+      throw new Error('Partially fulfilled — cancel the fulfillment first');
+    }
+
+    const restock = item.productId ? options.restock : false;
+
+    await applyOrderEdit({
+      shop: order.store.storeDomain,
+      accessToken: order.store.accessToken!,
+      shopifyOrderId,
+      currencyCode: order.currencyCode ?? 'AUD',
+      actions: [{ kind: 'setQuantity', lineItemId, quantity: 0, restock }],
+      staffNote: `Line item removed by ${options.actorName} via Order Fulfilment`,
+    });
+
+    return this.resyncAfterOrderEdit(orderId, {
+      affectedProductShopifyIds: item.productId ? [item.productId] : [],
+    });
+  }
+
+  async updateShopifyLineItem(
+    orderId: string,
+    lineItemId: string,
+    options: { quantity: number; title?: string; restock?: boolean; actorName: string }
+  ) {
+    const { order, shopifyOrderId } = await this.loadOrderForEdit(orderId);
+    const lineItems = toLineItems(order.lineItems);
+    const item = lineItems.find((line) => line.id === lineItemId);
+    if (!item) {
+      throw new Error('Line item not found on this order');
+    }
+
+    const fulfilledQty = getFulfilledQuantityByLineItem(toFulfillmentItems(order.fulfillmentItems).confirmations).get(lineItemId) ?? 0;
+    const quantity = Math.max(1, fulfilledQty, Math.floor(options.quantity));
+
+    const isCustom = !item.productId;
+    const requestedTitle = options.title?.trim();
+    const titleChanged = Boolean(requestedTitle) && requestedTitle !== item.title;
+    if (titleChanged && !isCustom) {
+      throw new Error('Title can only be changed on custom items');
+    }
+
+    const action: OrderEditAction = titleChanged
+      ? { kind: 'renameCustom', lineItemId, title: requestedTitle!, quantity, price: String(item.price ?? 0) }
+      : { kind: 'setQuantity', lineItemId, quantity, restock: isCustom ? false : Boolean(options.restock) };
+
+    await applyOrderEdit({
+      shop: order.store.storeDomain,
+      accessToken: order.store.accessToken!,
+      shopifyOrderId,
+      currencyCode: order.currencyCode ?? 'AUD',
+      actions: [action],
+      staffNote: `Line item updated by ${options.actorName} via Order Fulfilment`,
+    });
+
+    return this.resyncAfterOrderEdit(orderId, {
+      renameFromId: titleChanged ? lineItemId : undefined,
+      affectedProductShopifyIds: !titleChanged && item.productId ? [item.productId] : [],
+    });
+  }
+
+  async addShopifyLineItem(orderId: string, options: {
+    mode: 'variant' | 'custom';
+    variantId?: string;
+    quantity: number;
+    title?: string;
+    price?: string;
+    afterLineItemId?: string;
+    actorName: string;
+  }) {
+    const { order, shopifyOrderId } = await this.loadOrderForEdit(orderId);
+    const quantity = Math.max(1, Math.floor(options.quantity));
+
+    let action: OrderEditAction;
+    let affectedProductShopifyId: string | null = null;
+    if (options.mode === 'variant') {
+      if (!options.variantId) throw new Error('A variant must be selected');
+      const variant = await prisma.productVariant.findFirst({
+        where: { shopifyId: options.variantId, storeId: order.storeId },
+        select: { shopifyId: true, product: { select: { shopifyId: true } } },
+      });
+      if (!variant) throw new Error('Variant not found for this store');
+      action = { kind: 'addVariant', variantId: toVariantGid(variant.shopifyId), quantity };
+      affectedProductShopifyId = variant.product.shopifyId;
+    } else {
+      const title = options.title?.trim();
+      if (!title) throw new Error('Title is required');
+      const price = options.price?.trim() ?? '';
+      if (!price || Number(price) < 0) throw new Error('Price must be zero or greater');
+      action = { kind: 'addCustomItem', title, price, quantity };
+    }
+    console.log("my order currency", order.currencyCode ?? 'AUD', order.currencyCode)
+    await applyOrderEdit({
+      shop: order.store.storeDomain,
+      accessToken: order.store.accessToken!,
+      shopifyOrderId,
+      currencyCode: order.currencyCode ?? 'AUD',
+      actions: [action],
+      staffNote: `Line item added by ${options.actorName} via Order Fulfilment`,
+    });
+
+    return this.resyncAfterOrderEdit(orderId, {
+      insertAfterLineItemId: options.afterLineItemId,
+      affectedProductShopifyIds: affectedProductShopifyId ? [affectedProductShopifyId] : [],
+    });
+  }
+
+  private async loadOrderForEdit(orderId: string) {
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      select: {
+        id: true,
+        number: true,
+        storeId: true,
+        canceled: true,
+        closed: true,
+        lineItems: true,
+        fulfillmentItems: true,
+        currencyCode: true,
+        store: { select: { storeDomain: true, accessToken: true } },
+      },
+    });
+
+    if (!order) {
+      throw new Error('Order not found');
+    }
+    if (!order.store.accessToken) {
+      throw new Error('Store is missing a Shopify access token');
+    }
+    if (order.canceled) {
+      throw new Error('Canceled orders cannot be edited');
+    }
+    if (order.closed) {
+      throw new Error('Closed orders cannot be edited');
+    }
+
+    const shopifyOrderId = toFulfillmentItems(order.fulfillmentItems).shopifyOrderId;
+    if (!shopifyOrderId) {
+      throw new Error('Order is missing a Shopify order id');
+    }
+
+    return { order, shopifyOrderId };
+  }
+
+  /**
+   * Re-fetches the order from Shopify after a committed edit, then reconciles
+   * local satellite records (decoration/assignment/work/edit-requests, the
+   * OrderLineItem fact table, and OrderStockAdjustment) against whichever line
+   * item ids disappeared or appeared as a result.
+   */
+  private async resyncAfterOrderEdit(orderId: string, options?: {
+    affectedProductShopifyIds?: string[];
+    insertAfterLineItemId?: string;
+    renameFromId?: string;
+  }) {
+    const before = await prisma.order.findUnique({ where: { id: orderId }, select: { lineItems: true } });
+    const beforeIds = new Set(toLineItems(before?.lineItems ?? []).map((item) => item.id));
+
+    await this.refreshFromShopify(orderId);
+
+    const after = await prisma.order.findUnique({ where: { id: orderId }, select: { lineItems: true } });
+    const afterIds = new Set(toLineItems(after?.lineItems ?? []).map((item) => item.id));
+
+    let staleIds = [...beforeIds].filter((id) => !afterIds.has(id));
+    const newIds = [...afterIds].filter((id) => !beforeIds.has(id));
+    let warningMessage: string | undefined;
+
+    if (options?.renameFromId) {
+      if (staleIds.length === 1 && newIds.length === 1 && staleIds[0] === options.renameFromId) {
+        const [oldId] = staleIds;
+        const [newId] = newIds;
+        await prisma.$transaction([
+          prisma.lineItemDecoration.updateMany({ where: { orderId, lineItemId: oldId }, data: { lineItemId: newId } }),
+          prisma.lineItemAssignment.updateMany({ where: { orderId, lineItemId: oldId }, data: { lineItemId: newId } }),
+          prisma.lineItemWork.updateMany({ where: { orderId, lineItemId: oldId }, data: { lineItemId: newId } }),
+          prisma.decorationEditRequest.updateMany({ where: { orderId, lineItemId: oldId }, data: { lineItemId: newId } }),
+        ]);
+        staleIds = [];
+      } else {
+        warningMessage = 'Decoration and assignment records were reset.';
+      }
+    }
+
+    if (staleIds.length > 0) {
+      await prisma.$transaction([
+        prisma.lineItemDecoration.deleteMany({ where: { orderId, lineItemId: { in: staleIds } } }),
+        prisma.lineItemAssignment.deleteMany({ where: { orderId, lineItemId: { in: staleIds } } }),
+        prisma.lineItemWork.deleteMany({ where: { orderId, lineItemId: { in: staleIds } } }),
+        prisma.decorationEditRequest.deleteMany({ where: { orderId, lineItemId: { in: staleIds } } }),
+      ]);
+      await this.removeStaleStockAdjustmentItems(orderId, staleIds);
+    }
+
+    await linkOrderLineItems(orderId);
+
+    if (options?.insertAfterLineItemId && newIds.length > 0) {
+      await this.repositionLineItemsAfter(orderId, options.insertAfterLineItemId, newIds);
+    }
+
+    if (options?.affectedProductShopifyIds?.length) {
+      const store = await prisma.order.findUnique({
+        where: { id: orderId },
+        select: { storeId: true, store: { select: { storeDomain: true, accessToken: true } } },
+      });
+      if (store?.store.accessToken) {
+        for (const shopifyProductId of new Set(options.affectedProductShopifyIds)) {
+          syncSingleProduct({
+            storeId: store.storeId,
+            shop: store.store.storeDomain,
+            accessToken: store.store.accessToken,
+            shopifyProductId,
+          }).catch((error) => {
+            console.error('Failed to resync product inventory after order edit', { orderId, shopifyProductId, error });
+          });
+        }
+      }
+    }
+
+    const row = await this.getOrderRow(orderId);
+    return { row, warningMessage };
+  }
+
+  private async removeStaleStockAdjustmentItems(orderId: string, staleIds: string[]) {
+    const existing = await prisma.orderStockAdjustment.findUnique({ where: { orderId } });
+    if (!existing) return;
+
+    const items = toStockAdjustmentItems(existing.items).filter((item) => !staleIds.includes(item.lineItemId));
+    if (items.length === 0) {
+      await prisma.orderStockAdjustment.delete({ where: { id: existing.id } });
+      return;
+    }
+
+    await prisma.orderStockAdjustment.update({
+      where: { id: existing.id },
+      data: { items: items as unknown as Prisma.InputJsonValue, status: getStockAdjustmentStatus(items) },
+    });
+  }
+
+  private async repositionLineItemsAfter(orderId: string, afterLineItemId: string, newIds: string[]) {
+    const order = await prisma.order.findUnique({ where: { id: orderId }, select: { lineItems: true } });
+    if (!order || !Array.isArray(order.lineItems)) return;
+
+    const items = toLineItems(order.lineItems).sort((a, b) => a.position - b.position);
+    const newIdSet = new Set(newIds);
+    const withoutNew = items.filter((item) => !newIdSet.has(item.id));
+    const newItems = items.filter((item) => newIdSet.has(item.id));
+    const anchorIndex = withoutNew.findIndex((item) => item.id === afterLineItemId);
+    const spliceAt = anchorIndex === -1 ? withoutNew.length : anchorIndex + 1;
+    const reordered = [...withoutNew.slice(0, spliceAt), ...newItems, ...withoutNew.slice(spliceAt)];
+    const positionById = new Map(reordered.map((item, index) => [item.id, index]));
+
+    const raw = order.lineItems as Array<Record<string, unknown>>;
+    const updated = raw.map((rawItem) => {
+      const id = typeof rawItem.id === 'string' ? rawItem.id : String(rawItem.id ?? '');
+      const position = positionById.get(id);
+      return position === undefined ? rawItem : { ...rawItem, position };
+    });
+
+    await prisma.order.update({
+      where: { id: orderId },
+      data: { lineItems: updated as unknown as Prisma.InputJsonValue },
+    });
+  }
 }
 
 function toOrderNoteRow(note: {
@@ -1328,7 +1606,7 @@ function toOrderRow(row: {
     photos: Prisma.JsonValue;
   } | null;
 }, messageCount: number, decorations?: Map<string, { isEmbroidery: boolean; isPrint: boolean }>, assignments?: Map<string, AssignmentRow[]>, summaries?: Map<string, LineDecorationSummary>, trackings?: TrackingSummary[], viewerIsDecorator = false) {
-  const lineItems = toLineItems(row.lineItems);
+  const lineItems = toLineItems(row.lineItems).sort((a, b) => a.position - b.position);
   const itemCount = lineItems.reduce((sum, item) => sum + Math.max(0, item.qty), 0);
 
   const packingConfirmations = row.packingConfirmations ?? [];
@@ -1509,7 +1787,7 @@ function toOrderMessageRow(message: {
 }
 
 function buildOrderCreateData(payload: ShopifyOrderPayload, storeId: string): Prisma.OrderUncheckedCreateInput {
-  const data = buildOrderWriteData(payload, storeId, null);
+  const data = buildOrderWriteData(payload, storeId, null, null);
   return {
     number: payload.order_number,
     ...data,
@@ -1519,35 +1797,49 @@ function buildOrderCreateData(payload: ShopifyOrderPayload, storeId: string): Pr
 function buildOrderUpdateData(
   payload: ShopifyOrderPayload,
   storeId: string,
-  existingFulfillmentItems: Prisma.JsonValue | null
+  existingFulfillmentItems: Prisma.JsonValue | null,
+  existingLineItems: Prisma.JsonValue | null
 ): Prisma.OrderUncheckedUpdateInput {
-  return buildOrderWriteData(payload, storeId, existingFulfillmentItems);
+  return buildOrderWriteData(payload, storeId, existingFulfillmentItems, existingLineItems);
 }
 
 function buildOrderWriteData(
   payload: ShopifyOrderPayload,
   storeId: string,
-  existingFulfillmentItems: Prisma.JsonValue | null
+  existingFulfillmentItems: Prisma.JsonValue | null,
+  existingLineItems: Prisma.JsonValue | null
 ) {
   const currentFulfillmentItems = toFulfillmentItems(existingFulfillmentItems);
   const syncedFulfillmentConfirmations = toShopifyFulfillmentConfirmations(payload);
   const fulfilledQuantityByLineItem = getFulfilledQuantityByLineItem(syncedFulfillmentConfirmations);
-  const lineItems = (payload.line_items ?? []).map((item) => ({
-    id: item.id,
-    productId: item.product_id ? String(item.product_id) : null,
-    variantId: item.variant_id ? String(item.variant_id) : null,
-    name: item.name ?? '',
-    title: item.title ?? item.name ?? '',
-    variantTitle: item.variant_title ?? '',
-    variantOptions: normalizeLineItemProperties(item.properties ?? null),
-    customAttributes: normalizeLineItemProperties(item.custom_attributes ?? item.properties ?? null),
-    imageUrl: item.image?.src ?? item.image?.url ?? null,
-    sku: item.sku ?? '',
-    vendor: item.vendor ?? '',
-    qty: resolveLineItemQuantity(item, fulfilledQuantityByLineItem),
-    price: Number(item.price_set?.shop_money?.amount ?? item.price ?? 0),
-    currencyCode: item.price_set?.shop_money?.currency_code ?? null,
-  }));
+  const positionByLineItemId = new Map(
+    toLineItems(existingLineItems ?? []).map((item) => [item.id, item.position])
+  );
+  const maxExistingPosition = positionByLineItemId.size > 0 ? Math.max(...positionByLineItemId.values()) : -1;
+  let nextNewPosition = maxExistingPosition + 1;
+  const lineItems = (payload.line_items ?? [])
+    .filter((item) => item.current_quantity !== 0)
+    .map((item) => {
+      const id = String(item.id);
+      const position = positionByLineItemId.get(id) ?? nextNewPosition++;
+      return {
+        id: item.id,
+        productId: item.product_id ? String(item.product_id) : null,
+        variantId: item.variant_id ? String(item.variant_id) : null,
+        name: item.name ?? '',
+        title: item.title ?? item.name ?? '',
+        variantTitle: item.variant_title ?? '',
+        variantOptions: normalizeLineItemProperties(item.properties ?? null),
+        customAttributes: normalizeLineItemProperties(item.custom_attributes ?? item.properties ?? null),
+        imageUrl: item.image?.src ?? item.image?.url ?? null,
+        sku: item.sku ?? '',
+        vendor: item.vendor ?? '',
+        qty: resolveLineItemQuantity(item, fulfilledQuantityByLineItem),
+        price: Number(item.price_set?.shop_money?.amount ?? item.price ?? 0),
+        currencyCode: item.price_set?.shop_money?.currency_code ?? null,
+        position,
+      };
+    });
   const shippingLines = toShippingLines(
     payload.shipping_lines ?? null,
     payload.discount_applications ?? null
@@ -2493,12 +2785,14 @@ function toLineItems(value: Prisma.JsonValue): Array<{
   sku: string;
   vendor: string;
   qty: number;
+  price: number;
+  position: number;
 }> {
   if (!Array.isArray(value)) return [];
 
-  return value.map((item) => {
+  return value.map((item, index) => {
     if (!item || typeof item !== 'object') {
-      return { id: '', productId: null, variantId: null, name: '', title: '', variantTitle: '', variantOptions: [], customAttributes: [], imageUrl: null, sku: '', vendor: '', qty: 0 };
+      return { id: '', productId: null, variantId: null, name: '', title: '', variantTitle: '', variantOptions: [], customAttributes: [], imageUrl: null, sku: '', vendor: '', qty: 0, price: 0, position: index };
     }
 
     const obj = item as Record<string, unknown>;
@@ -2515,6 +2809,8 @@ function toLineItems(value: Prisma.JsonValue): Array<{
       sku: typeof obj.sku === 'string' ? obj.sku : '',
       vendor: typeof obj.vendor === 'string' ? obj.vendor : '',
       qty: typeof obj.qty === 'number' ? obj.qty : Number(obj.qty ?? 0),
+      price: typeof obj.price === 'number' ? obj.price : Number(obj.price ?? 0),
+      position: typeof obj.position === 'number' ? obj.position : index,
     };
   });
 }
@@ -2691,6 +2987,10 @@ function normalizeFulfillmentLines(
   }
 
   return normalized;
+}
+
+function toVariantGid(id: string) {
+  return id.startsWith('gid://shopify/ProductVariant/') ? id : `gid://shopify/ProductVariant/${id}`;
 }
 
 function toFulfillmentItems(value: Prisma.JsonValue | null) {
