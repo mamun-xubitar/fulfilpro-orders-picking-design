@@ -443,7 +443,6 @@ export type AddLineItemModalState = {
   searching: boolean;
   selectedVariant: VariantSearchResult | null;
   customTitle: string;
-  customPrice: string;
   currencyCode: string | null;
   quantity: number;
   saving: boolean;

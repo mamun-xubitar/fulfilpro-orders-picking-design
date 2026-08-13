@@ -330,7 +330,6 @@ export function useOrdersPage() {
     setAddLineItemMode: lineItemEditing.setAddLineItemMode,
     setAddLineItemQuantity: lineItemEditing.setAddLineItemQuantity,
     setAddLineItemCustomTitle: lineItemEditing.setAddLineItemCustomTitle,
-    setAddLineItemCustomPrice: lineItemEditing.setAddLineItemCustomPrice,
     selectAddLineItemVariant: lineItemEditing.selectAddLineItemVariant,
     setAddLineItemQuery: lineItemEditing.setAddLineItemQuery,
     submitAddLineItem: lineItemEditing.submitAddLineItem,

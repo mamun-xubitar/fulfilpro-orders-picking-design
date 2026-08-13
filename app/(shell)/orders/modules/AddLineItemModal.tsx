@@ -11,7 +11,6 @@ type Props = {
   selectVariant: (variant: VariantSearchResult | null) => void;
   setQuantity: (quantity: number) => void;
   setCustomTitle: (title: string) => void;
-  setCustomPrice: (price: string) => void;
   onClose: () => void;
   onConfirm: () => void;
 };
@@ -23,12 +22,11 @@ export default function AddLineItemModal({
   selectVariant,
   setQuantity,
   setCustomTitle,
-  setCustomPrice,
   onClose,
   onConfirm,
 }: Props) {
   if (!modal) return null;
-  const { mode, query, results, searching, selectedVariant, customTitle, customPrice, quantity, saving, error } = modal;
+  const { mode, query, results, searching, selectedVariant, customTitle, quantity, saving, error } = modal;
 
   return (
     <ModalShell
@@ -74,19 +72,6 @@ export default function AddLineItemModal({
                 type="text"
                 value={customTitle}
                 onChange={(e) => setCustomTitle(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-500 uppercase mb-1">
-                Price{modal.currencyCode ? ` (${modal.currencyCode})` : ''}
-              </label>
-              <input
-                type="number"
-                min={0}
-                step="0.01"
-                value={customPrice}
-                onChange={(e) => setCustomPrice(e.target.value)}
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
               />
             </div>

@@ -142,7 +142,6 @@ export function useLineItemEditing({ setOrders, blockTestModeAction, userIsAdmin
       searching: false,
       selectedVariant: null,
       customTitle: '',
-      customPrice: '',
       currencyCode: null,
       quantity: 1,
       saving: false,
@@ -179,10 +178,6 @@ export function useLineItemEditing({ setOrders, blockTestModeAction, userIsAdmin
     setAddLineItemModal((prev) => (prev ? { ...prev, customTitle } : prev));
   };
 
-  const setAddLineItemCustomPrice = (customPrice: string) => {
-    setAddLineItemModal((prev) => (prev ? { ...prev, customPrice } : prev));
-  };
-
   const selectAddLineItemVariant = (variant: VariantSearchResult | null) => {
     setAddLineItemModal((prev) => (prev ? { ...prev, selectedVariant: variant, error: '' } : prev));
   };
@@ -213,7 +208,7 @@ export function useLineItemEditing({ setOrders, blockTestModeAction, userIsAdmin
 
   const submitAddLineItem = async () => {
     if (!addLineItemModal) return;
-    const { order, afterLineItemId, mode, selectedVariant, customTitle, customPrice, quantity } = addLineItemModal;
+    const { order, afterLineItemId, mode, selectedVariant, customTitle, quantity } = addLineItemModal;
 
     if (mode === 'variant' && !selectedVariant) {
       setAddLineItemModal((prev) => (prev ? { ...prev, error: 'Select a product to add.' } : prev));
@@ -233,7 +228,7 @@ export function useLineItemEditing({ setOrders, blockTestModeAction, userIsAdmin
           mode,
           variantId: mode === 'variant' ? selectedVariant?.variantShopifyId : undefined,
           title: mode === 'custom' ? customTitle : undefined,
-          price: mode === 'custom' ? customPrice : undefined,
+          price: mode === 'custom' ? '0' : undefined,
           quantity,
           afterLineItemId,
         }),
@@ -269,7 +264,6 @@ export function useLineItemEditing({ setOrders, blockTestModeAction, userIsAdmin
     setAddLineItemMode,
     setAddLineItemQuantity,
     setAddLineItemCustomTitle,
-    setAddLineItemCustomPrice,
     selectAddLineItemVariant,
     setAddLineItemQuery,
     submitAddLineItem,

@@ -238,7 +238,6 @@ export default function OrdersPage() {
           selectVariant={p.selectAddLineItemVariant}
           setQuantity={p.setAddLineItemQuantity}
           setCustomTitle={p.setAddLineItemCustomTitle}
-          setCustomPrice={p.setAddLineItemCustomPrice}
           onClose={p.closeAddLineItemModal}
           onConfirm={() => void p.submitAddLineItem()}
         />
