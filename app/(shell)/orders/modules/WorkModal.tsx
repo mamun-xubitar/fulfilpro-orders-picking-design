@@ -70,10 +70,10 @@ export default function WorkModal({
                   ))}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <label className="inline-flex items-center gap-1 cursor-pointer text-xs text-blue-600 hover:text-blue-800">
+                  {/* <label className="inline-flex items-center gap-1 cursor-pointer text-xs text-blue-600 hover:text-blue-800">
                     <input type="file" multiple className="hidden" onChange={(e) => { void uploadCommentFiles(ci, e.target.files); e.target.value = ''; }} />
                     📎 Add files
-                  </label>
+                  </label> */}
                   {comment.uploading && <span className="text-[11px] text-gray-400">Uploading…</span>}
                   {comment.files.map((file, fi) => (
                     <span key={fi} className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-600">

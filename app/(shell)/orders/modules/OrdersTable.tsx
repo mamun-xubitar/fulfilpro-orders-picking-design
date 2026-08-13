@@ -6,6 +6,7 @@ import { STATUS_MAP } from './constants';
 import { getFulfillmentInfo, getOrderAddressLines, isOrderFullyFulfilled } from './utils';
 import OrderTableRow from './OrderTableRow';
 import OrderExpandedRow from './OrderExpandedRow';
+import OrderAttachmentsRow from './OrderAttachmentsRow';
 import SortableColumnHeader from './SortableColumnHeader';
 
 type OrdersTableProps = {
@@ -56,7 +57,6 @@ export default function OrdersTable({ p }: OrdersTableProps) {
           const statusKey = order.status.toLowerCase();
           const status = STATUS_MAP[statusKey] ?? STATUS_MAP.pending;
           const isExpanded = expandedIds.has(order.id);
-          const isPrevExpanded = index > 0 ? expandedIds.has(orders[index - 1].id) : false;
           const orderAddressLines = getOrderAddressLines(order);
           const fulfillmentInfo = getFulfillmentInfo(order);
           const isFullyFulfilled = isOrderFullyFulfilled(order);
@@ -64,9 +64,10 @@ export default function OrdersTable({ p }: OrdersTableProps) {
           const restockItems = (order.stockAdjustment?.items ?? []).filter((i) => i.action === 'restore');
           const hasRestock = restockItems.length > 0;
           const hasDecorationWork = order.items.some((i) => (i.decoration?.works?.length ?? 0) > 0);
+          const isEmbOrPrint = order.items.some((i) => i.isEmbroidery || i.isPrint);
           return (
             <Fragment key={order.id}>
-              {isExpanded && isPrevExpanded && (
+              {index > 0 && (
                 <tr><td colSpan={ordersColSpan} className="h-2 p-0 bg-white" /></tr>
               )}
               <OrderTableRow
@@ -79,6 +80,7 @@ export default function OrdersTable({ p }: OrdersTableProps) {
                 isFullyFulfilled={isFullyFulfilled}
                 hasBackInStockSignal={hasBackInStockSignal}
               />
+              {userIsAdmin && isEmbOrPrint && <OrderAttachmentsRow p={p} order={order} />}
               {isExpanded && (
                 <OrderExpandedRow
                   p={p}

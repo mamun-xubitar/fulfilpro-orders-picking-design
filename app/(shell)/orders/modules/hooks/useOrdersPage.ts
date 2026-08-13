@@ -20,6 +20,7 @@ import { useNameAttributes } from "./useNameAttributes";
 import { useFulfillment } from "./useFulfillment";
 import { useFulfillmentRequests } from "./useFulfillmentRequests";
 import { useDecorationWork } from "./useDecorationWork";
+import { useOrderDecorationAttachments } from "./useOrderDecorationAttachments";
 import { useAssignments } from "./useAssignments";
 import { useLineItemEditing } from "./useLineItemEditing";
 import { useOrderMessages } from "./useOrderMessages";
@@ -118,6 +119,11 @@ export function useOrdersPage() {
     setOrders: data.setOrders,
     blockTestModeAction,
     bumpRefresh: data.bumpRefresh,
+  });
+
+  const decorAttachments = useOrderDecorationAttachments({
+    setOrders: data.setOrders,
+    blockTestModeAction,
   });
 
   const assignments = useAssignments({
@@ -343,6 +349,14 @@ export function useOrdersPage() {
     deleteWorkRecord: decorWork.deleteWorkRecord,
     requestEditAccess: decorWork.requestEditAccess,
     requestingAccessKey: decorWork.requestingAccessKey,
+    // order-wide decoration attachments
+    getUploadingAttachmentFields: decorAttachments.getUploadingFields,
+    isSavingAttachmentRemarks: decorAttachments.isSavingRemarks,
+    uploadAttachmentFiles: decorAttachments.uploadAttachmentFiles,
+    removeAttachmentFile: decorAttachments.removeAttachmentFile,
+    getAttachmentRemarksValue: decorAttachments.getRemarksValue,
+    setAttachmentRemarksDraft: decorAttachments.setRemarksDraft,
+    commitAttachmentRemarks: decorAttachments.commitRemarks,
     // fulfillment view / requests
     fulfillmentViewOrderId: fulfillmentRequests.fulfillmentViewOrderId,
     setFulfillmentViewOrderId: fulfillmentRequests.setFulfillmentViewOrderId,
