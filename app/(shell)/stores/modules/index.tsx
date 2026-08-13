@@ -81,11 +81,6 @@ export default function StoresPage() {
     if (store) void updateApp.startUpdate({ id: store.id, name: store.name, storeDomain: store.storeDomain });
   };
 
-  const handleReauthorize = (id: string) => {
-    const url = updatedApps[id];
-    if (url) window.open(url, '_blank', 'noopener,noreferrer');
-  };
-
   const handleDisconnect = async (id: string) => {
     const store = stores.find((item) => item.id === id);
     if (!store || !confirm(`Disconnect ${store.name ?? store.storeDomain}?`)) return;
@@ -270,7 +265,7 @@ export default function StoresPage() {
           onLogoUpload={(id, file) => void handleLogoUpload(id, file)}
           onLogoRemove={(id) => void handleLogoRemove(id)}
           onUpdateApp={handleUpdateApp}
-          onReauthorize={handleReauthorize}
+          reauthorizeUrls={updatedApps}
           disconnectingIds={disconnectingIds}
           deletingIds={deletingIds}
           uploadingLogoIds={uploadingLogoIds}
