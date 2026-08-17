@@ -49,7 +49,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
   const inactivityLogoutTriggeredRef = useRef(false);
   const blockedActionWarningAt = useRef(0);
   const blockedActionTimer = useRef<number | null>(null);
-  const isOrdersPath = pathname === "/orders" || pathname.startsWith("/orders/");
+  const isOrdersPath = pathname === "/orders" || pathname.startsWith("/orders/") || pathname === "/decoration" || pathname.startsWith("/decoration/") || pathname === "/picking-list" || pathname.startsWith("/picking-list/");
   const userIsOrderPicker = isOrderPickerRole(session?.user?.role);
   const userIsDecorator = isDecoratorRole(session?.user?.role);
   const blockOrdersCopy = isOrdersPath && session?.user?.role !== "admin";
@@ -157,7 +157,17 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
       }, 2200);
     };
 
+    const isCopyAllowed = (node: Node | null | undefined) => {
+      const element = node instanceof Element ? node : node?.parentElement ?? null;
+      return Boolean(element?.closest(".allow-copy"));
+    };
+
+    const eventIsAllowed = (event: Event) =>
+      isCopyAllowed(event.target as Node | null) ||
+      isCopyAllowed(window.getSelection()?.anchorNode);
+
     const blockAction = (event: Event) => {
+      if (eventIsAllowed(event)) return;
       event.preventDefault();
       showBlockedActionMessage();
     };
@@ -167,6 +177,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
       const blocksSelectOrCopy = (event.ctrlKey || event.metaKey) && (key === "a" || key === "c");
 
       if (!blocksSelectOrCopy) return;
+      if (eventIsAllowed(event)) return;
 
       event.preventDefault();
       event.stopPropagation();
