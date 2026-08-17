@@ -3,11 +3,12 @@
 import { useState } from 'react';
 import { ModalActions, ModalShell } from '@/components/ModalShell';
 import { ChevronLeft, ChevronRight, Close, Plus, Trash } from './icons';
-import { formatMoney, getSwatch } from './utils';
+import { formatMoney, makeSwatchResolver } from './utils';
 import type { InventoryDevPage } from './hooks/useInventoryDevPage';
 
 export default function InventoryDevModals(p: InventoryDevPage) {
   const { gallery, pricing } = p;
+  const swatchOf = makeSwatchResolver(p.details.colours);
 
   return (
     <>
@@ -22,7 +23,7 @@ export default function InventoryDevModals(p: InventoryDevPage) {
                 <img src={image.url} alt={image.altText ?? ''} className="aspect-square w-full object-cover" />
                 <figcaption className="flex items-center justify-between gap-1 bg-gray-50 px-2 py-1.5">
                   <span className="flex min-w-0 items-center gap-1.5">
-                    {image.colour && <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: getSwatch(image.colour) }} />}
+                    {image.colour && <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: swatchOf(image.colour) }} />}
                     <span className="truncate text-[11px] font-medium text-gray-600">{image.colour ?? 'Unassigned'}</span>
                   </span>
                   <button

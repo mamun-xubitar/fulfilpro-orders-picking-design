@@ -1,8 +1,8 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { getStatus, listColours, listSizes, summariseVariants } from '../utils';
-import type { ProductRecord, VariantRow, VariantStatus } from '../types';
+import { getStatus, makeSwatchResolver, summariseVariants } from '../utils';
+import type { ColourOption, ProductRecord, VariantRow, VariantStatus } from '../types';
 
 type MatrixFilters = {
   /** null means "untouched", which reads as every colour selected. */
@@ -17,43 +17,55 @@ const DEFAULT_FILTERS: MatrixFilters = { colours: null, size: '', status: null, 
 
 type UseVariantsMatrixArgs = {
   product: ProductRecord | null;
-  /** Local, unsaved trigger edits keyed by variant id — owned by the composer. */
-  triggerEdits: Record<string, number>;
-  setTriggerEdit: (variantId: string, value: number) => void;
+  /** Product-level lists, draft-aware — owned by the details hook. */
+  sizes: string[];
+  colours: ColourOption[];
+  /** Local, unsaved row edits keyed by variant id — owned by the composer. */
+  variantEdits: Record<string, Partial<VariantRow>>;
+  setVariantEdit: (variantId: string, patch: Partial<VariantRow>) => void;
+  clearVariantEdit: (variantId: string) => void;
 };
 
-export function useVariantsMatrix({ product, triggerEdits, setTriggerEdit }: UseVariantsMatrixArgs) {
+export function useVariantsMatrix({ product, sizes, colours, variantEdits, setVariantEdit, clearVariantEdit }: UseVariantsMatrixArgs) {
   // Filters are tagged with the product they belong to, so changing product
   // resets them without an effect having to clear five pieces of state.
   const [stored, setStored] = useState<{ productId: string; filters: MatrixFilters } | null>(null);
   const filters = stored && stored.productId === product?.id ? stored.filters : DEFAULT_FILTERS;
+
+  // Only one row edits at a time, tagged with its product so navigation exits it.
+  const [storedEditingRow, setStoredEditingRow] = useState<{ productId: string; rowId: string } | null>(null);
+  const editingRowId = storedEditingRow && storedEditingRow.productId === product?.id ? storedEditingRow.rowId : null;
 
   const patch = (next: Partial<MatrixFilters>) => {
     if (!product) return;
     setStored({ productId: product.id, filters: { ...filters, ...next } });
   };
 
-  /** Variants with any unsaved trigger edit applied — the basis for every derived value. */
+  /** Variants with any unsaved row edit applied — the basis for every derived value. */
   const variants = useMemo<VariantRow[]>(() => {
     if (!product) return [];
-    return product.variants.map((v) => (v.id in triggerEdits ? { ...v, trigger: triggerEdits[v.id] } : v));
-  }, [product, triggerEdits]);
+    return product.variants.map((v) => (v.id in variantEdits ? { ...v, ...variantEdits[v.id] } : v));
+  }, [product, variantEdits]);
 
-  const colours = useMemo(() => listColours(variants), [variants]);
-  const sizes = useMemo(() => listSizes(variants), [variants]);
+  // Memoised so the `rows` filter keeps a stable dep when no colour is picked.
+  const colourNames = useMemo(() => colours.map((c) => c.name), [colours]);
 
-  const activeColours = filters.colours ?? colours;
+  const activeColours = filters.colours ?? colourNames;
   const allColoursSelected = filters.colours === null || filters.colours.length === colours.length;
+
+  // Resolved rather than stored, so editing a size out of the list falls back to
+  // "All sizes" instead of leaving the dropdown on a value it no longer offers.
+  const sizeFilter = sizes.includes(filters.size) ? filters.size : '';
 
   const rows = useMemo(() => {
     return variants.filter((v) => {
       if (!allColoursSelected && !activeColours.some((c) => c.toLowerCase() === v.colour.toLowerCase())) return false;
-      if (filters.size && v.size !== filters.size) return false;
+      if (sizeFilter && v.size !== sizeFilter) return false;
       if (filters.status && getStatus(v) !== filters.status) return false;
       if (!filters.showZeroStock && v.stockOnHand === 0) return false;
       return true;
     });
-  }, [variants, allColoursSelected, activeColours, filters.size, filters.status, filters.showZeroStock]);
+  }, [variants, allColoursSelected, activeColours, sizeFilter, filters.status, filters.showZeroStock]);
 
   // Selection is narrowed to the visible rows here rather than pruned in an effect.
   const selectedIds = useMemo(() => {
@@ -84,12 +96,23 @@ export function useVariantsMatrix({ product, triggerEdits, setTriggerEdit }: Use
     sizes,
     rows,
     totals,
+    editingRowId,
+    startRowEdit: (rowId: string) => product && setStoredEditingRow({ productId: product.id, rowId }),
+    /** Discards this row's draft. */
+    cancelRowEdit: () => {
+      if (editingRowId) clearVariantEdit(editingRowId);
+      setStoredEditingRow(null);
+    },
+    /** Demo mode: exits the row without writing back to `products`. */
+    saveRowEdit: () => setStoredEditingRow(null),
+    setVariantEdit,
+    swatchOf: makeSwatchResolver(colours),
     hiddenCount: variants.length - rows.length,
     allColoursSelected,
     isColourActive: (colour: string) => !allColoursSelected && activeColours.some((c) => c.toLowerCase() === colour.toLowerCase()),
     toggleColour,
     selectAllColours: () => patch({ colours: null }),
-    sizeFilter: filters.size,
+    sizeFilter,
     setSizeFilter: (size: string) => patch({ size }),
     statusFilter: filters.status,
     setStatusFilter: (status: VariantStatus) => patch({ status: filters.status === status ? null : status }),
@@ -99,7 +122,5 @@ export function useVariantsMatrix({ product, triggerEdits, setTriggerEdit }: Use
     toggleRow: (id: string) => patch({ selected: selectedIds.has(id) ? [...selectedIds].filter((s) => s !== id) : [...selectedIds, id] }),
     allRowsSelected,
     toggleAllRows: () => patch({ selected: allRowsSelected ? [] : rows.map((r) => r.id) }),
-    triggerEdits,
-    setTriggerEdit,
   };
 }

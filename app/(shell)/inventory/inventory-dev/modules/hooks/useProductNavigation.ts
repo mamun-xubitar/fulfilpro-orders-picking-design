@@ -33,12 +33,12 @@ export function useProductNavigation(products: ProductRecord[]) {
 
   /**
    * Derived rather than stored, so that when a filter change drops the selected
-   * product out of the set the page falls back to the newest one on its own.
+   * product out of the set the page falls back to the first one on its own.
    */
   const index = useMemo(() => {
     if (filtered.length === 0) return -1;
     const found = selectedId ? filtered.findIndex((p) => p.id === selectedId) : -1;
-    return found >= 0 ? found : filtered.length - 1;
+    return found >= 0 ? found : 0;
   }, [filtered, selectedId]);
 
   const searchResults = useMemo(() => {

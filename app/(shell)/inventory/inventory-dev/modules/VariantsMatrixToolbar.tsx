@@ -2,7 +2,6 @@
 
 import { STATUS_LEGEND } from './constants';
 import { Download, Expand, Plus } from './icons';
-import { getSwatch } from './utils';
 import type { useVariantsMatrix } from './hooks/useVariantsMatrix';
 
 type VariantsMatrixToolbarProps = {
@@ -32,9 +31,9 @@ export default function VariantsMatrixToolbar({ matrix, onAction }: VariantsMatr
           All colours
         </Pill>
         {matrix.colours.map((colour) => (
-          <Pill key={colour} active={matrix.isColourActive(colour)} onClick={() => matrix.toggleColour(colour)}>
-            <span className="h-2 w-2 rounded-full ring-1 ring-black/10" style={{ backgroundColor: getSwatch(colour) }} />
-            {colour}
+          <Pill key={colour.name} active={matrix.isColourActive(colour.name)} onClick={() => matrix.toggleColour(colour.name)}>
+            <span className="h-2 w-2 rounded-full ring-1 ring-black/10" style={{ backgroundColor: matrix.swatchOf(colour.name) }} />
+            {colour.name}
           </Pill>
         ))}
       </div>

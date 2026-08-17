@@ -124,7 +124,7 @@ function PricingActions({ p }: { p: PricingMarginPanelProps }) {
   );
 }
 
-function ActionButton({ onClick, icon, label, primary }: { onClick: () => void; icon: React.ReactNode; label: string; primary?: boolean }) {
+export function ActionButton({ onClick, icon, label, primary }: { onClick: () => void; icon: React.ReactNode; label: string; primary?: boolean }) {
   return (
     <button
       type="button"

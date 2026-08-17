@@ -19,7 +19,7 @@ export default function ProductDetailsTab({ p, product }: { p: InventoryDevPage;
   return (
     <div className="grid grid-cols-1 gap-3 xl:grid-cols-2 2xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.4fr)_minmax(0,1.1fr)_minmax(0,0.85fr)_minmax(0,1fr)]">
       <MainImagePanel gallery={p.gallery} onEditImages={p.openEditImages} />
-      <ProductFieldsPanel product={product} />
+      <ProductFieldsPanel details={p.details} />
       <PricingMarginPanel {...p.pricing} />
       <StockSummaryPanel summary={p.summary} />
       <OnlineStoresPanel

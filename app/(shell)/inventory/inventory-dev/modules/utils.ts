@@ -1,5 +1,6 @@
 import { COLOUR_SWATCHES, FALLBACK_SWATCH, NEAR_TRIGGER_RATIO } from './constants';
 import type {
+  ColourOption,
   PricingComputed,
   PricingForm,
   PricingInputs,
@@ -134,6 +135,24 @@ export function getSwatch(colour: string): string {
   return COLOUR_SWATCHES[colour.trim().toLowerCase()] ?? FALLBACK_SWATCH;
 }
 
+/** Resolves a colour name to the product's own hex, falling back to the shared swatch map. */
+export function makeSwatchResolver(colours: ColourOption[]): (colour: string) => string {
+  const map = new Map(colours.map((c) => [c.name.trim().toLowerCase(), c.hex]));
+  return (colour: string) => map.get(colour.trim().toLowerCase()) ?? getSwatch(colour);
+}
+
+/** "50 52  54, 56" → ['50','52','54','56'] — splits on whitespace and commas. */
+export function parseSizesInput(value: string): string[] {
+  return value
+    .split(/[\s,]+/)
+    .map((size) => size.trim())
+    .filter(Boolean);
+}
+
+export function formatSizesInput(sizes: string[]): string {
+  return sizes.join(' ');
+}
+
 /** Distinct colours in the order they first appear in the variant list. */
 export function listColours(variants: VariantRow[]): string[] {
   const seen = new Set<string>();
@@ -145,17 +164,6 @@ export function listColours(variants: VariantRow[]): string[] {
     out.push(v.colour);
   }
   return out;
-}
-
-/** Distinct sizes, numeric-aware so 6 sorts before 10. */
-export function listSizes(variants: VariantRow[]): string[] {
-  const unique = [...new Set(variants.map((v) => v.size).filter(Boolean))];
-  return unique.sort((a, b) => {
-    const na = Number(a);
-    const nb = Number(b);
-    if (Number.isFinite(na) && Number.isFinite(nb)) return na - nb;
-    return a.localeCompare(b);
-  });
 }
 
 /**

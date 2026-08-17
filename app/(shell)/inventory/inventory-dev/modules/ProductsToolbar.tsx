@@ -26,7 +26,7 @@ export default function ProductsToolbar(p: InventoryDevPage) {
 
       {/* Record navigation + search */}
       <div className="flex min-w-80 flex-1 flex-col justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 min-[1760px]:flex-nowrap">
           <Toggle label="All records" checked={nav.allRecords} onChange={nav.setAllRecords} />
           <Toggle label="Verified" checked={nav.verifiedOnly} disabled={nav.allRecords} onChange={nav.setVerifiedOnly} />
 
@@ -47,26 +47,26 @@ export default function ProductsToolbar(p: InventoryDevPage) {
               <Last />
             </PagerButton>
           </div>
-        </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <ProductSearchBox
-            value={nav.searchInput}
-            onChange={nav.setSearchInput}
-            open={nav.searchOpen}
-            setOpen={nav.setSearchOpen}
-            results={nav.searchResults}
-            containerRef={nav.searchRef}
-            onSelect={nav.selectProduct}
-          />
-          <button
-            type="button"
-            onClick={p.openNewProduct}
-            className="flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition-colors duration-150 hover:bg-emerald-700 cursor-pointer"
-          >
-            <Plus />
-            New Product
-          </button>
+          <div className="flex min-w-0 flex-1 basis-full items-center gap-2 min-[1760px]:basis-auto">
+            <ProductSearchBox
+              value={nav.searchInput}
+              onChange={nav.setSearchInput}
+              open={nav.searchOpen}
+              setOpen={nav.setSearchOpen}
+              results={nav.searchResults}
+              containerRef={nav.searchRef}
+              onSelect={nav.selectProduct}
+            />
+            <button
+              type="button"
+              onClick={p.openNewProduct}
+              className="flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition-colors duration-150 hover:bg-emerald-700 cursor-pointer"
+            >
+              <Plus />
+              New Product
+            </button>
+          </div>
         </div>
       </div>
 

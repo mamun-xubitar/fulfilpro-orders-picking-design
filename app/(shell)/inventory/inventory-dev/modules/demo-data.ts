@@ -6,7 +6,7 @@
  * component above it already speaks the `types.ts` contract.
  */
 
-import type { ActivityEntry, ProductImage, ProductRecord, ProductsResponse, StoreListing, VariantRow } from './types';
+import type { ActivityEntry, ColourOption, ProductImage, ProductRecord, ProductsResponse, StoreListing, VariantRow } from './types';
 
 /** Self-contained SVG placeholder so the demo never depends on the network. */
 function placeholderImage(hex: string, label: string, sub: string): string {
@@ -22,6 +22,9 @@ function placeholderImage(hex: string, label: string, sub: string): string {
 </svg>`;
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
+
+/** Every demo product offers the same numeric size run. */
+const DEMO_SIZES = ['50', '52', '54', '56', '58', '60'];
 
 type VariantSeed = {
   colour: string;
@@ -52,7 +55,7 @@ function buildVariants(seeds: VariantSeed[], buyPrice: number, sellPrice: number
   }));
 }
 
-function buildImages(productLabel: string, colours: { name: string; hex: string }[], extras: string[]): ProductImage[] {
+function buildImages(productLabel: string, colours: ColourOption[], extras: string[]): ProductImage[] {
   const coloured = colours.map<ProductImage>((c, i) => ({
     id: `img-colour-${i}`,
     url: placeholderImage(c.hex, productLabel, c.name),
@@ -82,6 +85,12 @@ const FLEX_KINDY_SEEDS: VariantSeed[] = [
   { colour: 'Hot Pink', size: '54', sku: 'FKBH-HP-54', barcode: '9331234567899', stockOnHand: 52, allocated: 10, incoming: 0, forwardOrders: 100, trigger: 150 },
 ];
 
+const FLEX_KINDY_COLOURS: ColourOption[] = [
+  { name: 'Aqua', hex: '#22b8e6' },
+  { name: 'Black', hex: '#111827' },
+  { name: 'Hot Pink', hex: '#ec4899' },
+];
+
 const FLEX_KINDY_STORES: StoreListing[] = [
   { id: 'st-1', name: 'Mad Hats', domain: 'madhats.com.au', status: 'ACTIVE', externalId: '6633188262024', price: 8.99, url: 'https://madhats.com.au/products/flex-kindy-bucket-hat' },
   { id: 'st-2', name: 'FunGear', domain: 'fungear.com.au', status: 'ACTIVE', externalId: '746075987080', price: 9.95, url: 'https://fungear.com.au/products/flex-kindy-bucket-hat' },
@@ -100,32 +109,74 @@ const FLEX_KINDY_ACTIVITY: ActivityEntry[] = [
 // — Product 2: exercises all three statuses, zero stock, and a wide colour set —
 
 const TOUR_CAP_SEEDS: VariantSeed[] = [
-  { colour: 'Navy', size: 'S', sku: 'TRC-NV-S', barcode: '9331234570011', stockOnHand: 640, allocated: 40, incoming: 0, forwardOrders: 0, trigger: 200 },
-  { colour: 'Navy', size: 'M', sku: 'TRC-NV-M', barcode: '9331234570012', stockOnHand: 512, allocated: 92, incoming: 0, forwardOrders: 0, trigger: 250 },
-  { colour: 'Navy', size: 'L', sku: 'TRC-NV-L', barcode: '9331234570013', stockOnHand: 268, allocated: 48, incoming: 0, forwardOrders: 0, trigger: 200 },
-  { colour: 'Red', size: 'S', sku: 'TRC-RD-S', barcode: '9331234570021', stockOnHand: 226, allocated: 16, incoming: 0, forwardOrders: 0, trigger: 200 },
-  { colour: 'Red', size: 'M', sku: 'TRC-RD-M', barcode: '9331234570022', stockOnHand: 130, allocated: 10, incoming: 150, forwardOrders: 60, trigger: 220 },
-  { colour: 'Red', size: 'L', sku: 'TRC-RD-L', barcode: '9331234570023', stockOnHand: 0, allocated: 0, incoming: 200, forwardOrders: 120, trigger: 180 },
-  { colour: 'Lime', size: 'M', sku: 'TRC-LM-M', barcode: '9331234570031', stockOnHand: 348, allocated: 24, incoming: 0, forwardOrders: 0, trigger: 300 },
-  { colour: 'Lime', size: 'L', sku: 'TRC-LM-L', barcode: '9331234570032', stockOnHand: 0, allocated: 0, incoming: 0, forwardOrders: 0, trigger: 150 },
-  { colour: 'Yellow', size: 'M', sku: 'TRC-YL-M', barcode: '9331234570041', stockOnHand: 96, allocated: 18, incoming: 0, forwardOrders: 80, trigger: 160 },
-  { colour: 'White', size: 'M', sku: 'TRC-WH-M', barcode: '9331234570051', stockOnHand: 704, allocated: 64, incoming: 0, forwardOrders: 0, trigger: 250 },
-  { colour: 'Charcoal', size: 'M', sku: 'TRC-CH-M', barcode: '9331234570061', stockOnHand: 214, allocated: 34, incoming: 0, forwardOrders: 0, trigger: 180 },
-  { colour: 'Royal', size: 'M', sku: 'TRC-RY-M', barcode: '9331234570071', stockOnHand: 0, allocated: 0, incoming: 0, forwardOrders: 40, trigger: 120 },
+  { colour: 'Navy', size: '54', sku: 'TRC-NV-54', barcode: '9331234570011', stockOnHand: 640, allocated: 40, incoming: 0, forwardOrders: 0, trigger: 200 },
+  { colour: 'Navy', size: '56', sku: 'TRC-NV-56', barcode: '9331234570012', stockOnHand: 512, allocated: 92, incoming: 0, forwardOrders: 0, trigger: 250 },
+  { colour: 'Navy', size: '58', sku: 'TRC-NV-58', barcode: '9331234570013', stockOnHand: 268, allocated: 48, incoming: 0, forwardOrders: 0, trigger: 200 },
+  { colour: 'Red', size: '54', sku: 'TRC-RD-54', barcode: '9331234570021', stockOnHand: 226, allocated: 16, incoming: 0, forwardOrders: 0, trigger: 200 },
+  { colour: 'Red', size: '56', sku: 'TRC-RD-56', barcode: '9331234570022', stockOnHand: 130, allocated: 10, incoming: 150, forwardOrders: 60, trigger: 220 },
+  { colour: 'Red', size: '58', sku: 'TRC-RD-58', barcode: '9331234570023', stockOnHand: 0, allocated: 0, incoming: 200, forwardOrders: 120, trigger: 180 },
+  { colour: 'Lime', size: '56', sku: 'TRC-LM-56', barcode: '9331234570031', stockOnHand: 348, allocated: 24, incoming: 0, forwardOrders: 0, trigger: 300 },
+  { colour: 'Lime', size: '58', sku: 'TRC-LM-58', barcode: '9331234570032', stockOnHand: 0, allocated: 0, incoming: 0, forwardOrders: 0, trigger: 150 },
+  { colour: 'Yellow', size: '56', sku: 'TRC-YL-56', barcode: '9331234570041', stockOnHand: 96, allocated: 18, incoming: 0, forwardOrders: 80, trigger: 160 },
+  { colour: 'White', size: '56', sku: 'TRC-WH-56', barcode: '9331234570051', stockOnHand: 704, allocated: 64, incoming: 0, forwardOrders: 0, trigger: 250 },
+  { colour: 'Charcoal', size: '56', sku: 'TRC-CH-56', barcode: '9331234570061', stockOnHand: 214, allocated: 34, incoming: 0, forwardOrders: 0, trigger: 180 },
+  { colour: 'Royal', size: '56', sku: 'TRC-RY-56', barcode: '9331234570071', stockOnHand: 0, allocated: 0, incoming: 0, forwardOrders: 40, trigger: 120 },
 ];
 
-// — Product 3: single colourway, no store listings —
+const TOUR_CAP_COLOURS: ColourOption[] = [
+  { name: 'Navy', hex: '#1e3a8a' },
+  { name: 'Red', hex: '#dc2626' },
+  { name: 'Lime', hex: '#84cc16' },
+  { name: 'Yellow', hex: '#facc15' },
+  { name: 'White', hex: '#f3f4f6' },
+  { name: 'Charcoal', hex: '#374151' },
+  { name: 'Royal', hex: '#2563eb' },
+];
 
-const CANVAS_TOTE_SEEDS: VariantSeed[] = [
-  { colour: 'Sand', size: 'One Size', sku: 'CVT-SD-OS', barcode: '9331234580011', stockOnHand: 418, allocated: 62, incoming: 0, forwardOrders: 0, trigger: 250 },
+// — Product 1 (first shown): enriched canvas tote —
+
+const ENRICHED_TOTE_SEEDS: VariantSeed[] = [
+  { colour: 'Sand', size: '50', sku: 'CVT-SD-50', barcode: '9331234580011', stockOnHand: 418, allocated: 62, incoming: 0, forwardOrders: 0, trigger: 250 },
+  { colour: 'Sand', size: '52', sku: 'CVT-SD-52', barcode: '9331234580012', stockOnHand: 204, allocated: 24, incoming: 120, forwardOrders: 60, trigger: 180 },
+  { colour: 'Sand', size: '54', sku: 'CVT-SD-54', barcode: '9331234580013', stockOnHand: 96, allocated: 14, incoming: 0, forwardOrders: 0, trigger: 120 },
+  { colour: 'Black', size: '50', sku: 'CVT-BK-50', barcode: '9331234580021', stockOnHand: 312, allocated: 48, incoming: 200, forwardOrders: 100, trigger: 220 },
+  { colour: 'Black', size: '52', sku: 'CVT-BK-52', barcode: '9331234580022', stockOnHand: 158, allocated: 12, incoming: 0, forwardOrders: 40, trigger: 160 },
+  { colour: 'Navy', size: '50', sku: 'CVT-NV-50', barcode: '9331234580031', stockOnHand: 0, allocated: 0, incoming: 250, forwardOrders: 180, trigger: 150 },
+  { colour: 'Navy', size: '52', sku: 'CVT-NV-52', barcode: '9331234580032', stockOnHand: 74, allocated: 8, incoming: 0, forwardOrders: 0, trigger: 100 },
+];
+
+const ENRICHED_TOTE_COLOURS: ColourOption[] = [
+  { name: 'Sand', hex: '#d6c7a1' },
+  { name: 'Black', hex: '#111827' },
+  { name: 'Navy', hex: '#1e3a8a' },
+];
+
+const ENRICHED_TOTE_STORES: StoreListing[] = [
+  { id: 'st-10', name: 'Mad Hats', domain: 'madhats.com.au', status: 'ACTIVE', externalId: '6633189001122', price: 14.95, url: 'https://madhats.com.au/products/harbour-canvas-tote' },
+  { id: 'st-11', name: 'FunGear', domain: 'fungear.com.au', status: 'ACTIVE', externalId: '746075992003', price: 15.5, url: 'https://fungear.com.au/products/harbour-canvas-tote' },
+  { id: 'st-12', name: 'Flag Factory', domain: 'flagfactory.com.au', status: 'DRAFT', externalId: '8311174605122', price: 14.5, url: null },
+];
+
+const ENRICHED_TOTE_ACTIVITY: ActivityEntry[] = [
+  { id: 'ac-e1', at: '2026-08-14T09:20:00.000Z', actor: 'Terry', message: 'Raised PO-00245 for 250 units of CVT-NV-50' },
+  { id: 'ac-e2', at: '2026-08-13T14:05:00.000Z', actor: 'System', message: 'Received 200 units against PO-00221' },
+  { id: 'ac-e3', at: '2026-08-12T11:45:00.000Z', actor: 'Alice Wong', message: 'Changed sell price to 14.95 AUD on Mad Hats' },
+  { id: 'ac-e4', at: '2026-08-11T08:30:00.000Z', actor: 'Terry', message: 'Marked product as verified' },
+  { id: 'ac-e5', at: '2026-08-09T16:10:00.000Z', actor: 'System', message: 'Synced 7 variants from Shopify' },
+  { id: 'ac-e6', at: '2026-08-05T10:00:00.000Z', actor: 'Alice Wong', message: 'Adjusted stock on hand by +40' },
 ];
 
 // — Product 4: no images, no activity, unverified —
 
 const SAMPLE_VISOR_SEEDS: VariantSeed[] = [
-  { colour: 'Bottle', size: 'S/M', sku: 'SPV-BT-SM', barcode: '9331234590011', stockOnHand: 44, allocated: 4, incoming: 0, forwardOrders: 60, trigger: 100 },
-  { colour: 'Bottle', size: 'L/XL', sku: 'SPV-BT-LX', barcode: '9331234590012', stockOnHand: 38, allocated: 6, incoming: 0, forwardOrders: 40, trigger: 100 },
-  { colour: 'Grey', size: 'S/M', sku: 'SPV-GY-SM', barcode: '9331234590021', stockOnHand: 51, allocated: 3, incoming: 60, forwardOrders: 0, trigger: 80 },
+  { colour: 'Bottle', size: '56', sku: 'SPV-BT-56', barcode: '9331234590011', stockOnHand: 44, allocated: 4, incoming: 0, forwardOrders: 60, trigger: 100 },
+  { colour: 'Bottle', size: '58', sku: 'SPV-BT-58', barcode: '9331234590012', stockOnHand: 38, allocated: 6, incoming: 0, forwardOrders: 40, trigger: 100 },
+  { colour: 'Grey', size: '56', sku: 'SPV-GY-56', barcode: '9331234590021', stockOnHand: 51, allocated: 3, incoming: 60, forwardOrders: 0, trigger: 80 },
+];
+
+const SAMPLE_VISOR_COLOURS: ColourOption[] = [
+  { name: 'Bottle', hex: '#065f46' },
+  { name: 'Grey', hex: '#9ca3af' },
 ];
 
 const DEMO_PRODUCTS: ProductRecord[] = [
@@ -141,13 +192,15 @@ const DEMO_PRODUCTS: ProductRecord[] = [
     status: 'ACTIVE',
     verified: true,
     createdAt: '2026-05-02T09:00:00.000Z',
-    images: buildImages('HARBOUR TOTE', [{ name: 'Sand', hex: '#d6c7a1' }], ['Packshot', 'Detail']),
-    variants: buildVariants(CANVAS_TOTE_SEEDS, 4.2, 14.95),
+    images: buildImages('HARBOUR TOTE', ENRICHED_TOTE_COLOURS, ['Packshot', 'Detail', 'Size guide', 'Lifestyle']),
+    sizes: DEMO_SIZES,
+    colours: ENRICHED_TOTE_COLOURS,
+    variants: buildVariants(ENRICHED_TOTE_SEEDS, 4.2, 14.95),
     pricing: { currencyCode: 'USD', exchangeRate: 1.55, buyingPrice: 2.71, freight: 0.4, misc: 0.05, marginPercent: 150, tax: 1.36 },
-    stores: [],
+    stores: ENRICHED_TOTE_STORES,
     stocktake: { lastAt: '2026-03-18T00:00:00.000Z', nextAt: '2026-09-18T00:00:00.000Z' },
     adjustments: { lastAt: '2026-04-02T00:00:00.000Z', thisMonth: 2 },
-    activity: [{ id: 'ac-t1', at: '2026-08-05T10:00:00.000Z', actor: 'Alice Wong', message: 'Adjusted stock on hand by +40' }],
+    activity: ENRICHED_TOTE_ACTIVITY,
   },
   {
     id: 'prd-sample-visor',
@@ -162,6 +215,8 @@ const DEMO_PRODUCTS: ProductRecord[] = [
     verified: false,
     createdAt: '2026-06-21T09:00:00.000Z',
     images: [],
+    sizes: DEMO_SIZES,
+    colours: SAMPLE_VISOR_COLOURS,
     variants: buildVariants(SAMPLE_VISOR_SEEDS, 2.48, 6.5),
     pricing: { currencyCode: 'USD', exchangeRate: 1.55, buyingPrice: 1.6, freight: 0.3, misc: 0.04, marginPercent: 150, tax: 0.59 },
     stores: [{ id: 'st-9', name: 'Mad Hats', domain: 'madhats.com.au', status: 'DRAFT', externalId: '6633188999111', price: 6.5, url: null }],
@@ -181,19 +236,9 @@ const DEMO_PRODUCTS: ProductRecord[] = [
     status: 'ACTIVE',
     verified: true,
     createdAt: '2026-07-14T09:00:00.000Z',
-    images: buildImages(
-      'TOUR PRO CAP',
-      [
-        { name: 'Navy', hex: '#1e3a8a' },
-        { name: 'Red', hex: '#dc2626' },
-        { name: 'Lime', hex: '#84cc16' },
-        { name: 'Yellow', hex: '#facc15' },
-        { name: 'White', hex: '#f3f4f6' },
-        { name: 'Charcoal', hex: '#374151' },
-        { name: 'Royal', hex: '#2563eb' },
-      ],
-      ['Packshot', 'Size guide', 'Lifestyle']
-    ),
+    images: buildImages('TOUR PRO CAP', TOUR_CAP_COLOURS, ['Packshot', 'Size guide', 'Lifestyle']),
+    sizes: DEMO_SIZES,
+    colours: TOUR_CAP_COLOURS,
     variants: buildVariants(TOUR_CAP_SEEDS, 5.27, 16.95),
     pricing: { currencyCode: 'USD', exchangeRate: 1.55, buyingPrice: 3.4, freight: 0.55, misc: 0.06, marginPercent: 150, tax: 1.54 },
     stores: [
@@ -203,7 +248,7 @@ const DEMO_PRODUCTS: ProductRecord[] = [
     stocktake: { lastAt: '2026-06-30T00:00:00.000Z', nextAt: '2026-12-30T00:00:00.000Z' },
     adjustments: { lastAt: '2026-07-29T00:00:00.000Z', thisMonth: 5 },
     activity: [
-      { id: 'ac-c1', at: '2026-08-11T12:30:00.000Z', actor: 'Terry', message: 'Raised PO-00231 for 350 units of TRC-RD-L' },
+      { id: 'ac-c1', at: '2026-08-11T12:30:00.000Z', actor: 'Terry', message: 'Raised PO-00231 for 350 units of TRC-RD-58' },
       { id: 'ac-c2', at: '2026-08-08T08:10:00.000Z', actor: 'System', message: 'Royal colourway went out of stock' },
     ],
   },
@@ -220,15 +265,9 @@ const DEMO_PRODUCTS: ProductRecord[] = [
     status: 'ACTIVE',
     verified: true,
     createdAt: '2026-08-09T09:00:00.000Z',
-    images: buildImages(
-      'FLEX KINDY HAT',
-      [
-        { name: 'Aqua', hex: '#22b8e6' },
-        { name: 'Black', hex: '#111827' },
-        { name: 'Hot Pink', hex: '#ec4899' },
-      ],
-      ['Packshot', 'Care label', 'Lifestyle', 'Size guide']
-    ),
+    images: buildImages('FLEX KINDY HAT', FLEX_KINDY_COLOURS, ['Packshot', 'Care label', 'Lifestyle', 'Size guide']),
+    sizes: DEMO_SIZES,
+    colours: FLEX_KINDY_COLOURS,
     variants: buildVariants(FLEX_KINDY_SEEDS, 3.1, 8.99),
     pricing: { currencyCode: 'USD', exchangeRate: 1.55, buyingPrice: 2.0, freight: 0.55, misc: 0.05, marginPercent: 100, tax: 0.93 },
     stores: FLEX_KINDY_STORES,

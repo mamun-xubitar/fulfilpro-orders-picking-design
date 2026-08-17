@@ -54,8 +54,15 @@ export default function VariantsMatrixTable({ matrix, onAction }: VariantsMatrix
               key={variant.id}
               variant={variant}
               selected={matrix.selectedIds.has(variant.id)}
+              editing={matrix.editingRowId === variant.id}
+              swatch={matrix.swatchOf(variant.colour)}
+              colours={matrix.colours}
+              sizes={matrix.sizes}
               onToggleSelect={matrix.toggleRow}
-              onTriggerChange={matrix.setTriggerEdit}
+              onFieldChange={matrix.setVariantEdit}
+              onStartEdit={matrix.startRowEdit}
+              onSave={matrix.saveRowEdit}
+              onCancel={matrix.cancelRowEdit}
               onAction={onAction}
             />
           ))}

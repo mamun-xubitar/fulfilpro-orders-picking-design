@@ -8,6 +8,12 @@
 
 export type ProductStatusValue = 'ACTIVE' | 'DRAFT' | 'ARCHIVED';
 
+/** A colourway on the product. `hex` is the source of truth for every swatch. */
+export type ColourOption = {
+  name: string;
+  hex: string;
+};
+
 /** One row of the variants / stock matrix. */
 export type VariantRow = {
   // — mirrors ProductVariant today —
@@ -149,6 +155,10 @@ export type ProductRecord = {
   /** ISO 8601 — orders the product list; the page opens on the newest. */
   createdAt: string;
   images: ProductImage[];
+  /** NOT IN PRISMA YET — source of truth for the size chips and the matrix size dropdown. */
+  sizes: string[];
+  /** NOT IN PRISMA YET — source of truth for the colour chips, matrix pills and every swatch. */
+  colours: ColourOption[];
   variants: VariantRow[];
   pricing: PricingInputs;
   stores: StoreListing[];
@@ -214,4 +224,20 @@ export type PricingForm = {
   misc: string;
   marginPercent: string;
   tax: string;
+};
+
+/** Editable copy of the product record while the details panel is in edit mode. */
+export type ProductDetailsForm = {
+  itemNo: string;
+  brand: string;
+  name: string;
+  category: string;
+  sku: string;
+  description: string;
+  deliveryRemarks: string;
+  /** Space-separated, e.g. "50 52 54 56 58 60". */
+  sizes: string;
+  colours: ColourOption[];
+  status: ProductStatusValue;
+  verified: boolean;
 };

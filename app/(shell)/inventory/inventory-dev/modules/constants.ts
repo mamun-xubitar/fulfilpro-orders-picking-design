@@ -80,6 +80,17 @@ export const COLOUR_SWATCHES: Record<string, string> = {
 
 export const FALLBACK_SWATCH = '#cbd5e1';
 
+/** Demo stand-in for the Shopify taxonomy the real page searches via /api/inventory/taxonomy. */
+export const PRODUCT_CATEGORIES = [
+  'Apparel & Accessories > Hats',
+  'Apparel & Accessories > Hats > Caps',
+  'Apparel & Accessories > Hats > Bucket Caps',
+  'Apparel & Accessories > Hats > Visors',
+  'Apparel & Accessories > Clothing > Shirts & Tops',
+  'Luggage & Bags > Totes',
+  'Luggage & Bags > Backpacks',
+];
+
 export const PRODUCT_STATUS_BADGES: Record<string, string> = {
   ACTIVE: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   DRAFT: 'bg-amber-50 text-amber-700 border-amber-200',

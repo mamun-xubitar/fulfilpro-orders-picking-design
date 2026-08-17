@@ -4,11 +4,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-toastify';
 import { fetchDemoProducts } from '../demo-data';
 import { summariseVariants } from '../utils';
+import { useProductDetailsDemo } from './useProductDetailsDemo';
 import { useProductImages } from './useProductImages';
 import { useProductNavigation } from './useProductNavigation';
 import { useProductPricingDemo } from './useProductPricingDemo';
 import { useVariantsMatrix } from './useVariantsMatrix';
-import type { InventoryGlobals, ModuleTabId, ProductRecord, ProductTabId, StoreListing } from '../types';
+import type { InventoryGlobals, ModuleTabId, ProductRecord, ProductTabId, StoreListing, VariantRow } from '../types';
 
 const EMPTY_GLOBALS: InventoryGlobals = { exchangeRate: 1, marginPercent: 0, baseCurrency: 'AUD', currencies: [{ code: 'AUD', rate: 1 }] };
 
@@ -22,7 +23,7 @@ export function useInventoryDevPage() {
   const [productTab, setProductTab] = useState<ProductTabId>('details');
   const [rateInput, setRateInput] = useState('');
   const [marginInput, setMarginInput] = useState('');
-  const [storedEdits, setStoredEdits] = useState<{ productId: string; values: Record<string, number> } | null>(null);
+  const [storedEdits, setStoredEdits] = useState<{ productId: string; values: Record<string, Partial<VariantRow>> } | null>(null);
   const [newProductOpen, setNewProductOpen] = useState(false);
   const [editImagesOpen, setEditImagesOpen] = useState(false);
   const [storePriceTarget, setStorePriceTarget] = useState<StoreListing | null>(null);
@@ -63,19 +64,33 @@ export function useInventoryDevPage() {
   const nav = useProductNavigation(products);
   const product = nav.product;
 
-  // Trigger edits are tagged with their product, so they fall away on navigation.
+  // Row edits are tagged with their product, so they fall away on navigation.
   // Memoised so the empty case keeps a stable identity for downstream memos.
-  const triggerEdits = useMemo(
+  const variantEdits = useMemo(
     () => (storedEdits && storedEdits.productId === product?.id ? storedEdits.values : {}),
     [storedEdits, product?.id]
   );
 
-  const setTriggerEdit = useCallback(
-    (variantId: string, value: number) => {
+  const setVariantEdit = useCallback(
+    (variantId: string, patch: Partial<VariantRow>) => {
       if (!product) return;
       setStoredEdits((prev) => {
         const base = prev && prev.productId === product.id ? prev.values : {};
-        return { productId: product.id, values: { ...base, [variantId]: value } };
+        return { productId: product.id, values: { ...base, [variantId]: { ...base[variantId], ...patch } } };
+      });
+    },
+    [product]
+  );
+
+  /** Drops one row's unsaved edits — the matrix row Cancel. */
+  const clearVariantEdit = useCallback(
+    (variantId: string) => {
+      if (!product) return;
+      setStoredEdits((prev) => {
+        if (!prev || prev.productId !== product.id) return prev;
+        const rest = { ...prev.values };
+        delete rest[variantId];
+        return { productId: product.id, values: rest };
       });
     },
     [product]
@@ -83,13 +98,21 @@ export function useInventoryDevPage() {
 
   const gallery = useProductImages(product);
   const pricing = useProductPricingDemo({ product, globals, applyPrices });
-  const matrix = useVariantsMatrix({ product, triggerEdits, setTriggerEdit });
+  const details = useProductDetailsDemo(product);
+  const matrix = useVariantsMatrix({
+    product,
+    sizes: details.sizes,
+    colours: details.colours,
+    variantEdits,
+    setVariantEdit,
+    clearVariantEdit,
+  });
 
   /** Stock Summary always reflects the whole product, not the filtered rows. */
   const summary = useMemo(() => {
     if (!product) return summariseVariants([]);
-    return summariseVariants(product.variants.map((v) => (v.id in triggerEdits ? { ...v, trigger: triggerEdits[v.id] } : v)));
-  }, [product, triggerEdits]);
+    return summariseVariants(product.variants.map((v) => (v.id in variantEdits ? { ...v, ...variantEdits[v.id] } : v)));
+  }, [product, variantEdits]);
 
   const applyGlobalRate = () => {
     const value = Number(rateInput);
@@ -130,6 +153,7 @@ export function useInventoryDevPage() {
     nav,
     gallery,
     pricing,
+    details,
     matrix,
     summary,
     rateInput,
