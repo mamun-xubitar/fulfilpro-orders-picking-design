@@ -28,6 +28,12 @@ body {
   -webkit-user-select: none;
   -webkit-touch-callout: none;
 }
+.protected-orders-page .allow-copy,
+.protected-orders-page .allow-copy * {
+  user-select: text;
+  -webkit-user-select: text;
+  -webkit-touch-callout: default;
+}
 @media (max-width: 767px) {
   #sidebar { width: 240px !important; }
   #main-content { margin-left: 0 !important; }

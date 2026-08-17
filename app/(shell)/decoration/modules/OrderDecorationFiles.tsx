@@ -124,7 +124,7 @@ export default function OrderDecorationFiles({
         onUpload={onUpload}
         onRemoveFile={onRemoveFile}
       />
-      <div className="min-w-[200px] flex-1">
+      <div className="allow-copy min-w-[200px] flex-1">
         <label className="block text-[11px] text-gray-500 mb-1">
           Customer remarks{savingRemarks && <span className="text-gray-400"> (saving…)</span>}
         </label>

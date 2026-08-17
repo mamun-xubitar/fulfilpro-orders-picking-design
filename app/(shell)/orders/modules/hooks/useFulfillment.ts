@@ -229,9 +229,30 @@ export function useFulfillment({ setOrders, blockTestModeAction }: UseFulfillmen
     };
   }, []);
 
+  const resetOrderSelections = (orderId: string) => {
+    const prefix = `${orderId}-`;
+    const isOrderRowKey = (key: string) => key.startsWith(prefix) && /^\d+$/.test(key.slice(prefix.length));
+
+    setFullChecks((prev) => {
+      const updated = { ...prev };
+      for (const key of Object.keys(updated)) {
+        if (isOrderRowKey(key)) delete updated[key];
+      }
+      return updated;
+    });
+    setPartialValues((prev) => {
+      const updated = { ...prev };
+      for (const key of Object.keys(updated)) {
+        if (isOrderRowKey(key)) delete updated[key];
+      }
+      return updated;
+    });
+  };
+
   return {
     fullChecks,
     partialValues,
+    resetOrderSelections,
     fulMessages,
     fulSaving,
     carrierDropdownOpen, setCarrierDropdownOpen,

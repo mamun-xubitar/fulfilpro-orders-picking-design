@@ -1,4 +1,4 @@
-import type { ApiResponse, BackInStockItem, BackInStockStatus, FulfillmentEditRequestRow, OrderItem, OrderRow, PackingSlipLabel, ShippingLine, WorkCommentDraft } from './types';
+import type { ApiResponse, BackInStockItem, BackInStockStatus, FulfillmentEditRequestRow, OrderItem, OrderRow, PackingSlipLabel, ShippingLine, VariantSearchResult, WorkCommentDraft } from './types';
 import type { NameAttributeRow } from './nameAttributesExport';
 import type { DecorationCategory } from '@/lib/roles';
 
@@ -344,4 +344,30 @@ export function getActiveFulfillmentRequest(
     (r.status === 'pending' || r.status === 'approved') &&
     new Date(r.expiresAt) > new Date()
   ) ?? null;
+}
+
+export type VariantSearchGroup = {
+  productShopifyId: string;
+  productTitle: string;
+  imageUrl: string | null;
+  variants: VariantSearchResult[];
+};
+
+export function groupVariantResults(results: VariantSearchResult[]): VariantSearchGroup[] {
+  const groups = new Map<string, VariantSearchGroup>();
+  for (const result of results) {
+    const existing = groups.get(result.productShopifyId);
+    if (existing) {
+      existing.variants.push(result);
+      if (!existing.imageUrl) existing.imageUrl = result.imageUrl;
+    } else {
+      groups.set(result.productShopifyId, {
+        productShopifyId: result.productShopifyId,
+        productTitle: result.productTitle,
+        imageUrl: result.imageUrl,
+        variants: [result],
+      });
+    }
+  }
+  return [...groups.values()];
 }

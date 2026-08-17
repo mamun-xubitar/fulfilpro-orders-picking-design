@@ -87,6 +87,7 @@ type ShopifyOrderByIdResult = {
         vendor: string | null;
         quantity: number;
         fulfillableQuantity: number;
+        currentQuantity: number;
         image: {
           url: string;
         } | null;
@@ -215,6 +216,7 @@ const ORDER_BY_ID_QUERY = `
           vendor
           quantity
           fulfillableQuantity
+          currentQuantity
           image {
             url
           }
@@ -365,6 +367,7 @@ function toShopifyOrderPayload(order: NonNullable<ShopifyOrderByIdResult['order'
         vendor: lineItem.vendor,
         quantity: lineItem.quantity,
         fulfillable_quantity: lineItem.fulfillableQuantity,
+        current_quantity: lineItem.currentQuantity,
         price: lineItem.discountedUnitPriceSet?.shopMoney.amount ?? null,
         price_set: lineItem.discountedUnitPriceSet
           ? {

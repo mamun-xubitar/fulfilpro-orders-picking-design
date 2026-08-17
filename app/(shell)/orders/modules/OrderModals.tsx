@@ -473,7 +473,7 @@ export default function OrderModals({
           {messageModal.loading ? (
             <div className="py-12 text-center text-sm text-gray-400">Loading messages...</div>
           ) : (
-            <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+            <div className="allow-copy grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
               <div className="space-y-3">
                 <label className="block text-sm text-gray-700">
                   <span className="block text-xs font-semibold uppercase text-gray-500 mb-1">Recipient</span>
@@ -601,7 +601,7 @@ export default function OrderModals({
           {noteModal.loading ? (
             <div className="py-12 text-center text-sm text-gray-400">Loading notes...</div>
           ) : (
-            <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.2fr)]">
+            <div className="allow-copy grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.2fr)]">
               <div className="space-y-3">
                 <label className="block text-sm text-gray-700">
                   <span className="block text-xs font-semibold uppercase text-gray-500 mb-1">

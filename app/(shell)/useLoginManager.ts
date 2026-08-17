@@ -65,6 +65,7 @@ export default function useLoginManager(isAdmin: boolean) {
       method: "PATCH",
       data: { userIds: selectedIds },
       successMessage: "Auto-approvals updated for today",
+      onSuccess: () => handleClose(),
     });
   }
 

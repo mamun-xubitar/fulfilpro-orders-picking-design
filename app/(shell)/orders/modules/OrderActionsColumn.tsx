@@ -29,7 +29,7 @@ export default function OrderActionsColumn({
   openMessageModal,
 }: OrderActionsColumnProps) {
   return (
-    <div className="w-full lg:max-w-[400px]">
+    <div className="w-full lg:max-w-[280px]">
       {(() => {
         const lockedFulfillment = isOrderFulfillmentLocked(order);
         const canConfirmFulfillment = !lockedFulfillment && getFulfillmentLines(order).length > 0;
@@ -94,7 +94,7 @@ export default function OrderActionsColumn({
         <div className="mt-2 text-xs text-center text-green-600 font-medium">{fulMessages[order.id]}</div>
       )}
       {order.note && (
-        <div className="mt-3 rounded-md border border-blue-100 bg-white/70 px-3 py-2">
+        <div className="allow-copy mt-3 rounded-md border border-blue-100 bg-white/70 px-3 py-2">
           <h4 className="text-[11px] font-semibold uppercase text-gray-400">Note</h4>
           <p className="mt-1 whitespace-pre-wrap break-words text-xs text-gray-600">{order.note}</p>
         </div>

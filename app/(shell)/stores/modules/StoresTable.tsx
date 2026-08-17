@@ -19,7 +19,7 @@ interface StoresTableProps {
   onLogoUpload: (id: string, file: File) => void;
   onLogoRemove: (id: string) => void;
   onUpdateApp: (id: string) => void;
-  onReauthorize: (id: string) => void;
+  reauthorizeUrls: Record<string, string>;
   disconnectingIds: string[];
   deletingIds: string[];
   uploadingLogoIds: string[];
@@ -54,7 +54,7 @@ export default function StoresTable({
   onLogoUpload,
   onLogoRemove,
   onUpdateApp,
-  onReauthorize,
+  reauthorizeUrls,
   disconnectingIds,
   deletingIds,
   uploadingLogoIds,
@@ -204,13 +204,15 @@ export default function StoresTable({
                               {isUpdated ? 'Updated ✓' : isUpdatingApp ? 'Updating…' : 'Update App'}
                             </button>
                           )}
-                          {isUpdated && (
-                            <button
-                              onClick={() => onReauthorize(store.id)}
+                          {isUpdated && reauthorizeUrls[store.id] && (
+                            <a
+                              href={reauthorizeUrls[store.id]}
+                              target="_blank"
+                              rel="noopener noreferrer"
                               className="px-2.5 py-1 text-xs border border-green-300 text-green-700 rounded-lg hover:bg-green-50 transition-colors duration-150 cursor-pointer"
                             >
                               Re-authorize
-                            </button>
+                            </a>
                           )}
                           <button
                             onClick={() => onDisconnect(store.id)}

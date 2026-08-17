@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 
-const DEFAULT_SCOPES = 'read_products,write_products,read_orders,write_orders,read_fulfillments,write_fulfillments,read_merchant_managed_fulfillment_orders,write_merchant_managed_fulfillment_orders,read_inventory,write_inventory,read_locations,write_locations,read_customers,read_publications,write_publications';
+const DEFAULT_SCOPES = 'read_products,write_products,read_orders,write_orders,read_fulfillments,write_fulfillments,read_merchant_managed_fulfillment_orders,write_merchant_managed_fulfillment_orders,read_inventory,write_inventory,read_locations,write_locations,read_customers,read_publications,write_publications,read_order_edits,write_order_edits';
 
 export type ShopifyCallbackQuery = {
   code: string | null;

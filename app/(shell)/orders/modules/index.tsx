@@ -10,6 +10,9 @@ import OrdersTable from './OrdersTable';
 import AssignModal from './AssignModal';
 import WorkModal from './WorkModal';
 import WorkDetailsModal from './WorkDetailsModal';
+import DeleteLineItemModal from './DeleteLineItemModal';
+import EditLineItemModal from './EditLineItemModal';
+import AddLineItemModal from './AddLineItemModal';
 import { formatStockStatus, getAvailableStockItemsForRow, getBackInStockEligibleItems, hasStockItemAvailableToAdd } from './utils';
 
 export default function OrdersPage() {
@@ -204,6 +207,39 @@ export default function OrdersPage() {
           closeWorkDetails={p.closeWorkDetails}
           userIsAdmin={p.userIsAdmin}
           deleteWorkRecord={p.deleteWorkRecord}
+        />
+      )}
+
+      {p.deleteLineItemModal && (
+        <DeleteLineItemModal
+          modal={p.deleteLineItemModal}
+          setModal={p.setDeleteLineItemModal}
+          onClose={p.closeDeleteLineItemModal}
+          onConfirm={() => void p.submitDeleteLineItem()}
+        />
+      )}
+
+      {p.editLineItemModal && (
+        <EditLineItemModal
+          modal={p.editLineItemModal}
+          setQuantity={p.setEditLineItemQuantity}
+          setTitle={p.setEditLineItemTitle}
+          setRestock={p.setEditLineItemRestock}
+          onClose={p.closeEditLineItemModal}
+          onConfirm={() => void p.submitEditLineItem()}
+        />
+      )}
+
+      {p.addLineItemModal && (
+        <AddLineItemModal
+          modal={p.addLineItemModal}
+          setMode={p.setAddLineItemMode}
+          setQuery={p.setAddLineItemQuery}
+          selectVariant={p.selectAddLineItemVariant}
+          setQuantity={p.setAddLineItemQuantity}
+          setCustomTitle={p.setAddLineItemCustomTitle}
+          onClose={p.closeAddLineItemModal}
+          onConfirm={() => void p.submitAddLineItem()}
         />
       )}
     </main>

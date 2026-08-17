@@ -109,6 +109,48 @@ export class ProductModel {
     }));
   }
 
+  async searchVariantsForStore(params: { storeId: string; query: string; limit?: number }) {
+    const { storeId, query, limit = 25 } = params;
+    const token = query.trim();
+
+    const variants = await prisma.productVariant.findMany({
+      where: {
+        storeId,
+        product: { deletedAt: null, status: ProductStatus.ACTIVE },
+        ...(token
+          ? {
+              OR: [
+                { sku: { contains: token, mode: 'insensitive' } },
+                { product: { title: { contains: token, mode: 'insensitive' } } },
+              ],
+            }
+          : {}),
+      },
+      select: {
+        shopifyId: true,
+        title: true,
+        sku: true,
+        price: true,
+        inventoryQuantity: true,
+        imageUrl: true,
+        product: { select: { shopifyId: true, title: true, imageUrl: true } },
+      },
+      take: limit,
+      orderBy: { product: { title: 'asc' } },
+    });
+
+    return variants.map((variant) => ({
+      variantShopifyId: variant.shopifyId,
+      productShopifyId: variant.product.shopifyId,
+      productTitle: variant.product.title,
+      variantTitle: variant.title,
+      sku: variant.sku,
+      price: Number(variant.price),
+      inventoryQuantity: variant.inventoryQuantity,
+      imageUrl: variant.imageUrl ?? variant.product.imageUrl,
+    }));
+  }
+
   async getStoreOptions(allowedStoreIds?: string[] | null) {
     const where: Prisma.StoreWhereInput = { status: 'connected' };
     if (allowedStoreIds !== null && allowedStoreIds !== undefined) {

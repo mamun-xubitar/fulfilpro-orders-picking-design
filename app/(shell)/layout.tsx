@@ -49,9 +49,10 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
   const inactivityLogoutTriggeredRef = useRef(false);
   const blockedActionWarningAt = useRef(0);
   const blockedActionTimer = useRef<number | null>(null);
-  const isOrdersPath = pathname === "/orders" || pathname.startsWith("/orders/");
+  const isOrdersPath = pathname === "/orders" || pathname.startsWith("/orders/") || pathname === "/decoration" || pathname.startsWith("/decoration/") || pathname === "/picking-list" || pathname.startsWith("/picking-list/");
   const userIsOrderPicker = isOrderPickerRole(session?.user?.role);
   const userIsDecorator = isDecoratorRole(session?.user?.role);
+  const blockOrdersCopy = isOrdersPath && session?.user?.role !== "admin";
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -138,7 +139,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
   }, []);
 
   useEffect(() => {
-    if (!isOrdersPath) {
+    if (!blockOrdersCopy) {
       return;
     }
 
@@ -156,7 +157,17 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
       }, 2200);
     };
 
+    const isCopyAllowed = (node: Node | null | undefined) => {
+      const element = node instanceof Element ? node : node?.parentElement ?? null;
+      return Boolean(element?.closest(".allow-copy"));
+    };
+
+    const eventIsAllowed = (event: Event) =>
+      isCopyAllowed(event.target as Node | null) ||
+      isCopyAllowed(window.getSelection()?.anchorNode);
+
     const blockAction = (event: Event) => {
+      if (eventIsAllowed(event)) return;
       event.preventDefault();
       showBlockedActionMessage();
     };
@@ -166,6 +177,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
       const blocksSelectOrCopy = (event.ctrlKey || event.metaKey) && (key === "a" || key === "c");
 
       if (!blocksSelectOrCopy) return;
+      if (eventIsAllowed(event)) return;
 
       event.preventDefault();
       event.stopPropagation();
@@ -185,7 +197,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
       document.removeEventListener("dragstart", blockAction);
       document.removeEventListener("keydown", handleKeyDown, true);
     };
-  }, [isOrdersPath]);
+  }, [blockOrdersCopy]);
 
   useEffect(() => {
     return () => {
@@ -369,8 +381,8 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
   }
 
   return (
-    <div className={isOrdersPath ? "protected-orders-page" : undefined}>
-      {isOrdersPath && blockedActionMessage && (
+    <div className={blockOrdersCopy ? "protected-orders-page" : undefined}>
+      {blockOrdersCopy && blockedActionMessage && (
         <div
           role="alert"
           className="fixed bottom-5 left-1/2 z-[100] -translate-x-1/2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900 shadow-lg"
