@@ -52,6 +52,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
   const isOrdersPath = pathname === "/orders" || pathname.startsWith("/orders/");
   const userIsOrderPicker = isOrderPickerRole(session?.user?.role);
   const userIsDecorator = isDecoratorRole(session?.user?.role);
+  const blockOrdersCopy = isOrdersPath && session?.user?.role !== "admin";
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -138,7 +139,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
   }, []);
 
   useEffect(() => {
-    if (!isOrdersPath) {
+    if (!blockOrdersCopy) {
       return;
     }
 
@@ -185,7 +186,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
       document.removeEventListener("dragstart", blockAction);
       document.removeEventListener("keydown", handleKeyDown, true);
     };
-  }, [isOrdersPath]);
+  }, [blockOrdersCopy]);
 
   useEffect(() => {
     return () => {
@@ -368,8 +369,8 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
   }
 
   return (
-    <div className={isOrdersPath ? "protected-orders-page" : undefined}>
-      {isOrdersPath && blockedActionMessage && (
+    <div className={blockOrdersCopy ? "protected-orders-page" : undefined}>
+      {blockOrdersCopy && blockedActionMessage && (
         <div
           role="alert"
           className="fixed bottom-5 left-1/2 z-[100] -translate-x-1/2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900 shadow-lg"
