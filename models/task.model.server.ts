@@ -1,7 +1,7 @@
 import prisma from '@/lib/prisma.server';
 import { type SavedFile } from '@/lib/uploads.server';
 import { deriveTaskState, completionLateness, type TaskState } from '@/lib/utils/task-status';
-import { Prisma, TaskStatus, TaskDueType } from '@prisma/client';
+import { Prisma, TaskStatus, TaskDueType, TaskRecurrenceType } from '@prisma/client';
 
 export type TaskMessageRow = {
   id: string;
@@ -31,6 +31,12 @@ export type TaskRow = {
   assigneeEmail: string;
   unreadCount: number;
   messageCount: number;
+  isRecurringParent: boolean;
+  recurrenceType: TaskRecurrenceType | null;
+  recurrenceEndDate: string | null;
+  recurrenceStoppedAt: string | null;
+  parentTaskId: string | null;
+  childCount?: number;
   createdAt: string;
   updatedAt: string;
 };
@@ -41,6 +47,7 @@ export type TabCounts = {
   overdue: number;
   seriouslyLate: number;
   completed: number;
+  recurring: number;
 };
 
 export type ReportRow = {
@@ -79,9 +86,16 @@ type TaskWithMessages = {
   assigneeEmail: string;
   lastReadByAssignerAt: Date | null;
   lastReadByAssigneeAt: Date | null;
+  isRecurringParent: boolean;
+  recurrenceType: TaskRecurrenceType | null;
+  recurrenceEndDate: Date | null;
+  recurrenceStoppedAt: Date | null;
+  parentTaskId: string | null;
+  nextOccurrenceAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
   messages: Array<{ senderId: string; createdAt: Date }>;
+  _count?: { children: number };
 };
 
 export class TaskModel {
@@ -224,12 +238,13 @@ export class TaskModel {
     if (scopeUserId) conditions.push({ OR: [{ assigneeId: scopeUserId }, { assignerId: scopeUserId }] });
     const baseWhere: Prisma.TaskWhereInput = conditions.length ? { AND: conditions } : {};
 
-    const [completedCount, pendingRows] = await Promise.all([
+    const [completedCount, pendingRows, recurringCount] = await Promise.all([
       prisma.task.count({ where: { ...baseWhere, status: 'COMPLETED' } }),
       prisma.task.findMany({
         where: { ...baseWhere, status: 'PENDING' },
         select: { dueDate: true },
       }),
+      prisma.task.count({ where: { ...baseWhere, isRecurringParent: true } }),
     ]);
 
     let pending = 0;
@@ -243,11 +258,12 @@ export class TaskModel {
     }
 
     return {
-      total: completedCount + pendingRows.length,
+      total: pendingRows.length,
       pending,
       overdue,
       seriouslyLate,
       completed: completedCount,
+      recurring: recurringCount,
     };
   }
 
@@ -364,25 +380,171 @@ export class TaskModel {
       seriouslyLate: d.seriouslyLate,
     }));
   }
+
+  async createForAssignees(
+    entries: Array<{
+      title: string;
+      description: string;
+      dueDate: Date;
+      dueType: TaskDueType;
+      assigner: { id: string; name: string; email: string };
+      assignee: { id: string; name: string; email: string };
+      recurrence?: { type: TaskRecurrenceType; endDate: Date; nextOccurrenceAt: Date };
+    }>,
+  ): Promise<TaskRow[]> {
+    const rows = await prisma.$transaction(
+      entries.map((e) =>
+        prisma.task.create({
+          data: {
+            title: e.title,
+            description: e.description,
+            dueDate: e.dueDate,
+            dueType: e.dueType,
+            assignerId: e.assigner.id,
+            assignerName: e.assigner.name,
+            assignerEmail: e.assigner.email,
+            assigneeId: e.assignee.id,
+            assigneeName: e.assignee.name,
+            assigneeEmail: e.assignee.email,
+            ...(e.recurrence
+              ? {
+                  isRecurringParent: true,
+                  recurrenceType: e.recurrence.type,
+                  recurrenceEndDate: e.recurrence.endDate,
+                  nextOccurrenceAt: e.recurrence.nextOccurrenceAt,
+                }
+              : {}),
+          },
+          include: { messages: { select: { senderId: true, createdAt: true } } },
+        }),
+      ),
+    );
+    return rows.map((row, i) => toTaskRow(row, entries[i].assigner.id));
+  }
+
+  async findRecurringParents(params: {
+    assigneeId?: string;
+    scopeUserId?: string;
+    search?: string;
+    dueType?: TaskDueType;
+    page: number;
+    pageSize: number;
+    viewerId: string;
+  }) {
+    const where = buildWhere({
+      assigneeId: params.assigneeId,
+      scopeUserId: params.scopeUserId,
+      search: params.search,
+      dueType: params.dueType,
+      isRecurringParent: true,
+    });
+    const [total, rows] = await Promise.all([
+      prisma.task.count({ where }),
+      prisma.task.findMany({
+        where,
+        include: {
+          messages: { select: { senderId: true, createdAt: true } },
+          _count: { select: { children: true } },
+        },
+        orderBy: [{ createdAt: 'desc' }],
+        skip: (params.page - 1) * params.pageSize,
+        take: params.pageSize,
+      }),
+    ]);
+    return { total, tasks: rows.map((row) => toTaskRow(row, params.viewerId)) };
+  }
+
+  async findChildren(parentTaskId: string, viewerId: string): Promise<TaskRow[]> {
+    const rows = await prisma.task.findMany({
+      where: { OR: [{ id: parentTaskId }, { parentTaskId }] },
+      include: { messages: { select: { senderId: true, createdAt: true } } },
+      orderBy: { dueDate: 'desc' },
+    });
+    return rows.map((row) => toTaskRow(row, viewerId));
+  }
+
+  async stopRecurring(parentTaskId: string) {
+    await prisma.task.update({ where: { id: parentTaskId }, data: { recurrenceStoppedAt: new Date() } });
+  }
+
+  async findActiveRecurringParentsDueForGeneration(now: Date) {
+    return prisma.task.findMany({
+      where: {
+        isRecurringParent: true,
+        recurrenceStoppedAt: null,
+        nextOccurrenceAt: { lte: now },
+        OR: [{ recurrenceEndDate: null }, { recurrenceEndDate: { gte: now } }],
+      },
+    });
+  }
+
+  async createRecurringChild(
+    parent: {
+      id: string;
+      title: string;
+      description: string;
+      dueType: TaskDueType;
+      assignerId: string;
+      assignerName: string;
+      assignerEmail: string;
+      assigneeId: string;
+      assigneeName: string;
+      assigneeEmail: string;
+    },
+    dueDate: Date,
+    nextOccurrenceAt: Date,
+  ): Promise<TaskRow> {
+    const [child] = await prisma.$transaction([
+      prisma.task.create({
+        data: {
+          title: parent.title,
+          description: parent.description,
+          dueDate,
+          dueType: parent.dueType,
+          assignerId: parent.assignerId,
+          assignerName: parent.assignerName,
+          assignerEmail: parent.assignerEmail,
+          assigneeId: parent.assigneeId,
+          assigneeName: parent.assigneeName,
+          assigneeEmail: parent.assigneeEmail,
+          parentTaskId: parent.id,
+        },
+        include: { messages: { select: { senderId: true, createdAt: true } } },
+      }),
+      prisma.task.update({ where: { id: parent.id }, data: { nextOccurrenceAt } }),
+    ]);
+    return toTaskRow(child, parent.assigneeId);
+  }
 }
 
-function buildWhere(params: { assigneeId?: string; scopeUserId?: string; state?: TaskState2; search?: string; dueType?: TaskDueType }) {
+function buildWhere(params: {
+  assigneeId?: string;
+  scopeUserId?: string;
+  state?: TaskState2;
+  search?: string;
+  dueType?: TaskDueType;
+  isRecurringParent?: boolean;
+}) {
   const where: Prisma.TaskWhereInput = {};
   const and: Prisma.TaskWhereInput[] = [];
 
   if (params.assigneeId) where.assigneeId = params.assigneeId;
   if (params.scopeUserId) and.push({ OR: [{ assigneeId: params.scopeUserId }, { assignerId: params.scopeUserId }] });
   if (params.dueType) where.dueType = params.dueType;
+  if (params.isRecurringParent !== undefined) where.isRecurringParent = params.isRecurringParent;
 
   if (params.state === 'completed') {
     where.status = 'COMPLETED';
   } else if (
+    params.state === 'all' ||
     params.state === 'pending' ||
     params.state === 'overdue' ||
     params.state === 'seriously_late'
   ) {
+    // 'all' now means "active (non-completed)" too, same as the other three
     where.status = 'PENDING';
   }
+  // no state param at all (e.g. the Recurring-parents listing) → no status filter
 
   if (params.search) {
     const s = { contains: params.search, mode: 'insensitive' as const };
@@ -420,6 +582,12 @@ function toTaskRow(row: TaskWithMessages, viewerId: string): TaskRow {
     assigneeEmail: row.assigneeEmail,
     unreadCount,
     messageCount: row.messages.length,
+    isRecurringParent: row.isRecurringParent,
+    recurrenceType: row.recurrenceType,
+    recurrenceEndDate: row.recurrenceEndDate?.toISOString() ?? null,
+    recurrenceStoppedAt: row.recurrenceStoppedAt?.toISOString() ?? null,
+    parentTaskId: row.parentTaskId,
+    ...(row._count ? { childCount: row._count.children } : {}),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };

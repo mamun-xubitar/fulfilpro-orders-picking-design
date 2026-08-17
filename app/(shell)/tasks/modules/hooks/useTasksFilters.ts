@@ -46,6 +46,14 @@ export function useTasksFilters() {
     return params.toString();
   }
 
+  function buildRecurringQueryString() {
+    const params = new URLSearchParams({ page: String(page), pageSize: String(DEFAULT_PAGE_SIZE) });
+    if (search) params.set('search', search);
+    if (filterAssigneeId) params.set('assigneeId', filterAssigneeId);
+    if (filterDueType) params.set('dueType', filterDueType);
+    return params.toString();
+  }
+
   return {
     tab,
     setTab,
@@ -59,5 +67,6 @@ export function useTasksFilters() {
     setPage,
     buildQueryString,
     buildCountQueryString,
+    buildRecurringQueryString,
   };
 }
