@@ -1,17 +1,24 @@
+import moment from 'moment-timezone';
 import prisma from '@/lib/prisma.server';
 import { TaskModel, type TaskState2 } from '@/models/task.model.server';
-import { createNotification } from '@/lib/notifications.server';
-import { sendAppMail } from '@/lib/email.server';
+import { fireTaskEvent, fireMessageEvent } from '@/lib/task-events.server';
+import { resolveDueDate } from '@/lib/task-due-date.server';
 import { computeUrgentDueDate } from '@/lib/auth-policy.server';
+import { computeNextOccurrenceAt } from '@/lib/task-recurrence.server';
 import { getTaskVisibleUserIds, getTaskVisibleUsers } from '@/lib/task-visibility.server';
 import type { SavedFile } from '@/lib/uploads.server';
-import type { TaskDueType } from '@prisma/client';
+import type { TaskDueType, TaskRecurrenceType } from '@prisma/client';
 
 const taskModel = new TaskModel();
 const DUE_TYPES: TaskDueType[] = ['STANDARD', 'URGENT', 'CUSTOM'];
+const RECURRENCE_TYPES: TaskRecurrenceType[] = ['DAILY', 'WEEKLY'];
 
 function isTaskDueType(value: string): value is TaskDueType {
   return (DUE_TYPES as string[]).includes(value);
+}
+
+function isRecurrenceType(value: string): value is TaskRecurrenceType {
+  return (RECURRENCE_TYPES as string[]).includes(value);
 }
 
 type Session = { user: { id: string; name?: string | null; email?: string | null; role?: string | null } };
@@ -22,6 +29,74 @@ function isAdmin(session: Session) {
 
 function userName(session: Session) {
   return session.user.name ?? session.user.email ?? 'Unknown';
+}
+
+async function getSettingsTimezone(): Promise<string> {
+  const settings = await prisma.appSettings.findUnique({ where: { id: 'default' }, select: { timezone: true } });
+  return settings?.timezone ?? 'Australia/Sydney';
+}
+
+type CreateBody = {
+  title: string;
+  assigneeIds: string[];
+  perAssigneeDescription: boolean;
+  description: string;
+  descriptions: Record<string, string>;
+  dueType: string;
+  dueDateStr: string;
+  recurrence: string;
+  recurrenceEndDateStr: string;
+};
+
+function parseCreateBody(body: unknown): CreateBody {
+  const b = body as Record<string, unknown>;
+  const assigneeIdsRaw = Array.isArray(b.assigneeIds) ? b.assigneeIds : [];
+  const descriptionsRaw = b.descriptions && typeof b.descriptions === 'object' ? (b.descriptions as Record<string, unknown>) : {};
+  const descriptions: Record<string, string> = {};
+  for (const [id, value] of Object.entries(descriptionsRaw)) {
+    if (typeof value === 'string') descriptions[id] = value;
+  }
+  return {
+    title: String(b.title ?? '').trim(),
+    assigneeIds: assigneeIdsRaw.filter((v): v is string => typeof v === 'string' && v.trim() !== '').map((v) => v.trim()),
+    perAssigneeDescription: Boolean(b.perAssigneeDescription),
+    description: String(b.description ?? '').trim(),
+    descriptions,
+    dueType: String(b.dueType ?? '').trim(),
+    dueDateStr: String(b.dueDate ?? '').trim(),
+    recurrence: String(b.recurrence ?? '').trim(),
+    recurrenceEndDateStr: String(b.recurrenceEndDate ?? '').trim(),
+  };
+}
+
+function validateCreateBody(parsed: CreateBody, todayStr: string): string[] {
+  const errors: string[] = [];
+  if (!parsed.title) errors.push('title: Title is required');
+  if (parsed.assigneeIds.length === 0) errors.push('assigneeIds: At least one assignee is required');
+
+  if (parsed.perAssigneeDescription) {
+    for (const id of parsed.assigneeIds) {
+      if (!parsed.descriptions[id]?.trim()) errors.push(`descriptions.${id}: Description is required`);
+    }
+  } else if (!parsed.description) {
+    errors.push('description: Description is required');
+  }
+
+  if (!parsed.dueType || !isTaskDueType(parsed.dueType)) errors.push('dueType: Due type is required');
+  if (parsed.dueType === 'CUSTOM' && (!parsed.dueDateStr || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(parsed.dueDateStr))) {
+    errors.push('dueDate: Valid due date and time is required');
+  }
+
+  if (parsed.recurrence) {
+    if (!isRecurrenceType(parsed.recurrence)) errors.push('recurrence: Invalid recurrence type');
+    if (!parsed.recurrenceEndDateStr || !/^\d{4}-\d{2}-\d{2}$/.test(parsed.recurrenceEndDateStr)) {
+      errors.push('recurrenceEndDate: A valid end date is required');
+    } else if (parsed.recurrenceEndDateStr <= todayStr) {
+      errors.push('recurrenceEndDate: End date must be after today');
+    }
+  }
+
+  return errors;
 }
 
 export class TaskController {
@@ -52,57 +127,56 @@ export class TaskController {
   }
 
   async create(body: unknown, session: Session) {
-    const b = body as Record<string, unknown>;
-    const title = String(b.title ?? '').trim();
-    const description = String(b.description ?? '').trim();
-    const dueDateStr = String(b.dueDate ?? '').trim();
-    const dueTypeStr = String(b.dueType ?? '').trim();
-    const assigneeId = String(b.assigneeId ?? '').trim();
+    const parsed = parseCreateBody(body);
+    const timezone = await getSettingsTimezone();
+    const todayStr = moment().tz(timezone).format('YYYY-MM-DD');
 
-    const errors: string[] = [];
-    if (!title) errors.push('title: Title is required');
-    if (!description) errors.push('description: Description is required');
-    if (!dueTypeStr || !isTaskDueType(dueTypeStr)) errors.push('dueType: Due type is required');
-    if (dueTypeStr === 'CUSTOM' && (!dueDateStr || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(dueDateStr))) {
-      errors.push('dueDate: Valid due date and time is required');
-    }
-    if (!assigneeId) errors.push('assigneeId: Assignee is required');
+    const errors = validateCreateBody(parsed, todayStr);
     if (errors.length) return { error: { message: 'Validation failed', errors, status: 400 } };
 
-    const dueType = dueTypeStr as TaskDueType;
+    const dueType = parsed.dueType as TaskDueType;
+    const recurrenceType = isRecurrenceType(parsed.recurrence) ? parsed.recurrence : undefined;
 
-    const [assigner, assignee] = await Promise.all([
+    const [assigner, assignees] = await Promise.all([
       prisma.user.findUnique({ where: { id: session.user.id }, select: { id: true, name: true, email: true } }),
-      prisma.user.findUnique({ where: { id: assigneeId }, select: { id: true, name: true, email: true } }),
+      prisma.user.findMany({ where: { id: { in: parsed.assigneeIds } }, select: { id: true, name: true, email: true } }),
     ]);
     if (!assigner) return { error: { message: 'Session user not found', status: 400 } };
-    if (!assignee) return { error: { message: 'Validation failed', errors: ['assigneeId: User not found'], status: 400 } };
+    if (assignees.length !== parsed.assigneeIds.length) {
+      return { error: { message: 'Validation failed', errors: ['assigneeIds: One or more users were not found'], status: 400 } };
+    }
     if (!isAdmin(session)) {
       const visibleIds = await getTaskVisibleUserIds(session.user.id);
-      if (!visibleIds.includes(assignee.id)) {
-        return { error: { message: 'You are not allowed to assign tasks to this user', status: 403 } };
+      if (parsed.assigneeIds.some((id) => !visibleIds.includes(id))) {
+        return { error: { message: 'You are not allowed to assign tasks to one or more of these users', status: 403 } };
       }
     }
 
-    const dueDate =
-      dueType === 'STANDARD'
-        ? new Date(Date.now() + 24 * 60 * 60 * 1000)
-        : dueType === 'URGENT'
-        ? await computeUrgentDueDate(assigneeId)
-        : new Date(dueDateStr);
+    const recurrenceEndDate = recurrenceType
+      ? moment.tz(parsed.recurrenceEndDateStr, 'YYYY-MM-DD', timezone).endOf('day').toDate()
+      : undefined;
 
-    const task = await taskModel.create({
-      title,
-      description,
-      dueDate,
-      dueType,
-      assigner: { id: assigner.id, name: assigner.name ?? assigner.email ?? '', email: assigner.email ?? '' },
-      assignee: { id: assignee.id, name: assignee.name ?? assignee.email ?? '', email: assignee.email ?? '' },
-    });
+    const entries = await Promise.all(
+      assignees.map(async (assignee) => ({
+        title: parsed.title,
+        description: parsed.perAssigneeDescription ? parsed.descriptions[assignee.id]!.trim() : parsed.description,
+        dueDate: await resolveDueDate(dueType, assignee.id, parsed.dueDateStr),
+        dueType,
+        assigner: { id: assigner.id, name: assigner.name ?? assigner.email ?? '', email: assigner.email ?? '' },
+        assignee: { id: assignee.id, name: assignee.name ?? assignee.email ?? '', email: assignee.email ?? '' },
+        ...(recurrenceType && recurrenceEndDate
+          ? { recurrence: { type: recurrenceType, endDate: recurrenceEndDate, nextOccurrenceAt: computeNextOccurrenceAt(new Date(), timezone, recurrenceType) } }
+          : {}),
+      })),
+    );
 
-    void fireTaskEvent('assigned', task.id, task.title, task.assigneeId, task.assigneeName, task.assigneeEmail, assigner.name ?? assigner.email ?? '').catch(() => {});
+    const tasks = await taskModel.createForAssignees(entries);
 
-    return { data: task, message: 'Task created' };
+    for (const task of tasks) {
+      void fireTaskEvent('assigned', task.id, task.title, task.assigneeId, task.assigneeName, task.assigneeEmail, assigner.name ?? assigner.email ?? '').catch(() => {});
+    }
+
+    return { data: tasks, message: tasks.length > 1 ? 'Tasks created' : 'Task created' };
   }
 
   async update(id: string, body: unknown, session: Session) {
@@ -271,63 +345,41 @@ export class TaskController {
       : await getTaskVisibleUsers(session.user.id);
     return { data: users };
   }
-}
 
-async function fireTaskEvent(
-  event: 'assigned' | 'completed',
-  taskId: string,
-  taskTitle: string,
-  recipientId: string,
-  recipientName: string,
-  recipientEmail: string,
-  actorName: string,
-) {
-  const isAssigned = event === 'assigned';
-  const type = isAssigned ? 'task_assigned' : 'task_completed';
-  const title = isAssigned ? 'New task assigned to you' : 'Task marked complete';
-  const body = isAssigned
-    ? `${actorName} assigned you a task: "${taskTitle}"`
-    : `${actorName} completed the task: "${taskTitle}"`;
-  const subject = isAssigned
-    ? `You have a new task: ${taskTitle}`
-    : `Task completed: ${taskTitle}`;
-  const html = buildTaskEmail({ taskId, taskTitle, body, recipientName });
+  async listRecurringParents(searchParams: URLSearchParams, session: Session) {
+    const admin = isAdmin(session);
+    const page = Math.max(1, parseInt(searchParams.get('page') ?? '1'));
+    const pageSize = Math.min(50, Math.max(1, parseInt(searchParams.get('pageSize') ?? '20')));
+    const search = searchParams.get('search') ?? undefined;
+    const assigneeId = searchParams.get('assigneeId') ?? undefined;
+    const scopeUserId = admin ? undefined : session.user.id;
+    const dueTypeParam = searchParams.get('dueType') ?? undefined;
+    const dueType = dueTypeParam && isTaskDueType(dueTypeParam) ? dueTypeParam : undefined;
 
-  await Promise.all([
-    sendAppMail({ to: [recipientEmail], subject, html, text: body }).catch(() => {}),
-    createNotification({ recipientId, type, title, body, taskId }),
-  ]);
-}
+    const result = await taskModel.findRecurringParents({ assigneeId, scopeUserId, search, dueType, page, pageSize, viewerId: session.user.id });
+    return { data: result, message: 'Recurring tasks retrieved' };
+  }
 
-async function fireMessageEvent(
-  taskId: string,
-  taskTitle: string,
-  messageText: string,
-  recipientId: string,
-  recipientEmail: string,
-  senderName: string,
-) {
-  const body = `${senderName} sent a message on task "${taskTitle}": ${messageText.slice(0, 120)}`;
-  const subject = `New message on task: ${taskTitle}`;
-  const html = buildTaskEmail({ taskId, taskTitle, body, recipientName: '' });
+  async listChildren(parentTaskId: string, session: Session) {
+    const parent = await taskModel.findById(parentTaskId);
+    if (!parent) return { error: { message: 'Task not found', status: 404 } };
 
-  await Promise.all([
-    sendAppMail({ to: [recipientEmail], subject, html, text: body }).catch(() => {}),
-    createNotification({ recipientId, type: 'task_message', title: 'New task message', body, taskId }),
-  ]);
-}
+    const uid = session.user.id;
+    if (!isAdmin(session) && parent.assigneeId !== uid && parent.assignerId !== uid) {
+      return { error: { message: 'Forbidden', status: 403 } };
+    }
 
-function buildTaskEmail(params: { taskId: string; taskTitle: string; body: string; recipientName: string }) {
-  return `
-    <div style="font-family:Arial,sans-serif;color:#111;max-width:600px">
-      <h2 style="font-size:16px;margin-bottom:8px">${escapeHtml(params.taskTitle)}</h2>
-      <p style="color:#555;margin:0 0 16px">${escapeHtml(params.body)}</p>
-      <p style="font-size:12px;color:#888">Task ID: ${escapeHtml(params.taskId)}</p>
-    </div>`;
-}
+    const children = await taskModel.findChildren(parentTaskId, uid);
+    return { data: children, message: 'Child tasks retrieved' };
+  }
 
-function escapeHtml(v: string) {
-  return v
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+  async stopRecurring(parentTaskId: string, session: Session) {
+    if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
+    const parent = await taskModel.findById(parentTaskId);
+    if (!parent) return { error: { message: 'Task not found', status: 404 } };
+    if (parent.assignerId !== session.user.id) return { error: { message: 'Only the assigner can stop this recurring task', status: 403 } };
+
+    await taskModel.stopRecurring(parentTaskId);
+    return { data: null, message: 'Recurring task stopped' };
+  }
 }

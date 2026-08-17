@@ -6,22 +6,24 @@ import type { TabCounts, TaskRow } from '../types';
 type ListResponse = { tasks: TaskRow[]; total: number };
 
 export function useTasksData(params: {
+  active: boolean;
   queryString: string;
   countQueryString: string;
 }) {
   const [tasks, setTasks] = useState<TaskRow[]>([]);
   const [total, setTotal] = useState(0);
-  const [tabCounts, setTabCounts] = useState<TabCounts>({ total: 0, pending: 0, overdue: 0, seriouslyLate: 0, completed: 0 });
+  const [tabCounts, setTabCounts] = useState<TabCounts>({ total: 0, pending: 0, overdue: 0, seriouslyLate: 0, completed: 0, recurring: 0 });
   const [refreshKey, setRefreshKey] = useState(0);
   const [resolvedFetchKey, setResolvedFetchKey] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   const fetchKey = `${params.queryString}|${refreshKey}`;
-  const loading = fetchKey !== resolvedFetchKey;
+  const loading = params.active && fetchKey !== resolvedFetchKey;
 
   const bumpRefresh = useCallback(() => setRefreshKey((k) => k + 1), []);
 
   useEffect(() => {
+    if (!params.active) return;
     abortRef.current?.abort();
     const ctrl = new AbortController();
     abortRef.current = ctrl;
@@ -41,7 +43,7 @@ export function useTasksData(params: {
       });
 
     return () => ctrl.abort();
-  }, [params.queryString, refreshKey]);
+  }, [params.active, params.queryString, refreshKey]);
 
   useEffect(() => {
     const qs = params.countQueryString;

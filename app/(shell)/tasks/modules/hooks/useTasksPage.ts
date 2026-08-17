@@ -6,6 +6,7 @@ import { useEffect, useRef } from 'react';
 import { useChat } from '@/hooks/useChat';
 import { useTasksFilters } from './useTasksFilters';
 import { useTasksData } from './useTasksData';
+import { useRecurringTasks } from './useRecurringTasks';
 import { useTaskMutations } from './useTaskMutations';
 import { useTaskMessages } from './useTaskMessages';
 import { useTaskReport } from './useTaskReport';
@@ -21,9 +22,15 @@ export function useTasksPage() {
 
   const listQs = filters.buildQueryString();
   const countQs = filters.buildCountQueryString();
+  const recurringQs = filters.buildRecurringQueryString();
 
-  const data = useTasksData({ queryString: listQs, countQueryString: countQs });
-  const mutations = useTaskMutations({ bumpRefresh: data.bumpRefresh, setTasks: data.setTasks });
+  const data = useTasksData({ active: filters.tab !== 'recurring', queryString: listQs, countQueryString: countQs });
+  const recurring = useRecurringTasks({ active: filters.tab === 'recurring', queryString: recurringQs });
+  const bumpAllRefresh = () => {
+    data.bumpRefresh();
+    recurring.bumpRecurringRefresh();
+  };
+  const mutations = useTaskMutations({ bumpRefresh: bumpAllRefresh, setTasks: data.setTasks });
   const messages = useTaskMessages(data.setTasks);
   const report = useTaskReport(filters.tab === 'completed');
   const chat = useChat();
@@ -58,7 +65,9 @@ export function useTasksPage() {
     total: data.total,
     tabCounts: data.tabCounts,
     dataLoading: data.loading,
-    bumpRefresh: data.bumpRefresh,
+    bumpRefresh: bumpAllRefresh,
+    // recurring
+    ...recurring,
     // mutations
     ...mutations,
     // messages

@@ -11,6 +11,69 @@ function toDatetimeLocal(iso: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+function validateEditForm(form: TaskForm): Record<string, string> {
+  const errs: Record<string, string> = {};
+  if (!form.title.trim()) errs.title = 'Title is required';
+  if (!form.description.trim()) errs.description = 'Description is required';
+  if (!form.dueType) errs.dueType = 'Due type is required';
+  if (form.dueType === 'CUSTOM' && !form.dueDate) errs.dueDate = 'Due date is required';
+  if (!form.assigneeIds[0]) errs.assigneeId = 'Assignee is required';
+  return errs;
+}
+
+function validateCreateForm(form: TaskForm): Record<string, string> {
+  const errs: Record<string, string> = {};
+  if (!form.title.trim()) errs.title = 'Title is required';
+  if (form.assigneeIds.length === 0) errs.assigneeIds = 'At least one assignee is required';
+
+  if (form.perAssigneeDescription) {
+    form.assigneeIds.forEach((id) => {
+      if (!form.descriptions[id]?.trim()) errs[`descriptions.${id}`] = 'Description is required';
+    });
+  } else if (!form.description.trim()) {
+    errs.description = 'Description is required';
+  }
+
+  if (!form.dueType) errs.dueType = 'Due type is required';
+  if (form.dueType === 'CUSTOM' && !form.dueDate) errs.dueDate = 'Due date is required';
+
+  if (form.recurrence) {
+    if (!form.recurrenceEndDate) {
+      errs.recurrenceEndDate = 'End date is required';
+    } else {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (new Date(form.recurrenceEndDate) <= today) errs.recurrenceEndDate = 'End date must be after today';
+    }
+  }
+
+  return errs;
+}
+
+function buildEditPayload(form: TaskForm): Record<string, unknown> {
+  return {
+    title: form.title,
+    description: form.description,
+    dueType: form.dueType,
+    dueDate: form.dueDate,
+    assigneeId: form.assigneeIds[0] ?? '',
+  };
+}
+
+function buildCreatePayload(form: TaskForm): Record<string, unknown> {
+  return {
+    title: form.title,
+    dueType: form.dueType,
+    dueDate: form.dueDate,
+    assigneeIds: form.assigneeIds,
+    perAssigneeDescription: form.perAssigneeDescription,
+    description: form.description,
+    descriptions: form.descriptions,
+    recurrence: form.recurrence || undefined,
+    recurrenceEndDate: form.recurrenceEndDate || undefined,
+  };
+}
+
 type MutationsParams = {
   bumpRefresh: () => void;
   setTasks: React.Dispatch<React.SetStateAction<TaskRow[]>>;
@@ -56,10 +119,14 @@ export function useTaskMutations({ bumpRefresh, setTasks }: MutationsParams) {
     setEditTask(task);
     setForm({
       title: task.title,
+      perAssigneeDescription: false,
       description: task.description,
+      descriptions: {},
       dueType: task.dueType,
       dueDate: toDatetimeLocal(task.dueDate),
-      assigneeId: task.assigneeId,
+      assigneeIds: [task.assigneeId],
+      recurrence: '',
+      recurrenceEndDate: '',
     });
     setErrors({});
     loadUsers();
@@ -71,28 +138,51 @@ export function useTaskMutations({ bumpRefresh, setTasks }: MutationsParams) {
     setEditTask(null);
   }, []);
 
+  const clearError = useCallback((field: string) => {
+    setErrors((prev) => {
+      if (!(field in prev)) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  }, [setErrors]);
+
   const set = (field: keyof TaskForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
+    clearError(field);
   };
 
+  const toggleAssignee = useCallback((id: string) => {
+    setForm((prev) => ({
+      ...prev,
+      assigneeIds: prev.assigneeIds.includes(id) ? prev.assigneeIds.filter((x) => x !== id) : [...prev.assigneeIds, id],
+    }));
+    clearError('assigneeIds');
+  }, [clearError]);
+
+  const setSingleAssignee = useCallback((id: string) => {
+    setForm((prev) => ({ ...prev, assigneeIds: id ? [id] : [] }));
+    clearError('assigneeId');
+  }, [clearError]);
+
+  const setDescriptionFor = useCallback((id: string, value: string) => {
+    setForm((prev) => ({ ...prev, descriptions: { ...prev.descriptions, [id]: value } }));
+    clearError(`descriptions.${id}`);
+  }, [clearError]);
+
+  const togglePerAssigneeDescription = useCallback(() => {
+    setForm((prev) => ({ ...prev, perAssigneeDescription: !prev.perAssigneeDescription }));
+  }, []);
+
   function submitForm() {
-    const url = editTask ? `/api/tasks/${editTask.id}` : '/api/tasks';
-    const method = editTask ? 'PATCH' : 'POST';
+    const isEdit = Boolean(editTask);
     void request({
-      url,
-      method,
-      data: form as unknown as Record<string, unknown>,
+      url: editTask ? `/api/tasks/${editTask.id}` : '/api/tasks',
+      method: editTask ? 'PATCH' : 'POST',
+      data: isEdit ? buildEditPayload(form) : buildCreatePayload(form),
       showToast: true,
-      successMessage: editTask ? 'Task updated' : 'Task created',
-      validation: async () => {
-        const errs: Record<string, string> = {};
-        if (!form.title.trim()) errs.title = 'Title is required';
-        if (!form.description.trim()) errs.description = 'Description is required';
-        if (!form.dueType) errs.dueType = 'Due type is required';
-        if (form.dueType === 'CUSTOM' && !form.dueDate) errs.dueDate = 'Due date is required';
-        if (!form.assigneeId) errs.assigneeId = 'Assignee is required';
-        return errs;
-      },
+      successMessage: isEdit ? 'Task updated' : 'Task created',
+      validation: async () => (isEdit ? validateEditForm(form) : validateCreateForm(form)),
       onSuccess: () => {
         bumpRefresh();
         closeModal();
@@ -164,6 +254,10 @@ export function useTaskMutations({ bumpRefresh, setTasks }: MutationsParams) {
     editTask,
     form,
     set,
+    toggleAssignee,
+    setSingleAssignee,
+    setDescriptionFor,
+    togglePerAssigneeDescription,
     users,
     openAdd,
     openEdit,
