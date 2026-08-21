@@ -1,8 +1,8 @@
 'use client';
 
+import type { useProductImages } from './hooks/useProductImages';
 import { Expand, Image as ImageIcon, Pencil } from './icons';
 import { getSwatch } from './utils';
-import type { useProductImages } from './hooks/useProductImages';
 
 type MainImagePanelProps = {
   gallery: ReturnType<typeof useProductImages>;
@@ -73,7 +73,7 @@ export default function MainImagePanel({ gallery, onEditImages }: MainImagePanel
           type="button"
           onClick={gallery.openLightbox}
           disabled={!active}
-          className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-gray-300 py-1.5 text-[13px] font-semibold text-gray-700 transition-colors duration-150 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+          className="px-2 flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-gray-300 py-1.5 text-[13px] font-semibold text-gray-700 transition-colors duration-150 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
         >
           <Expand />
           Enlarge
@@ -81,7 +81,7 @@ export default function MainImagePanel({ gallery, onEditImages }: MainImagePanel
         <button
           type="button"
           onClick={onEditImages}
-          className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-gray-300 py-1.5 text-[13px] font-semibold text-gray-700 transition-colors duration-150 hover:bg-gray-50 cursor-pointer"
+          className="px-2 flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-gray-300 py-1.5 text-[13px] font-semibold text-gray-700 transition-colors duration-150 hover:bg-gray-50 cursor-pointer"
         >
           <Pencil />
           Edit images ({images.length})
