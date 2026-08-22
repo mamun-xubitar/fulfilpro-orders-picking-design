@@ -10,7 +10,7 @@ type ProductSubTabsProps = {
 
 export default function ProductSubTabs({ active, onChange }: ProductSubTabsProps) {
   return (
-    <div className="overflow-x-auto border-b border-gray-200">
+    <div className="overflow-x-auto py-px">
       <nav className="flex w-max min-w-full items-center gap-1" aria-label="Product sections">
         {PRODUCT_TABS.map((tab) => {
           const isActive = tab.id === active;

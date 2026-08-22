@@ -75,7 +75,7 @@ export default function MainImagePanel({ gallery, onEditImages }: MainImagePanel
           disabled={!active}
           className="px-2 flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-gray-300 py-1.5 text-[13px] font-semibold text-gray-700 transition-colors duration-150 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
         >
-          <Expand />
+          <Expand className="min-w-4 h-4 w-4" />
           Enlarge
         </button>
         <button
@@ -83,7 +83,7 @@ export default function MainImagePanel({ gallery, onEditImages }: MainImagePanel
           onClick={onEditImages}
           className="px-2 flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-gray-300 py-1.5 text-[13px] font-semibold text-gray-700 transition-colors duration-150 hover:bg-gray-50 cursor-pointer"
         >
-          <Pencil />
+          <Pencil className="min-w-4 h-4 w-4" />
           Edit images ({images.length})
         </button>
       </div>
