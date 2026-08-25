@@ -1,3 +1,4 @@
+import prisma from '@/lib/prisma.server';
 import { CurrencyRateModel } from '@/models/currency-rate.model.server';
 import { SettingsModel } from '@/models/settings.model.server';
 import type { UpdateAppSettingsData } from '@/models/settings.model.server';
@@ -17,11 +18,16 @@ export class InventorySettingsController {
   async get(session: Session) {
     if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
 
-    const [settings, currencies] = await Promise.all([settingsModel.get(), currencyModel.list()]);
+    const [settings, currencies, exchangeRateRow] = await Promise.all([
+      settingsModel.get(),
+      currencyModel.list(),
+      prisma.appSettings.findUnique({ where: { id: 'default' }, select: { globalExchangeRate: true } }),
+    ]);
 
     return {
       data: {
         globalMarginPercent: settings.globalMarginPercent,
+        globalExchangeRate: Number(exchangeRateRow?.globalExchangeRate ?? 1),
         lowStockThreshold: settings.lowStockThreshold,
         baseCurrency: 'AUD',
         currencies,
@@ -35,12 +41,19 @@ export class InventorySettingsController {
     const value = (body ?? {}) as Record<string, unknown>;
     const updateData: UpdateAppSettingsData = {};
     const errors: string[] = [];
+    let globalExchangeRate: number | undefined;
 
     if ('globalMarginPercent' in value) {
       const margin = Number(value.globalMarginPercent);
       if (!Number.isFinite(margin)) errors.push('globalMarginPercent: Margin is required');
-      else if (margin < 0 || margin > 100) errors.push('globalMarginPercent: Margin must be between 0 and 100');
+      else if (margin < 0) errors.push('globalMarginPercent: Margin must be 0 or more');
       else updateData.globalMarginPercent = Math.round(margin * 100) / 100;
+    }
+
+    if ('globalExchangeRate' in value) {
+      const rate = Number(value.globalExchangeRate);
+      if (!Number.isFinite(rate) || rate <= 0) errors.push('globalExchangeRate: Enter a rate greater than 0');
+      else globalExchangeRate = Math.round(rate * 1_000_000) / 1_000_000;
     }
 
     if ('lowStockThreshold' in value) {
@@ -50,11 +63,23 @@ export class InventorySettingsController {
     }
 
     if (errors.length) return { error: { message: 'Validation failed', errors, status: 400 } };
-    if (!Object.keys(updateData).length) return { error: { message: 'No settings to update', status: 400 } };
+    if (!Object.keys(updateData).length && globalExchangeRate === undefined) return { error: { message: 'No settings to update', status: 400 } };
 
-    const settings = await settingsModel.update(updateData);
+    const settings = Object.keys(updateData).length ? await settingsModel.update(updateData) : await settingsModel.get();
+    if (globalExchangeRate !== undefined) {
+      await prisma.appSettings.update({ where: { id: 'default' }, data: { globalExchangeRate } });
+    }
+
+    const currentRate =
+      globalExchangeRate ??
+      Number((await prisma.appSettings.findUnique({ where: { id: 'default' }, select: { globalExchangeRate: true } }))?.globalExchangeRate ?? 1);
+
     return {
-      data: { globalMarginPercent: settings.globalMarginPercent, lowStockThreshold: settings.lowStockThreshold },
+      data: {
+        globalMarginPercent: settings.globalMarginPercent,
+        globalExchangeRate: currentRate,
+        lowStockThreshold: settings.lowStockThreshold,
+      },
       message: 'Settings saved',
     };
   }

@@ -1,6 +1,4 @@
-import prisma from '@/lib/prisma.server';
 import { SupplierModel } from '@/models/supplier.model.server';
-import { fetchStoreCollections } from '@/lib/shopify-collections-fetch.server';
 
 const model = new SupplierModel();
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -100,81 +98,5 @@ export class SupplierController {
     if (!existing) return { error: { message: 'Supplier not found', status: 404 } };
     await model.delete(id);
     return { data: null, message: 'Supplier deleted' };
-  }
-
-  async listConnections(id: string, session: Session) {
-    if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
-    const existing = await model.findById(id);
-    if (!existing) return { error: { message: 'Supplier not found', status: 404 } };
-    const connections = await model.listConnections(id);
-    return { data: connections, message: 'Connections retrieved' };
-  }
-
-  async addConnection(id: string, body: unknown, session: Session) {
-    if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
-    const existing = await model.findById(id);
-    if (!existing) return { error: { message: 'Supplier not found', status: 404 } };
-
-    const value = (body ?? {}) as Record<string, unknown>;
-    if (value.type === 'product') {
-      const productId = typeof value.productId === 'string' ? value.productId : '';
-      if (!productId) return { error: { message: 'productId is required', status: 400 } };
-      await model.linkProduct(id, productId);
-      return { data: null, message: 'Product linked' };
-    }
-
-    if (value.type === 'collection') {
-      const storeId = typeof value.storeId === 'string' ? value.storeId : '';
-      const collectionId = typeof value.collectionId === 'string' ? value.collectionId : '';
-      const title = typeof value.title === 'string' ? value.title : '';
-      const handle = typeof value.handle === 'string' ? value.handle : null;
-      if (!storeId || !collectionId || !title) {
-        return { error: { message: 'storeId, collectionId and title are required', status: 400 } };
-      }
-      await model.linkCollection({ supplierId: id, storeId, collectionId, title, handle });
-      return { data: null, message: 'Collection linked' };
-    }
-
-    return { error: { message: 'Invalid connection type', status: 400 } };
-  }
-
-  async removeConnection(id: string, body: unknown, session: Session) {
-    if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
-    const existing = await model.findById(id);
-    if (!existing) return { error: { message: 'Supplier not found', status: 404 } };
-
-    const value = (body ?? {}) as Record<string, unknown>;
-    if (value.type === 'product') {
-      const productId = typeof value.productId === 'string' ? value.productId : '';
-      if (!productId) return { error: { message: 'productId is required', status: 400 } };
-      await model.unlinkProduct(id, productId);
-      return { data: null, message: 'Product unlinked' };
-    }
-
-    if (value.type === 'collection') {
-      const storeId = typeof value.storeId === 'string' ? value.storeId : '';
-      const collectionId = typeof value.collectionId === 'string' ? value.collectionId : '';
-      if (!storeId || !collectionId) return { error: { message: 'storeId and collectionId are required', status: 400 } };
-      await model.unlinkCollection(id, storeId, collectionId);
-      return { data: null, message: 'Collection unlinked' };
-    }
-
-    return { error: { message: 'Invalid connection type', status: 400 } };
-  }
-
-  async listStoreCollections(storeId: string, session: Session) {
-    if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
-    if (!storeId) return { error: { message: 'storeId is required', status: 400 } };
-
-    const store = await prisma.store.findUnique({ where: { id: storeId }, select: { storeDomain: true, accessToken: true } });
-    if (!store) return { error: { message: 'Store not found', status: 404 } };
-    if (!store.accessToken) return { error: { message: 'Store is not connected', status: 400 } };
-
-    try {
-      const collections = await fetchStoreCollections({ storeDomain: store.storeDomain, accessToken: store.accessToken });
-      return { data: { collections }, message: 'Collections retrieved' };
-    } catch (error) {
-      return { error: { message: error instanceof Error ? error.message : 'Failed to fetch collections', status: 400 } };
-    }
   }
 }

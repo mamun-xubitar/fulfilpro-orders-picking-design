@@ -80,35 +80,6 @@ export class ProductModel {
     };
   }
 
-  async findDetail(id: string) {
-    const product = await prisma.product.findUnique({
-      where: { id },
-      include: {
-        store: { select: { id: true, name: true, storeDomain: true } },
-        variants: { orderBy: { position: 'asc' } },
-      },
-    });
-    return product ? serializeProductDetail(product) : null;
-  }
-
-  async findSiblingsByHandle(handle: string, excludeProductId: string) {
-    const products = await prisma.product.findMany({
-      where: { handle, deletedAt: null, id: { not: excludeProductId } },
-      select: {
-        id: true,
-        title: true,
-        onlineStoreUrl: true,
-        store: { select: { id: true, name: true, storeDomain: true } },
-      },
-    });
-    return products.map((p) => ({
-      id: p.id,
-      title: p.title,
-      onlineStoreUrl: p.onlineStoreUrl,
-      store: { id: p.store.id, name: p.store.name ?? p.store.storeDomain },
-    }));
-  }
-
   async searchVariantsForStore(params: { storeId: string; query: string; limit?: number }) {
     const { storeId, query, limit = 25 } = params;
     const token = query.trim();
@@ -259,53 +230,3 @@ function serializeProduct(product: ProductWithStore) {
   };
 }
 
-type ProductDetailPayload = Prisma.ProductGetPayload<{
-  include: {
-    store: { select: { id: true; name: true; storeDomain: true } };
-    variants: true;
-  };
-}>;
-
-function serializeProductDetail(product: ProductDetailPayload) {
-  return {
-    id: product.id,
-    storeId: product.storeId,
-    shopifyId: product.shopifyId,
-    title: product.title,
-    handle: product.handle,
-    vendor: product.vendor,
-    productType: product.productType,
-    category: product.category,
-    categoryId: product.categoryId,
-    status: product.status,
-    tags: product.tags,
-    imageUrl: product.imageUrl,
-    descriptionHtml: product.descriptionHtml,
-    images: Array.isArray(product.images) ? (product.images as Array<{ id: string; url: string; altText: string | null }>) : [],
-    onlineStoreUrl: product.onlineStoreUrl,
-    salesChannels: Array.isArray(product.salesChannels) ? (product.salesChannels as Array<{ id: string; name: string }>) : [],
-    totalInventory: product.totalInventory,
-    store: { id: product.store.id, name: product.store.name ?? product.store.storeDomain, storeDomain: product.store.storeDomain },
-    variants: product.variants.map(serializeVariantDetail),
-    updatedAt: product.updatedAt.toISOString(),
-  };
-}
-
-function serializeVariantDetail(variant: ProductDetailPayload['variants'][number]) {
-  return {
-    id: variant.id,
-    shopifyId: variant.shopifyId,
-    title: variant.title,
-    sku: variant.sku,
-    price: Number(variant.price),
-    cost: variant.cost != null ? Number(variant.cost) : null,
-    inventoryItemId: variant.inventoryItemId,
-    inventoryQuantity: variant.inventoryQuantity,
-    inventoryTracked: variant.inventoryTracked,
-    inventoryPolicy: variant.inventoryPolicy,
-    imageUrl: variant.imageUrl,
-    optionValues: Array.isArray(variant.optionValues) ? (variant.optionValues as Array<{ name: string; value: string }>) : [],
-    position: variant.position,
-    soldQuantity: variant.soldQuantity,
-  };
-}

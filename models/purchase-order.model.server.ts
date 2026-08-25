@@ -8,6 +8,7 @@ export type PurchaseOrderItemRow = {
   sku: string | null;
   quantity: number;
   receivedQuantity: number;
+  unitCost: number | null;
 };
 
 export type PurchaseOrderRow = {
@@ -16,7 +17,7 @@ export type PurchaseOrderRow = {
   supplierId: string;
   supplierName: string;
   poEmail: string;
-  productId: string;
+  supplierProductId: string;
   productTitle: string;
   status: PurchaseOrderStatus;
   deliveryDate: string | null;
@@ -35,15 +36,15 @@ type PurchaseOrderWithItems = Prisma.PurchaseOrderGetPayload<{ include: { items:
 
 export class PurchaseOrderModel {
   async list(params: {
-    productId: string;
+    supplierProductId: string;
     status?: PurchaseOrderStatus;
     dateFrom?: string;
     dateTo?: string;
     page: number;
     pageSize: number;
   }) {
-    const { productId, status, dateFrom, dateTo, page, pageSize } = params;
-    const where: Prisma.PurchaseOrderWhereInput = { productId };
+    const { supplierProductId, status, dateFrom, dateTo, page, pageSize } = params;
+    const where: Prisma.PurchaseOrderWhereInput = { supplierProductId };
 
     if (status) where.status = status;
 
@@ -77,20 +78,20 @@ export class PurchaseOrderModel {
     supplierId: string;
     supplierName: string;
     poEmail: string;
-    productId: string;
+    supplierProductId: string;
     productTitle: string;
     deliveryDate: Date | null;
     remark: string | null;
     createdById: string;
     createdByName: string;
-    items: Array<{ variantId: string; variantTitle: string; sku: string | null; quantity: number }>;
+    items: Array<{ variantId: string; variantTitle: string; sku: string | null; quantity: number; unitCost?: number }>;
   }) {
     const row = await prisma.purchaseOrder.create({
       data: {
         supplierId: data.supplierId,
         supplierName: data.supplierName,
         poEmail: data.poEmail,
-        productId: data.productId,
+        supplierProductId: data.supplierProductId,
         productTitle: data.productTitle,
         status: 'REQUESTED',
         deliveryDate: data.deliveryDate,
@@ -107,39 +108,79 @@ export class PurchaseOrderModel {
   async updateStatus(id: string, status: PurchaseOrderStatus, actor: { id: string; name: string }) {
     const row = await prisma.purchaseOrder.update({
       where: { id },
-      data: {
-        status,
-        statusUpdatedById: actor.id,
-        statusUpdatedByName: actor.name,
-        statusUpdatedAt: new Date(),
-      },
+      data: { status, statusUpdatedById: actor.id, statusUpdatedByName: actor.name, statusUpdatedAt: new Date() },
       include: { items: true },
     });
     return toPurchaseOrderRow(row);
   }
 
-  async receiveItems(id: string, receipts: Array<{ itemId: string; quantity: number }>, actor: { id: string; name: string }) {
+  /**
+   * Applies received quantities to the hub catalogue: bumps stock on hand for each existing
+   * variant, and creates a new variant when the receipt references a colour/size the catalogue
+   * doesn't have yet (e.g. the supplier substituted or added an item).
+   */
+  async receive(
+    id: string,
+    receipts: Array<{ itemId?: string; variantId?: string; colour?: string; size?: string; sku?: string | null; quantity: number }>,
+    actor: { id: string; name: string }
+  ) {
     return prisma.$transaction(async (tx) => {
+      const po = await tx.purchaseOrder.findUniqueOrThrow({ where: { id }, include: { items: true } });
+      const itemById = new Map(po.items.map((item) => [item.id, item]));
+
       for (const receipt of receipts) {
-        await tx.purchaseOrderItem.update({
-          where: { id: receipt.itemId },
-          data: { receivedQuantity: { increment: receipt.quantity } },
-        });
+        let variantId = receipt.variantId ?? null;
+        let unitCost: Prisma.Decimal | null = null;
+
+        if (receipt.itemId) {
+          const item = itemById.get(receipt.itemId);
+          if (!item) continue;
+          variantId = item.variantId;
+          unitCost = item.unitCost;
+
+          if (!variantId && receipt.colour && receipt.size) {
+            const created = await tx.supplierProductVariant.create({
+              data: { supplierProductId: po.supplierProductId, colour: receipt.colour, size: receipt.size, sku: receipt.sku ?? null },
+            });
+            variantId = created.id;
+            await tx.purchaseOrderItem.update({ where: { id: item.id }, data: { variantId } });
+          }
+
+          await tx.purchaseOrderItem.update({ where: { id: item.id }, data: { receivedQuantity: { increment: receipt.quantity } } });
+        } else if (receipt.colour && receipt.size) {
+          const existing = await tx.supplierProductVariant.findUnique({
+            where: { supplierProductId_colour_size: { supplierProductId: po.supplierProductId, colour: receipt.colour, size: receipt.size } },
+          });
+          variantId = existing?.id ?? (await tx.supplierProductVariant.create({
+            data: { supplierProductId: po.supplierProductId, colour: receipt.colour, size: receipt.size, sku: receipt.sku ?? null },
+          })).id;
+        }
+
+        if (variantId) {
+          await tx.supplierProductVariant.update({
+            where: { id: variantId },
+            data: { stockOnHand: { increment: receipt.quantity }, ...(unitCost !== null && { buyPrice: unitCost }) },
+          });
+        }
       }
 
       const items = await tx.purchaseOrderItem.findMany({ where: { purchaseOrderId: id } });
-      const status: PurchaseOrderStatus = items.every((item) => item.receivedQuantity >= item.quantity)
-        ? 'RECEIVED'
-        : 'PARTIALLY_RECEIVED';
+      const status: PurchaseOrderStatus = items.every((item) => item.receivedQuantity >= item.quantity) ? 'RECEIVED' : 'PARTIALLY_RECEIVED';
+
+      const totalReceived = receipts.reduce((sum, r) => sum + r.quantity, 0);
+      await tx.inventoryActivity.create({
+        data: {
+          supplierProductId: po.supplierProductId,
+          type: 'po_received',
+          message: `Received ${totalReceived} unit${totalReceived === 1 ? '' : 's'} against PO-${String(po.number).padStart(5, '0')}`,
+          actorId: actor.id,
+          actorName: actor.name,
+        },
+      });
 
       const row = await tx.purchaseOrder.update({
         where: { id },
-        data: {
-          status,
-          statusUpdatedById: actor.id,
-          statusUpdatedByName: actor.name,
-          statusUpdatedAt: new Date(),
-        },
+        data: { status, statusUpdatedById: actor.id, statusUpdatedByName: actor.name, statusUpdatedAt: new Date() },
         include: { items: true },
       });
       return toPurchaseOrderRow(row);
@@ -154,7 +195,7 @@ function toPurchaseOrderRow(row: PurchaseOrderWithItems): PurchaseOrderRow {
     supplierId: row.supplierId,
     supplierName: row.supplierName,
     poEmail: row.poEmail,
-    productId: row.productId,
+    supplierProductId: row.supplierProductId,
     productTitle: row.productTitle,
     status: row.status,
     deliveryDate: row.deliveryDate?.toISOString() ?? null,
@@ -173,6 +214,7 @@ function toPurchaseOrderRow(row: PurchaseOrderWithItems): PurchaseOrderRow {
       sku: item.sku,
       quantity: item.quantity,
       receivedQuantity: item.receivedQuantity,
+      unitCost: item.unitCost !== null ? Number(item.unitCost) : null,
     })),
   };
 }

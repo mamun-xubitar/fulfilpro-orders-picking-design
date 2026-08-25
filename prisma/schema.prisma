@@ -64,7 +64,6 @@ model Store {
   shipmentTrackings           ShipmentTracking[]
   products                    Product[]
   orderLineItems              OrderLineItem[]
-  supplierCollections         SupplierCollection[]
 
   @@index([status])
   @@index([partnerStoreId])
@@ -444,9 +443,6 @@ model Product {
   store            Store             @relation(fields: [storeId], references: [id], onDelete: Cascade)
   variants         ProductVariant[]
   lineItems        OrderLineItem[]
-  supplierLinks    SupplierProduct[]
-  purchaseOrders   PurchaseOrder[]
-  pricing          ProductPricing?
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
 
@@ -479,7 +475,6 @@ model ProductVariant {
   soldAmount         Decimal             @default(0) @db.Decimal(14, 2)
   product            Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
   lineItems          OrderLineItem[]
-  purchaseOrderItems PurchaseOrderItem[]
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 
@@ -487,21 +482,6 @@ model ProductVariant {
   @@index([productId])
   @@index([sku])
   @@index([storeId])
-}
-
-model ProductPricing {
-  id            String   @id @default(uuid())
-  productId     String   @unique
-  currencyCode  String   @default("AUD")
-  exchangeRate  Decimal  @default(1) @db.Decimal(14, 6)
-  buyingPrice   Decimal  @default(0) @db.Decimal(14, 2)
-  freight       Decimal  @default(0) @db.Decimal(14, 2)
-  misc          Decimal  @default(0) @db.Decimal(14, 2)
-  marginPercent Decimal  @default(0) @db.Decimal(6, 2)
-  tax           Decimal  @default(0) @db.Decimal(14, 2)
-  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
 }
 
 model OrderLineItem {
@@ -531,6 +511,7 @@ model OrderLineItem {
   @@index([productId, orderedAt])
   @@index([variantId, orderedAt])
   @@index([storeId])
+  @@index([sku])
 }
 
 model ProductSyncJob {
@@ -593,6 +574,7 @@ model AppSettings {
   messageVisibilityByUser            Json      @default("{}")
   decorationCrossVisibilityEnabled   Boolean   @default(false)
   globalMarginPercent                Decimal   @default(0) @db.Decimal(6, 2)
+  globalExchangeRate                 Decimal   @default(1) @db.Decimal(14, 6)
   lowStockThreshold                  Int       @default(10)
   createdAt                          DateTime  @default(now())
   updatedAt                          DateTime  @updatedAt
@@ -827,7 +809,6 @@ model Supplier {
   poEmail        String
   description    String?
   products       SupplierProduct[]
-  collections    SupplierCollection[]
   purchaseOrders PurchaseOrder[]
   createdAt      DateTime             @default(now())
   updatedAt      DateTime             @updatedAt
@@ -850,7 +831,7 @@ model PurchaseOrder {
   supplierId          String
   supplierName        String
   poEmail             String
-  productId           String
+  supplierProductId   String
   productTitle        String
   status              PurchaseOrderStatus @default(REQUESTED)
   deliveryDate        DateTime?
@@ -863,51 +844,195 @@ model PurchaseOrder {
   createdAt           DateTime            @default(now())
   updatedAt           DateTime            @updatedAt
   supplier            Supplier            @relation(fields: [supplierId], references: [id], onDelete: Restrict)
-  product             Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
+  supplierProduct     SupplierProduct     @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
   items               PurchaseOrderItem[]
 
-  @@index([productId, createdAt])
+  @@index([supplierProductId, createdAt])
   @@index([supplierId])
   @@index([status])
 }
 
 model PurchaseOrderItem {
-  id              String          @id @default(uuid())
-  purchaseOrderId String
-  variantId       String?
-  variantTitle    String
-  sku             String?
-  quantity        Int
-  receivedQuantity Int            @default(0)
-  purchaseOrder   PurchaseOrder   @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
-  variant         ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  id               String                  @id @default(uuid())
+  purchaseOrderId  String
+  variantId        String?
+  variantTitle     String
+  sku              String?
+  quantity         Int
+  receivedQuantity Int                     @default(0)
+  unitCost         Decimal?                @db.Decimal(14, 2)
+  purchaseOrder    PurchaseOrder           @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  variant          SupplierProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
 
   @@index([purchaseOrderId])
 }
 
+enum SupplierProductStatus {
+  ACTIVE
+  DRAFT
+  ARCHIVED
+}
+
+/** The hub catalogue master record — a supplier's product, sold at its own price by any connected store. */
 model SupplierProduct {
-  id         String   @id @default(uuid())
-  supplierId String
-  productId  String
-  linkedAt   DateTime @default(now())
-  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
-  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  id              String                   @id @default(uuid())
+  supplierId      String
+  itemNo          String
+  name            String
+  brand           String?
+  category        String?
+  categoryId      String?
+  sku             String
+  description     String?
+  deliveryRemarks String?
+  status          SupplierProductStatus    @default(DRAFT)
+  verified        Boolean                  @default(false)
+  sizes           String[]                 @default([])
+  colours         Json                     @default("[]")
+  nextStocktakeAt DateTime?
+  supplier        Supplier                 @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  variants        SupplierProductVariant[]
+  images          SupplierProductImage[]
+  pricing         SupplierProductPricing?
+  purchaseOrders  PurchaseOrder[]
+  stocktakes      Stocktake[]
+  adjustments     StockAdjustment[]
+  activity        InventoryActivity[]
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
 
-  @@unique([supplierId, productId])
-  @@index([productId, linkedAt])
+  @@unique([supplierId, itemNo])
+  @@index([createdAt])
+  @@index([name])
+  @@index([sku])
 }
 
-model SupplierCollection {
-  id           String   @id @default(uuid())
-  supplierId   String
-  storeId      String
-  collectionId String
-  title        String
-  handle       String?
-  createdAt    DateTime @default(now())
-  supplier     Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
-  store        Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+model SupplierProductVariant {
+  id                 String                  @id @default(uuid())
+  supplierProductId  String
+  sku                String?
+  barcode            String?
+  colour             String
+  size               String
+  stockOnHand        Int                     @default(0)
+  buyPrice           Decimal                 @default(0) @db.Decimal(14, 2)
+  sellPrice          Decimal                 @default(0) @db.Decimal(14, 2)
+  trigger            Int                     @default(0)
+  forwardOrders      Int                     @default(0)
+  position           Int                     @default(0)
+  supplierProduct    SupplierProduct         @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
+  purchaseOrderItems PurchaseOrderItem[]
+  stocktakeItems     StocktakeItem[]
+  adjustments        StockAdjustment[]
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
 
-  @@unique([supplierId, storeId, collectionId])
-  @@index([storeId, collectionId])
+  @@unique([supplierProductId, colour, size])
+  @@index([supplierProductId])
+  @@index([sku])
+  @@index([barcode])
 }
+
+model SupplierProductImage {
+  id                String          @id @default(uuid())
+  supplierProductId String
+  url               String
+  altText           String?
+  colour            String?
+  position          Int             @default(0)
+  supplierProduct   SupplierProduct @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
+  createdAt         DateTime        @default(now())
+
+  @@index([supplierProductId])
+}
+
+/** Mirrors the old ProductPricing table 1:1 so `computePricing` in the client stays unchanged. */
+model SupplierProductPricing {
+  id                String          @id @default(uuid())
+  supplierProductId String          @unique
+  currencyCode      String          @default("AUD")
+  exchangeRate      Decimal         @default(1) @db.Decimal(14, 6)
+  buyingPrice       Decimal         @default(0) @db.Decimal(14, 2)
+  freight           Decimal         @default(0) @db.Decimal(14, 2)
+  misc              Decimal         @default(0) @db.Decimal(14, 2)
+  marginPercent     Decimal         @default(0) @db.Decimal(6, 2)
+  tax               Decimal         @default(0) @db.Decimal(14, 2)
+  supplierProduct   SupplierProduct @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+}
+
+enum StocktakeStatus {
+  OPEN
+  COMPLETED
+  CANCELLED
+}
+
+model Stocktake {
+  id                String          @id @default(uuid())
+  supplierProductId String
+  status            StocktakeStatus @default(OPEN)
+  startedById       String
+  startedByName     String
+  completedAt       DateTime?
+  supplierProduct   SupplierProduct @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
+  items             StocktakeItem[]
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@index([supplierProductId, createdAt])
+}
+
+model StocktakeItem {
+  id          String                 @id @default(uuid())
+  stocktakeId String
+  variantId   String
+  expectedQty Int
+  countedQty  Int?
+  stocktake   Stocktake              @relation(fields: [stocktakeId], references: [id], onDelete: Cascade)
+  variant     SupplierProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@index([stocktakeId])
+  @@index([variantId])
+}
+
+enum StockAdjustmentReason {
+  DAMAGED
+  LOST
+  FOUND
+  RETURN
+  CORRECTION
+  OTHER
+}
+
+model StockAdjustment {
+  id                String                 @id @default(uuid())
+  supplierProductId String
+  variantId         String
+  delta             Int
+  reason            StockAdjustmentReason
+  note              String?
+  actorId           String
+  actorName         String
+  supplierProduct   SupplierProduct        @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
+  variant           SupplierProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  createdAt         DateTime               @default(now())
+
+  @@index([supplierProductId, createdAt])
+  @@index([variantId])
+}
+
+model InventoryActivity {
+  id                String          @id @default(uuid())
+  supplierProductId String
+  variantId         String?
+  type              String
+  message           String
+  actorId           String?
+  actorName         String
+  supplierProduct   SupplierProduct @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
+  createdAt         DateTime        @default(now())
+
+  @@index([supplierProductId, createdAt])
+}
+
