@@ -2,6 +2,7 @@
 
 import { Fragment, type Dispatch, type SetStateAction } from 'react';
 import { type PrintOrder, type PrintItem, getRemainingForPrint, clampNumber, getVariantText } from './usePickingListPage';
+import LocationRemarkFields from './LocationRemarkFields';
 
 function updatePrintItem(setOrders: Dispatch<SetStateAction<PrintOrder[] | null>>, orderId: string, itemId: string, patch: Partial<PrintItem>) {
   setOrders((prev) => prev ? prev.map((o) => o.id === orderId ? { ...o, printItems: o.printItems.map((item) => item.id === itemId ? { ...item, ...patch } : item) } : o) : prev);
@@ -56,10 +57,7 @@ export default function PrintModal({ orders, setOrders, onClose, onPrint }: Prop
                                 {item.removed ? <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v6h6M20 20v-6h-6M20 9A8 8 0 0 0 6.3 3.7L4 10M4 15a8 8 0 0 0 13.7 5.3L20 14" /></svg> : <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 6 6 18M6 6l12 12" /></svg>}
                               </button>
                             </div>
-                            <div className="mt-3 grid grid-cols-2 gap-3">
-                              <label><span className="mb-1 block text-xs font-semibold uppercase text-gray-500">Location</span><input value={item.printLocation} disabled={item.removed} onChange={(e) => updatePrintItem(setOrders, order.id, item.id, { printLocation: e.target.value })} className="w-full rounded border border-gray-300 px-2 py-1 disabled:bg-gray-100" /></label>
-                              <label><span className="mb-1 block text-xs font-semibold uppercase text-gray-500">Remark</span><input value={item.printRemark} disabled={item.removed} onChange={(e) => updatePrintItem(setOrders, order.id, item.id, { printRemark: e.target.value })} className="w-full rounded border border-gray-300 px-2 py-1 disabled:bg-gray-100" /></label>
-                            </div>
+                            <LocationRemarkFields orderId={order.id} itemId={item.id} locationRemarks={item.locationRemarks} disabled={item.removed} setOrders={setOrders} />
                           </td>
                         </tr>
                         <tr className={`border-b border-gray-100 ${item.removed ? 'opacity-40' : ''}`}>
