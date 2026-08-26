@@ -7,32 +7,11 @@ export type SupplierRow = {
   poEmail: string;
   description: string | null;
   productCount: number;
-  collectionCount: number;
   createdAt: string;
   updatedAt: string;
 };
 
 export type SupplierOption = { id: string; name: string; poEmail: string };
-
-export type SupplierConnectionProduct = {
-  id: string;
-  productId: string;
-  title: string;
-  storeName: string;
-  linkedAt: string;
-};
-
-export type SupplierConnectionCollection = {
-  id: string;
-  storeId: string;
-  storeName: string;
-  collectionId: string;
-  title: string;
-  handle: string | null;
-};
-
-export type AttachedSupplier = { id: string; name: string; linkedAt: string };
-export type CollectionSupplier = { id: string; name: string; collectionTitle: string };
 
 export class SupplierModel {
   async list(params: { search?: string; page: number; pageSize: number }) {
@@ -44,7 +23,7 @@ export class SupplierModel {
       prisma.supplier.count({ where }),
       prisma.supplier.findMany({
         where,
-        include: { _count: { select: { products: true, collections: true } } },
+        include: { _count: { select: { products: true } } },
         orderBy: { name: 'asc' },
         skip: (params.page - 1) * params.pageSize,
         take: params.pageSize,
@@ -57,7 +36,7 @@ export class SupplierModel {
   async findById(id: string): Promise<SupplierRow | null> {
     const row = await prisma.supplier.findUnique({
       where: { id },
-      include: { _count: { select: { products: true, collections: true } } },
+      include: { _count: { select: { products: true } } },
     });
     return row ? toSupplierRow(row) : null;
   }
@@ -65,7 +44,7 @@ export class SupplierModel {
   async create(data: { name: string; contactEmail: string | null; poEmail: string; description: string | null }) {
     const row = await prisma.supplier.create({
       data,
-      include: { _count: { select: { products: true, collections: true } } },
+      include: { _count: { select: { products: true } } },
     });
     return toSupplierRow(row);
   }
@@ -74,7 +53,7 @@ export class SupplierModel {
     const row = await prisma.supplier.update({
       where: { id },
       data,
-      include: { _count: { select: { products: true, collections: true } } },
+      include: { _count: { select: { products: true } } },
     });
     return toSupplierRow(row);
   }
@@ -87,90 +66,6 @@ export class SupplierModel {
     const rows = await prisma.supplier.findMany({ select: { id: true, name: true, poEmail: true }, orderBy: { name: 'asc' } });
     return rows;
   }
-
-  async listConnections(supplierId: string): Promise<{ products: SupplierConnectionProduct[]; collections: SupplierConnectionCollection[] }> {
-    const [products, collections] = await Promise.all([
-      prisma.supplierProduct.findMany({
-        where: { supplierId },
-        include: { product: { select: { title: true, store: { select: { name: true, storeDomain: true } } } } },
-        orderBy: { linkedAt: 'desc' },
-      }),
-      prisma.supplierCollection.findMany({
-        where: { supplierId },
-        include: { store: { select: { name: true, storeDomain: true } } },
-        orderBy: { createdAt: 'desc' },
-      }),
-    ]);
-
-    return {
-      products: products.map((p) => ({
-        id: p.id,
-        productId: p.productId,
-        title: p.product.title,
-        storeName: p.product.store.name ?? p.product.store.storeDomain,
-        linkedAt: p.linkedAt.toISOString(),
-      })),
-      collections: collections.map((c) => ({
-        id: c.id,
-        storeId: c.storeId,
-        storeName: c.store.name ?? c.store.storeDomain,
-        collectionId: c.collectionId,
-        title: c.title,
-        handle: c.handle,
-      })),
-    };
-  }
-
-  async linkProduct(supplierId: string, productId: string) {
-    await prisma.supplierProduct.upsert({
-      where: { supplierId_productId: { supplierId, productId } },
-      update: { linkedAt: new Date() },
-      create: { supplierId, productId },
-    });
-  }
-
-  async unlinkProduct(supplierId: string, productId: string) {
-    await prisma.supplierProduct.deleteMany({ where: { supplierId, productId } });
-  }
-
-  async linkCollection(data: { supplierId: string; storeId: string; collectionId: string; title: string; handle: string | null }) {
-    await prisma.supplierCollection.upsert({
-      where: { supplierId_storeId_collectionId: { supplierId: data.supplierId, storeId: data.storeId, collectionId: data.collectionId } },
-      update: { title: data.title, handle: data.handle },
-      create: data,
-    });
-  }
-
-  async unlinkCollection(supplierId: string, storeId: string, collectionId: string) {
-    await prisma.supplierCollection.deleteMany({ where: { supplierId, storeId, collectionId } });
-  }
-
-  async findForProduct(productId: string): Promise<AttachedSupplier[]> {
-    const rows = await prisma.supplierProduct.findMany({
-      where: { productId },
-      include: { supplier: { select: { id: true, name: true } } },
-      orderBy: { linkedAt: 'desc' },
-    });
-    return rows.map((r) => ({ id: r.supplier.id, name: r.supplier.name, linkedAt: r.linkedAt.toISOString() }));
-  }
-
-  async findByCollections(storeId: string, collectionIds: string[]): Promise<CollectionSupplier[]> {
-    if (collectionIds.length === 0) return [];
-    const rows = await prisma.supplierCollection.findMany({
-      where: { storeId, collectionId: { in: collectionIds } },
-      include: { supplier: { select: { id: true, name: true } } },
-      orderBy: { createdAt: 'asc' },
-    });
-
-    const seen = new Set<string>();
-    const result: CollectionSupplier[] = [];
-    for (const row of rows) {
-      if (seen.has(row.supplier.id)) continue;
-      seen.add(row.supplier.id);
-      result.push({ id: row.supplier.id, name: row.supplier.name, collectionTitle: row.title });
-    }
-    return result;
-  }
 }
 
 type SupplierWithCount = {
@@ -181,7 +76,7 @@ type SupplierWithCount = {
   description: string | null;
   createdAt: Date;
   updatedAt: Date;
-  _count: { products: number; collections: number };
+  _count: { products: number };
 };
 
 function toSupplierRow(row: SupplierWithCount): SupplierRow {
@@ -192,7 +87,6 @@ function toSupplierRow(row: SupplierWithCount): SupplierRow {
     poEmail: row.poEmail,
     description: row.description,
     productCount: row._count.products,
-    collectionCount: row._count.collections,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };

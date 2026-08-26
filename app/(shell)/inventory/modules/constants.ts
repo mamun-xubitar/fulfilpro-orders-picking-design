@@ -1,52 +1,97 @@
-import type { Pagination } from './types';
+import type { ModuleTabId, ProductTabId, QuickFilterId, StoreListing, TabDef, VariantStatus } from './types';
 
-export const DEFAULT_PAGINATION: Pagination = {
-  page: 1,
-  pageSize: 20,
-  total: 0,
-  totalPages: 1,
-  hasPrev: false,
-  hasNext: false,
+export const MODULE_TABS: TabDef<ModuleTabId>[] = [
+  { id: 'products', label: 'Products', blurb: 'Browse and maintain the product catalogue.' },
+  { id: 'purchase-recommend', label: 'Purchase Recommend', blurb: 'Reorder suggestions rolled up across every product.' },
+  { id: 'purchase-orders', label: 'Purchase Orders', blurb: 'Raise and track supplier purchase orders.' },
+  { id: 'receiving', label: 'Receiving', blurb: 'Book incoming stock against open purchase orders.' },
+  { id: 'stocktake', label: 'Stocktake', blurb: 'Plan counts and reconcile counted quantities.' },
+  { id: 'adjustments', label: 'Adjustments', blurb: 'Record and review manual stock corrections.' },
+  { id: 'suppliers', label: 'Suppliers', blurb: 'Manage supplier records and their product links.' },
+  { id: 'payments', label: 'Payments', blurb: 'Track supplier invoices and settlements.' },
+  { id: 'reports', label: 'Reports', blurb: 'Stock valuation, movement and margin reporting.' },
+  { id: 'dashboard', label: 'Dashboard', blurb: 'Headline inventory metrics at a glance.' },
+];
+
+export const PRODUCT_TABS: TabDef<ProductTabId>[] = [
+  { id: 'details', label: 'Product Details', blurb: 'Core product record.' },
+  { id: 'variants', label: 'Variants / Stock', blurb: 'Full-screen variant and stock editor.' },
+  { id: 'purchase-info', label: 'Purchase Info', blurb: 'Lead times, minimum order quantities and pack sizes.' },
+  { id: 'suppliers', label: 'Suppliers', blurb: 'Suppliers who can fulfil this product.' },
+  { id: 'images', label: 'Images', blurb: 'Manage the full image library for this product.' },
+  { id: 'notes', label: 'Notes', blurb: 'Internal notes against this product.' },
+  { id: 'documents', label: 'Documents', blurb: 'Spec sheets, certificates and artwork files.' },
+  { id: 'history', label: 'History', blurb: 'Every change made to this product record.' },
+];
+
+export const QUICK_FILTERS: { id: QuickFilterId; label: string }[] = [
+  { id: 'buying-lt-1', label: 'Buying < $1.00' },
+  { id: 'profit-lt-5', label: 'Profit < $5.00' },
+  { id: 'selling-lt-1', label: 'Selling < $1.00' },
+  { id: 'selling-lt-5', label: 'Selling < $5.00' },
+];
+
+/** A row within this fraction above its trigger counts as "near". */
+export const NEAR_TRIGGER_RATIO = 1.2;
+
+export const STATUS_STYLES: Record<VariantStatus, { row: string; badge: string; bar: string; label: string }> = {
+  below: {
+    row: 'bg-red-50/70 hover:bg-red-50',
+    badge: 'bg-red-100 text-red-700 border-red-200',
+    bar: 'bg-red-500',
+    label: 'Reorder',
+  },
+  near: {
+    row: 'bg-amber-50/70 hover:bg-amber-50',
+    badge: 'bg-amber-100 text-amber-800 border-amber-200',
+    bar: 'bg-amber-500',
+    label: 'Low',
+  },
+  above: {
+    row: 'hover:bg-gray-50',
+    badge: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    bar: 'bg-emerald-500',
+    label: 'OK',
+  },
 };
 
-export const SEARCH_FIELDS = [
-  { value: 'title', label: 'Title' },
-  { value: 'vendor', label: 'Vendor' },
-  { value: 'supplier', label: 'Supplier' },
-  { value: 'category', label: 'Category' },
-  { value: 'type', label: 'Type' },
-  { value: 'tag', label: 'Tag' },
+export const STATUS_LEGEND: { id: VariantStatus; label: string; className: string }[] = [
+  { id: 'below', label: 'Below trigger', className: 'bg-red-100 text-red-700 border-red-200' },
+  { id: 'near', label: 'Within 20% of trigger', className: 'bg-amber-100 text-amber-800 border-amber-200' },
+  { id: 'above', label: 'Above trigger', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
 ];
 
-export const STATUS_OPTIONS = [
-  { value: 'ACTIVE', label: 'Active' },
-  { value: 'DRAFT', label: 'Draft' },
-  { value: 'ARCHIVED', label: 'Archived' },
-];
-
-export const STATUS_BADGE: Record<string, { label: string; className: string }> = {
-  ACTIVE: { label: 'Active', className: 'bg-green-50 text-green-700 border-green-200' },
-  DRAFT: { label: 'Draft', className: 'bg-gray-50 text-gray-600 border-gray-200' },
-  ARCHIVED: { label: 'Archived', className: 'bg-amber-50 text-amber-700 border-amber-200' },
+/** Swatch colours for the colour pills and matrix dots. Keyed by lowercased colour name. */
+export const COLOUR_SWATCHES: Record<string, string> = {
+  aqua: '#22b8e6',
+  black: '#111827',
+  'hot pink': '#ec4899',
+  lime: '#84cc16',
+  navy: '#1e3a8a',
+  red: '#dc2626',
+  yellow: '#facc15',
+  white: '#f3f4f6',
+  grey: '#9ca3af',
+  charcoal: '#374151',
+  royal: '#2563eb',
+  bottle: '#065f46',
+  sand: '#d6c7a1',
 };
 
-export const STOCK_LEVEL_OPTIONS = [
-  { value: '', label: 'All Stock Levels' },
-  { value: 'in_stock', label: 'In Stock' },
-  { value: 'out_of_stock', label: 'Out of Stock' },
-  { value: 'not_tracked', label: 'Not Tracked' },
+export const FALLBACK_SWATCH = '#cbd5e1';
+
+/**
+ * "Online stores & prices" stays on the original design mock-up — no store-connection
+ * backend exists yet, so every product shows this same illustrative sample.
+ */
+export const DEMO_ONLINE_STORES: StoreListing[] = [
+  { id: 'demo-store-1', name: 'Mad Hats', domain: 'madhats.com.au', status: 'ACTIVE', externalId: '6633188262024', price: 8.99, url: 'https://madhats.com.au' },
+  { id: 'demo-store-2', name: 'FunGear', domain: 'fungear.com.au', status: 'ACTIVE', externalId: '746075987080', price: 9.95, url: 'https://fungear.com.au' },
+  { id: 'demo-store-3', name: 'Flag Factory', domain: 'flagfactory.com.au', status: 'DRAFT', externalId: '8311174604936', price: 9.5, url: null },
 ];
 
-export const COLUMNS: Array<{ key: string; label: string; sortable: boolean }> = [
-  { key: 'select', label: '', sortable: false },
-  { key: 'title', label: 'Product', sortable: true },
-  { key: 'status', label: 'Status', sortable: true },
-  { key: 'totalInventory', label: 'Inventory', sortable: true },
-  { key: 'soldQuantity', label: 'Sold', sortable: true },
-  { key: 'store', label: 'Store', sortable: true },
-  { key: 'category', label: 'Category', sortable: true },
-  { key: 'productType', label: 'Type', sortable: true },
-  { key: 'salesChannels', label: 'Channels', sortable: false },
-  { key: 'vendor', label: 'Vendor', sortable: true },
-  { key: 'actions', label: 'Actions', sortable: false },
-];
+export const PRODUCT_STATUS_BADGES: Record<string, string> = {
+  ACTIVE: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  DRAFT: 'bg-amber-50 text-amber-700 border-amber-200',
+  ARCHIVED: 'bg-gray-50 text-gray-600 border-gray-200',
+};

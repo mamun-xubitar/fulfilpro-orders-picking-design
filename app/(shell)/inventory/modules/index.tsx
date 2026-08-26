@@ -1,115 +1,85 @@
 'use client';
 
+import BottomPanels from './BottomPanels';
+import ComingSoon from './ComingSoon';
+import InventoryModals from './InventoryModals';
+import ModuleTabs from './ModuleTabs';
+import ProductDetailsTab from './ProductDetailsTab';
+import ProductSubTabs from './ProductSubTabs';
+import ProductsToolbar from './ProductsToolbar';
+import PurchaseOrdersPanel from './PurchaseOrdersPanel';
+import VariantsMatrixTable from './VariantsMatrixTable';
+import VariantsMatrixToolbar from './VariantsMatrixToolbar';
+import { MODULE_TABS, PRODUCT_TABS } from './constants';
 import { useInventoryPage } from './hooks/useInventoryPage';
-import InventoryToolbar from './InventoryToolbar';
-import InventoryTable from './InventoryTable';
-import InventoryPagination from './InventoryPagination';
-import InventorySelectionBar from './InventorySelectionBar';
-import InventoryBulkModals from './InventoryBulkModals';
 
 export default function InventoryPage() {
   const p = useInventoryPage();
-  const hasSelection = p.selectAllFilters || p.selectedIds.length > 0;
+  const moduleTab = MODULE_TABS.find((t) => t.id === p.moduleTab)!;
+  const productTab = PRODUCT_TABS.find((t) => t.id === p.productTab)!;
 
   return (
-    <main className="flex-1 p-4 md:p-6">
-      <InventoryToolbar
-        searchInput={p.searchInput}
-        setSearchInput={p.setSearchInput}
-        searchField={p.searchField}
-        setSearchField={p.setSearchField}
-        searchDropdownOpen={p.searchDropdownOpen}
-        setSearchDropdownOpen={p.setSearchDropdownOpen}
-        searchDropdownRef={p.searchDropdownRef}
-        stores={p.stores}
-        storeIds={p.storeIds}
-        storeDropdownOpen={p.storeDropdownOpen}
-        setStoreDropdownOpen={p.setStoreDropdownOpen}
-        storeDropdownRef={p.storeDropdownRef}
-        handleStoreToggle={p.handleStoreToggle}
-        status={p.status}
-        statusDropdownOpen={p.statusDropdownOpen}
-        setStatusDropdownOpen={p.setStatusDropdownOpen}
-        statusDropdownRef={p.statusDropdownRef}
-        handleStatusToggle={p.handleStatusToggle}
-        stockLevel={p.stockLevel}
-        stockDropdownOpen={p.stockDropdownOpen}
-        setStockDropdownOpen={p.setStockDropdownOpen}
-        stockDropdownRef={p.stockDropdownRef}
-        handleStockLevelChange={p.handleStockLevelChange}
-        hasActiveFilters={p.hasActiveFilters}
-        handleClearFilters={p.handleClearFilters}
-        syncStoreIds={p.syncStoreIds}
-        handleSyncStoreToggle={p.handleSyncStoreToggle}
-        syncStoreDropdownOpen={p.syncStoreDropdownOpen}
-        setSyncStoreDropdownOpen={p.setSyncStoreDropdownOpen}
-        syncStoreDropdownRef={p.syncStoreDropdownRef}
-        handleSync={p.handleSync}
-        syncing={p.syncing}
-        loading={p.loading}
-        syncActive={p.syncActive}
-        handleRefresh={p.handleRefresh}
-        syncRefreshNeeded={p.syncRefreshNeeded}
-        refreshRotation={p.refreshRotation}
-        syncMessage={p.syncMessage}
-      />
+    <main className="flex-1 space-y-3 p-4 md:p-6">
+      <ModuleTabs active={p.moduleTab} onChange={p.setModuleTab} />
 
-      {hasSelection && (
-        <InventorySelectionBar
-          selectedCount={p.selectedIds.length}
-          selectAllFilters={p.selectAllFilters}
-          onToggleSelectAllFilters={p.toggleSelectAllFilters}
-          isCurrentPageAllSelected={p.isCurrentPageAllSelected}
-          onToggleCurrentPage={p.toggleSelectAllOnPage}
-          bulkRunning={p.bulkRunning}
-          bulkJob={p.bulkJob}
-          onArchive={() => p.runBulkAction('archive')}
-          onSetDraft={() => p.runBulkAction('set_draft')}
-          onOpenTagModal={(mode) => p.setTagModal({ mode, input: '' })}
-          onOpenChannelModal={(mode) => p.setChannelModal({ mode, input: '' })}
-          onOpenDelete={() => p.setDeleteConfirm({ kind: 'selection' })}
-          onClear={p.clearSelection}
-        />
+      {p.moduleTab !== 'products' ? (
+        <ComingSoon label={moduleTab.label} blurb={moduleTab.blurb} />
+      ) : (
+        <>
+          <ProductsToolbar {...p} />
+
+          {p.loading ? (
+            <LoadingState />
+          ) : !p.product ? (
+            <EmptyState />
+          ) : (
+            <>
+              <div className="rounded-xl border border-gray-200 bg-white px-4 shadow-sm">
+                <ProductSubTabs active={p.productTab} onChange={p.setProductTab} />
+              </div>
+
+              {p.productTab === 'details' ? (
+                <ProductDetailsTab p={p} />
+              ) : (
+                <ComingSoon label={productTab.label} blurb={productTab.blurb} />
+              )}
+
+              <section className="rounded-xl border border-gray-200 bg-white shadow-sm">
+                <VariantsMatrixToolbar p={p} />
+                <VariantsMatrixTable matrix={p.matrix} />
+              </section>
+
+              <PurchaseOrdersPanel po={p.po} />
+
+              <BottomPanels p={p} />
+            </>
+          )}
+        </>
       )}
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <InventoryTable
-            products={p.products}
-            loading={p.loading}
-            error={p.error}
-            sort={p.sort}
-            dir={p.dir}
-            onSortChange={p.handleSortChange}
-            selectedIds={p.selectedIds}
-            onToggleSelect={p.toggleSelect}
-            isCurrentPageAllSelected={p.isCurrentPageAllSelected}
-            onToggleSelectAllOnPage={p.toggleSelectAllOnPage}
-            onRequestDelete={(id, title) => p.setDeleteConfirm({ kind: 'single', id, title })}
-          />
-        </div>
-
-        <InventoryPagination
-          pagination={p.pagination}
-          loading={p.loading}
-          pageNumbers={p.pageNumbers}
-          onPageChange={p.goToPage}
-          itemLabel="products"
-        />
-      </div>
-
-      <InventoryBulkModals
-        tagModal={p.tagModal}
-        setTagModal={p.setTagModal}
-        onSubmitTagModal={p.submitTagModal}
-        channelModal={p.channelModal}
-        setChannelModal={p.setChannelModal}
-        onSubmitChannelModal={p.submitChannelModal}
-        deleteConfirm={p.deleteConfirm}
-        setDeleteConfirm={p.setDeleteConfirm}
-        onConfirmDelete={p.confirmDelete}
-        bulkRunning={p.bulkRunning}
-      />
+      <InventoryModals {...p} />
     </main>
+  );
+}
+
+function LoadingState() {
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-1 gap-3 xl:grid-cols-2 2xl:grid-cols-5">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="h-80 animate-pulse rounded-xl border border-gray-200 bg-gray-100" />
+        ))}
+      </div>
+      <div className="h-64 animate-pulse rounded-xl border border-gray-200 bg-gray-100" />
+    </div>
+  );
+}
+
+function EmptyState() {
+  return (
+    <div className="rounded-xl border border-dashed border-gray-300 bg-white px-6 py-20 text-center">
+      <h2 className="text-base font-semibold text-gray-900">No products match the current filters</h2>
+      <p className="mt-1 text-sm text-gray-500">Tick “All records” or clear the price shortcut to see the full catalogue.</p>
+    </div>
   );
 }

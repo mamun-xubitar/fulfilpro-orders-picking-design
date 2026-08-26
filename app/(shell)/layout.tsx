@@ -216,7 +216,19 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
     await signOut({ callbackUrl: "/" });
   }
 
-  const navItems = [
+  type NavItem = {
+    id: string;
+    label: string;
+    href: string;
+    icon: React.ReactNode;
+    adminOnly: boolean;
+    pickerHidden?: boolean;
+    pickerOnly?: boolean;
+    adminDecoratorOnly: boolean;
+    children?: { id: string; label: string; href: string }[];
+  };
+
+  const navItems: NavItem[] = [
     {
       id: "orders", label: "Orders", href: "/orders",
       icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>,
@@ -279,11 +291,6 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
       adminOnly: true,
       pickerHidden: true,
       adminDecoratorOnly: false,
-      children: [
-        { id: "inventory-dev", label: "Inventory (New)", href: "/inventory/inventory-dev" },
-        { id: "suppliers", label: "Suppliers", href: "/inventory/suppliers" },
-        { id: "config", label: "Configuration", href: "/inventory/config" },
-      ],
     },
     {
       id: "users", label: "Users", href: "/users",

@@ -1,6 +1,6 @@
-import 'dotenv/config';
-import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
+import { PrismaClient } from '@prisma/client';
+import 'dotenv/config';
 import { Pool } from 'pg';
 import { saltAndHashPassword } from '../lib/password';
 
@@ -37,6 +37,25 @@ async function main() {
       isTempPassword: true,
     },
   });
+
+  if ((await prisma.supplier.count()) === 0) {
+    await prisma.supplier.createMany({
+      data: [
+        {
+          name: 'Northwind Apparel',
+          poEmail: 'orders@northwindapparel.example',
+          contactEmail: 'sales@northwindapparel.example',
+          description: 'Headwear and soft-goods supplier',
+        },
+        {
+          name: 'Pacific Sportswear',
+          poEmail: 'orders@pacificsportswear.example',
+          contactEmail: 'accounts@pacificsportswear.example',
+          description: 'Teamwear and technical apparel',
+        },
+      ],
+    });
+  }
 
   await prisma.appSettings.upsert({
     where: { id: 'default' },
