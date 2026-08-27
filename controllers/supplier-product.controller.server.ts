@@ -32,6 +32,12 @@ export class SupplierProductController {
 
     const products = search ? allProducts.filter((p) => matchesSearch(p, search)) : allProducts;
 
+    // USD is always offered in the currency picker even if no CurrencyRate row has been configured
+    // for it yet — the pricing panel defaults new products to USD, so the option must always exist.
+    const configuredUsd = currencies.find((c) => c.code === 'USD');
+    const usdRate = configuredUsd?.rate ?? Number(settings.globalExchangeRate);
+    const extraCurrencies = currencies.filter((c) => c.code !== 'USD').map((c) => ({ code: c.code, rate: c.rate }));
+
     return {
       data: {
         products,
@@ -39,7 +45,7 @@ export class SupplierProductController {
           exchangeRate: Number(settings.globalExchangeRate),
           marginPercent: Number(settings.globalMarginPercent),
           baseCurrency: 'AUD',
-          currencies: [{ code: 'AUD', rate: 1 }, ...currencies.map((c) => ({ code: c.code, rate: c.rate }))],
+          currencies: [{ code: 'AUD', rate: 1 }, { code: 'USD', rate: usdRate }, ...extraCurrencies],
         },
       },
     };
@@ -78,6 +84,7 @@ export class SupplierProductController {
       name,
       brand: brand || null,
       marginPercent: Number(settings.globalMarginPercent),
+      exchangeRate: Number(settings.globalExchangeRate),
     });
     const product = await model.findById(id);
     return { data: product, message: 'Product created' };
@@ -138,7 +145,7 @@ export class SupplierProductController {
     if (!Number.isFinite(freight) || freight < 0) errors.push('freight: Enter a value of 0 or more');
     if (!Number.isFinite(misc) || misc < 0) errors.push('misc: Enter a value of 0 or more');
     if (!Number.isFinite(marginPercent) || marginPercent < 0) errors.push('marginPercent: Enter a margin of 0 or more');
-    if (!Number.isFinite(tax) || tax < 0) errors.push('tax: Enter a value of 0 or more');
+    if (!Number.isFinite(tax) || tax < 0 || tax > 100) errors.push('tax: Enter a percent between 0 and 100');
     if (errors.length) return { error: { message: 'Validation failed', errors, status: 400 } };
 
     await model.upsertPricing(id, { currencyCode, exchangeRate, buyingPrice, freight, misc, marginPercent, tax });
@@ -174,7 +181,7 @@ export class SupplierProductController {
     const value = (body ?? {}) as Record<string, unknown>;
     const errors: string[] = [];
     const numeric: Record<string, number> = {};
-    for (const field of ['stockOnHand', 'buyPrice', 'sellPrice', 'trigger', 'forwardOrders'] as const) {
+    for (const field of ['stockOnHand', 'sellPrice', 'trigger', 'allocated'] as const) {
       if (value[field] === undefined) continue;
       const n = Number(value[field]);
       if (!Number.isFinite(n) || n < 0) errors.push(`${field}: Enter a value of 0 or more`);
@@ -261,6 +268,42 @@ export class SupplierProductController {
 
     const product = await model.findById(id);
     return { data: product, message: 'Image colour updated' };
+  }
+
+  async remove(id: string, session: Session) {
+    if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
+    const removed = await model.delete(id);
+    if (!removed) return { error: { message: 'Product not found', status: 404 } };
+    return { data: null, message: 'Product deleted' };
+  }
+
+  async bulk(body: unknown, session: Session) {
+    if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
+
+    const value = (body ?? {}) as Record<string, unknown>;
+    const action = typeof value.action === 'string' ? value.action : '';
+    const productIds = Array.isArray(value.productIds) ? (value.productIds as unknown[]).filter((id): id is string => typeof id === 'string') : [];
+    if (productIds.length === 0) return { error: { message: 'productIds: At least one product is required', status: 400 } };
+
+    if (action === 'delete') {
+      const count = await model.deleteMany(productIds);
+      return { data: { count }, message: `${count} product${count === 1 ? '' : 's'} deleted` };
+    }
+
+    if (action === 'set_status') {
+      const status = typeof value.status === 'string' ? value.status : '';
+      if (!STATUS_VALUES.has(status)) return { error: { message: 'status: Invalid status', status: 400 } };
+      const count = await model.setStatusMany(productIds, status as SupplierProductStatus);
+      return { data: { count }, message: `${count} product${count === 1 ? '' : 's'} updated` };
+    }
+
+    if (action === 'set_verified') {
+      if (typeof value.verified !== 'boolean') return { error: { message: 'verified: Must be true or false', status: 400 } };
+      const count = await model.setVerifiedMany(productIds, value.verified);
+      return { data: { count }, message: `${count} product${count === 1 ? '' : 's'} updated` };
+    }
+
+    return { error: { message: 'action: Unsupported bulk action', status: 400 } };
   }
 }
 

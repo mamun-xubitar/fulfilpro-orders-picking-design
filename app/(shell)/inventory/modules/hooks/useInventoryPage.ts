@@ -13,6 +13,7 @@ import { useProductImageMutations } from './useProductImageMutations';
 import { useProductImages } from './useProductImages';
 import { useProductNavigation } from './useProductNavigation';
 import { useProductPricing } from './useProductPricing';
+import { useProductsTable } from './useProductsTable';
 import { usePurchaseOrder } from './usePurchaseOrder';
 import { useStocktake } from './useStocktake';
 import { useVariantsMatrix } from './useVariantsMatrix';
@@ -44,6 +45,7 @@ export function useInventoryPage() {
   const stocktake = useStocktake({ product, refreshCatalog: data.refresh });
   const adjustments = useAdjustments({ product, refreshCatalog: data.refresh });
   const importExport = useImportExport({ product, refreshCatalog: data.refresh });
+  const productsTable = useProductsTable({ products: data.products, verifiedOnly: nav.verifiedOnly, onView: nav.viewProduct, refreshCatalog: data.refresh });
 
   /** Stock Summary always reflects the whole product, not the matrix's filtered rows. */
   const summary = useMemo(() => summariseVariants(product?.variants ?? []), [product]);
@@ -82,6 +84,7 @@ export function useInventoryPage() {
 
   return {
     loading: data.loading,
+    refresh: data.refresh,
     product,
     globals: data.globals,
     now,
@@ -99,6 +102,7 @@ export function useInventoryPage() {
     stocktake,
     adjustments,
     importExport,
+    productsTable,
     summary,
     rateInput: data.rateInput,
     setRateInput: data.setRateInput,

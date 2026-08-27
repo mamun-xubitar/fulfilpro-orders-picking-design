@@ -5,7 +5,7 @@ import useRequest from '@/hooks/useRequest';
 import { computePricing, pricingFormToInputs, pricingInputsToForm, round2 } from '../utils';
 import type { InventoryGlobals, PricingForm, ProductRecord } from '../types';
 
-const EMPTY_FORM: PricingForm = { currencyCode: 'AUD', exchangeRate: '1', buyingPrice: '0', freight: '0', misc: '0', marginPercent: '0', tax: '0' };
+const EMPTY_FORM: PricingForm = { currencyCode: 'USD', exchangeRate: '1', buyingPrice: '0', freight: '0', misc: '0', marginPercent: '0', tax: '10' };
 
 type UseProductPricingArgs = {
   product: ProductRecord | null;
@@ -33,12 +33,10 @@ export function useProductPricing({ product, globals, onSaved }: UseProductPrici
     const value = e.target.value;
     const next: PricingForm =
       field === 'currencyCode'
-        ? { ...form, currencyCode: value, exchangeRate: (globals.currencies.find((c) => c.code === value)?.rate ?? Number(form.exchangeRate)).toFixed(4) }
+        ? { ...form, currencyCode: value, exchangeRate: (globals.currencies.find((c) => c.code === value)?.rate ?? Number(form.exchangeRate)).toFixed(2) }
         : { ...form, [field]: value };
     setDraft({ productId: product.id, form: next });
   };
-
-  const taxAmount = Number(form.tax) || 0;
 
   const savePricing = () => {
     if (!product) return;
@@ -88,8 +86,6 @@ export function useProductPricing({ product, globals, onSaved }: UseProductPrici
     form,
     set,
     computed,
-    taxAmount,
-    taxPercentOfSell: computed.sellingPrice > 0 ? (taxAmount / computed.sellingPrice) * 100 : 0,
     currencies: globals.currencies,
     baseCurrency: globals.baseCurrency,
     startEdit: () => product && setEditingId(product.id),

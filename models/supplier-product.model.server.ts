@@ -3,6 +3,8 @@ import { Prisma, SupplierProductStatus } from '@prisma/client';
 
 export type ColourOptionData = { name: string; hex: string };
 
+export type IncomingLotRow = { quantity: number; date: string | null };
+
 export type SupplierProductVariantRow = {
   id: string;
   sku: string | null;
@@ -10,12 +12,18 @@ export type SupplierProductVariantRow = {
   colour: string;
   size: string;
   stockOnHand: number;
+  /** Weighted average of unitCost across received PurchaseOrderItems; falls back to the stored column when nothing has been received. */
   buyPrice: number;
   sellPrice: number;
   trigger: number;
+  /** Stored, manually-editable — wins over allocatedFromOrders. */
   allocated: number;
+  /** Order-derived hint only, shown as a tooltip next to the editable Allocated cell. */
+  allocatedFromOrders: number;
+  /** Sum of incomingLots — kept for the stock summary / totals row. */
   incoming: number;
-  forwardOrders: number;
+  /** One entry per open PO with unreceived quantity, oldest delivery date first. */
+  incomingLots: IncomingLotRow[];
 };
 
 export type SupplierProductImageRow = { id: string; url: string; altText: string | null; colour: string | null };
@@ -34,6 +42,8 @@ export type SupplierProductActivityRow = { id: string; at: string; actor: string
 
 export type SupplierProductRow = {
   id: string;
+  supplierId: string;
+  supplierName: string;
   itemNo: string;
   brand: string;
   name: string;
@@ -58,18 +68,19 @@ export type SupplierProductRow = {
 };
 
 const EMPTY_PRICING: SupplierProductPricingRow = {
-  currencyCode: 'AUD',
+  currencyCode: 'USD',
   exchangeRate: 1,
   buyingPrice: 0,
   freight: 0,
   misc: 0,
   marginPercent: 0,
-  tax: 0,
+  tax: 10,
 };
 
 const OPEN_PO_STATUSES = ['REQUESTED', 'CONFIRMED', 'PARTIALLY_RECEIVED'] as const;
 
 const catalogueInclude = {
+  supplier: { select: { id: true, name: true } },
   variants: { orderBy: { position: 'asc' as const } },
   images: { orderBy: { position: 'asc' as const } },
   pricing: true,
@@ -107,6 +118,7 @@ export class SupplierProductModel {
     name: string;
     brand: string | null;
     marginPercent: number;
+    exchangeRate: number;
   }): Promise<string> {
     const row = await prisma.supplierProduct.create({
       data: {
@@ -116,7 +128,7 @@ export class SupplierProductModel {
         brand: data.brand,
         sku: data.itemNo,
         status: 'DRAFT',
-        pricing: { create: { currencyCode: 'AUD', exchangeRate: 1, marginPercent: data.marginPercent } },
+        pricing: { create: { currencyCode: 'USD', exchangeRate: data.exchangeRate, marginPercent: data.marginPercent } },
       },
     });
     await prisma.inventoryActivity.create({
@@ -206,7 +218,7 @@ export class SupplierProductModel {
 
   async updateVariant(
     variantId: string,
-    data: Partial<{ sku: string | null; barcode: string | null; colour: string; size: string; stockOnHand: number; buyPrice: number; sellPrice: number; trigger: number; forwardOrders: number }>
+    data: Partial<{ sku: string | null; barcode: string | null; colour: string; size: string; stockOnHand: number; buyPrice: number; sellPrice: number; trigger: number; allocated: number }>
   ): Promise<void> {
     try {
       await prisma.supplierProductVariant.update({ where: { id: variantId }, data });
@@ -221,6 +233,26 @@ export class SupplierProductModel {
   async deleteVariant(supplierProductId: string, variantId: string): Promise<boolean> {
     const result = await prisma.supplierProductVariant.deleteMany({ where: { id: variantId, supplierProductId } });
     return result.count > 0;
+  }
+
+  async delete(id: string): Promise<boolean> {
+    const result = await prisma.supplierProduct.deleteMany({ where: { id } });
+    return result.count > 0;
+  }
+
+  async deleteMany(ids: string[]): Promise<number> {
+    const result = await prisma.supplierProduct.deleteMany({ where: { id: { in: ids } } });
+    return result.count;
+  }
+
+  async setStatusMany(ids: string[], status: SupplierProductStatus): Promise<number> {
+    const result = await prisma.supplierProduct.updateMany({ where: { id: { in: ids } }, data: { status } });
+    return result.count;
+  }
+
+  async setVerifiedMany(ids: string[], verified: boolean): Promise<number> {
+    const result = await prisma.supplierProduct.updateMany({ where: { id: { in: ids } }, data: { verified } });
+    return result.count;
   }
 
   async applyPriceToColours(supplierProductId: string, colours: string[], sellPrice: number, buyPrice: number): Promise<number> {
@@ -264,12 +296,21 @@ export class SupplierProductModel {
     const productIds = rows.map((r) => r.id);
     const skus = rows.flatMap((r) => r.variants.map((v) => v.sku).filter((s): s is string => !!s));
 
-    const [incomingRows, adjustmentCounts, allocatedRows] = await Promise.all([
+    const [incomingItems, receivedCostItems, adjustmentCounts, allocatedRows] = await Promise.all([
+      // One row per open PO line, kept ungrouped so each PO's own quantity/date survives
+      // into the Incoming column instead of being folded into a single total.
       variantIds.length
-        ? prisma.purchaseOrderItem.groupBy({
-            by: ['variantId'],
+        ? prisma.purchaseOrderItem.findMany({
             where: { variantId: { in: variantIds }, purchaseOrder: { status: { in: [...OPEN_PO_STATUSES] } } },
-            _sum: { quantity: true, receivedQuantity: true },
+            select: { variantId: true, quantity: true, receivedQuantity: true, purchaseOrder: { select: { deliveryDate: true } } },
+          })
+        : Promise.resolve([]),
+      // Weighted average buy price = Σ(unitCost × receivedQuantity) / Σ(receivedQuantity), over every
+      // PO line that has actually been received (any status — a partially-received PO still counts).
+      variantIds.length
+        ? prisma.purchaseOrderItem.findMany({
+            where: { variantId: { in: variantIds }, receivedQuantity: { gt: 0 }, unitCost: { not: null } },
+            select: { variantId: true, receivedQuantity: true, unitCost: true },
           })
         : Promise.resolve([]),
       productIds.length
@@ -279,9 +320,10 @@ export class SupplierProductModel {
             _count: { id: true },
           })
         : Promise.resolve([]),
-      // "Allocated" = committed to orders that haven't shipped yet. There's no FK from
-      // OrderLineItem to SupplierProductVariant, so this joins on SKU string equality —
-      // the only link available (mirrors buildFulfillmentStatusConditions' "still owed" bucket).
+      // "AllocatedFromOrders" = committed to orders that haven't shipped yet, shown as a hint next to
+      // the now-editable Allocated cell. There's no FK from OrderLineItem to SupplierProductVariant,
+      // so this joins on SKU string equality — the only link available (mirrors
+      // buildFulfillmentStatusConditions' "still owed" bucket).
       skus.length
         ? prisma.orderLineItem.groupBy({
             by: ['sku'],
@@ -298,7 +340,31 @@ export class SupplierProductModel {
         : Promise.resolve([]),
     ]);
 
-    const incomingByVariant = new Map(incomingRows.map((r) => [r.variantId!, (r._sum.quantity ?? 0) - (r._sum.receivedQuantity ?? 0)]));
+    const incomingLotsByVariant = new Map<string, IncomingLotRow[]>();
+    for (const item of incomingItems) {
+      const remaining = item.quantity - item.receivedQuantity;
+      if (remaining <= 0) continue;
+      const lots = incomingLotsByVariant.get(item.variantId!) ?? [];
+      lots.push({ quantity: remaining, date: item.purchaseOrder.deliveryDate?.toISOString() ?? null });
+      incomingLotsByVariant.set(item.variantId!, lots);
+    }
+    for (const lots of incomingLotsByVariant.values()) {
+      lots.sort((a, b) => {
+        if (a.date === b.date) return 0;
+        if (a.date === null) return 1;
+        if (b.date === null) return -1;
+        return a.date.localeCompare(b.date);
+      });
+    }
+
+    const buyPriceSumsByVariant = new Map<string, { totalCost: number; totalQty: number }>();
+    for (const item of receivedCostItems) {
+      const entry = buyPriceSumsByVariant.get(item.variantId!) ?? { totalCost: 0, totalQty: 0 };
+      entry.totalCost += Number(item.unitCost) * item.receivedQuantity;
+      entry.totalQty += item.receivedQuantity;
+      buyPriceSumsByVariant.set(item.variantId!, entry);
+    }
+
     const adjustmentCountByProduct = new Map(adjustmentCounts.map((r) => [r.supplierProductId, r._count.id]));
     const allocatedBySku = new Map(allocatedRows.map((r) => [r.sku!, r._sum.netQuantity ?? 0]));
 
@@ -314,6 +380,8 @@ export class SupplierProductModel {
 
     return rows.map((row) => ({
       id: row.id,
+      supplierId: row.supplierId,
+      supplierName: row.supplier?.name ?? '',
       itemNo: row.itemNo,
       brand: row.brand ?? '',
       name: row.name,
@@ -328,20 +396,25 @@ export class SupplierProductModel {
       images: row.images.map((i) => ({ id: i.id, url: i.url, altText: i.altText, colour: i.colour })),
       sizes: row.sizes,
       colours: (row.colours as unknown as ColourOptionData[]) ?? [],
-      variants: row.variants.map((v) => ({
-        id: v.id,
-        sku: v.sku,
-        barcode: v.barcode,
-        colour: v.colour,
-        size: v.size,
-        stockOnHand: v.stockOnHand,
-        buyPrice: Number(v.buyPrice),
-        sellPrice: Number(v.sellPrice),
-        trigger: v.trigger,
-        allocated: v.sku ? allocatedBySku.get(v.sku) ?? 0 : 0,
-        incoming: incomingByVariant.get(v.id) ?? 0,
-        forwardOrders: v.forwardOrders,
-      })),
+      variants: row.variants.map((v) => {
+        const incomingLots = incomingLotsByVariant.get(v.id) ?? [];
+        const costs = buyPriceSumsByVariant.get(v.id);
+        return {
+          id: v.id,
+          sku: v.sku,
+          barcode: v.barcode,
+          colour: v.colour,
+          size: v.size,
+          stockOnHand: v.stockOnHand,
+          buyPrice: costs && costs.totalQty > 0 ? costs.totalCost / costs.totalQty : Number(v.buyPrice),
+          sellPrice: Number(v.sellPrice),
+          trigger: v.trigger,
+          allocated: v.allocated,
+          allocatedFromOrders: v.sku ? allocatedBySku.get(v.sku) ?? 0 : 0,
+          incoming: incomingLots.reduce((sum, lot) => sum + lot.quantity, 0),
+          incomingLots,
+        };
+      }),
       pricing: row.pricing
         ? {
             currencyCode: row.pricing.currencyCode,

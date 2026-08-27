@@ -1,6 +1,6 @@
 'use client';
 
-import { ModalActions, ModalShell } from '@/components/ModalShell';
+import { ModalShell } from '@/components/ModalShell';
 import { formatDate } from './utils';
 import type { useAdjustments } from './hooks/useAdjustments';
 import type { VariantRow } from './types';
@@ -17,65 +17,123 @@ export default function AdjustmentModals({ adjustments: a, variants }: Adjustmen
 }
 
 function NewAdjustmentModal({ a, variants }: { a: ReturnType<typeof useAdjustments>; variants: VariantRow[] }) {
+  const variantById = new Map(variants.map((v) => [v.id, v]));
+  const targetVariants = a.variantIds.map((id) => variantById.get(id)).filter((v): v is VariantRow => !!v);
+  const dirtyCount = a.variantIds.filter((id) => Number(a.rows[id]?.delta) !== 0 && a.rows[id]?.delta).length;
+
   return (
     <ModalShell
       title="New stock adjustment"
       onClose={a.closeModal}
-      footer={<ModalActions onCancel={a.closeModal} onConfirm={a.submit} confirmLabel={a.saving ? 'Saving...' : 'Save adjustment'} disabled={a.saving} />}
+      extraWide
+      footer={
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-xs text-gray-500">{dirtyCount} row{dirtyCount === 1 ? '' : 's'} with a pending change</span>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={a.closeModal}
+              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50 cursor-pointer"
+            >
+              Close
+            </button>
+            <button
+              type="button"
+              onClick={a.saveAll}
+              disabled={a.savingAll || dirtyCount === 0}
+              className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+            >
+              {a.savingAll ? 'Saving all...' : `Save all (${dirtyCount})`}
+            </button>
+          </div>
+        </div>
+      }
     >
-      <div className="space-y-3">
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Variant</label>
-          <select
-            value={a.variantId}
-            onChange={(e) => a.setVariantId(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400"
-          >
-            {variants.map((v) => (
-              <option key={v.id} value={v.id}>
-                {v.colour} / {v.size} — {v.stockOnHand} on hand
-              </option>
-            ))}
-          </select>
-          {a.errors.variantId && <p className="mt-1 text-xs text-red-600">{a.errors.variantId}</p>}
-        </div>
-
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Quantity change</label>
-          <input
-            type="number"
-            value={a.delta}
-            onChange={(e) => a.setDelta(e.target.value)}
-            placeholder="e.g. -3 or 5"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400"
-          />
-          {a.errors.delta && <p className="mt-1 text-xs text-red-600">{a.errors.delta}</p>}
-        </div>
-
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Reason</label>
-          <select
-            value={a.reason}
-            onChange={(e) => a.setReason(e.target.value as typeof a.reason)}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400"
-          >
-            {a.reasons.map((r) => (
-              <option key={r} value={r}>
-                {r.charAt(0) + r.slice(1).toLowerCase()}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Note</label>
-          <textarea
-            rows={2}
-            value={a.note}
-            onChange={(e) => a.setNote(e.target.value)}
-            className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400"
-          />
-        </div>
+      <div className="max-h-[60vh] overflow-y-auto rounded-lg border border-gray-200">
+        <table className="w-full border-collapse text-sm">
+          <thead className="sticky top-0 bg-gray-50">
+            <tr className="border-b border-gray-200 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+              <th className="px-3 py-2">Variant</th>
+              <th className="px-3 py-2 text-right">On hand</th>
+              <th className="px-3 py-2">Delta</th>
+              <th className="px-3 py-2">Reason</th>
+              <th className="px-3 py-2">Note</th>
+              <th className="px-3 py-2" />
+            </tr>
+          </thead>
+          <tbody>
+            {targetVariants.map((v) => {
+              const row = a.rows[v.id];
+              const saving = a.savingIds.has(v.id);
+              const error = a.rowErrors[v.id];
+              return (
+                <tr key={v.id} className="border-b border-gray-100 align-top last:border-0">
+                  <td className="px-3 py-2 text-gray-700">
+                    {v.colour} / {v.size}
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums text-gray-500">{v.stockOnHand}</td>
+                  <td className="px-3 py-2">
+                    <div className="flex items-center gap-1.5">
+                      <select
+                        value={a.presets.includes(Number(row?.delta)) ? row?.delta : ''}
+                        onChange={(e) => a.applyPreset(v.id, Number(e.target.value))}
+                        className="w-20 rounded-lg border border-gray-300 px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer"
+                      >
+                        <option value="" disabled>
+                          Preset...
+                        </option>
+                        {a.presets.map((preset) => (
+                          <option key={preset} value={preset}>
+                            {preset > 0 ? `+${preset}` : preset}
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        type="number"
+                        value={row?.delta ?? ''}
+                        onChange={(e) => a.setRowField(v.id, { delta: e.target.value })}
+                        placeholder="or type"
+                        className="w-20 rounded-lg border border-gray-300 px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-blue-400"
+                      />
+                    </div>
+                    {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+                  </td>
+                  <td className="px-3 py-2">
+                    <select
+                      value={row?.reason ?? 'CORRECTION'}
+                      onChange={(e) => a.setRowField(v.id, { reason: e.target.value as typeof row.reason })}
+                      className="w-32 rounded-lg border border-gray-300 px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-blue-400"
+                    >
+                      {a.reasons.map((r) => (
+                        <option key={r} value={r}>
+                          {r.charAt(0) + r.slice(1).toLowerCase()}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="px-3 py-2">
+                    <textarea
+                      rows={2}
+                      value={row?.note ?? ''}
+                      onChange={(e) => a.setRowField(v.id, { note: e.target.value })}
+                      className="w-72 resize-none rounded-lg border border-gray-300 px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-blue-400"
+                    />
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    <button
+                      type="button"
+                      onClick={() => a.saveRow(v.id)}
+                      disabled={saving}
+                      className="rounded-lg border border-gray-300 bg-white px-2.5 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+                    >
+                      {saving ? 'Saving...' : 'Save'}
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     </ModalShell>
   );

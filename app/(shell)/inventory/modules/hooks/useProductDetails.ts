@@ -103,6 +103,41 @@ export function useProductDetails({ product, onSaved }: UseProductDetailsArgs) {
     });
   };
 
+  /** Appends one size and saves immediately — for the matrix toolbar's "Add size" button,
+   * which shouldn't require opening the Product Details edit form. No-op on a duplicate. */
+  const quickAddSize = (value: string) => {
+    if (!product) return;
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    const currentSizes = parseSizesInput(form.sizes);
+    if (currentSizes.includes(trimmed)) return;
+    const nextSizes = [...currentSizes, trimmed];
+    write({ ...form, sizes: formatSizesInput(nextSizes) });
+    request({
+      url: `/api/inventory/catalog/${product.id}`,
+      method: 'PATCH',
+      data: { sizes: nextSizes },
+      successMessage: 'Size added',
+      onSuccess: ({ data }) => onSaved(data),
+    });
+  };
+
+  /** Appends one colour and saves immediately — mirrors quickAddSize. No-op on a duplicate name. */
+  const quickAddColour = (colour: ColourOption) => {
+    if (!product) return;
+    const name = colour.name.trim();
+    if (!name || form.colours.some((c) => c.name.toLowerCase() === name.toLowerCase())) return;
+    const nextColours = [...form.colours, { name, hex: colour.hex || NEW_COLOUR.hex }];
+    write({ ...form, colours: nextColours });
+    request({
+      url: `/api/inventory/catalog/${product.id}`,
+      method: 'PATCH',
+      data: { colours: nextColours },
+      successMessage: 'Colour added',
+      onSuccess: ({ data }) => onSaved(data),
+    });
+  };
+
   return {
     editing,
     saving,
@@ -121,6 +156,8 @@ export function useProductDetails({ product, onSaved }: UseProductDetailsArgs) {
       setEditingId(null);
     },
     saveDetails,
+    quickAddSize,
+    quickAddColour,
     // Effective lists, so the variants matrix reflects an in-progress edit.
     sizes: parseSizesInput(form.sizes),
     colours: form.colours,

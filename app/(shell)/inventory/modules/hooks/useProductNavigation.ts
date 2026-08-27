@@ -64,13 +64,19 @@ export function useProductNavigation(products: ProductRecord[]) {
     if (filtered[clamped]) setSelectedId(filtered[clamped].id);
   };
 
-  /**
-   * A search result may be a product the current filters exclude, so drop back
-   * to "all records" rather than silently showing nothing.
-   */
-  const selectProduct = (id: string) => {
-    if (!filtered.some((p) => p.id === id)) setAllRecords(true);
+  /** Always drops back to the single-product detail view for exactly this product —
+   * used by the products table's row "view" action and by selectProduct below. */
+  const viewProduct = (id: string) => {
+    setAllRecords(false);
+    setVerifiedOnly(false);
+    setQuickFilter(null);
     setSelectedId(id);
+  };
+
+  /** Picking a search result (or a newly created product) should always land on that
+   * product's detail view, regardless of whether "All records" or a filter was active. */
+  const selectProduct = (id: string) => {
+    viewProduct(id);
     setSearchInput('');
     setSearchOpen(false);
   };
@@ -99,5 +105,6 @@ export function useProductNavigation(products: ProductRecord[]) {
     searchResults,
     searchRef,
     selectProduct,
+    viewProduct,
   };
 }

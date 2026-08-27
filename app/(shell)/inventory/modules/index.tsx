@@ -4,8 +4,13 @@ import BottomPanels from './BottomPanels';
 import ComingSoon from './ComingSoon';
 import InventoryModals from './InventoryModals';
 import ModuleTabs from './ModuleTabs';
+import Pagination from '@/components/Pagination';
 import ProductDetailsTab from './ProductDetailsTab';
 import ProductSubTabs from './ProductSubTabs';
+import ProductsBulkModals from './ProductsBulkModals';
+import ProductsSelectionBar from './ProductsSelectionBar';
+import ProductsTable from './ProductsTable';
+import ProductsTableToolbar from './ProductsTableToolbar';
 import ProductsToolbar from './ProductsToolbar';
 import PurchaseOrdersPanel from './PurchaseOrdersPanel';
 import VariantsMatrixTable from './VariantsMatrixTable';
@@ -17,6 +22,7 @@ export default function InventoryPage() {
   const p = useInventoryPage();
   const moduleTab = MODULE_TABS.find((t) => t.id === p.moduleTab)!;
   const productTab = PRODUCT_TABS.find((t) => t.id === p.productTab)!;
+  const hasSelection = p.productsTable.selectAllFilters || p.productsTable.selectedIds.length > 0;
 
   return (
     <main className="flex-1 space-y-3 p-4 md:p-6">
@@ -28,7 +34,22 @@ export default function InventoryPage() {
         <>
           <ProductsToolbar {...p} />
 
-          {p.loading ? (
+          {p.nav.allRecords ? (
+            <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+              <ProductsTableToolbar table={p.productsTable} onRefresh={p.refresh} loading={p.loading} />
+              {hasSelection && <ProductsSelectionBar table={p.productsTable} />}
+              <ProductsTable table={p.productsTable} loading={p.loading} />
+              <Pagination
+                pagination={p.productsTable.pagination}
+                loading={p.loading}
+                pageNumbers={p.productsTable.pageNumbers}
+                onPageChange={p.productsTable.goToPage}
+                itemLabel="products"
+                pageSizeOptions={p.productsTable.pageSizeOptions}
+                onPageSizeChange={p.productsTable.setPageSize}
+              />
+            </div>
+          ) : p.loading ? (
             <LoadingState />
           ) : !p.product ? (
             <EmptyState />
@@ -38,16 +59,16 @@ export default function InventoryPage() {
                 <ProductSubTabs active={p.productTab} onChange={p.setProductTab} />
               </div>
 
+              <section className="rounded-xl border border-gray-200 bg-white shadow-sm">
+                <VariantsMatrixToolbar p={p} />
+                <VariantsMatrixTable matrix={p.matrix} />
+              </section>
+
               {p.productTab === 'details' ? (
                 <ProductDetailsTab p={p} />
               ) : (
                 <ComingSoon label={productTab.label} blurb={productTab.blurb} />
               )}
-
-              <section className="rounded-xl border border-gray-200 bg-white shadow-sm">
-                <VariantsMatrixToolbar p={p} />
-                <VariantsMatrixTable matrix={p.matrix} />
-              </section>
 
               <PurchaseOrdersPanel po={p.po} />
 
@@ -57,6 +78,7 @@ export default function InventoryPage() {
         </>
       )}
 
+      {p.nav.allRecords && <ProductsBulkModals table={p.productsTable} />}
       <InventoryModals {...p} />
     </main>
   );

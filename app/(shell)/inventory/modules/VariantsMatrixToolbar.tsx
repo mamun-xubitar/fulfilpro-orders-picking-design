@@ -1,14 +1,18 @@
 'use client';
 
+import { useState } from 'react';
+import { ModalShell } from '@/components/ModalShell';
 import { STATUS_LEGEND } from './constants';
 import type { InventoryPage } from './hooks/useInventoryPage';
-import { Download, Expand, Plus } from './icons';
+import { Adjust, Download, Expand, Plus } from './icons';
 
 type VariantsMatrixToolbarProps = { p: InventoryPage };
 
 export default function VariantsMatrixToolbar({ p }: VariantsMatrixToolbarProps) {
   const { matrix } = p;
   const onAction = p.notImplemented;
+  const [addColourOpen, setAddColourOpen] = useState(false);
+  const [addSizeOpen, setAddSizeOpen] = useState(false);
 
   const exportCsv = () => p.importExport.exportVariants(matrix.rows);
   const selectedColours = () => {
@@ -17,6 +21,7 @@ export default function VariantsMatrixToolbar({ p }: VariantsMatrixToolbarProps)
   };
   const applyToSelected = () => p.pricing.applyToColours(selectedColours());
   const createPo = () => p.po.openCreate(matrix.selectedIds.size > 0 ? [...matrix.selectedIds] : matrix.rows.map((r) => r.id));
+  const adjustSelected = () => p.adjustments.openModal([...matrix.selectedIds]);
 
   return (
     <div className="flex flex-wrap items-center gap-2 border-b border-gray-200 px-4 py-3">
@@ -107,14 +112,136 @@ export default function VariantsMatrixToolbar({ p }: VariantsMatrixToolbarProps)
         </button>
         <button
           type="button"
+          onClick={adjustSelected}
+          disabled={matrix.selectedIds.size === 0}
+          title="Opens the stock adjustment modal for the selected variants"
+          className="flex items-center gap-1.5 rounded-lg bg-amber-600 px-2.5 py-1.5 text-xs font-semibold text-white transition-colors duration-150 hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+        >
+          <Adjust className="h-3.5 w-3.5" />
+          Adjust Stock
+        </button>
+        <button
+          type="button"
           onClick={createPo}
           className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white transition-colors duration-150 hover:bg-emerald-700 cursor-pointer"
         >
           <Plus className="h-3.5 w-3.5" />
           Create purchase order
         </button>
+
+        <span className="mx-1 h-5 w-px bg-gray-200" aria-hidden="true" />
+
+        <SecondaryButton onClick={() => setAddColourOpen(true)}>
+          <Plus className="h-3.5 w-3.5" />
+          Add colour
+        </SecondaryButton>
+        <SecondaryButton onClick={() => setAddSizeOpen(true)}>
+          <Plus className="h-3.5 w-3.5" />
+          Add size
+        </SecondaryButton>
       </div>
+
+      {addColourOpen && (
+        <AddColourModal
+          onClose={() => setAddColourOpen(false)}
+          onAdd={(colour) => {
+            p.details.quickAddColour(colour);
+            setAddColourOpen(false);
+          }}
+        />
+      )}
+      {addSizeOpen && (
+        <AddSizeModal
+          onClose={() => setAddSizeOpen(false)}
+          onAdd={(size) => {
+            p.details.quickAddSize(size);
+            setAddSizeOpen(false);
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+function AddColourModal({ onClose, onAdd }: { onClose: () => void; onAdd: (colour: { name: string; hex: string }) => void }) {
+  const [name, setName] = useState('');
+  const [hex, setHex] = useState('#cbd5e1');
+
+  return (
+    <ModalShell
+      title="Add colour"
+      onClose={onClose}
+      footer={
+        <div className="flex gap-2">
+          <button type="button" onClick={onClose} className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50 cursor-pointer">
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => name.trim() && onAdd({ name: name.trim(), hex })}
+            disabled={!name.trim()}
+            className="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+          >
+            Add colour
+          </button>
+        </div>
+      }
+    >
+      <div className="space-y-3">
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">Name</label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Black"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-sm font-medium text-gray-700">Swatch</label>
+          <input type="color" value={hex} onChange={(e) => setHex(e.target.value)} className="h-8 w-12 cursor-pointer rounded border border-gray-300" />
+          <span className="text-xs text-gray-500 tabular-nums">{hex}</span>
+        </div>
+      </div>
+    </ModalShell>
+  );
+}
+
+function AddSizeModal({ onClose, onAdd }: { onClose: () => void; onAdd: (size: string) => void }) {
+  const [size, setSize] = useState('');
+
+  return (
+    <ModalShell
+      title="Add size"
+      onClose={onClose}
+      footer={
+        <div className="flex gap-2">
+          <button type="button" onClick={onClose} className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50 cursor-pointer">
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => size.trim() && onAdd(size.trim())}
+            disabled={!size.trim()}
+            className="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+          >
+            Add size
+          </button>
+        </div>
+      }
+    >
+      <div>
+        <label className="mb-1 block text-sm font-medium text-gray-700">Size</label>
+        <input
+          type="text"
+          value={size}
+          onChange={(e) => setSize(e.target.value)}
+          placeholder="e.g. XL or 54"
+          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400"
+        />
+      </div>
+    </ModalShell>
   );
 }
 

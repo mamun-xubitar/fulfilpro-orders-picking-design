@@ -8,33 +8,34 @@ export type ColourOption = {
   hex: string;
 };
 
+/** One open PO's unreceived quantity for a variant, with its expected delivery date. */
+export type IncomingLot = {
+  quantity: number;
+  /** ISO 8601, or null when the PO has no delivery date yet ("TBC"). */
+  date: string | null;
+};
+
 /** One row of the variants / stock matrix. */
 export type VariantRow = {
-  // — mirrors ProductVariant today —
   id: string;
   sku: string | null;
-  /** Not on ProductVariant; would come from a barcode column or Shopify metafield. */
   barcode: string | null;
-  /** Derived from ProductVariant.optionValues JSON via COLOR_OPTION_NAMES. */
   colour: string;
-  /** Derived from ProductVariant.optionValues JSON via SIZE_OPTION_NAMES. */
   size: string;
-  /** ProductVariant.inventoryQuantity */
   stockOnHand: number;
-  /** ProductVariant.cost, converted to base currency */
+  /** Weighted average of received PO unit cost; falls back to the stored per-variant price. Read-only. */
   buyPrice: number;
-  /** ProductVariant.price */
   sellPrice: number;
-
-  // — NOT IN PRISMA YET —
-  /** Reorder point. Needs a new column on ProductVariant. */
+  /** Reorder point. No calculation — admin sets it manually. Defaults to 10. */
   trigger: number;
-  /** Committed to unfulfilled orders. Would roll up from OrderLineItem. */
+  /** Committed to unfulfilled orders. Manually editable — this value wins over allocatedFromOrders. */
   allocated: number;
-  /** On order but not received. Would roll up from PurchaseOrderItem. */
+  /** Order-derived hint only, shown next to the editable Allocated cell. */
+  allocatedFromOrders: number;
+  /** Sum of incomingLots. */
   incoming: number;
-  /** Future-dated / pre-sold demand. Needs a new source. */
-  forwardOrders: number;
+  /** One entry per open PO with unreceived quantity. */
+  incomingLots: IncomingLot[];
 };
 
 /** Below / near / above the reorder trigger. Drives row tint, badge and legend. */
@@ -43,19 +44,16 @@ export type VariantStatus = 'below' | 'near' | 'above';
 /** Per-row values computed from a VariantRow — never stored. */
 export type VariantComputed = {
   available: number;
-  suggested: number;
   stockValue: number;
   status: VariantStatus;
 };
 
-/** The seven Stock Summary figures, folded from the visible rows. */
+/** The Stock Summary figures, folded from the visible rows. */
 export type StockSummary = {
   totalStock: number;
   availableStock: number;
   allocated: number;
   incoming: number;
-  forwardOrders: number;
-  suggestedOrder: number;
   stockValue: number;
   /** Sum of the Trigger column — shown in the table totals row only. */
   trigger: number;
@@ -95,7 +93,7 @@ export type PricingInputs = {
   freight: number;
   misc: number;
   marginPercent: number;
-  /** Flat amount in base currency, not a rate — matches ProductPricing.tax. */
+  /** A percent (0-100) of the ex-tax sell price — matches ProductPricing.tax. */
   tax: number;
 };
 
@@ -103,6 +101,8 @@ export type PricingInputs = {
 export type PricingComputed = {
   totalBuying: number;
   sellingPrice: number;
+  /** sellingPrice * (tax / 100). */
+  taxAmount: number;
   sellingIncTax: number;
 };
 
@@ -129,6 +129,8 @@ export type AdjustmentsInfo = {
 /** Everything the Products tab renders for one product. */
 export type ProductRecord = {
   id: string;
+  supplierId: string;
+  supplierName: string;
   /** Style code — Product.handle stands in for this today. */
   itemNo: string;
   /** Product.vendor */

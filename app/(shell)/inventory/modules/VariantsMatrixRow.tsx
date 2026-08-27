@@ -1,7 +1,7 @@
 'use client';
 
 import { memo } from 'react';
-import { ColourCell, Num, NumCell, RowAction, SizeCell, SkuCell } from './VariantsMatrixCells';
+import { ColourCell, IncomingCell, Num, NumCell, RowAction, SizeCell, SkuCell } from './VariantsMatrixCells';
 import { STATUS_STYLES } from './constants';
 import { Check, Close, Pencil, Trash } from './icons';
 import { computeVariant, formatCurrencyValue, formatMoney, formatNumber } from './utils';
@@ -37,7 +37,7 @@ function VariantsMatrixRow({
   onCancel,
   onDelete,
 }: VariantsMatrixRowProps) {
-  const { available, suggested, stockValue, status } = computeVariant(variant);
+  const { available, stockValue, status } = computeVariant(variant);
   const style = STATUS_STYLES[status];
   const name = variant.sku ?? variant.id;
   const set = (patch: Partial<VariantRow>) => onFieldChange(variant.id, patch);
@@ -87,34 +87,33 @@ function VariantsMatrixRow({
       ) : (
         <Num value={formatNumber(variant.stockOnHand)} bold />
       )}
-      <Num value={formatNumber(variant.allocated)} muted />
+      {editing ? (
+        <NumCell
+          value={variant.allocated}
+          label={`Allocated for ${name}`}
+          title={`${formatNumber(variant.allocatedFromOrders)} committed to open orders`}
+          onChange={(allocated) => set({ allocated })}
+        />
+      ) : (
+        <Num value={formatNumber(variant.allocated)} muted title={`${formatNumber(variant.allocatedFromOrders)} committed to open orders`} />
+      )}
 
       <Num value={formatNumber(available)} className="font-bold text-emerald-700" />
 
-      <Num value={formatNumber(variant.incoming)} muted />
-      {editing ? (
-        <NumCell value={variant.forwardOrders} label={`Forward orders for ${name}`} onChange={(forwardOrders) => set({ forwardOrders })} />
-      ) : (
-        <Num value={formatNumber(variant.forwardOrders)} muted />
-      )}
+      <IncomingCell lots={variant.incomingLots} />
       {editing ? (
         <NumCell value={variant.trigger} label={`Reorder trigger for ${name}`} onChange={(trigger) => set({ trigger })} />
       ) : (
         <Num value={formatNumber(variant.trigger)} />
       )}
 
-      <Num value={formatNumber(suggested)} className="font-bold text-blue-700" />
       <td className="px-2 py-2 text-center">
         <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${style.badge}`}>
           {style.label}
         </span>
       </td>
 
-      {editing ? (
-        <NumCell value={variant.buyPrice} label={`Buy price for ${name}`} step="0.01" onChange={(buyPrice) => set({ buyPrice })} />
-      ) : (
-        <Num value={formatMoney(variant.buyPrice)} />
-      )}
+      <Num value={formatMoney(variant.buyPrice)} muted title="Weighted average of received PO cost" />
       {editing ? (
         <NumCell value={variant.sellPrice} label={`Sell price for ${name}`} step="0.01" onChange={(sellPrice) => set({ sellPrice })} />
       ) : (

@@ -51,10 +51,25 @@ export function useStocktake({ product, refreshCatalog }: UseStocktakeArgs) {
     if (!product) return;
     const items = product.variants.map((v) => ({ colour: v.colour, size: v.size, sku: v.sku, expectedQty: v.stockOnHand }));
     const doc = buildCountSheetDocument(product, items);
-    const win = window.open('', '_blank');
-    if (!win) return;
+
+    // Print via a hidden iframe rather than window.open, so no new tab/window appears —
+    // only the browser's print dialog.
+    const iframe = document.createElement('iframe');
+    iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+    document.body.appendChild(iframe);
+    const win = iframe.contentWindow;
+    if (!win) {
+      document.body.removeChild(iframe);
+      return;
+    }
+    const cleanup = () => {
+      if (document.body.contains(iframe)) document.body.removeChild(iframe);
+    };
+    win.document.open();
     win.document.write(doc);
     win.document.close();
+    win.onafterprint = cleanup;
+    setTimeout(cleanup, 2000);
     win.focus();
     win.print();
   };

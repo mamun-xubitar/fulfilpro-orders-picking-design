@@ -7,6 +7,7 @@ export function ModalShell({
   footer,
   allowOverflow,
   wide,
+  extraWide,
 }: {
   title: string;
   onClose: () => void;
@@ -14,6 +15,8 @@ export function ModalShell({
   footer?: React.ReactNode;
   allowOverflow?: boolean;
   wide?: boolean;
+  /** For content that needs more than `wide`'s max-w-2xl — e.g. a table of rows. */
+  extraWide?: boolean;
 }) {
   return (
     <div
@@ -23,7 +26,7 @@ export function ModalShell({
       onClick={onClose}
     >
       <div
-        className={`w-full ${wide ? 'max-w-2xl' : 'max-w-md'} rounded-lg border border-gray-200 bg-white shadow-xl ${allowOverflow ? 'overflow-visible' : 'overflow-hidden flex flex-col max-h-[calc(100dvh-2rem)]'}`}
+        className={`w-full ${extraWide ? 'max-w-5xl' : wide ? 'max-w-2xl' : 'max-w-md'} rounded-lg border border-gray-200 bg-white shadow-xl ${allowOverflow ? 'overflow-visible' : 'overflow-hidden flex flex-col max-h-[calc(100dvh-2rem)]'}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex shrink-0 items-center justify-between gap-4 border-b border-gray-200 px-5 py-4">

@@ -1,6 +1,7 @@
 import { COLOUR_SWATCHES, FALLBACK_SWATCH, NEAR_TRIGGER_RATIO } from './constants';
 import type {
   ColourOption,
+  IncomingLot,
   PricingComputed,
   PricingForm,
   PricingInputs,
@@ -18,13 +19,8 @@ export function getAvailable(v: VariantRow): number {
   return v.stockOnHand - v.allocated;
 }
 
-/** How many units to order to clear forward demand and land back on the trigger. */
-export function getSuggested(v: VariantRow): number {
-  return Math.max(0, v.trigger + v.forwardOrders - getAvailable(v) - v.incoming);
-}
-
 export function getStockValue(v: VariantRow): number {
-  return v.stockOnHand * v.buyPrice;
+  return v.stockOnHand * v.sellPrice;
 }
 
 export function getStatus(v: VariantRow): VariantStatus {
@@ -37,7 +33,6 @@ export function getStatus(v: VariantRow): VariantStatus {
 export function computeVariant(v: VariantRow): VariantComputed {
   return {
     available: getAvailable(v),
-    suggested: getSuggested(v),
     stockValue: getStockValue(v),
     status: getStatus(v),
   };
@@ -51,26 +46,25 @@ export function summariseVariants(rows: VariantRow[]): StockSummary {
       availableStock: acc.availableStock + getAvailable(v),
       allocated: acc.allocated + v.allocated,
       incoming: acc.incoming + v.incoming,
-      forwardOrders: acc.forwardOrders + v.forwardOrders,
-      suggestedOrder: acc.suggestedOrder + getSuggested(v),
       stockValue: acc.stockValue + getStockValue(v),
       trigger: acc.trigger + v.trigger,
     }),
-    { totalStock: 0, availableStock: 0, allocated: 0, incoming: 0, forwardOrders: 0, suggestedOrder: 0, stockValue: 0, trigger: 0 }
+    { totalStock: 0, availableStock: 0, allocated: 0, incoming: 0, stockValue: 0, trigger: 0 }
   );
 }
 
 // — Pricing maths —
 
 /**
- * Mirrors `computePricing` in the existing product detail page: buying, freight
- * and misc are entered in the foreign currency and multiplied up by the rate,
- * margin is a mark-up on cost, and tax is a flat base-currency amount.
+ * Freight and Misc are always AUD, so only the (foreign-currency) buying price is
+ * converted by the exchange rate. Margin is a mark-up on landed cost, and tax is a
+ * percent of the ex-tax sell price rather than a flat amount.
  */
 export function computePricing(v: PricingInputs): PricingComputed {
-  const totalBuying = (v.buyingPrice + v.freight + v.misc) * v.exchangeRate;
+  const totalBuying = v.buyingPrice * v.exchangeRate + v.freight + v.misc;
   const sellingPrice = totalBuying * (1 + v.marginPercent / 100);
-  return { totalBuying, sellingPrice, sellingIncTax: sellingPrice + v.tax };
+  const taxAmount = sellingPrice * (v.tax / 100);
+  return { totalBuying, sellingPrice, taxAmount, sellingIncTax: sellingPrice + taxAmount };
 }
 
 export function pricingFormToInputs(form: PricingForm): PricingInputs {
@@ -88,7 +82,7 @@ export function pricingFormToInputs(form: PricingForm): PricingInputs {
 export function pricingInputsToForm(pricing: PricingInputs): PricingForm {
   return {
     currencyCode: pricing.currencyCode,
-    exchangeRate: pricing.exchangeRate.toFixed(4),
+    exchangeRate: pricing.exchangeRate.toFixed(2),
     buyingPrice: String(pricing.buyingPrice),
     freight: String(pricing.freight),
     misc: String(pricing.misc),
@@ -118,6 +112,12 @@ export function formatCurrencyValue(n: number): string {
 export function formatDate(iso: string | null): string {
   if (!iso) return '—';
   return new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+/** "10 (28 Aug 2026)", or "10 (Date not set)" when the PO has no delivery date yet. */
+export function formatIncomingLot(lot: IncomingLot): string {
+  const date = lot.date ? new Date(lot.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Date not set';
+  return `${formatNumber(lot.quantity)} (${date})`;
 }
 
 export function formatRelative(iso: string, now: number): string {
@@ -316,6 +316,7 @@ const SHOPIFY_CSV_HEADERS = [
   'Variant Taxable',
   'Variant Barcode',
   'Variant Inventory Qty',
+  'Cost per item',
   'Image Src',
 ];
 
@@ -354,6 +355,7 @@ export function buildShopifyProductCsv(product: ProductRecord, rows: VariantRow[
         'TRUE',
         v.barcode ?? '',
         String(v.stockOnHand),
+        v.buyPrice.toFixed(2),
         image,
       ]
         .map(escapeCsv)

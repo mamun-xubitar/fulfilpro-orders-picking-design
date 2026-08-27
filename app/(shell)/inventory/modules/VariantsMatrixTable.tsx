@@ -8,7 +8,7 @@ type VariantsMatrixTableProps = {
   matrix: ReturnType<typeof useVariantsMatrix>;
 };
 
-const NUMERIC_HEADERS = ['Stock on hand', 'Allocated', 'Available', 'Incoming', 'Fwd. orders', 'Trigger', 'Suggested'];
+const NUMERIC_HEADERS = ['Stock on hand', 'Allocated', 'Available', 'Incoming', 'Trigger'];
 
 export default function VariantsMatrixTable({ matrix }: VariantsMatrixTableProps) {
   const { rows, totals } = matrix;
@@ -67,7 +67,7 @@ export default function VariantsMatrixTable({ matrix }: VariantsMatrixTableProps
           ))}
           {rows.length === 0 && (
             <tr>
-              <td colSpan={15} className="px-4 py-12 text-center text-sm text-gray-400">
+              <td colSpan={13} className="px-4 py-12 text-center text-sm text-gray-400">
                 No variants match the current filters
               </td>
             </tr>
@@ -87,9 +87,7 @@ export default function VariantsMatrixTable({ matrix }: VariantsMatrixTableProps
               <TotalCell value={formatNumber(totals.allocated)} />
               <TotalCell value={formatNumber(totals.availableStock)} className="text-emerald-700" />
               <TotalCell value={formatNumber(totals.incoming)} />
-              <TotalCell value={formatNumber(totals.forwardOrders)} />
               <TotalCell value={formatNumber(totals.trigger)} />
-              <TotalCell value={formatNumber(totals.suggestedOrder)} className="text-blue-700" />
               <td />
               <td />
               <td />

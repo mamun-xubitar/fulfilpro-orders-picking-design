@@ -12,8 +12,6 @@ export default function StockSummaryPanel({ summary }: { summary: StockSummary }
     { label: 'Available stock', value: formatNumber(summary.availableStock) },
     { label: 'Allocated', value: formatNumber(summary.allocated), emphasis: 'muted' },
     { label: 'Incoming', value: formatNumber(summary.incoming), emphasis: 'muted' },
-    { label: 'Forward orders', value: formatNumber(summary.forwardOrders), emphasis: 'muted' },
-    { label: 'Suggested order', value: formatNumber(summary.suggestedOrder), emphasis: 'blue' },
   ];
 
   return (

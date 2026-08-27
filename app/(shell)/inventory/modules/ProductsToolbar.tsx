@@ -18,7 +18,7 @@ export default function ProductsToolbar(p: InventoryPage) {
           value={p.rateInput}
           onChange={p.setRateInput}
           onApply={p.applyGlobalRate}
-          step="0.0001"
+          step="0.01"
           suffix={p.globals.baseCurrency}
         />
         <GlobalField label="System wide margin" value={p.marginInput} onChange={p.setMarginInput} onApply={p.applyGlobalMargin} step="1" suffix="%" />
@@ -28,22 +28,22 @@ export default function ProductsToolbar(p: InventoryPage) {
       <div className="flex min-w-80 flex-1 flex-col justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 min-[1760px]:flex-nowrap">
           <Toggle label="All records" checked={nav.allRecords} onChange={nav.setAllRecords} />
-          <Toggle label="Verified" checked={nav.verifiedOnly} disabled={nav.allRecords} onChange={nav.setVerifiedOnly} />
+          <Toggle label="Verified" checked={nav.verifiedOnly} onChange={nav.setVerifiedOnly} />
 
           <div className="flex items-center gap-1">
-            <PagerButton label="First product" onClick={nav.goFirst} disabled={!nav.canPrev}>
+            <PagerButton label="First product" onClick={nav.goFirst} disabled={!nav.canPrev || nav.allRecords}>
               <First />
             </PagerButton>
-            <PagerButton label="Previous product" onClick={nav.goPrev} disabled={!nav.canPrev}>
+            <PagerButton label="Previous product" onClick={nav.goPrev} disabled={!nav.canPrev || nav.allRecords}>
               <ChevronLeft />
             </PagerButton>
             <span className="min-w-28 px-2 text-center text-xs font-semibold text-gray-700 tabular-nums" aria-live="polite">
               {nav.position} / {formatNumber(nav.filteredCount)} of {formatNumber(nav.totalCount)}
             </span>
-            <PagerButton label="Next product" onClick={nav.goNext} disabled={!nav.canNext}>
+            <PagerButton label="Next product" onClick={nav.goNext} disabled={!nav.canNext || nav.allRecords}>
               <ChevronRight />
             </PagerButton>
-            <PagerButton label="Last product" onClick={nav.goLast} disabled={!nav.canNext}>
+            <PagerButton label="Last product" onClick={nav.goLast} disabled={!nav.canNext || nav.allRecords}>
               <Last />
             </PagerButton>
           </div>
