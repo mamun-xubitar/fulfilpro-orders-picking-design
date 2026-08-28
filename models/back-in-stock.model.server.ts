@@ -169,6 +169,43 @@ export class BackInStockModel {
     return toRow(request);
   }
 
+  async searchOrderOptions(params: { search: string; storeIds: string[] | null; limit: number }): Promise<BackInStockOrderOption[]> {
+    const where: Prisma.OrderWhereInput = params.storeIds ? { storeId: { in: params.storeIds } } : {};
+    const rows = await prisma.order.findMany({
+      where,
+      select: {
+        id: true,
+        number: true,
+        cusName: true,
+        lineItems: true,
+        fulfillmentItems: true,
+        store: { select: { id: true, name: true, storeDomain: true } },
+      },
+      orderBy: { orderedAt: 'desc' },
+      take: 500,
+    });
+
+    const search = params.search.trim().toLowerCase();
+
+    return rows
+      .filter((row) => (
+        !search
+        || String(row.number).includes(search)
+        || row.cusName.toLowerCase().includes(search)
+        || (row.store.name ?? row.store.storeDomain).toLowerCase().includes(search)
+      ))
+      .map((row) => ({
+        id: row.id,
+        number: row.number,
+        customer: row.cusName,
+        storeId: row.store.id,
+        storeName: row.store.name ?? row.store.storeDomain,
+        eligibleItems: getEligibleLineItems(row.lineItems, row.fulfillmentItems),
+      }))
+      .filter((option) => option.eligibleItems.length > 0)
+      .slice(0, params.limit);
+  }
+
   async adminUpdate(params: {
     requestId: string;
     admin: { id: string; name: string; email: string; role: string };
@@ -334,7 +371,7 @@ function normalizeRequestedItems(
   return normalized;
 }
 
-function toOrderLineItems(value: Prisma.JsonValue): Array<{ id: string; name: string; qty: number }> {
+function toOrderLineItems(value: Prisma.JsonValue): Array<{ id: string; name: string; qty: number; sku: string; vendor: string }> {
   if (!Array.isArray(value)) return [];
   return value.flatMap((item) => {
     if (!item || typeof item !== 'object') return [];
@@ -342,8 +379,37 @@ function toOrderLineItems(value: Prisma.JsonValue): Array<{ id: string; name: st
     const id = typeof obj.id === 'string' ? obj.id : String(obj.id ?? '');
     const name = typeof obj.name === 'string' ? obj.name : '';
     const qty = typeof obj.qty === 'number' ? obj.qty : Number(obj.qty ?? 0);
-    return id && name && Number.isFinite(qty) ? [{ id, name, qty }] : [];
+    const sku = typeof obj.sku === 'string' ? obj.sku : '';
+    const vendor = typeof obj.vendor === 'string' ? obj.vendor : '';
+    return id && name && Number.isFinite(qty) ? [{ id, name, qty, sku, vendor }] : [];
   });
+}
+
+export type BackInStockOrderOption = {
+  id: string;
+  number: number;
+  customer: string;
+  storeId: string;
+  storeName: string;
+  eligibleItems: Array<{ lineItemId: string; name: string; sku: string; vendor: string; remainingQty: number }>;
+};
+
+function getEligibleLineItems(
+  lineItemsJson: Prisma.JsonValue,
+  fulfillmentItemsJson: Prisma.JsonValue | null
+): BackInStockOrderOption['eligibleItems'] {
+  const orderItems = toOrderLineItems(lineItemsJson);
+  const fulfilledByLineId = getFulfilledQuantityByLineId(fulfillmentItemsJson);
+
+  return orderItems
+    .map((item) => ({
+      lineItemId: item.id,
+      name: item.name,
+      sku: item.sku,
+      vendor: item.vendor,
+      remainingQty: Math.max(0, item.qty - (fulfilledByLineId.get(item.id) ?? 0)),
+    }))
+    .filter((item) => item.remainingQty > 0);
 }
 
 function getFulfilledQuantityByLineId(value: Prisma.JsonValue | null) {

@@ -3,6 +3,8 @@
 import { Fragment } from 'react';
 import { useSession } from 'next-auth/react';
 import { useBackInStockData, createAdminDraft, type BackInStockStatus, type BackInStockRequest } from './useBackInStockData';
+import { useRequestStockModal } from './useRequestStockModal';
+import RequestStockModal from './RequestStockModal';
 
 const STATUSES: Array<{ value: '' | BackInStockStatus; label: string }> = [
   { value: '', label: 'All Statuses' },
@@ -15,6 +17,7 @@ export default function BackInStockPage() {
   const { data: session } = useSession();
   const isAdmin = session?.user?.role === 'admin';
   const d = useBackInStockData();
+  const stock = useRequestStockModal(() => d.setReloadToken((prev) => prev + 1));
 
   return (
     <main className="p-4 md:p-6">
@@ -23,8 +26,13 @@ export default function BackInStockPage() {
           <h2 className="text-lg font-semibold text-gray-900">Back In Stock</h2>
           <p className="text-sm text-gray-500">{isAdmin ? 'Manage stock requests and notify requesters.' : 'Track your stock requests and admin updates.'}</p>
         </div>
-        <button onClick={() => d.setReloadToken((prev) => prev + 1)} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50">Refresh</button>
+        <div className="flex items-center gap-2">
+          <button onClick={stock.openModal} className="rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm font-medium text-amber-700 hover:bg-amber-50">Request Stock</button>
+          <button onClick={() => d.setReloadToken((prev) => prev + 1)} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50">Refresh</button>
+        </div>
       </div>
+
+      <RequestStockModal {...stock} />
 
       <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_220px]">
         <input value={d.searchInput} onChange={(e) => d.setSearchInput(e.target.value)} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm" placeholder="Search order, requester, or email" />
