@@ -13,6 +13,7 @@ export function useOrderPicker() {
   const [selectedOrders, setSelectedOrders] = useState<OrderOption[]>([]);
 
   useEffect(() => {
+    if (!open) return;
     let cancelled = false;
     const timer = window.setTimeout(async () => {
       setLoading(true);
@@ -28,7 +29,7 @@ export function useOrderPicker() {
       }
     }, 300);
     return () => { cancelled = true; window.clearTimeout(timer); };
-  }, [query]);
+  }, [query, open]);
 
   const toggleOrder = (option: OrderOption) => {
     setSelectedOrders((prev) => (

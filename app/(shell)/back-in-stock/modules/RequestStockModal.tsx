@@ -6,7 +6,7 @@ import type { useRequestStockModal } from './useRequestStockModal';
 
 type Props = ReturnType<typeof useRequestStockModal>;
 
-export default function RequestStockModal({ open, closeModal, picker, toggleOrder, removeOrder, sections, message, setMessage, updateItem, addItem, removeItem, submitAll, hasPendingSection, saving }: Props) {
+export default function RequestStockModal({ open, closeModal, picker, toggleOrder, removeOrder, sections, updateItem, updateMessage, addItem, removeItem, submitAll, hasPendingSection, saving }: Props) {
   if (!open) return null;
 
   return (
@@ -46,17 +46,11 @@ export default function RequestStockModal({ open, closeModal, picker, toggleOrde
                   key={order.id}
                   section={sections[order.id]}
                   updateItem={updateItem}
+                  updateMessage={updateMessage}
                   addItem={addItem}
                   removeItem={removeItem}
                 />
               ))}
-
-              <textarea
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                className="min-h-20 w-full rounded-md border border-gray-300 px-2.5 py-2 text-xs"
-                placeholder="Message (optional)"
-              />
             </div>
           )}
         </div>

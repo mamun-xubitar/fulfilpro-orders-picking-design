@@ -170,36 +170,49 @@ export class BackInStockModel {
   }
 
   async searchOrderOptions(params: { search: string; storeIds: string[] | null; limit: number }): Promise<BackInStockOrderOption[]> {
-    const where: Prisma.OrderWhereInput = params.storeIds ? { storeId: { in: params.storeIds } } : {};
-    const rows = await prisma.order.findMany({
-      where,
-      select: {
-        id: true,
-        number: true,
-        cusName: true,
-        lineItems: true,
-        fulfillmentItems: true,
-        store: { select: { id: true, name: true, storeDomain: true } },
-      },
-      orderBy: { orderedAt: 'desc' },
-      take: 500,
-    });
+    if (params.storeIds && params.storeIds.length === 0) return [];
 
-    const search = params.search.trim().toLowerCase();
+    const whereParts: Prisma.Sql[] = [Prisma.sql`1 = 1`];
+    if (params.storeIds) {
+      whereParts.push(Prisma.sql`o."storeId" IN (${Prisma.join(params.storeIds)})`);
+    }
+
+    const search = params.search.trim();
+    if (search) {
+      whereParts.push(Prisma.sql`(
+        ${ilikeContains(Prisma.sql`o."number"::text`, search)}
+        OR ${ilikeContains(Prisma.sql`o."cusName"`, search)}
+        OR ${ilikeContains(Prisma.sql`s.name`, search)}
+        OR ${ilikeContains(Prisma.sql`s."storeDomain"`, search)}
+      )`);
+    }
+
+    const rows = await prisma.$queryRaw<Array<{
+      id: string;
+      number: number;
+      cusName: string;
+      lineItems: Prisma.JsonValue;
+      fulfillmentItems: Prisma.JsonValue | null;
+      storeId: string;
+      storeName: string | null;
+      storeDomain: string;
+    }>>(Prisma.sql`
+      SELECT o.id, o."number", o."cusName", o."lineItems", o."fulfillmentItems",
+        s.id AS "storeId", s.name AS "storeName", s."storeDomain"
+      FROM "Order" o
+      INNER JOIN "Store" s ON s.id = o."storeId"
+      WHERE ${Prisma.join(whereParts, ' AND ')}
+      ORDER BY o."orderedAt" DESC NULLS LAST
+      LIMIT 200
+    `);
 
     return rows
-      .filter((row) => (
-        !search
-        || String(row.number).includes(search)
-        || row.cusName.toLowerCase().includes(search)
-        || (row.store.name ?? row.store.storeDomain).toLowerCase().includes(search)
-      ))
       .map((row) => ({
         id: row.id,
         number: row.number,
         customer: row.cusName,
-        storeId: row.store.id,
-        storeName: row.store.name ?? row.store.storeDomain,
+        storeId: row.storeId,
+        storeName: row.storeName ?? row.storeDomain,
         eligibleItems: getEligibleLineItems(row.lineItems, row.fulfillmentItems),
       }))
       .filter((option) => option.eligibleItems.length > 0)
@@ -369,6 +382,15 @@ function normalizeRequestedItems(
 
   if (normalized.length === 0) throw new Error('No product to request back in stock');
   return normalized;
+}
+
+function ilikeContains(field: Prisma.Sql, value: string) {
+  return Prisma.sql`COALESCE(${field}, '') ILIKE ${buildLikePattern(value)} ESCAPE '\\'`;
+}
+
+function buildLikePattern(value: string) {
+  const escaped = value.replace(/[\\%_]/g, (char) => `\\${char}`);
+  return `%${escaped}%`;
 }
 
 function toOrderLineItems(value: Prisma.JsonValue): Array<{ id: string; name: string; qty: number; sku: string; vendor: string }> {

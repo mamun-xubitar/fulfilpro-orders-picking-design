@@ -14,6 +14,7 @@ export type OrderStockSectionState = {
   order: OrderOption;
   requests: BackInStockRequest[];
   items: BackInStockItem[];
+  message: string;
   loading: boolean;
   saving: boolean;
   error: string;
@@ -35,7 +36,6 @@ export function useRequestStockModal(onSubmitted?: () => void) {
   const picker = useOrderPicker();
   const [open, setOpen] = useState(false);
   const [sections, setSections] = useState<Record<string, OrderStockSectionState>>({});
-  const [message, setMessage] = useState('');
 
   const blockTestModeAction = () => {
     if (!isTestUserRole(session?.user?.role)) return false;
@@ -50,7 +50,6 @@ export function useRequestStockModal(onSubmitted?: () => void) {
     setOpen(false);
     picker.reset();
     setSections({});
-    setMessage('');
   };
 
   const loadExistingRequests = async (orderId: string) => {
@@ -89,6 +88,7 @@ export function useRequestStockModal(onSubmitted?: () => void) {
         order: option,
         requests: [],
         items: [createDefaultItem(option)],
+        message: '',
         loading: true,
         saving: false,
         error: '',
@@ -131,6 +131,14 @@ export function useRequestStockModal(onSubmitted?: () => void) {
         return { ...item, [field]: value };
       });
       return { ...prev, [orderId]: { ...section, items, error: '' } };
+    });
+  };
+
+  const updateMessage = (orderId: string, value: string) => {
+    setSections((prev) => {
+      const section = prev[orderId];
+      if (!section) return prev;
+      return { ...prev, [orderId]: { ...section, message: value } };
     });
   };
 
@@ -220,7 +228,7 @@ export function useRequestStockModal(onSubmitted?: () => void) {
       const res = await fetch('/api/back-in-stock', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId, items, message: message.trim() }),
+        body: JSON.stringify({ orderId, items, message: section.message.trim() }),
       });
       const json = (await res.json()) as ApiResponse<BackInStockRequest>;
       if (!res.ok || !json.success) throw new Error(json.message || 'Failed to submit back in stock request');
@@ -242,7 +250,6 @@ export function useRequestStockModal(onSubmitted?: () => void) {
     const succeeded = results.filter((result) => result.status === 'fulfilled').length;
     if (succeeded === pendingIds.length) {
       toast.success(`Submitted ${succeeded} back in stock request${succeeded === 1 ? '' : 's'}.`);
-      setMessage('');
       onSubmitted?.();
     } else if (succeeded > 0) {
       toast.error(`${succeeded} of ${pendingIds.length} requests submitted. Check errors below.`);
@@ -263,9 +270,8 @@ export function useRequestStockModal(onSubmitted?: () => void) {
     toggleOrder,
     removeOrder,
     sections,
-    message,
-    setMessage,
     updateItem,
+    updateMessage,
     addItem,
     removeItem,
     submitAll,

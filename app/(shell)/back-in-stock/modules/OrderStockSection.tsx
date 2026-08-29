@@ -6,6 +6,7 @@ import type { OrderStockSectionState } from './useRequestStockModal';
 type Props = {
   section: OrderStockSectionState;
   updateItem: (orderId: string, index: number, field: keyof BackInStockItem, value: string) => void;
+  updateMessage: (orderId: string, value: string) => void;
   addItem: (orderId: string) => void;
   removeItem: (orderId: string, index: number) => void;
 };
@@ -31,7 +32,7 @@ function formatStockStatus(status: string) {
   return 'Pending';
 }
 
-export default function OrderStockSection({ section, updateItem, addItem, removeItem }: Props) {
+export default function OrderStockSection({ section, updateItem, updateMessage, addItem, removeItem }: Props) {
   const { order } = section;
 
   return (
@@ -138,6 +139,12 @@ export default function OrderStockSection({ section, updateItem, addItem, remove
           >
             Add Product
           </button>
+          <textarea
+            value={section.message}
+            onChange={(e) => updateMessage(order.id, e.target.value)}
+            className="min-h-20 w-full rounded-md border border-gray-300 px-2.5 py-2 text-xs"
+            placeholder="Message (optional)"
+          />
         </div>
       )}
 
