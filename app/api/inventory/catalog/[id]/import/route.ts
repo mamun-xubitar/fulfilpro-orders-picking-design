@@ -1,17 +1,26 @@
 import { NextRequest } from 'next/server';
-import { InventoryImportController } from '@/controllers/inventory-import.controller.server';
+import { InventoryCsvImportController } from '@/controllers/inventory-csv-import.controller.server';
 import { apiSuccess, apiError } from '@/lib/api-response.server';
 import { auth } from '@/auth';
 
-const controller = new InventoryImportController();
+const controller = new InventoryCsvImportController();
+const MAX_SIZE = 10 * 1024 * 1024; // 10 MB
 type ErrResult = { error: { message: string; errors?: string[]; status: number } };
 
+/** Auto-detects a Shopify product CSV vs. our own PO CSV from the header row. `commit=false`
+ * (the default) parses and validates without writing, for the import modal's preview table;
+ * `commit=true` re-parses the same file and applies it. */
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
   const { id } = await params;
-  const body = await request.json().catch(() => ({}));
   try {
-    const result = await controller.importVariants(id, body, session);
+    const formData = await request.formData();
+    const file = formData.get('file');
+    if (!(file instanceof File)) return apiError({ message: 'No file provided', status: 400 });
+    if (file.size > MAX_SIZE) return apiError({ message: 'File exceeds the 10 MB limit', status: 400 });
+
+    const commit = formData.get('commit') === 'true';
+    const result = commit ? await controller.commit(id, file, session) : await controller.preview(id, file, session);
     if ('error' in result) {
       const { error } = result as ErrResult;
       return apiError({ message: error.message, errors: error.errors, status: error.status });

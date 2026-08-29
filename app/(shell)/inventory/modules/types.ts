@@ -2,10 +2,11 @@
 
 export type ProductStatusValue = 'ACTIVE' | 'DRAFT' | 'ARCHIVED';
 
-/** A colourway on the product. `hex` is the source of truth for every swatch. */
+/** A colourway on the product. `color` is a CSS-compatible value (named keyword or hex),
+ * derived from `name` — see lib/inventory/colour.ts. */
 export type ColourOption = {
   name: string;
-  hex: string;
+  color: string;
 };
 
 /** One open PO's unreceived quantity for a variant, with its expected delivery date. */
@@ -234,9 +235,10 @@ export type ProductDetailsForm = {
   sku: string;
   description: string;
   deliveryRemarks: string;
-  /** Space-separated, e.g. "50 52 54 56 58 60". */
+  /** Comma-separated, e.g. "50, 52, 54, 56, 58, 60". */
   sizes: string;
-  colours: ColourOption[];
+  /** Comma-separated, e.g. "Red, Blue, Hot Pink". */
+  colours: string;
   status: ProductStatusValue;
   verified: boolean;
 };
@@ -249,6 +251,9 @@ export type PurchaseOrderItemRecord = {
   id: string;
   variantId: string | null;
   variantTitle: string;
+  /** Null when the linked variant has since been deleted. */
+  colour: string | null;
+  size: string | null;
   sku: string | null;
   quantity: number;
   receivedQuantity: number;

@@ -44,7 +44,7 @@ export function useInventoryPage() {
   const po = usePurchaseOrder({ product, refreshCatalog: data.refresh });
   const stocktake = useStocktake({ product, refreshCatalog: data.refresh });
   const adjustments = useAdjustments({ product, refreshCatalog: data.refresh });
-  const importExport = useImportExport({ product, refreshCatalog: data.refresh });
+  const importExport = useImportExport({ product, refreshCatalog: data.refresh, onPoImported: po.loadPurchaseOrders });
   const productsTable = useProductsTable({ products: data.products, verifiedOnly: nav.verifiedOnly, onView: nav.viewProduct, refreshCatalog: data.refresh });
 
   /** Stock Summary always reflects the whole product, not the matrix's filtered rows. */

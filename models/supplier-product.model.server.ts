@@ -1,7 +1,8 @@
 import prisma from '@/lib/prisma.server';
+import { deriveColorFromName } from '@/lib/inventory/colour';
 import { Prisma, SupplierProductStatus } from '@prisma/client';
 
-export type ColourOptionData = { name: string; hex: string };
+export type ColourOptionData = { name: string; color: string };
 
 export type IncomingLotRow = { quantity: number; date: string | null };
 
@@ -157,6 +158,13 @@ export class SupplierProductModel {
     const current = await prisma.supplierProduct.findUnique({ where: { id }, select: { supplierId: true, sizes: true, colours: true } });
     if (!current) throw new Error('Product not found');
 
+    if (data.colours !== undefined) {
+      await this.applyColourRenames(id, normalizeColours(current.colours), data.colours);
+    }
+    if (data.sizes !== undefined) {
+      await this.applySizeRenames(id, current.sizes as string[], data.sizes);
+    }
+
     await prisma.supplierProduct.update({
       where: { id },
       data: {
@@ -176,7 +184,57 @@ export class SupplierProductModel {
     });
 
     if (data.sizes !== undefined || data.colours !== undefined) {
-      await this.reconcileVariants(id, data.sizes ?? (current.sizes as string[]), (data.colours ?? (current.colours as unknown as ColourOptionData[])).map((c) => c.name));
+      await this.reconcileVariants(id, data.sizes ?? (current.sizes as string[]), (data.colours ?? normalizeColours(current.colours)).map((c) => c.name));
+    }
+  }
+
+  /**
+   * A colour that only changed casing (e.g. "orange" -> "Orange") is a rename, not a
+   * remove+add — update the matching variant/image rows in place so reconcileVariants sees
+   * them as already current instead of deleting and recreating them. A colour genuinely no
+   * longer in the list clears its tag from any image that still carries it, rather than
+   * leaving the image pointing at a colour that no longer exists.
+   */
+  private async applyColourRenames(supplierProductId: string, oldColours: ColourOptionData[], newColours: ColourOptionData[]) {
+    const oldByLower = new Map(oldColours.map((c) => [c.name.toLowerCase(), c.name]));
+    const newByLower = new Map(newColours.map((c) => [c.name.toLowerCase(), c.name]));
+
+    for (const [lower, oldName] of oldByLower) {
+      const newName = newByLower.get(lower);
+      if (newName !== undefined) {
+        if (newName !== oldName) {
+          await prisma.supplierProductVariant.updateMany({
+            where: { supplierProductId, colour: { equals: oldName, mode: 'insensitive' } },
+            data: { colour: newName },
+          });
+          await prisma.supplierProductImage.updateMany({
+            where: { supplierProductId, colour: { equals: oldName, mode: 'insensitive' } },
+            data: { colour: newName },
+          });
+        }
+      } else {
+        await prisma.supplierProductImage.updateMany({
+          where: { supplierProductId, colour: { equals: oldName, mode: 'insensitive' } },
+          data: { colour: null },
+        });
+      }
+    }
+  }
+
+  /** Mirrors applyColourRenames for sizes — a casing-only change updates matching variant rows
+   * in place instead of deleting and recreating them. Sizes don't tag images, so no image step. */
+  private async applySizeRenames(supplierProductId: string, oldSizes: string[], newSizes: string[]) {
+    const oldByLower = new Map(oldSizes.map((s) => [s.toLowerCase(), s]));
+    const newByLower = new Map(newSizes.map((s) => [s.toLowerCase(), s]));
+
+    for (const [lower, oldSize] of oldByLower) {
+      const newSize = newByLower.get(lower);
+      if (newSize !== undefined && newSize !== oldSize) {
+        await prisma.supplierProductVariant.updateMany({
+          where: { supplierProductId, size: { equals: oldSize, mode: 'insensitive' } },
+          data: { size: newSize },
+        });
+      }
     }
   }
 
@@ -395,7 +453,7 @@ export class SupplierProductModel {
       createdAt: row.createdAt.toISOString(),
       images: row.images.map((i) => ({ id: i.id, url: i.url, altText: i.altText, colour: i.colour })),
       sizes: row.sizes,
-      colours: (row.colours as unknown as ColourOptionData[]) ?? [],
+      colours: normalizeColours(row.colours),
       variants: row.variants.map((v) => {
         const incomingLots = incomingLotsByVariant.get(v.id) ?? [];
         const costs = buyPriceSumsByVariant.get(v.id);
@@ -443,4 +501,16 @@ export class SupplierProductModel {
 function startOfMonth(): Date {
   const now = new Date();
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+}
+
+/** Reads legacy `{name, hex}` rows (pre-redesign) as `{name, color}`, preserving the old hex
+ * verbatim as `color` — still valid CSS — until the product's colours are next saved. */
+function normalizeColours(raw: unknown): ColourOptionData[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((entry) => {
+    const c = (entry ?? {}) as Record<string, unknown>;
+    const name = String(c.name ?? '');
+    const color = typeof c.color === 'string' && c.color ? c.color : typeof c.hex === 'string' && c.hex ? c.hex : deriveColorFromName(name);
+    return { name, color };
+  });
 }

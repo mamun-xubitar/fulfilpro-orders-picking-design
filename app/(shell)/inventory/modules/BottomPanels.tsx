@@ -39,13 +39,13 @@ export default function BottomPanels({ p }: BottomPanelsProps) {
           className="mt-auto flex w-full items-center justify-center gap-1.5 rounded-lg bg-emerald-600 py-2 text-[13px] font-semibold text-white transition-colors duration-150 hover:bg-emerald-700 cursor-pointer"
         >
           <Upload className="h-4 w-4" />
-          Import Excel / CSV
+          Import CSV
         </button>
         {/* Not pinned: this card has no stat rows, so the exports sit with the import
             rather than being stranded at the bottom of a stretched grid cell. */}
         <Actions pin={false}>
-          <SecondaryButton onClick={() => p.importExport.exportVariants(product.variants)}>Export products</SecondaryButton>
-          <SecondaryButton onClick={() => p.importExport.exportPurchaseOrders(p.po.purchaseOrders)}>Export PO</SecondaryButton>
+          <SecondaryButton onClick={() => p.importExport.exportVariants(product.variants)}>Export product CSV</SecondaryButton>
+          <SecondaryButton onClick={() => p.importExport.exportPurchaseOrders(p.po.purchaseOrders)}>Export PO CSV</SecondaryButton>
         </Actions>
       </Card>
 

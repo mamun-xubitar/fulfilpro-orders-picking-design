@@ -2,6 +2,7 @@ import prisma from '@/lib/prisma.server';
 import { SupplierProductModel } from '@/models/supplier-product.model.server';
 import { CurrencyRateModel } from '@/models/currency-rate.model.server';
 import { saveUploadedFile } from '@/lib/uploads.server';
+import { deriveColorFromName } from '@/lib/inventory/colour';
 import { SupplierProductStatus } from '@prisma/client';
 
 const model = new SupplierProductModel();
@@ -115,7 +116,10 @@ export class SupplierProductController {
         ? {
             colours: (value.colours as unknown[])
               .filter((c): c is Record<string, unknown> => !!c && typeof c === 'object')
-              .map((c) => ({ name: String(c.name ?? ''), hex: String(c.hex ?? '#cbd5e1') })),
+              .map((c) => {
+                const name = String(c.name ?? '');
+                return { name, color: typeof c.color === 'string' && c.color ? c.color : deriveColorFromName(name) };
+              }),
           }
         : {}),
     });

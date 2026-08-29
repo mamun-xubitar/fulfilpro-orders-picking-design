@@ -1,5 +1,6 @@
 'use client';
 
+import { resolveSwatch } from '@/lib/inventory/colour';
 import type { GalleryGroup } from './utils';
 
 type GalleryThumbRowProps = {
@@ -37,7 +38,7 @@ export default function GalleryThumbRow({ groups, activeKey, onSelect }: Gallery
             ) : (
               <div
                 className="flex h-full w-full items-center justify-center text-[9px] font-semibold text-white"
-                style={{ backgroundColor: group.hex, textShadow: '0 1px 2px rgba(0,0,0,0.35)' }}
+                style={{ backgroundColor: resolveSwatch(group.color), textShadow: '0 1px 2px rgba(0,0,0,0.35)' }}
               >
                 {group.colourName.slice(0, 3).toUpperCase()}
               </div>

@@ -27,6 +27,7 @@
   "dependencies": {
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
+    "csv-parse": "^7.0.2",
     "dotenv": "^17.4.2",
     "moment-timezone": "^0.6.2",
     "next": "16.2.4",

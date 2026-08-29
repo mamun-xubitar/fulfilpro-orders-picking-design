@@ -61,25 +61,6 @@ export const STATUS_LEGEND: { id: VariantStatus; label: string; className: strin
   { id: 'above', label: 'Above trigger', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
 ];
 
-/** Swatch colours for the colour pills and matrix dots. Keyed by lowercased colour name. */
-export const COLOUR_SWATCHES: Record<string, string> = {
-  aqua: '#22b8e6',
-  black: '#111827',
-  'hot pink': '#ec4899',
-  lime: '#84cc16',
-  navy: '#1e3a8a',
-  red: '#dc2626',
-  yellow: '#facc15',
-  white: '#f3f4f6',
-  grey: '#9ca3af',
-  charcoal: '#374151',
-  royal: '#2563eb',
-  bottle: '#065f46',
-  sand: '#d6c7a1',
-};
-
-export const FALLBACK_SWATCH = '#cbd5e1';
-
 /**
  * "Online stores & prices" stays on the original design mock-up — no store-connection
  * backend exists yet, so every product shows this same illustrative sample.

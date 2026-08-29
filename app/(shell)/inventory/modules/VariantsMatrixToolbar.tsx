@@ -98,7 +98,7 @@ export default function VariantsMatrixToolbar({ p }: VariantsMatrixToolbarProps)
       <div className="ml-auto flex flex-wrap items-center gap-2">
         <SecondaryButton onClick={exportCsv}>
           <Download className="h-3.5 w-3.5" />
-          Export to Excel
+          Export product CSV
         </SecondaryButton>
         <SecondaryButton onClick={matrix.toggleAllRows}>{matrix.allRowsSelected ? 'Deselect all Colours' : 'Select all Colours'}</SecondaryButton>
         <button
@@ -141,31 +141,22 @@ export default function VariantsMatrixToolbar({ p }: VariantsMatrixToolbarProps)
         </SecondaryButton>
       </div>
 
-      {addColourOpen && (
-        <AddColourModal
-          onClose={() => setAddColourOpen(false)}
-          onAdd={(colour) => {
-            p.details.quickAddColour(colour);
-            setAddColourOpen(false);
-          }}
-        />
-      )}
-      {addSizeOpen && (
-        <AddSizeModal
-          onClose={() => setAddSizeOpen(false)}
-          onAdd={(size) => {
-            p.details.quickAddSize(size);
-            setAddSizeOpen(false);
-          }}
-        />
-      )}
+      {addColourOpen && <AddColourModal onClose={() => setAddColourOpen(false)} onAdd={p.details.quickAddColour} />}
+      {addSizeOpen && <AddSizeModal onClose={() => setAddSizeOpen(false)} onAdd={p.details.quickAddSize} />}
     </div>
   );
 }
 
-function AddColourModal({ onClose, onAdd }: { onClose: () => void; onAdd: (colour: { name: string; hex: string }) => void }) {
+function AddColourModal({ onClose, onAdd }: { onClose: () => void; onAdd: (name: string) => string | null }) {
   const [name, setName] = useState('');
-  const [hex, setHex] = useState('#cbd5e1');
+  const [error, setError] = useState<string | null>(null);
+
+  const handleAdd = () => {
+    if (!name.trim()) return;
+    const err = onAdd(name.trim());
+    if (err) setError(err);
+    else onClose();
+  };
 
   return (
     <ModalShell
@@ -178,7 +169,7 @@ function AddColourModal({ onClose, onAdd }: { onClose: () => void; onAdd: (colou
           </button>
           <button
             type="button"
-            onClick={() => name.trim() && onAdd({ name: name.trim(), hex })}
+            onClick={handleAdd}
             disabled={!name.trim()}
             className="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
           >
@@ -187,29 +178,34 @@ function AddColourModal({ onClose, onAdd }: { onClose: () => void; onAdd: (colou
         </div>
       }
     >
-      <div className="space-y-3">
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Name</label>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Black"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400"
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-gray-700">Swatch</label>
-          <input type="color" value={hex} onChange={(e) => setHex(e.target.value)} className="h-8 w-12 cursor-pointer rounded border border-gray-300" />
-          <span className="text-xs text-gray-500 tabular-nums">{hex}</span>
-        </div>
+      <div>
+        <label className="mb-1 block text-sm font-medium text-gray-700">Name</label>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => {
+            setName(e.target.value);
+            setError(null);
+          }}
+          placeholder="e.g. Black or Hot Pink"
+          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400"
+        />
+        {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
       </div>
     </ModalShell>
   );
 }
 
-function AddSizeModal({ onClose, onAdd }: { onClose: () => void; onAdd: (size: string) => void }) {
+function AddSizeModal({ onClose, onAdd }: { onClose: () => void; onAdd: (size: string) => string | null }) {
   const [size, setSize] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const handleAdd = () => {
+    if (!size.trim()) return;
+    const err = onAdd(size.trim());
+    if (err) setError(err);
+    else onClose();
+  };
 
   return (
     <ModalShell
@@ -222,7 +218,7 @@ function AddSizeModal({ onClose, onAdd }: { onClose: () => void; onAdd: (size: s
           </button>
           <button
             type="button"
-            onClick={() => size.trim() && onAdd(size.trim())}
+            onClick={handleAdd}
             disabled={!size.trim()}
             className="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
           >
@@ -236,10 +232,14 @@ function AddSizeModal({ onClose, onAdd }: { onClose: () => void; onAdd: (size: s
         <input
           type="text"
           value={size}
-          onChange={(e) => setSize(e.target.value)}
+          onChange={(e) => {
+            setSize(e.target.value);
+            setError(null);
+          }}
           placeholder="e.g. XL or 54"
           className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400"
         />
+        {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
       </div>
     </ModalShell>
   );

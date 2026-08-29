@@ -864,6 +864,7 @@ model PurchaseOrderItem {
   purchaseOrder    PurchaseOrder           @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
   variant          SupplierProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
 
+  @@unique([purchaseOrderId, variantId])
   @@index([purchaseOrderId])
 }
 

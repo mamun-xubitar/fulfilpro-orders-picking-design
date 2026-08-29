@@ -8,7 +8,6 @@ import { Field, FieldLabel, TextAreaField, TextField } from './ProductFieldRows'
 import ProductSizesField from './ProductSizesField';
 import { PRODUCT_STATUS_BADGES } from './constants';
 import { Check, Close, Document, Pencil } from './icons';
-import { makeSwatchResolver } from './utils';
 import type { useProductDetails } from './hooks/useProductDetails';
 import type { ProductStatusValue } from './types';
 
@@ -21,7 +20,6 @@ const STATUS_OPTIONS: ProductStatusValue[] = ['ACTIVE', 'DRAFT', 'ARCHIVED'];
 /** Demo mode: Save only leaves edit mode — nothing is written back to the product list. */
 export default function ProductFieldsPanel({ details: d }: ProductFieldsPanelProps) {
   const editing = d.editing;
-  const swatchOf = makeSwatchResolver(d.colours);
 
   return (
     <section className="flex min-w-0 flex-col rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -74,16 +72,9 @@ export default function ProductFieldsPanel({ details: d }: ProductFieldsPanelPro
           </>
         )}
 
-        <ProductSizesField value={d.form.sizes} sizes={d.sizes} editing={editing} onChange={d.set('sizes')} />
+        <ProductSizesField value={d.form.sizes} sizes={d.sizes} editing={editing} onChange={d.set('sizes')} error={d.errors?.sizes} />
 
-        <ProductColoursField
-          colours={d.colours}
-          editing={editing}
-          swatchOf={swatchOf}
-          onChange={d.setColour}
-          onAdd={d.addColour}
-          onRemove={d.removeColour}
-        />
+        <ProductColoursField value={d.form.colours} colours={d.colours} editing={editing} onChange={d.set('colours')} error={d.errors?.colours} />
 
         <StatusRow details={d} editing={editing} />
 

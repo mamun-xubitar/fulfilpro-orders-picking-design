@@ -52,6 +52,9 @@ export default function InventoryModals(p: InventoryPage) {
                     className="min-w-0 flex-1 rounded border border-gray-200 bg-white px-1.5 py-0.5 text-[11px] font-medium text-gray-600 outline-none focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <option value="">Unassigned</option>
+                    {image.colour && p.details.colours.every((c) => c.name.toLowerCase() !== image.colour!.toLowerCase()) && (
+                      <option value={image.colour}>{image.colour}</option>
+                    )}
                     {p.details.colours.map((c) => (
                       <option key={c.name} value={c.name}>
                         {c.name}

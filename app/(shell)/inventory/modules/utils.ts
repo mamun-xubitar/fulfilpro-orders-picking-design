@@ -1,4 +1,5 @@
-import { COLOUR_SWATCHES, FALLBACK_SWATCH, NEAR_TRIGGER_RATIO } from './constants';
+import { deriveColorFromName, isValidCssColor, FALLBACK_SWATCH, parseColoursInput, formatColoursInput } from '@/lib/inventory/colour';
+import { NEAR_TRIGGER_RATIO } from './constants';
 import type {
   ColourOption,
   IncomingLot,
@@ -7,6 +8,7 @@ import type {
   PricingInputs,
   ProductImage,
   ProductRecord,
+  PurchaseOrderRecord,
   StockSummary,
   VariantComputed,
   VariantRow,
@@ -131,32 +133,49 @@ export function formatRelative(iso: string, now: number): string {
 
 // — Colour / size helpers —
 
+export { parseColoursInput, formatColoursInput };
+
+/** Resolves a bare colour name with no stored ColourOption — e.g. a variant colour that
+ * predates the product's declared palette — to a CSS value, falling back to grey. */
 export function getSwatch(colour: string): string {
-  return COLOUR_SWATCHES[colour.trim().toLowerCase()] ?? FALLBACK_SWATCH;
+  const derived = deriveColorFromName(colour);
+  return isValidCssColor(derived) ? derived : FALLBACK_SWATCH;
 }
 
-/** Resolves a colour name to the product's own hex, falling back to the shared swatch map. */
+/** Resolves a colour name to the product's own CSS colour value, falling back to getSwatch. */
 export function makeSwatchResolver(colours: ColourOption[]): (colour: string) => string {
-  const map = new Map(colours.map((c) => [c.name.trim().toLowerCase(), c.hex]));
+  const map = new Map(colours.map((c) => [c.name.trim().toLowerCase(), c.color]));
   return (colour: string) => map.get(colour.trim().toLowerCase()) ?? getSwatch(colour);
 }
 
-/** "50 52  54, 56" → ['50','52','54','56'] — splits on whitespace and commas. */
+/** "50, 52, 54, 56" → ['50','52','54','56'] — splits only on commas, so a multi-word size
+ * (e.g. "One Size") survives intact. Mirrors parseColoursInput. */
 export function parseSizesInput(value: string): string[] {
   return value
-    .split(/[\s,]+/)
+    .split(',')
     .map((size) => size.trim())
     .filter(Boolean);
 }
 
 export function formatSizesInput(sizes: string[]): string {
-  return sizes.join(' ');
+  return sizes.join(', ');
+}
+
+/** Returns the first value that appears more than once (case-insensitive), or null if none. */
+export function findCaseInsensitiveDuplicate(values: string[]): string | null {
+  const seen = new Set<string>();
+  for (const value of values) {
+    const lower = value.trim().toLowerCase();
+    if (seen.has(lower)) return value.trim();
+    seen.add(lower);
+  }
+  return null;
 }
 
 /** One tile in the grouped gallery: a colourway's representative photo, or a colour-swatch stand-in when it has none. */
 export type GalleryGroup =
-  | { kind: 'photo'; key: string; colourName: string | null; hex: string | null; image: ProductImage }
-  | { kind: 'placeholder'; key: string; colourName: string; hex: string; image: null };
+  | { kind: 'photo'; key: string; colourName: string | null; color: string | null; image: ProductImage }
+  | { kind: 'placeholder'; key: string; colourName: string; color: string; image: null };
 
 /**
  * Groups a product's images into one gallery tile per colourway: a photo tile for colours
@@ -188,8 +207,8 @@ export function groupImagesByColour(images: ProductImage[], colours: ColourOptio
     const bucket = byColour.get(key);
     groups.push(
       bucket && bucket.length > 0
-        ? { kind: 'photo', key, colourName: colour.name, hex: colour.hex, image: bucket[0] }
-        : { kind: 'placeholder', key, colourName: colour.name, hex: colour.hex, image: null }
+        ? { kind: 'photo', key, colourName: colour.name, color: colour.color, image: bucket[0] }
+        : { kind: 'placeholder', key, colourName: colour.name, color: colour.color, image: null }
     );
   }
 
@@ -198,11 +217,11 @@ export function groupImagesByColour(images: ProductImage[], colours: ColourOptio
     const key = image.colour.trim().toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
-    groups.push({ kind: 'photo', key, colourName: image.colour, hex: swatchOf(image.colour), image });
+    groups.push({ kind: 'photo', key, colourName: image.colour, color: swatchOf(image.colour), image });
   }
 
   if (unassigned.length > 0) {
-    groups.push({ kind: 'photo', key: '__unassigned__', colourName: null, hex: null, image: unassigned[0] });
+    groups.push({ kind: 'photo', key: '__unassigned__', colourName: null, color: null, image: unassigned[0] });
   }
 
   return groups;
@@ -236,19 +255,19 @@ export function buildLightboxItems(images: ProductImage[], colours: ColourOption
     seen.add(key);
     const bucket = byColour.get(key);
     if (bucket && bucket.length > 0) {
-      for (const image of bucket) items.push({ kind: 'photo', key: image.id, colourName: colour.name, hex: colour.hex, image });
+      for (const image of bucket) items.push({ kind: 'photo', key: image.id, colourName: colour.name, color: colour.color, image });
     } else {
-      items.push({ kind: 'placeholder', key: `placeholder:${key}`, colourName: colour.name, hex: colour.hex, image: null });
+      items.push({ kind: 'placeholder', key: `placeholder:${key}`, colourName: colour.name, color: colour.color, image: null });
     }
   }
 
   for (const [key, bucket] of byColour) {
     if (seen.has(key)) continue;
-    for (const image of bucket) items.push({ kind: 'photo', key: image.id, colourName: image.colour, hex: swatchOf(image.colour!), image });
+    for (const image of bucket) items.push({ kind: 'photo', key: image.id, colourName: image.colour, color: swatchOf(image.colour!), image });
   }
 
   for (const image of unassigned) {
-    items.push({ kind: 'photo', key: image.id, colourName: null, hex: null, image });
+    items.push({ kind: 'photo', key: image.id, colourName: null, color: null, image });
   }
 
   return items;
@@ -309,6 +328,7 @@ const SHOPIFY_CSV_HEADERS = [
   'Option2 Value',
   'Variant SKU',
   'Variant Grams',
+  'Variant Inventory Tracker',
   'Variant Inventory Policy',
   'Variant Fulfillment Service',
   'Variant Price',
@@ -318,7 +338,10 @@ const SHOPIFY_CSV_HEADERS = [
   'Variant Inventory Qty',
   'Cost per item',
   'Image Src',
+  'Status',
 ];
+
+const PRODUCT_STATUS_TO_SHOPIFY: Record<ProductRecord['status'], string> = { ACTIVE: 'active', DRAFT: 'draft', ARCHIVED: 'archived' };
 
 /**
  * Best-effort Shopify product-CSV export — the columns Shopify's own product importer expects,
@@ -348,6 +371,7 @@ export function buildShopifyProductCsv(product: ProductRecord, rows: VariantRow[
         v.size,
         v.sku ?? '',
         '0',
+        'shopify',
         'deny',
         'manual',
         v.sellPrice.toFixed(2),
@@ -357,11 +381,44 @@ export function buildShopifyProductCsv(product: ProductRecord, rows: VariantRow[
         String(v.stockOnHand),
         v.buyPrice.toFixed(2),
         image,
+        PRODUCT_STATUS_TO_SHOPIFY[product.status],
       ]
         .map(escapeCsv)
         .join(',')
     );
   });
+  return lines.join('\r\n');
+}
+
+const PO_CSV_HEADERS = ['PO Number', 'Status', 'Delivery Date', 'Remark', 'Colour', 'Size', 'SKU', 'Quantity', 'Received Quantity', 'Unit Cost'];
+
+/**
+ * Round-trippable PO export — one row per line item. Re-importing this file (via the unified
+ * Import button) updates the same POs by number, or creates new ones for an invented PO Number
+ * label. There's no Shopify equivalent for purchase orders, so this format is our own.
+ */
+export function buildPoCsv(purchaseOrders: PurchaseOrderRecord[]): string {
+  const lines = [PO_CSV_HEADERS.join(',')];
+  for (const po of purchaseOrders) {
+    for (const item of po.items) {
+      lines.push(
+        [
+          formatPoNumber(po.number),
+          po.status,
+          po.deliveryDate ? po.deliveryDate.slice(0, 10) : '',
+          po.remark ?? '',
+          item.colour ?? '',
+          item.size ?? '',
+          item.sku ?? '',
+          String(item.quantity),
+          String(item.receivedQuantity),
+          item.unitCost !== null ? item.unitCost.toFixed(2) : '',
+        ]
+          .map(escapeCsv)
+          .join(',')
+      );
+    }
+  }
   return lines.join('\r\n');
 }
 

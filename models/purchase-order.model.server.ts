@@ -5,6 +5,9 @@ export type PurchaseOrderItemRow = {
   id: string;
   variantId: string | null;
   variantTitle: string;
+  /** Null when the linked variant has since been deleted. */
+  colour: string | null;
+  size: string | null;
   sku: string | null;
   quantity: number;
   receivedQuantity: number;
@@ -32,7 +35,9 @@ export type PurchaseOrderRow = {
   items: PurchaseOrderItemRow[];
 };
 
-type PurchaseOrderWithItems = Prisma.PurchaseOrderGetPayload<{ include: { items: true } }>;
+const itemsInclude = { items: { include: { variant: { select: { colour: true, size: true } } } } } as const;
+
+type PurchaseOrderWithItems = Prisma.PurchaseOrderGetPayload<{ include: typeof itemsInclude }>;
 
 export class PurchaseOrderModel {
   async list(params: {
@@ -58,7 +63,7 @@ export class PurchaseOrderModel {
     const [rows, total] = await Promise.all([
       prisma.purchaseOrder.findMany({
         where,
-        include: { items: true },
+        include: itemsInclude,
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * pageSize,
         take: pageSize,
@@ -70,7 +75,14 @@ export class PurchaseOrderModel {
   }
 
   async findById(id: string): Promise<PurchaseOrderRow | null> {
-    const row = await prisma.purchaseOrder.findUnique({ where: { id }, include: { items: true } });
+    const row = await prisma.purchaseOrder.findUnique({ where: { id }, include: itemsInclude });
+    return row ? toPurchaseOrderRow(row) : null;
+  }
+
+  /** Looks up a PO by its DB-assigned display number — used by PO CSV import to find the
+   * existing PO a "PO-00042"-style cell refers to. Never creates one under an invented number. */
+  async findByNumber(number: number): Promise<PurchaseOrderRow | null> {
+    const row = await prisma.purchaseOrder.findUnique({ where: { number }, include: itemsInclude });
     return row ? toPurchaseOrderRow(row) : null;
   }
 
@@ -100,7 +112,7 @@ export class PurchaseOrderModel {
         createdByName: data.createdByName,
         items: { create: data.items },
       },
-      include: { items: true },
+      include: itemsInclude,
     });
     return toPurchaseOrderRow(row);
   }
@@ -109,7 +121,7 @@ export class PurchaseOrderModel {
     const row = await prisma.purchaseOrder.update({
       where: { id },
       data: { status, statusUpdatedById: actor.id, statusUpdatedByName: actor.name, statusUpdatedAt: new Date() },
-      include: { items: true },
+      include: itemsInclude,
     });
     return toPurchaseOrderRow(row);
   }
@@ -125,7 +137,7 @@ export class PurchaseOrderModel {
     actor: { id: string; name: string }
   ) {
     return prisma.$transaction(async (tx) => {
-      const po = await tx.purchaseOrder.findUniqueOrThrow({ where: { id }, include: { items: true } });
+      const po = await tx.purchaseOrder.findUniqueOrThrow({ where: { id }, include: itemsInclude });
       const itemById = new Map(po.items.map((item) => [item.id, item]));
 
       for (const receipt of receipts) {
@@ -181,10 +193,49 @@ export class PurchaseOrderModel {
       const row = await tx.purchaseOrder.update({
         where: { id },
         data: { status, statusUpdatedById: actor.id, statusUpdatedByName: actor.name, statusUpdatedAt: new Date() },
-        include: { items: true },
+        include: itemsInclude,
       });
       return toPurchaseOrderRow(row);
     });
+  }
+
+  /** PO-level field patch for PO CSV import — blank/omitted fields leave the existing value untouched. */
+  async updateFields(id: string, data: Partial<{ status: PurchaseOrderStatus; deliveryDate: Date | null; remark: string | null }>): Promise<void> {
+    await prisma.purchaseOrder.update({ where: { id }, data });
+  }
+
+  /** Upserts one line item per variant on an existing PO, keyed by the (purchaseOrderId, variantId)
+   * unique constraint — used by PO CSV import to update quantities/cost on matching lines and add
+   * new ones for variants the PO didn't already have. */
+  async upsertItems(
+    purchaseOrderId: string,
+    items: Array<{ variantId: string; variantTitle: string; sku: string | null; quantity: number; receivedQuantity: number; unitCost: number | null }>
+  ): Promise<PurchaseOrderRow> {
+    await prisma.$transaction(
+      items.map((item) =>
+        prisma.purchaseOrderItem.upsert({
+          where: { purchaseOrderId_variantId: { purchaseOrderId, variantId: item.variantId } },
+          create: {
+            purchaseOrderId,
+            variantId: item.variantId,
+            variantTitle: item.variantTitle,
+            sku: item.sku,
+            quantity: item.quantity,
+            receivedQuantity: item.receivedQuantity,
+            unitCost: item.unitCost,
+          },
+          update: {
+            variantTitle: item.variantTitle,
+            sku: item.sku,
+            quantity: item.quantity,
+            receivedQuantity: item.receivedQuantity,
+            unitCost: item.unitCost,
+          },
+        })
+      )
+    );
+    const row = await prisma.purchaseOrder.findUniqueOrThrow({ where: { id: purchaseOrderId }, include: itemsInclude });
+    return toPurchaseOrderRow(row);
   }
 }
 
@@ -211,6 +262,8 @@ function toPurchaseOrderRow(row: PurchaseOrderWithItems): PurchaseOrderRow {
       id: item.id,
       variantId: item.variantId,
       variantTitle: item.variantTitle,
+      colour: item.variant?.colour ?? null,
+      size: item.variant?.size ?? null,
       sku: item.sku,
       quantity: item.quantity,
       receivedQuantity: item.receivedQuantity,

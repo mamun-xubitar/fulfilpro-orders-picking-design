@@ -93,7 +93,7 @@ function Thumb({ product }: { product: ProductRecord }) {
   return (
     <span
       className="h-10 w-10 shrink-0 rounded-lg border border-gray-200"
-      style={{ backgroundColor: product.colours[0]?.hex ?? getSwatch(product.variants[0]?.colour ?? '') }}
+      style={{ backgroundColor: product.colours[0]?.color ?? getSwatch(product.variants[0]?.colour ?? '') }}
       aria-hidden="true"
     />
   );

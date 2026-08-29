@@ -1,5 +1,6 @@
 "use client";
 
+import { resolveSwatch } from "@/lib/inventory/colour";
 import type { useProductImages } from "./hooks/useProductImages";
 import { Expand, Image as ImageIcon, Pencil } from "./icons";
 
@@ -55,7 +56,7 @@ export default function MainImagePanel({
                     <div
                       className="flex aspect-square w-full items-center justify-center text-[9px] font-semibold text-white"
                       style={{
-                        backgroundColor: group.hex,
+                        backgroundColor: resolveSwatch(group.color),
                         textShadow: "0 1px 2px rgba(0,0,0,0.35)",
                       }}
                     >
@@ -87,7 +88,7 @@ export default function MainImagePanel({
               ) : (
                 <div
                   className="flex h-full w-full items-center justify-center px-3 text-center "
-                  style={{ backgroundColor: active.hex }}
+                  style={{ backgroundColor: resolveSwatch(active.color) }}
                 >
                   <span
                     className="text-base font-semibold text-white line-clamp-2"
