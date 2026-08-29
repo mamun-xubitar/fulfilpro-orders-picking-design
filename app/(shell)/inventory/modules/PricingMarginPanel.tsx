@@ -8,10 +8,12 @@ import type { PricingForm } from './types';
 
 type PricingMarginPanelProps = ReturnType<typeof useProductPricing>;
 
-const COST_FIELDS: { key: Extract<keyof PricingForm, 'buyingPrice' | 'freight' | 'misc'>; label: string }[] = [
-  { key: 'buyingPrice', label: 'Buying price' },
-  { key: 'freight', label: 'Freight' },
-  { key: 'misc', label: 'Misc' },
+/** Buying price is in the foreign currency and gets converted by the exchange rate;
+ * freight and misc are always AUD, so their unit never follows the currency picker. */
+const COST_FIELDS: { key: Extract<keyof PricingForm, 'buyingPrice' | 'freight' | 'misc'>; label: string; unit: 'foreign' | 'base' }[] = [
+  { key: 'buyingPrice', label: 'Buying price', unit: 'foreign' },
+  { key: 'freight', label: 'Freight', unit: 'base' },
+  { key: 'misc', label: 'Misc', unit: 'base' },
 ];
 
 export default function PricingMarginPanel(p: PricingMarginPanelProps) {
@@ -44,23 +46,26 @@ export default function PricingMarginPanel(p: PricingMarginPanelProps) {
 
         <Row label="Exchange rate">
           {p.editing ? (
-            <NumberInput value={p.form.exchangeRate} onChange={p.set('exchangeRate')} step="0.0001" suffix="rate" />
+            <NumberInput value={p.form.exchangeRate} onChange={p.set('exchangeRate')} step="0.01" suffix="rate" />
           ) : (
-            <Value>{Number(p.form.exchangeRate).toFixed(4)}</Value>
+            <Value>{Number(p.form.exchangeRate).toFixed(2)}</Value>
           )}
         </Row>
 
-        {COST_FIELDS.map(({ key, label }) => (
-          <Row key={key} label={label}>
-            {p.editing ? (
-              <NumberInput value={p.form[key]} onChange={p.set(key)} step="0.01" suffix={foreign} />
-            ) : (
-              <Value>
-                {formatMoney(Number(p.form[key]) || 0)} <Unit>{foreign}</Unit>
-              </Value>
-            )}
-          </Row>
-        ))}
+        {COST_FIELDS.map(({ key, label, unit }) => {
+          const currency = unit === 'foreign' ? foreign : base;
+          return (
+            <Row key={key} label={label}>
+              {p.editing ? (
+                <NumberInput value={p.form[key]} onChange={p.set(key)} step="0.01" suffix={currency} />
+              ) : (
+                <Value>
+                  {formatMoney(Number(p.form[key]) || 0)} <Unit>{currency}</Unit>
+                </Value>
+              )}
+            </Row>
+          );
+        })}
 
         <div className="flex items-center justify-between rounded-lg bg-gray-100 px-3 py-2">
           <span className="text-[11px] font-semibold uppercase tracking-wide text-red-600">Total buying (landed)</span>
@@ -85,11 +90,13 @@ export default function PricingMarginPanel(p: PricingMarginPanelProps) {
 
         <Row label="Tax">
           {p.editing ? (
-            <NumberInput value={p.form.tax} onChange={p.set('tax')} step="0.01" suffix={base} />
+            <NumberInput value={p.form.tax} onChange={p.set('tax')} step="0.1" suffix="%" />
           ) : (
             <Value>
-              {formatMoney(p.taxAmount)} <Unit>{base}</Unit>
-              <span className="ml-1.5 text-[11px] font-normal text-gray-400">({p.taxPercentOfSell.toFixed(1)}%)</span>
+              {Number(p.form.tax).toFixed(1)}%
+              <span className="ml-1.5 text-[11px] font-normal text-gray-400">
+                ({formatMoney(p.computed.taxAmount)} {base})
+              </span>
             </Value>
           )}
         </Row>

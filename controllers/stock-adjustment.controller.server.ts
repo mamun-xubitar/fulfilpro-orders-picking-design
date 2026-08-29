@@ -18,28 +18,59 @@ export class StockAdjustmentController {
     return { data: { adjustments } };
   }
 
+  /** Accepts either a single { variantId, delta, reason, note } body (unchanged) or a batch
+   * { items: [...] } body for the multi-row "Adjust Stock" modal — applied in one transaction. */
   async create(supplierProductId: string, body: unknown, session: Session) {
     if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
 
     const value = (body ?? {}) as Record<string, unknown>;
-    const variantId = typeof value.variantId === 'string' ? value.variantId.trim() : '';
-    const delta = Number(value.delta);
-    const reasonRaw = typeof value.reason === 'string' ? value.reason : '';
-    const note = typeof value.note === 'string' ? value.note.trim() : '';
+    const rawItems = Array.isArray(value.items) ? value.items : [value];
 
     const errors: string[] = [];
-    if (!variantId) errors.push('variantId: Select a variant');
-    if (!Number.isFinite(delta) || delta === 0) errors.push('delta: Enter a non-zero quantity');
-    if (!REASON_VALUES.has(reasonRaw)) errors.push('reason: Select a reason');
-    if (errors.length) return { error: { message: 'Validation failed', errors, status: 400 } };
+    const parsed: { variantId: string; delta: number; reason: StockAdjustmentReason; note: string | null }[] = [];
+    for (const raw of rawItems) {
+      if (!raw || typeof raw !== 'object') continue;
+      const item = raw as Record<string, unknown>;
+      const variantId = typeof item.variantId === 'string' ? item.variantId.trim() : '';
+      const delta = Number(item.delta);
+      const reasonRaw = typeof item.reason === 'string' ? item.reason : '';
+      const note = typeof item.note === 'string' ? item.note.trim() : '';
 
-    const variant = await prisma.supplierProductVariant.findUnique({ where: { id: variantId }, select: { supplierProductId: true, stockOnHand: true } });
-    if (!variant || variant.supplierProductId !== supplierProductId) return { error: { message: 'Variant not found', status: 404 } };
-    if (variant.stockOnHand + delta < 0) return { error: { message: 'Validation failed', errors: ['delta: This would take stock below 0'], status: 400 } };
+      if (!variantId) {
+        errors.push('variantId: Select a variant');
+        continue;
+      }
+      if (!Number.isFinite(delta) || delta === 0) {
+        errors.push(`delta: Enter a non-zero quantity for ${variantId}`);
+        continue;
+      }
+      if (!REASON_VALUES.has(reasonRaw)) {
+        errors.push(`reason: Select a reason for ${variantId}`);
+        continue;
+      }
+      parsed.push({ variantId, delta: Math.trunc(delta), reason: reasonRaw as StockAdjustmentReason, note: note || null });
+    }
+    if (parsed.length === 0) {
+      return { error: { message: 'Validation failed', errors: errors.length ? errors : ['items: No valid adjustments to save'], status: 400 } };
+    }
+
+    const variants = await prisma.supplierProductVariant.findMany({
+      where: { id: { in: parsed.map((p) => p.variantId) } },
+      select: { id: true, supplierProductId: true, stockOnHand: true },
+    });
+    const variantById = new Map(variants.map((v) => [v.id, v]));
+
+    for (const item of parsed) {
+      const variant = variantById.get(item.variantId);
+      if (!variant || variant.supplierProductId !== supplierProductId) return { error: { message: 'Variant not found', status: 404 } };
+      if (variant.stockOnHand + item.delta < 0) {
+        return { error: { message: 'Validation failed', errors: [`delta: This would take ${variant.id} below 0`], status: 400 } };
+      }
+    }
 
     const actor = { id: session?.user?.id ?? '', name: session?.user?.name ?? session?.user?.email ?? 'Unknown' };
-    await model.create({ supplierProductId, variantId, delta: Math.trunc(delta), reason: reasonRaw as StockAdjustmentReason, note: note || null, actorId: actor.id, actorName: actor.name });
+    await model.createMany(parsed.map((item) => ({ supplierProductId, ...item, actorId: actor.id, actorName: actor.name })));
 
-    return { data: null, message: 'Stock adjusted' };
+    return { data: null, message: parsed.length === 1 ? 'Stock adjusted' : `${parsed.length} adjustments saved` };
   }
 }

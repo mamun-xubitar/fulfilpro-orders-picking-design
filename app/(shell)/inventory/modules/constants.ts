@@ -1,4 +1,4 @@
-import type { ModuleTabId, ProductTabId, QuickFilterId, StoreListing, TabDef, VariantStatus } from './types';
+import type { ModuleTabId, ProductStatusValue, ProductTabId, QuickFilterId, StoreListing, TabDef, VariantStatus } from './types';
 
 export const MODULE_TABS: TabDef<ModuleTabId>[] = [
   { id: 'products', label: 'Products', blurb: 'Browse and maintain the product catalogue.' },
@@ -61,25 +61,6 @@ export const STATUS_LEGEND: { id: VariantStatus; label: string; className: strin
   { id: 'above', label: 'Above trigger', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
 ];
 
-/** Swatch colours for the colour pills and matrix dots. Keyed by lowercased colour name. */
-export const COLOUR_SWATCHES: Record<string, string> = {
-  aqua: '#22b8e6',
-  black: '#111827',
-  'hot pink': '#ec4899',
-  lime: '#84cc16',
-  navy: '#1e3a8a',
-  red: '#dc2626',
-  yellow: '#facc15',
-  white: '#f3f4f6',
-  grey: '#9ca3af',
-  charcoal: '#374151',
-  royal: '#2563eb',
-  bottle: '#065f46',
-  sand: '#d6c7a1',
-};
-
-export const FALLBACK_SWATCH = '#cbd5e1';
-
 /**
  * "Online stores & prices" stays on the original design mock-up — no store-connection
  * backend exists yet, so every product shows this same illustrative sample.
@@ -95,3 +76,15 @@ export const PRODUCT_STATUS_BADGES: Record<string, string> = {
   DRAFT: 'bg-amber-50 text-amber-700 border-amber-200',
   ARCHIVED: 'bg-gray-50 text-gray-600 border-gray-200',
 };
+
+/** The products table's status filter and bulk "Set status" modal. */
+export const STATUS_OPTIONS: { value: ProductStatusValue; label: string }[] = [
+  { value: 'ACTIVE', label: 'Active' },
+  { value: 'DRAFT', label: 'Draft' },
+  { value: 'ARCHIVED', label: 'Archived' },
+];
+
+/** Preset quantity dropdown on each row of the stock adjustment modal, so an admin rarely has to
+ * type: every whole number 1-10, then even steps up to 20 — mirrored to negative and positive. */
+const ADJUSTMENT_MAGNITUDES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20];
+export const ADJUSTMENT_PRESETS = [...ADJUSTMENT_MAGNITUDES.slice().reverse().map((n) => -n), ...ADJUSTMENT_MAGNITUDES];

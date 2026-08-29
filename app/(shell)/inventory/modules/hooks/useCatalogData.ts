@@ -5,7 +5,7 @@ import { toast } from 'react-toastify';
 import useRequest from '@/hooks/useRequest';
 import type { InventoryGlobals, ProductRecord, ProductsResponse } from '../types';
 
-const EMPTY_GLOBALS: InventoryGlobals = { exchangeRate: 1, marginPercent: 0, baseCurrency: 'AUD', currencies: [{ code: 'AUD', rate: 1 }] };
+const EMPTY_GLOBALS: InventoryGlobals = { exchangeRate: 1, marginPercent: 0, baseCurrency: 'AUD', currencies: [{ code: 'AUD', rate: 1 }, { code: 'USD', rate: 1 }] };
 
 export function useCatalogData() {
   const [products, setProducts] = useState<ProductRecord[]>([]);
@@ -23,7 +23,7 @@ export function useCatalogData() {
       onSuccess: ({ data }) => {
         setProducts(data.products);
         setGlobals(data.globals);
-        setRateInput(data.globals.exchangeRate.toFixed(4));
+        setRateInput(data.globals.exchangeRate.toFixed(2));
         setMarginInput(String(data.globals.marginPercent));
       },
     });
@@ -52,7 +52,7 @@ export function useCatalogData() {
       url: '/api/inventory/settings',
       method: 'PATCH',
       data: { globalExchangeRate: value },
-      successMessage: `System exchange rate set to ${value.toFixed(4)}`,
+      successMessage: `System exchange rate set to ${value.toFixed(2)}`,
       onSuccess: () => setGlobals((prev) => ({ ...prev, exchangeRate: value })),
     });
   };

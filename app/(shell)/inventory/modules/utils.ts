@@ -1,11 +1,14 @@
-import { COLOUR_SWATCHES, FALLBACK_SWATCH, NEAR_TRIGGER_RATIO } from './constants';
+import { deriveColorFromName, isValidCssColor, FALLBACK_SWATCH, parseColoursInput, formatColoursInput } from '@/lib/inventory/colour';
+import { NEAR_TRIGGER_RATIO } from './constants';
 import type {
   ColourOption,
+  IncomingLot,
   PricingComputed,
   PricingForm,
   PricingInputs,
   ProductImage,
   ProductRecord,
+  PurchaseOrderRecord,
   StockSummary,
   VariantComputed,
   VariantRow,
@@ -18,13 +21,8 @@ export function getAvailable(v: VariantRow): number {
   return v.stockOnHand - v.allocated;
 }
 
-/** How many units to order to clear forward demand and land back on the trigger. */
-export function getSuggested(v: VariantRow): number {
-  return Math.max(0, v.trigger + v.forwardOrders - getAvailable(v) - v.incoming);
-}
-
 export function getStockValue(v: VariantRow): number {
-  return v.stockOnHand * v.buyPrice;
+  return v.stockOnHand * v.sellPrice;
 }
 
 export function getStatus(v: VariantRow): VariantStatus {
@@ -37,7 +35,6 @@ export function getStatus(v: VariantRow): VariantStatus {
 export function computeVariant(v: VariantRow): VariantComputed {
   return {
     available: getAvailable(v),
-    suggested: getSuggested(v),
     stockValue: getStockValue(v),
     status: getStatus(v),
   };
@@ -51,26 +48,25 @@ export function summariseVariants(rows: VariantRow[]): StockSummary {
       availableStock: acc.availableStock + getAvailable(v),
       allocated: acc.allocated + v.allocated,
       incoming: acc.incoming + v.incoming,
-      forwardOrders: acc.forwardOrders + v.forwardOrders,
-      suggestedOrder: acc.suggestedOrder + getSuggested(v),
       stockValue: acc.stockValue + getStockValue(v),
       trigger: acc.trigger + v.trigger,
     }),
-    { totalStock: 0, availableStock: 0, allocated: 0, incoming: 0, forwardOrders: 0, suggestedOrder: 0, stockValue: 0, trigger: 0 }
+    { totalStock: 0, availableStock: 0, allocated: 0, incoming: 0, stockValue: 0, trigger: 0 }
   );
 }
 
 // — Pricing maths —
 
 /**
- * Mirrors `computePricing` in the existing product detail page: buying, freight
- * and misc are entered in the foreign currency and multiplied up by the rate,
- * margin is a mark-up on cost, and tax is a flat base-currency amount.
+ * Freight and Misc are always AUD, so only the (foreign-currency) buying price is
+ * converted by the exchange rate. Margin is a mark-up on landed cost, and tax is a
+ * percent of the ex-tax sell price rather than a flat amount.
  */
 export function computePricing(v: PricingInputs): PricingComputed {
-  const totalBuying = (v.buyingPrice + v.freight + v.misc) * v.exchangeRate;
+  const totalBuying = v.buyingPrice * v.exchangeRate + v.freight + v.misc;
   const sellingPrice = totalBuying * (1 + v.marginPercent / 100);
-  return { totalBuying, sellingPrice, sellingIncTax: sellingPrice + v.tax };
+  const taxAmount = sellingPrice * (v.tax / 100);
+  return { totalBuying, sellingPrice, taxAmount, sellingIncTax: sellingPrice + taxAmount };
 }
 
 export function pricingFormToInputs(form: PricingForm): PricingInputs {
@@ -88,7 +84,7 @@ export function pricingFormToInputs(form: PricingForm): PricingInputs {
 export function pricingInputsToForm(pricing: PricingInputs): PricingForm {
   return {
     currencyCode: pricing.currencyCode,
-    exchangeRate: pricing.exchangeRate.toFixed(4),
+    exchangeRate: pricing.exchangeRate.toFixed(2),
     buyingPrice: String(pricing.buyingPrice),
     freight: String(pricing.freight),
     misc: String(pricing.misc),
@@ -120,6 +116,12 @@ export function formatDate(iso: string | null): string {
   return new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
+/** "10 (28 Aug 2026)", or "10 (Date not set)" when the PO has no delivery date yet. */
+export function formatIncomingLot(lot: IncomingLot): string {
+  const date = lot.date ? new Date(lot.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Date not set';
+  return `${formatNumber(lot.quantity)} (${date})`;
+}
+
 export function formatRelative(iso: string, now: number): string {
   const diffMinutes = Math.round((now - new Date(iso).getTime()) / 60000);
   if (diffMinutes < 1) return 'just now';
@@ -131,32 +133,49 @@ export function formatRelative(iso: string, now: number): string {
 
 // — Colour / size helpers —
 
+export { parseColoursInput, formatColoursInput };
+
+/** Resolves a bare colour name with no stored ColourOption — e.g. a variant colour that
+ * predates the product's declared palette — to a CSS value, falling back to grey. */
 export function getSwatch(colour: string): string {
-  return COLOUR_SWATCHES[colour.trim().toLowerCase()] ?? FALLBACK_SWATCH;
+  const derived = deriveColorFromName(colour);
+  return isValidCssColor(derived) ? derived : FALLBACK_SWATCH;
 }
 
-/** Resolves a colour name to the product's own hex, falling back to the shared swatch map. */
+/** Resolves a colour name to the product's own CSS colour value, falling back to getSwatch. */
 export function makeSwatchResolver(colours: ColourOption[]): (colour: string) => string {
-  const map = new Map(colours.map((c) => [c.name.trim().toLowerCase(), c.hex]));
+  const map = new Map(colours.map((c) => [c.name.trim().toLowerCase(), c.color]));
   return (colour: string) => map.get(colour.trim().toLowerCase()) ?? getSwatch(colour);
 }
 
-/** "50 52  54, 56" → ['50','52','54','56'] — splits on whitespace and commas. */
+/** "50, 52, 54, 56" → ['50','52','54','56'] — splits only on commas, so a multi-word size
+ * (e.g. "One Size") survives intact. Mirrors parseColoursInput. */
 export function parseSizesInput(value: string): string[] {
   return value
-    .split(/[\s,]+/)
+    .split(',')
     .map((size) => size.trim())
     .filter(Boolean);
 }
 
 export function formatSizesInput(sizes: string[]): string {
-  return sizes.join(' ');
+  return sizes.join(', ');
+}
+
+/** Returns the first value that appears more than once (case-insensitive), or null if none. */
+export function findCaseInsensitiveDuplicate(values: string[]): string | null {
+  const seen = new Set<string>();
+  for (const value of values) {
+    const lower = value.trim().toLowerCase();
+    if (seen.has(lower)) return value.trim();
+    seen.add(lower);
+  }
+  return null;
 }
 
 /** One tile in the grouped gallery: a colourway's representative photo, or a colour-swatch stand-in when it has none. */
 export type GalleryGroup =
-  | { kind: 'photo'; key: string; colourName: string | null; hex: string | null; image: ProductImage }
-  | { kind: 'placeholder'; key: string; colourName: string; hex: string; image: null };
+  | { kind: 'photo'; key: string; colourName: string | null; color: string | null; image: ProductImage }
+  | { kind: 'placeholder'; key: string; colourName: string; color: string; image: null };
 
 /**
  * Groups a product's images into one gallery tile per colourway: a photo tile for colours
@@ -188,8 +207,8 @@ export function groupImagesByColour(images: ProductImage[], colours: ColourOptio
     const bucket = byColour.get(key);
     groups.push(
       bucket && bucket.length > 0
-        ? { kind: 'photo', key, colourName: colour.name, hex: colour.hex, image: bucket[0] }
-        : { kind: 'placeholder', key, colourName: colour.name, hex: colour.hex, image: null }
+        ? { kind: 'photo', key, colourName: colour.name, color: colour.color, image: bucket[0] }
+        : { kind: 'placeholder', key, colourName: colour.name, color: colour.color, image: null }
     );
   }
 
@@ -198,11 +217,11 @@ export function groupImagesByColour(images: ProductImage[], colours: ColourOptio
     const key = image.colour.trim().toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
-    groups.push({ kind: 'photo', key, colourName: image.colour, hex: swatchOf(image.colour), image });
+    groups.push({ kind: 'photo', key, colourName: image.colour, color: swatchOf(image.colour), image });
   }
 
   if (unassigned.length > 0) {
-    groups.push({ kind: 'photo', key: '__unassigned__', colourName: null, hex: null, image: unassigned[0] });
+    groups.push({ kind: 'photo', key: '__unassigned__', colourName: null, color: null, image: unassigned[0] });
   }
 
   return groups;
@@ -236,19 +255,19 @@ export function buildLightboxItems(images: ProductImage[], colours: ColourOption
     seen.add(key);
     const bucket = byColour.get(key);
     if (bucket && bucket.length > 0) {
-      for (const image of bucket) items.push({ kind: 'photo', key: image.id, colourName: colour.name, hex: colour.hex, image });
+      for (const image of bucket) items.push({ kind: 'photo', key: image.id, colourName: colour.name, color: colour.color, image });
     } else {
-      items.push({ kind: 'placeholder', key: `placeholder:${key}`, colourName: colour.name, hex: colour.hex, image: null });
+      items.push({ kind: 'placeholder', key: `placeholder:${key}`, colourName: colour.name, color: colour.color, image: null });
     }
   }
 
   for (const [key, bucket] of byColour) {
     if (seen.has(key)) continue;
-    for (const image of bucket) items.push({ kind: 'photo', key: image.id, colourName: image.colour, hex: swatchOf(image.colour!), image });
+    for (const image of bucket) items.push({ kind: 'photo', key: image.id, colourName: image.colour, color: swatchOf(image.colour!), image });
   }
 
   for (const image of unassigned) {
-    items.push({ kind: 'photo', key: image.id, colourName: null, hex: null, image });
+    items.push({ kind: 'photo', key: image.id, colourName: null, color: null, image });
   }
 
   return items;
@@ -309,6 +328,7 @@ const SHOPIFY_CSV_HEADERS = [
   'Option2 Value',
   'Variant SKU',
   'Variant Grams',
+  'Variant Inventory Tracker',
   'Variant Inventory Policy',
   'Variant Fulfillment Service',
   'Variant Price',
@@ -316,8 +336,12 @@ const SHOPIFY_CSV_HEADERS = [
   'Variant Taxable',
   'Variant Barcode',
   'Variant Inventory Qty',
+  'Cost per item',
   'Image Src',
+  'Status',
 ];
+
+const PRODUCT_STATUS_TO_SHOPIFY: Record<ProductRecord['status'], string> = { ACTIVE: 'active', DRAFT: 'draft', ARCHIVED: 'archived' };
 
 /**
  * Best-effort Shopify product-CSV export — the columns Shopify's own product importer expects,
@@ -347,6 +371,7 @@ export function buildShopifyProductCsv(product: ProductRecord, rows: VariantRow[
         v.size,
         v.sku ?? '',
         '0',
+        'shopify',
         'deny',
         'manual',
         v.sellPrice.toFixed(2),
@@ -354,12 +379,46 @@ export function buildShopifyProductCsv(product: ProductRecord, rows: VariantRow[
         'TRUE',
         v.barcode ?? '',
         String(v.stockOnHand),
+        v.buyPrice.toFixed(2),
         image,
+        PRODUCT_STATUS_TO_SHOPIFY[product.status],
       ]
         .map(escapeCsv)
         .join(',')
     );
   });
+  return lines.join('\r\n');
+}
+
+const PO_CSV_HEADERS = ['PO Number', 'Status', 'Delivery Date', 'Remark', 'Colour', 'Size', 'SKU', 'Quantity', 'Received Quantity', 'Unit Cost'];
+
+/**
+ * Round-trippable PO export — one row per line item. Re-importing this file (via the unified
+ * Import button) updates the same POs by number, or creates new ones for an invented PO Number
+ * label. There's no Shopify equivalent for purchase orders, so this format is our own.
+ */
+export function buildPoCsv(purchaseOrders: PurchaseOrderRecord[]): string {
+  const lines = [PO_CSV_HEADERS.join(',')];
+  for (const po of purchaseOrders) {
+    for (const item of po.items) {
+      lines.push(
+        [
+          formatPoNumber(po.number),
+          po.status,
+          po.deliveryDate ? po.deliveryDate.slice(0, 10) : '',
+          po.remark ?? '',
+          item.colour ?? '',
+          item.size ?? '',
+          item.sku ?? '',
+          String(item.quantity),
+          String(item.receivedQuantity),
+          item.unitCost !== null ? item.unitCost.toFixed(2) : '',
+        ]
+          .map(escapeCsv)
+          .join(',')
+      );
+    }
+  }
   return lines.join('\r\n');
 }
 

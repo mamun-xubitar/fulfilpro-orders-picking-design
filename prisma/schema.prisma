@@ -864,6 +864,7 @@ model PurchaseOrderItem {
   purchaseOrder    PurchaseOrder           @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
   variant          SupplierProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
 
+  @@unique([purchaseOrderId, variantId])
   @@index([purchaseOrderId])
 }
 
@@ -915,9 +916,12 @@ model SupplierProductVariant {
   colour             String
   size               String
   stockOnHand        Int                     @default(0)
+  /** Committed to unfulfilled orders. Manually editable; wins over the order-derived figure shown as a hint. */
+  allocated          Int                     @default(0)
   buyPrice           Decimal                 @default(0) @db.Decimal(14, 2)
   sellPrice          Decimal                 @default(0) @db.Decimal(14, 2)
-  trigger            Int                     @default(0)
+  trigger            Int                     @default(10)
+  /** Unused by the UI — kept for backward compatibility with existing rows. */
   forwardOrders      Int                     @default(0)
   position           Int                     @default(0)
   supplierProduct    SupplierProduct         @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
@@ -950,13 +954,14 @@ model SupplierProductImage {
 model SupplierProductPricing {
   id                String          @id @default(uuid())
   supplierProductId String          @unique
-  currencyCode      String          @default("AUD")
+  currencyCode      String          @default("USD")
   exchangeRate      Decimal         @default(1) @db.Decimal(14, 6)
   buyingPrice       Decimal         @default(0) @db.Decimal(14, 2)
   freight           Decimal         @default(0) @db.Decimal(14, 2)
   misc              Decimal         @default(0) @db.Decimal(14, 2)
   marginPercent     Decimal         @default(0) @db.Decimal(6, 2)
-  tax               Decimal         @default(0) @db.Decimal(14, 2)
+  /** A percent (0-100), not a flat amount — e.g. 10 means 10% of the ex-tax sell price. */
+  tax               Decimal         @default(10) @db.Decimal(6, 2)
   supplierProduct   SupplierProduct @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt

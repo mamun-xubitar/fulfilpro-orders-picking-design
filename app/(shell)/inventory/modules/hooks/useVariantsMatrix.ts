@@ -80,7 +80,8 @@ export function useVariantsMatrix({ product, sizes, colours, onVariantSaved }: U
       if (!allColoursSelected && !activeColours.some((c) => c.toLowerCase() === v.colour.toLowerCase())) return false;
       if (sizeFilter && v.size !== sizeFilter) return false;
       if (filters.status && getStatus(v) !== filters.status) return false;
-      if (!filters.showZeroStock && v.stockOnHand === 0) return false;
+      // Unchecked (default) shows every variant; checking it narrows to zero-or-below stock only.
+      if (filters.showZeroStock && v.stockOnHand > 0) return false;
       return true;
     });
   }, [variants, allColoursSelected, activeColours, sizeFilter, filters.status, filters.showZeroStock]);

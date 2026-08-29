@@ -2,14 +2,16 @@
 
 /** Read and edit cells for one variants / stock matrix row. */
 
-import type { ColourOption } from './types';
+import { formatIncomingLot } from './utils';
+import type { ColourOption, IncomingLot } from './types';
 
 const INPUT_BASE =
   'rounded-lg border border-gray-300 bg-white px-2 py-1 text-[13px] outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100';
 
-export function Num({ value, bold, muted, className }: { value: string; bold?: boolean; muted?: boolean; className?: string }) {
+export function Num({ value, bold, muted, className, title }: { value: string; bold?: boolean; muted?: boolean; className?: string; title?: string }) {
   return (
     <td
+      title={title}
       className={`px-2 py-2 text-right text-[13px] tabular-nums ${className ?? ''} ${
         className ? '' : bold ? 'font-bold text-gray-900' : muted ? 'text-gray-500' : 'text-gray-700'
       }`}
@@ -23,15 +25,17 @@ export function NumCell({
   value,
   label,
   step,
+  title,
   onChange,
 }: {
   value: number;
   label: string;
   step?: string;
+  title?: string;
   onChange: (value: number) => void;
 }) {
   return (
-    <td className="px-2 py-2 text-right">
+    <td className="px-2 py-2 text-right" title={title}>
       <input
         type="number"
         min={0}
@@ -41,6 +45,22 @@ export function NumCell({
         aria-label={label}
         className={`w-20 text-right tabular-nums ${INPUT_BASE}`}
       />
+    </td>
+  );
+}
+
+/** Incoming: one "qty · date" line per open PO, read-only. */
+export function IncomingCell({ lots }: { lots: IncomingLot[] }) {
+  if (lots.length === 0) {
+    return <td className="px-2 py-2 text-right text-[13px] text-gray-400">—</td>;
+  }
+  return (
+    <td className="px-2 py-2 text-right text-[13px] text-gray-500">
+      {lots.map((lot, i) => (
+        <div key={i} className="tabular-nums whitespace-nowrap">
+          {formatIncomingLot(lot)}
+        </div>
+      ))}
     </td>
   );
 }

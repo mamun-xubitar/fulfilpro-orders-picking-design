@@ -98,6 +98,7 @@ export function usePurchaseOrder({ product, refreshCatalog }: UsePurchaseOrderAr
         }
         setCreateOpen(false);
         loadPurchaseOrders();
+        refreshCatalog();
       },
     });
   };
@@ -138,6 +139,7 @@ export function usePurchaseOrder({ product, refreshCatalog }: UsePurchaseOrderAr
     supplierOptions,
     purchaseOrders,
     loadingList,
+    loadPurchaseOrders,
     createOpen,
     openCreate,
     closeCreate,

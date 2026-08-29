@@ -1,5 +1,6 @@
 'use client';
 
+import { resolveSwatch } from '@/lib/inventory/colour';
 import { Image as ImageIcon } from './icons';
 import { deriveImageFilename } from './utils';
 import type { GalleryGroup } from './utils';
@@ -20,7 +21,7 @@ export default function GalleryPreview({ active, productName }: GalleryPreviewPr
           ) : (
             <div
               className="flex aspect-square max-h-[65vh] w-[65vh] max-w-full items-center justify-center rounded-xl px-6 text-center"
-              style={{ backgroundColor: active.hex }}
+              style={{ backgroundColor: resolveSwatch(active.color) }}
             >
               <span className="text-lg font-semibold text-white line-clamp-2" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.35)' }}>
                 {productName || active.colourName}

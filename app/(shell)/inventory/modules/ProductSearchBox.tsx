@@ -28,6 +28,14 @@ export default function ProductSearchBox({ value, onChange, open, setOpen, resul
           setOpen(true);
         }}
         onFocus={() => setOpen(true)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && results.length > 0) {
+            e.preventDefault();
+            onSelect(results[0].id);
+          } else if (e.key === 'Escape') {
+            setOpen(false);
+          }
+        }}
         placeholder="Search products by name, SKU, barcode…"
         aria-label="Search products"
         className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm text-gray-800 shadow-sm outline-none placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
@@ -73,7 +81,7 @@ function SearchThumb({ product }: { product: ProductRecord }) {
   return (
     <span
       className="h-9 w-9 shrink-0 rounded-lg border border-gray-200"
-      style={{ backgroundColor: product.colours[0]?.hex ?? getSwatch(product.variants[0]?.colour ?? '') }}
+      style={{ backgroundColor: product.colours[0]?.color ?? getSwatch(product.variants[0]?.colour ?? '') }}
       aria-hidden="true"
     />
   );

@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import useRequest from '@/hooks/useRequest';
-import { formatSizesInput, parseSizesInput } from '../utils';
-import type { ColourOption, ProductDetailsForm, ProductRecord, ProductStatusValue } from '../types';
+import { deriveColorFromName } from '@/lib/inventory/colour';
+import { findCaseInsensitiveDuplicate, formatColoursInput, formatSizesInput, parseColoursInput, parseSizesInput } from '../utils';
+import type { ProductDetailsForm, ProductRecord, ProductStatusValue } from '../types';
 
 const EMPTY_FORM: ProductDetailsForm = {
   itemNo: '',
@@ -15,12 +16,10 @@ const EMPTY_FORM: ProductDetailsForm = {
   description: '',
   deliveryRemarks: '',
   sizes: '',
-  colours: [],
+  colours: '',
   status: 'DRAFT',
   verified: false,
 };
-
-const NEW_COLOUR: ColourOption = { name: '', hex: '#cbd5e1' };
 
 function productToForm(product: ProductRecord): ProductDetailsForm {
   return {
@@ -33,14 +32,14 @@ function productToForm(product: ProductRecord): ProductDetailsForm {
     description: product.description,
     deliveryRemarks: product.deliveryRemarks,
     sizes: formatSizesInput(product.sizes),
-    colours: product.colours,
+    colours: formatColoursInput(product.colours),
     status: product.status,
     verified: product.verified,
   };
 }
 
 /** Plain string fields the curried `set` helper drives — the rest have their own setters. */
-type TextField = Exclude<keyof ProductDetailsForm, 'colours' | 'verified' | 'status' | 'categoryId'>;
+type TextField = Exclude<keyof ProductDetailsForm, 'verified' | 'status' | 'categoryId'>;
 
 type UseProductDetailsArgs = {
   product: ProductRecord | null;
@@ -71,10 +70,6 @@ export function useProductDetails({ product, onSaved }: UseProductDetailsArgs) {
     write({ ...form, category: category.name, categoryId: category.id });
   };
 
-  const setColour = (index: number, patch: Partial<ColourOption>) => {
-    write({ ...form, colours: form.colours.map((c, i) => (i === index ? { ...c, ...patch } : c)) });
-  };
-
   const saveDetails = () => {
     if (!product) return;
     request({
@@ -90,9 +85,17 @@ export function useProductDetails({ product, onSaved }: UseProductDetailsArgs) {
         description: form.description,
         deliveryRemarks: form.deliveryRemarks,
         sizes: parseSizesInput(form.sizes),
-        colours: form.colours,
+        colours: parseColoursInput(form.colours),
         status: form.status,
         verified: form.verified,
+      },
+      validation: async () => {
+        const validationErrors: Record<string, string> = {};
+        const dupColour = findCaseInsensitiveDuplicate(parseColoursInput(form.colours).map((c) => c.name));
+        if (dupColour) validationErrors.colours = `"${dupColour}" is listed more than once`;
+        const dupSize = findCaseInsensitiveDuplicate(parseSizesInput(form.sizes));
+        if (dupSize) validationErrors.sizes = `"${dupSize}" is listed more than once`;
+        return validationErrors;
       },
       successMessage: 'Product details saved',
       onSuccess: ({ data }) => {
@@ -103,6 +106,47 @@ export function useProductDetails({ product, onSaved }: UseProductDetailsArgs) {
     });
   };
 
+  /** Appends one size and saves immediately — for the matrix toolbar's "Add size" button,
+   * which shouldn't require opening the Product Details edit form. Returns an error message
+   * on a duplicate (case-insensitive) instead of adding it, or null on success. */
+  const quickAddSize = (value: string): string | null => {
+    if (!product) return null;
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const currentSizes = parseSizesInput(form.sizes);
+    if (currentSizes.some((s) => s.toLowerCase() === trimmed.toLowerCase())) return `"${trimmed}" already exists`;
+    const nextSizes = [...currentSizes, trimmed];
+    write({ ...form, sizes: formatSizesInput(nextSizes) });
+    request({
+      url: `/api/inventory/catalog/${product.id}`,
+      method: 'PATCH',
+      data: { sizes: nextSizes },
+      successMessage: 'Size added',
+      onSuccess: ({ data }) => onSaved(data),
+    });
+    return null;
+  };
+
+  /** Appends one colour and saves immediately — mirrors quickAddSize. Returns an error message
+   * on a duplicate name (case-insensitive) instead of adding it, or null on success. */
+  const quickAddColour = (name: string): string | null => {
+    if (!product) return null;
+    const trimmed = name.trim();
+    if (!trimmed) return null;
+    const currentColours = parseColoursInput(form.colours);
+    if (currentColours.some((c) => c.name.toLowerCase() === trimmed.toLowerCase())) return `"${trimmed}" already exists`;
+    const nextColours = [...currentColours, { name: trimmed, color: deriveColorFromName(trimmed) }];
+    write({ ...form, colours: formatColoursInput(nextColours) });
+    request({
+      url: `/api/inventory/catalog/${product.id}`,
+      method: 'PATCH',
+      data: { colours: nextColours },
+      successMessage: 'Colour added',
+      onSuccess: ({ data }) => onSaved(data),
+    });
+    return null;
+  };
+
   return {
     editing,
     saving,
@@ -110,9 +154,6 @@ export function useProductDetails({ product, onSaved }: UseProductDetailsArgs) {
     form,
     set,
     setCategory,
-    setColour,
-    addColour: () => write({ ...form, colours: [...form.colours, NEW_COLOUR] }),
-    removeColour: (index: number) => write({ ...form, colours: form.colours.filter((_, i) => i !== index) }),
     setStatus: (status: ProductStatusValue) => write({ ...form, status }),
     setVerified: (verified: boolean) => write({ ...form, verified }),
     startEdit: () => product && setEditingId(product.id),
@@ -121,8 +162,10 @@ export function useProductDetails({ product, onSaved }: UseProductDetailsArgs) {
       setEditingId(null);
     },
     saveDetails,
+    quickAddSize,
+    quickAddColour,
     // Effective lists, so the variants matrix reflects an in-progress edit.
     sizes: parseSizesInput(form.sizes),
-    colours: form.colours,
+    colours: parseColoursInput(form.colours),
   };
 }
