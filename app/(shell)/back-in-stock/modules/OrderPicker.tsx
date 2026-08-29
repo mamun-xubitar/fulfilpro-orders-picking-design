@@ -38,15 +38,30 @@ export default function OrderPicker({ query, setQuery, options, loading, open, s
 
   useEffect(() => {
     if (!open) return;
+
     const updatePosition = (): void => {
       const rect = inputRef.current?.getBoundingClientRect();
       if (!rect) return;
-      setPosition({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+      const next: DropdownPosition = { top: rect.bottom + 4, left: rect.left, width: rect.width };
+      setPosition((prev) => (
+        prev && prev.top === next.top && prev.left === next.left && prev.width === next.width ? prev : next
+      ));
     };
+
     updatePosition();
+
+    // The dropdown's anchor (the input) shifts whenever the modal panel grows or
+    // shrinks — e.g. selecting an order adds a chip above the input, or adds a
+    // whole section below it — which changes nothing about the input's own size,
+    // only its position. Observing the panel (not the input) catches that reflow.
+    const panel = containerRef.current?.closest('.rounded-xl');
+    const resizeObserver = panel ? new ResizeObserver(updatePosition) : null;
+    resizeObserver?.observe(panel!);
+
     window.addEventListener('resize', updatePosition);
     window.addEventListener('scroll', updatePosition, true);
     return () => {
+      resizeObserver?.disconnect();
       window.removeEventListener('resize', updatePosition);
       window.removeEventListener('scroll', updatePosition, true);
     };
@@ -94,11 +109,7 @@ export default function OrderPicker({ query, setQuery, options, loading, open, s
           style={{ position: 'fixed', top: position.top, left: position.left, width: position.width }}
           className="z-[60] max-h-56 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg"
         >
-          {loading ? (
-            <p className="px-3 py-3 text-sm text-gray-400">Searching...</p>
-          ) : options.length === 0 ? (
-            <p className="px-3 py-3 text-sm text-gray-400">No eligible orders found.</p>
-          ) : (
+          {options.length > 0 ? (
             options.map((option) => (
               <label key={option.id} className="flex cursor-pointer items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50">
                 <input
@@ -110,6 +121,10 @@ export default function OrderPicker({ query, setQuery, options, loading, open, s
                 <span className="text-gray-800">{optionLabel(option)}</span>
               </label>
             ))
+          ) : loading ? (
+            <p className="px-3 py-3 text-sm text-gray-400">Searching...</p>
+          ) : (
+            <p className="px-3 py-3 text-sm text-gray-400">No eligible orders found.</p>
           )}
         </div>,
         document.body
