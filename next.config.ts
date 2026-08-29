@@ -3,8 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   /* config options here */
   allowedDevOrigins: [
-    "shopify-dev-tunnel.xubitar.com",
-    "triclinic-measurelessly-bryanna.ngrok-free.dev",
+     new URL(process.env.APP_URL || "shopify-dev-tunnel.xubitar.com").hostname,
   ],
 };
 

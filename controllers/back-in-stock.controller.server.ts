@@ -28,6 +28,17 @@ export class BackInStockController {
     return { data: result, message: 'Back in stock requests loaded' };
   }
 
+  async searchOrderOptions(searchParams: URLSearchParams, allowedStoreIds: string[] | null) {
+    const search = searchParams.get('q')?.trim() ?? '';
+
+    if (allowedStoreIds !== null && allowedStoreIds.length === 0) {
+      return { data: [], message: 'Orders loaded' };
+    }
+
+    const options = await model.searchOrderOptions({ search, storeIds: allowedStoreIds, limit: 20 });
+    return { data: options, message: 'Orders loaded' };
+  }
+
   async create(body: unknown, requester: { id: string; name: string; email: string }) {
     const parsed = parseCreate(body);
     const result = await model.create({
