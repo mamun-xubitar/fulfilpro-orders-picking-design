@@ -38,10 +38,10 @@ export default function InventoryPage() {
             <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
               <ProductsTableToolbar table={p.productsTable} onRefresh={p.refresh} loading={p.loading} />
               {hasSelection && <ProductsSelectionBar table={p.productsTable} />}
-              <ProductsTable table={p.productsTable} loading={p.loading} />
+              <ProductsTable table={p.productsTable} loading={p.initialLoading} />
               <Pagination
                 pagination={p.productsTable.pagination}
-                loading={p.loading}
+                loading={p.initialLoading}
                 pageNumbers={p.productsTable.pageNumbers}
                 onPageChange={p.productsTable.goToPage}
                 itemLabel="products"
@@ -49,7 +49,7 @@ export default function InventoryPage() {
                 onPageSizeChange={p.productsTable.setPageSize}
               />
             </div>
-          ) : p.loading ? (
+          ) : p.initialLoading ? (
             <LoadingState />
           ) : !p.product ? (
             <EmptyState />

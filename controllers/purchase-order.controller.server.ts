@@ -1,8 +1,10 @@
 import prisma from '@/lib/prisma.server';
 import { PurchaseOrderModel } from '@/models/purchase-order.model.server';
+import { SupplierProductModel } from '@/models/supplier-product.model.server';
 import { PurchaseOrderStatus } from '@prisma/client';
 
 const model = new PurchaseOrderModel();
+const productModel = new SupplierProductModel();
 const STATUS_VALUES = new Set<string>(Object.values(PurchaseOrderStatus));
 
 type Session = { user?: { id?: string | null; name?: string | null; email?: string | null; role?: string | null } | null } | null;
@@ -13,6 +15,11 @@ function isAdmin(session: Session) {
 
 function actorFromSession(session: Session) {
   return { id: session?.user?.id ?? '', name: session?.user?.name ?? session?.user?.email ?? 'Unknown' };
+}
+
+/** "Black / M", "Black" (colour-only), "M" (size-only), or "—" (neither axis). */
+function variantTitle(colour: string, size: string): string {
+  return [colour, size].filter(Boolean).join(' / ') || '—';
 }
 
 export class PurchaseOrderController {
@@ -118,7 +125,7 @@ export class PurchaseOrderController {
         const variant = variantMap.get(i.variantId)!;
         return {
           variantId: variant.id,
-          variantTitle: `${variant.colour} / ${variant.size}`,
+          variantTitle: variantTitle(variant.colour, variant.size),
           sku: variant.sku,
           quantity: i.quantity,
           unitCost: i.unitCost ?? Number(variant.buyPrice),
@@ -126,7 +133,8 @@ export class PurchaseOrderController {
       }),
     });
 
-    return { data: purchaseOrder, message: 'Purchase order created' };
+    const updatedProduct = await productModel.findById(product.id);
+    return { data: { purchaseOrder, product: updatedProduct }, message: 'Purchase order created' };
   }
 
   async updateStatus(id: string, body: unknown, session: Session) {
@@ -191,6 +199,7 @@ export class PurchaseOrderController {
     if (errors.length) return { error: { message: 'Validation failed', errors, status: 400 } };
 
     const purchaseOrder = await model.receive(id, receipts, actorFromSession(session));
-    return { data: purchaseOrder, message: 'Inventory received' };
+    const product = await productModel.findById(po.supplierProductId);
+    return { data: { purchaseOrder, product }, message: 'Inventory received' };
   }
 }

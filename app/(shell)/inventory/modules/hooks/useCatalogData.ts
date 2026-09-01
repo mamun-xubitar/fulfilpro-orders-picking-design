@@ -12,6 +12,7 @@ export function useCatalogData() {
   const [globals, setGlobals] = useState<InventoryGlobals>(EMPTY_GLOBALS);
   const [rateInput, setRateInput] = useState('');
   const [marginInput, setMarginInput] = useState('');
+  const [loaded, setLoaded] = useState(false);
   const { request, loading } = useRequest<ProductsResponse>();
   const { request: requestSettings } = useRequest();
 
@@ -25,6 +26,7 @@ export function useCatalogData() {
         setGlobals(data.globals);
         setRateInput(data.globals.exchangeRate.toFixed(2));
         setMarginInput(String(data.globals.marginPercent));
+        setLoaded(true);
       },
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -40,6 +42,16 @@ export function useCatalogData() {
 
   const addProduct = useCallback((product: ProductRecord) => {
     setProducts((prev) => [product, ...prev]);
+  }, []);
+
+  const removeProducts = useCallback((ids: string[]) => {
+    const idSet = new Set(ids);
+    setProducts((prev) => prev.filter((p) => !idSet.has(p.id)));
+  }, []);
+
+  const patchProducts = useCallback((ids: string[], patch: Partial<ProductRecord>) => {
+    const idSet = new Set(ids);
+    setProducts((prev) => prev.map((p) => (idSet.has(p.id) ? { ...p, ...patch } : p)));
   }, []);
 
   const applyGlobalRate = () => {
@@ -74,11 +86,17 @@ export function useCatalogData() {
 
   return {
     loading,
+    /** True only for the page's first load — a background refresh (after a mutation) never
+     * flips this, so the detail view and product table stay mounted instead of flashing to
+     * skeletons and jumping scroll position. */
+    initialLoading: loading && !loaded,
     products,
     globals,
     refresh: load,
     updateProduct,
     addProduct,
+    removeProducts,
+    patchProducts,
     rateInput,
     setRateInput,
     applyGlobalRate,

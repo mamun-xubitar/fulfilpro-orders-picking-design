@@ -82,7 +82,7 @@ export function ColourCell({
     <div className="flex items-center gap-2">
       <span className="h-2.5 w-2.5 shrink-0 rounded-full ring-1 ring-black/10" style={{ backgroundColor: swatch }} />
       <select value={value} onChange={(e) => onChange(e.target.value)} aria-label={label} className={`w-28 cursor-pointer ${INPUT_BASE}`}>
-        {colours.every((c) => c.name !== value) && <option value={value}>{value}</option>}
+        {value === '' ? <option value="">—</option> : colours.every((c) => c.name !== value) && <option value={value}>{value}</option>}
         {colours.map((colour) => (
           <option key={colour.name} value={colour.name}>
             {colour.name}
@@ -107,7 +107,7 @@ export function SizeCell({
   return (
     <td className="px-2 py-2">
       <select value={value} onChange={(e) => onChange(e.target.value)} aria-label={label} className={`w-20 cursor-pointer ${INPUT_BASE}`}>
-        {!sizes.includes(value) && <option value={value}>{value}</option>}
+        {value === '' ? <option value="">—</option> : !sizes.includes(value) && <option value={value}>{value}</option>}
         {sizes.map((size) => (
           <option key={size} value={size}>
             {size}

@@ -1,9 +1,8 @@
 import prisma from '@/lib/prisma.server';
-import { deriveColorFromName } from '@/lib/inventory/colour';
-import { detectCsvType, parsePoCsv, parseShopifyProductCsv } from '@/lib/inventory/csv-import';
-import type { ParsedPoRow } from '@/lib/inventory/csv-import';
+import { detectCsvType, findIncompleteAxisRows, normalizeParsedProductRows, parsePoCsv, parseShopifyProductCsv, upsertParsedProductVariants } from '@/lib/inventory/csv-import';
+import type { ParsedPoRow, ParsedProductGroup } from '@/lib/inventory/csv-import';
 import { SupplierProductModel } from '@/models/supplier-product.model.server';
-import type { ColourOptionData, SupplierProductRow } from '@/models/supplier-product.model.server';
+import type { SupplierProductRow } from '@/models/supplier-product.model.server';
 import { PurchaseOrderModel } from '@/models/purchase-order.model.server';
 import { PurchaseOrderStatus, SupplierProductStatus } from '@prisma/client';
 
@@ -23,16 +22,27 @@ function actorFromSession(session: Session) {
   return { id: session?.user?.id ?? null, name: session?.user?.name ?? session?.user?.email ?? 'Unknown' };
 }
 
+/** "Black / M", "Black" (colour-only), "M" (size-only), or "—" (neither axis). */
+function variantTitle(colour: string, size: string): string {
+  return [colour, size].filter(Boolean).join(' / ') || '—';
+}
+
+type ProductCsvOptions = {
+  /** Defaults to today's always-replace behaviour when the flag is omitted by an older caller. */
+  overwrite: boolean;
+  markVerified: boolean;
+};
+
 export class InventoryCsvImportController {
-  async preview(supplierProductId: string, file: File, session: Session) {
-    return this.process(supplierProductId, file, session, false);
+  async preview(supplierProductId: string, file: File, session: Session, options: ProductCsvOptions) {
+    return this.process(supplierProductId, file, session, false, options);
   }
 
-  async commit(supplierProductId: string, file: File, session: Session) {
-    return this.process(supplierProductId, file, session, true);
+  async commit(supplierProductId: string, file: File, session: Session, options: ProductCsvOptions) {
+    return this.process(supplierProductId, file, session, true, options);
   }
 
-  private async process(supplierProductId: string, file: File, session: Session, commit: boolean) {
+  private async process(supplierProductId: string, file: File, session: Session, commit: boolean, options: ProductCsvOptions) {
     if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
     const product = await productModel.findById(supplierProductId);
     if (!product) return { error: { message: 'Product not found', status: 404 } };
@@ -42,121 +52,130 @@ export class InventoryCsvImportController {
     if (type === 'unknown') {
       return { error: { message: 'Unrecognized file — expected a Shopify product CSV or a purchase-order CSV', status: 400 } };
     }
-    if (type === 'product') return this.processProductCsv(product, text, commit, session);
+    // The overwrite / markVerified options apply to product CSVs only — a PO CSV never
+    // replaces product details, so there's nothing for them to gate.
+    if (type === 'product') return this.processProductCsv(product, text, commit, session, options);
     return this.processPoCsv(product, text, commit, session);
   }
 
+  /** Picks the group in a (possibly multi-product) CSV that belongs to this product: the group
+   * whose Handle matches, or — for a single-product file with a different Handle (e.g. importing
+   * a freshly exported file back into the product that produced it, or a file downloaded straight
+   * from Shopify) — the file's only group, adopting its Handle onto this product. A multi-product
+   * file with no matching Handle is rejected rather than guessed at. */
+  private async resolveProductGroup(
+    product: SupplierProductRow,
+    groups: ParsedProductGroup[],
+    commit: boolean
+  ): Promise<{ group: ParsedProductGroup; newHandle: string | null } | { error: { message: string; status: number } }> {
+    const matched = groups.find((g) => g.handle === product.handle);
+    if (matched) return { group: matched, newHandle: null as string | null };
+
+    if (groups.length === 0) {
+      return { error: { message: 'rows: No product rows found in this file', status: 400 } };
+    }
+    if (groups.length > 1) {
+      const handles = groups.map((g) => g.handle).join(', ');
+      return {
+        error: {
+          message: `handle: This file describes ${groups.length} products (${handles}) — none match this product's handle (${product.handle}). Use "Import products" to add multiple products at once.`,
+          status: 400,
+        },
+      };
+    }
+
+    const [only] = groups;
+    if (commit) {
+      const conflict = await prisma.supplierProduct.findUnique({ where: { handle: only.handle }, select: { id: true } });
+      if (conflict && conflict.id !== product.id) {
+        return { error: { message: 'handle: Another product already uses this file\'s handle', status: 409 } };
+      }
+    }
+    return { group: only, newHandle: only.handle };
+  }
+
   /** Pricing (buying price, freight, margin, tax, exchange rate) is deliberately excluded here —
-   * import only ever touches product details, images, and per-variant sku/barcode/stock/sell price.
-   * itemNo is NOT imported: it's the hub's own style code, and the CSV's Handle is a Shopify URL
-   * slug that can collide with another product's itemNo under the same supplier (unique constraint). */
-  private async processProductCsv(product: SupplierProductRow, text: string, commit: boolean, session: Session) {
-    const parsed = parseShopifyProductCsv(text);
+   * import only ever touches product details, handle, images, and per-variant sku/barcode/stock/
+   * sell price/image. itemNo is NOT imported: it's the hub's own style code, distinct from the
+   * CSV's Handle (which import instead writes to the product's own handle field). */
+  private async processProductCsv(product: SupplierProductRow, text: string, commit: boolean, session: Session, options: ProductCsvOptions) {
+    const groups = parseShopifyProductCsv(text);
+    const resolved = await this.resolveProductGroup(product, groups, commit);
+    if ('error' in resolved) return resolved;
+    const { group: parsed, newHandle } = resolved;
+
+    // `newHandle === null` means the file's handle matched this product's own handle — i.e. this
+    // import is about to replace values already on the record, which is exactly what
+    // "Overwrite…" gates. Adopting a brand-new handle onto the product isn't a replace in that
+    // sense, so it's unaffected by the flag.
+    if (newHandle === null && !options.overwrite) {
+      return {
+        error: { message: `handle: This product already exists — tick "Overwrite products with matching handles" to replace its values`, status: 409 },
+      };
+    }
+
     if (parsed.rows.length === 0) {
-      return { error: { message: 'rows: No valid rows found — expected Option1 Value (Colour) and Option2 Value (Size) columns', status: 400 } };
+      return { error: { message: 'rows: No variant rows found — expected Handle plus Option values (Colour / Size), or a single Default Title row', status: 400 } };
     }
 
-    // Normalise each row's colour/size to the existing casing. The variant's unique key is
-    // case-sensitive, so a CSV value that differs only in case from the real variant record
-    // would otherwise miss the lookup below and create a duplicate instead of updating it.
-    const existingColourByLower = new Map(product.colours.map((c) => [c.name.toLowerCase(), c.name]));
-    const existingSizeByLower = new Map(product.sizes.map((s) => [s.toLowerCase(), s]));
-    const existingVariantColourByLower = new Map(product.variants.map((v) => [v.colour.toLowerCase(), v.colour]));
-    const existingVariantSizeByLower = new Map(product.variants.map((v) => [v.size.toLowerCase(), v.size]));
-    const rows = parsed.rows.map((row) => ({
-      ...row,
-      colour: existingVariantColourByLower.get(row.colour.toLowerCase()) ?? existingColourByLower.get(row.colour.toLowerCase()) ?? row.colour,
-      size: existingVariantSizeByLower.get(row.size.toLowerCase()) ?? existingSizeByLower.get(row.size.toLowerCase()) ?? row.size,
-    }));
+    const { rows, unionSizes, unionColours } = normalizeParsedProductRows(product, parsed.rows);
 
-    // Extend the product's declared sizes/colours to the union with what's being imported, so
-    // reconcileVariants (inside updateDetails) creates the new combos instead of deleting them.
-    const unionSizes = [...product.sizes];
-    for (const row of rows) {
-      if (!existingSizeByLower.has(row.size.toLowerCase())) {
-        unionSizes.push(row.size);
-        existingSizeByLower.set(row.size.toLowerCase(), row.size);
-      }
-    }
-    const unionColours: ColourOptionData[] = [...product.colours];
-    for (const row of rows) {
-      if (!existingColourByLower.has(row.colour.toLowerCase())) {
-        unionColours.push({ name: row.colour, color: deriveColorFromName(row.colour) });
-        existingColourByLower.set(row.colour.toLowerCase(), row.colour);
-      }
-    }
+    // Applied on both preview and commit, so a malformed file is caught before the user ever
+    // sees a preview table for it — see findIncompleteAxisRows for why this matters.
+    const axisErrors = findIncompleteAxisRows(
+      rows,
+      unionColours.map((c) => c.name),
+      unionSizes
+    );
+    if (axisErrors.length > 0) return { error: { message: 'Validation failed', errors: axisErrors, status: 400 } };
 
     if (typeof parsed.product.status === 'string' && !PRODUCT_STATUS_VALUES.has(parsed.product.status)) {
       delete parsed.product.status;
     }
 
-    // Dedup against existing images by (url, colour) — not url alone.
-    const existingImageKeys = new Set(product.images.map((i) => `${i.url}::${i.colour ?? ''}`));
-    const images = parsed.images
-      .map((image) => ({ url: image.url, colour: image.colour ? existingColourByLower.get(image.colour.toLowerCase()) ?? image.colour : null }))
-      .filter((image) => !existingImageKeys.has(`${image.url}::${image.colour ?? ''}`));
+    // Dedup against existing images by url alone — a flat pool, Shopify-style, so the same photo
+    // shared by several variants is stored once and linked from multiple variants (`imageId`).
+    const existingImageUrls = new Set(product.images.map((i) => i.url));
+    const images = parsed.images.map((image) => ({ url: image.url, altText: image.altText })).filter((image) => !existingImageUrls.has(image.url));
 
     if (!commit) {
       return { data: { type: 'product' as const, rows, product: parsed.product, images }, message: 'Preview ready' };
     }
 
-    await productModel.updateDetails(product.id, { ...parsed.product, sizes: unionSizes, colours: unionColours });
+    await productModel.updateDetails(product.id, {
+      ...parsed.product,
+      ...(newHandle ? { handle: newHandle } : {}),
+      sizes: unionSizes,
+      colours: unionColours,
+      ...(options.markVerified ? { verified: true } : {}),
+    });
 
-    let created = 0;
-    let updated = 0;
-    await prisma.$transaction(
+    // Insert new images first, so their ids are available to link into `Variant Image` rows below.
+    const urlToImageId = new Map(product.images.map((i) => [i.url, i.id]));
+    if (images.length > 0) {
+      const createdImages = await productModel.addImages(
+        product.id,
+        images.map((image) => ({ url: image.url, altText: image.altText, colour: null }))
+      );
+      for (const created of createdImages) urlToImageId.set(created.url, created.id);
+    }
+
+    const { created, updated } = await prisma.$transaction(
       async (tx) => {
-        for (const row of rows) {
-          const existing = await tx.supplierProductVariant.findUnique({
-            where: { supplierProductId_colour_size: { supplierProductId: product.id, colour: row.colour, size: row.size } },
-          });
-          if (existing) {
-            await tx.supplierProductVariant.update({
-              where: { id: existing.id },
-              data: {
-                sku: row.sku,
-                barcode: row.barcode,
-                stockOnHand: row.stockOnHand,
-                sellPrice: row.sellPrice,
-                ...(row.buyPrice !== undefined && { buyPrice: row.buyPrice }),
-              },
-            });
-            updated++;
-          } else {
-            await tx.supplierProductVariant.create({
-              data: {
-                supplierProductId: product.id,
-                colour: row.colour,
-                size: row.size,
-                sku: row.sku,
-                barcode: row.barcode,
-                stockOnHand: row.stockOnHand,
-                sellPrice: row.sellPrice,
-                buyPrice: row.buyPrice ?? 0,
-              },
-            });
-            created++;
-          }
-        }
+        const result = await upsertParsedProductVariants(tx, product.id, rows, urlToImageId);
         await tx.inventoryActivity.create({
           data: {
             supplierProductId: product.id,
             type: 'imported',
-            message: `Imported ${rows.length} row${rows.length === 1 ? '' : 's'} (${created} created, ${updated} updated)`,
+            message: `Imported ${rows.length} row${rows.length === 1 ? '' : 's'} (${result.created} created, ${result.updated} updated)`,
             actorId: session?.user?.id ?? null,
             actorName: session?.user?.name ?? session?.user?.email ?? 'Unknown',
           },
         });
+        return result;
       },
       { timeout: 30_000 }
     );
-
-    if (images.length > 0) {
-      await productModel.addImages(
-        product.id,
-        images.map((image) => ({ url: image.url, altText: null, colour: image.colour }))
-      );
-    }
 
     const updatedProduct = await productModel.findById(product.id);
     return { data: { product: updatedProduct, created, updated }, message: `Imported ${rows.length} row${rows.length === 1 ? '' : 's'}` };
@@ -231,16 +250,16 @@ export class InventoryCsvImportController {
       for (const row of rows) {
         const variant = (row.sku && variantBySku.get(row.sku.toLowerCase())) || variantByColourSize.get(`${row.colour.toLowerCase()}::${row.size.toLowerCase()}`);
         if (!variant) {
-          errors.push(`${poNumber}: No variant found for ${row.sku || `${row.colour} / ${row.size}`}`);
+          errors.push(`${poNumber}: No variant found for ${row.sku || variantTitle(row.colour, row.size)}`);
           continue;
         }
         if (!Number.isFinite(row.quantity) || row.quantity < 0) {
-          errors.push(`${poNumber}: Invalid quantity for ${variant.colour} / ${variant.size}`);
+          errors.push(`${poNumber}: Invalid quantity for ${variantTitle(variant.colour, variant.size)}`);
           continue;
         }
         items.push({
           variantId: variant.id,
-          variantTitle: `${variant.colour} / ${variant.size}`,
+          variantTitle: variantTitle(variant.colour, variant.size),
           sku: variant.sku,
           quantity: Math.trunc(row.quantity),
           receivedQuantity: row.receivedQuantity !== undefined ? Math.trunc(row.receivedQuantity) : 0,

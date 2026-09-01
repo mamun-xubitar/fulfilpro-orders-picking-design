@@ -37,6 +37,9 @@ export type VariantRow = {
   incoming: number;
   /** One entry per open PO with unreceived quantity. */
   incomingLots: IncomingLot[];
+  /** The one image from the product's pool this variant is linked to, Shopify-style — several
+   * variants may point at the same image. Null when unlinked. */
+  imageId: string | null;
 };
 
 /** Below / near / above the reorder trigger. Drives row tint, badge and legend. */
@@ -132,8 +135,10 @@ export type ProductRecord = {
   id: string;
   supplierId: string;
   supplierName: string;
-  /** Style code — Product.handle stands in for this today. */
+  /** The hub's own style code — distinct from `handle`. */
   itemNo: string;
+  /** Unique, URL-safe slug — Shopify's product Handle equivalent. */
+  handle: string;
   /** Product.vendor */
   brand: string;
   /** Product.title */
@@ -144,7 +149,8 @@ export type ProductRecord = {
   categoryId: string | null;
   /** Parent SKU. Shopify has no such field; derived from the variant prefix. */
   sku: string;
-  /** Plain text, from Product.descriptionHtml. */
+  /** Sanitized HTML — edited via a rich-text field, imported straight from Shopify's
+   * `Body (HTML)` CSV column, and rendered rather than escaped. */
   description: string;
   /** NOT IN PRISMA YET — free-text supplier delivery note. */
   deliveryRemarks: string;
@@ -228,6 +234,7 @@ export type PricingForm = {
 /** Editable copy of the product record while the details panel is in edit mode. */
 export type ProductDetailsForm = {
   itemNo: string;
+  handle: string;
   brand: string;
   name: string;
   category: string;

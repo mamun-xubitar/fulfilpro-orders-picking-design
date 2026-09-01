@@ -3,11 +3,13 @@
 import { useMemo, useState } from 'react';
 import { toast } from 'react-toastify';
 import useRequest from '@/hooks/useRequest';
+import { isValidHandle } from '@/lib/inventory/handle';
 import { DEMO_ONLINE_STORES } from '../constants';
 import { summariseVariants } from '../utils';
 import { useAdjustments } from './useAdjustments';
 import { useCatalogData } from './useCatalogData';
 import { useImportExport } from './useImportExport';
+import { useImportProducts } from './useImportProducts';
 import { useProductDetails } from './useProductDetails';
 import { useProductImageMutations } from './useProductImageMutations';
 import { useProductImages } from './useProductImages';
@@ -40,12 +42,19 @@ export function useInventoryPage() {
   const imageMutations = useProductImageMutations({ product, onSaved: onProductSaved });
   const pricing = useProductPricing({ product, globals: data.globals, onSaved: onProductSaved });
   const details = useProductDetails({ product, onSaved: onProductSaved });
-  const matrix = useVariantsMatrix({ product, sizes: details.sizes, colours: details.colours, onVariantSaved: onProductSaved });
-  const po = usePurchaseOrder({ product, refreshCatalog: data.refresh });
-  const stocktake = useStocktake({ product, refreshCatalog: data.refresh });
-  const adjustments = useAdjustments({ product, refreshCatalog: data.refresh });
-  const importExport = useImportExport({ product, refreshCatalog: data.refresh, onPoImported: po.loadPurchaseOrders });
-  const productsTable = useProductsTable({ products: data.products, verifiedOnly: nav.verifiedOnly, onView: nav.viewProduct, refreshCatalog: data.refresh });
+  // A variant delete (or edit) can prune a colour/size the details draft doesn't know about yet
+  // — sync the draft's lists from the server's copy so a since-removed value isn't offered back.
+  const onVariantSaved = (updated: ProductRecord) => {
+    onProductSaved(updated);
+    details.syncListsFromProduct(updated);
+  };
+  const matrix = useVariantsMatrix({ product, sizes: details.sizes, colours: details.colours, onVariantSaved });
+  const po = usePurchaseOrder({ product, onSaved: onProductSaved });
+  const stocktake = useStocktake({ product, onSaved: onProductSaved });
+  const adjustments = useAdjustments({ product, onSaved: onProductSaved });
+  const importExport = useImportExport({ product, onSaved: onProductSaved, onPoImported: po.loadPurchaseOrders });
+  const importProducts = useImportProducts({ supplierOptions: po.supplierOptions, addProduct: data.addProduct, updateProduct: data.updateProduct });
+  const productsTable = useProductsTable({ products: data.products, verifiedOnly: nav.verifiedOnly, onView: nav.viewProduct, removeProducts: data.removeProducts, patchProducts: data.patchProducts });
 
   /** Stock Summary always reflects the whole product, not the matrix's filtered rows. */
   const summary = useMemo(() => summariseVariants(product?.variants ?? []), [product]);
@@ -55,7 +64,7 @@ export function useInventoryPage() {
     toast.info(`${action} isn't available yet.`);
   };
 
-  const createProduct = (form: { supplierId: string; itemNo: string; name: string; brand: string }) => {
+  const createProduct = (form: { supplierId: string; itemNo: string; name: string; brand: string; handle: string }) => {
     requestCreate({
       url: '/api/inventory/catalog',
       method: 'POST',
@@ -66,6 +75,7 @@ export function useInventoryPage() {
         if (!form.supplierId) errors.supplierId = 'Supplier is required';
         if (!form.itemNo.trim()) errors.itemNo = 'Item number is required';
         if (!form.name.trim()) errors.name = 'Product name is required';
+        if (!isValidHandle(form.handle.trim())) errors.handle = 'Enter a valid handle (lowercase letters, numbers and dashes)';
         return errors;
       },
       onSuccess: ({ data: created }) => {
@@ -84,6 +94,7 @@ export function useInventoryPage() {
 
   return {
     loading: data.loading,
+    initialLoading: data.initialLoading,
     refresh: data.refresh,
     product,
     globals: data.globals,
@@ -102,6 +113,7 @@ export function useInventoryPage() {
     stocktake,
     adjustments,
     importExport,
+    importProducts,
     productsTable,
     summary,
     rateInput: data.rateInput,

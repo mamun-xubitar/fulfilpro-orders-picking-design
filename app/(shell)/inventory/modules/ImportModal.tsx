@@ -29,6 +29,32 @@ export default function ImportModal({ importExport: ie }: { importExport: Return
           variants/stock matrix. A PO CSV inserts or updates purchase orders for this product (matched by PO number) and their line items; the Incoming column updates
           automatically. Pricing (buying price, freight, margin, tax) and the reorder Trigger aren&apos;t touched by import.
         </p>
+        <div className="space-y-1.5 rounded-lg border border-gray-200 bg-gray-50 p-3">
+          <label className="flex items-start gap-2 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              checked={ie.overwrite}
+              onChange={(e) => ie.setOverwrite(e.target.checked)}
+              className="mt-0.5 h-3.5 w-3.5 cursor-pointer accent-blue-600"
+            />
+            <span>
+              <span className="font-medium">Overwrite this product if the file&apos;s handle matches.</span> Checked: this product&apos;s values are
+              replaced by the file. Unchecked: the import is skipped instead. <span className="text-gray-400">(Product CSV only.)</span>
+            </span>
+          </label>
+          <label className="flex items-start gap-2 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              checked={ie.markVerified}
+              onChange={(e) => ie.setMarkVerified(e.target.checked)}
+              className="mt-0.5 h-3.5 w-3.5 cursor-pointer accent-blue-600"
+            />
+            <span>
+              <span className="font-medium">Mark this product as verified.</span> <span className="text-gray-400">(Product CSV only.)</span>
+            </span>
+          </label>
+        </div>
+
         <input
           type="file"
           accept=".csv,text/csv"

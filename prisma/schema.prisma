@@ -879,6 +879,8 @@ model SupplierProduct {
   id              String                   @id @default(uuid())
   supplierId      String
   itemNo          String
+  /** Unique, URL-safe slug — Shopify's product Handle equivalent. */
+  handle          String                   @unique
   name            String
   brand           String?
   category        String?
@@ -924,6 +926,9 @@ model SupplierProductVariant {
   /** Unused by the UI — kept for backward compatibility with existing rows. */
   forwardOrders      Int                     @default(0)
   position           Int                     @default(0)
+  /** One image from the product's pool, Shopify-style — several variants may point at the same image. */
+  imageId            String?
+  image              SupplierProductImage?   @relation(fields: [imageId], references: [id], onDelete: SetNull)
   supplierProduct    SupplierProduct         @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
   purchaseOrderItems PurchaseOrderItem[]
   stocktakeItems     StocktakeItem[]
@@ -935,17 +940,19 @@ model SupplierProductVariant {
   @@index([supplierProductId])
   @@index([sku])
   @@index([barcode])
+  @@index([imageId])
 }
 
 model SupplierProductImage {
-  id                String          @id @default(uuid())
+  id                String                   @id @default(uuid())
   supplierProductId String
   url               String
   altText           String?
   colour            String?
-  position          Int             @default(0)
-  supplierProduct   SupplierProduct @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
-  createdAt         DateTime        @default(now())
+  position          Int                      @default(0)
+  supplierProduct   SupplierProduct          @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
+  variants          SupplierProductVariant[]
+  createdAt         DateTime                 @default(now())
 
   @@index([supplierProductId])
 }

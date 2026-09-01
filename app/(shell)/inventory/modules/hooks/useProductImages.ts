@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { buildLightboxItems, groupImagesByColour } from '../utils';
+import { buildGalleryTiles } from '../utils';
 import type { ProductRecord } from '../types';
 
 export function useProductImages(product: ProductRecord | null) {
@@ -9,52 +9,46 @@ export function useProductImages(product: ProductRecord | null) {
   const [lightboxActiveKey, setLightboxActiveKey] = useState<string | null>(null);
   const [lightboxOpen, setLightboxOpen] = useState(false);
 
-  /** One deduped tile per colourway — drives the Main Image panel's rail. */
-  const groups = useMemo(() => {
+  /** One tile per linked image, per still-unlinked colour, and per unassigned image — shared by
+   * both the Main Image panel's rail and the lightbox, since each image already appears exactly
+   * once. */
+  const tiles = useMemo(() => {
     if (!product) return [];
-    return groupImagesByColour(product.images, product.colours);
-  }, [product]);
-
-  /** Every image individually, plus a placeholder for empty colours — drives the lightbox. */
-  const lightboxItems = useMemo(() => {
-    if (!product) return [];
-    return buildLightboxItems(product.images, product.colours);
+    return buildGalleryTiles(product.images, product.variants, product.colours);
   }, [product]);
 
   /**
    * Resolved rather than stored, so switching product falls back to the first
-   * group without an effect having to reset the selection.
+   * tile without an effect having to reset the selection.
    */
   const activeIndex = useMemo(() => {
-    const found = groups.findIndex((g) => g.key === activeKey);
+    const found = tiles.findIndex((t) => t.key === activeKey);
     return found >= 0 ? found : 0;
-  }, [groups, activeKey]);
+  }, [tiles, activeKey]);
 
-  const active = groups[activeIndex] ?? null;
+  const active = tiles[activeIndex] ?? null;
 
   const lightboxIndex = useMemo(() => {
-    const found = lightboxItems.findIndex((item) => item.key === lightboxActiveKey);
+    const found = tiles.findIndex((t) => t.key === lightboxActiveKey);
     return found >= 0 ? found : 0;
-  }, [lightboxItems, lightboxActiveKey]);
+  }, [tiles, lightboxActiveKey]);
 
-  const lightboxActive = lightboxItems[lightboxIndex] ?? null;
+  const lightboxActive = tiles[lightboxIndex] ?? null;
 
   const step = useCallback(
     (direction: 1 | -1) => {
-      if (lightboxItems.length === 0) return;
-      setLightboxActiveKey(lightboxItems[(lightboxIndex + direction + lightboxItems.length) % lightboxItems.length].key);
+      if (tiles.length === 0) return;
+      setLightboxActiveKey(tiles[(lightboxIndex + direction + tiles.length) % tiles.length].key);
     },
-    [lightboxItems, lightboxIndex]
+    [tiles, lightboxIndex]
   );
 
   /** Opens on whatever's active in the panel; stepping inside the lightbox from there doesn't write back. */
   const openLightbox = useCallback(() => {
-    if (lightboxItems.length === 0) return;
-    const matchKey = active ? (active.kind === 'photo' ? active.image.id : `placeholder:${active.key}`) : null;
-    const found = matchKey ? lightboxItems.some((item) => item.key === matchKey) : false;
-    setLightboxActiveKey(found ? matchKey : lightboxItems[0].key);
+    if (tiles.length === 0) return;
+    setLightboxActiveKey(active ? active.key : tiles[0].key);
     setLightboxOpen(true);
-  }, [active, lightboxItems]);
+  }, [active, tiles]);
 
   useEffect(() => {
     if (!lightboxOpen) return;
@@ -68,11 +62,11 @@ export function useProductImages(product: ProductRecord | null) {
   }, [lightboxOpen, step]);
 
   return {
-    groups,
+    tiles,
     active,
     activeKey: active?.key ?? null,
     setActiveKey,
-    lightboxItems,
+    lightboxItems: tiles,
     lightboxActive,
     lightboxActiveKey: lightboxActive?.key ?? null,
     setLightboxActiveKey,

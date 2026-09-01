@@ -20,7 +20,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (file.size > MAX_SIZE) return apiError({ message: 'File exceeds the 10 MB limit', status: 400 });
 
     const commit = formData.get('commit') === 'true';
-    const result = commit ? await controller.commit(id, file, session) : await controller.preview(id, file, session);
+    // Overwrite defaults to today's always-replace behaviour when the client omits it.
+    const overwrite = formData.get('overwrite') !== 'false';
+    const markVerified = formData.get('markVerified') === 'true';
+    const result = commit
+      ? await controller.commit(id, file, session, { overwrite, markVerified })
+      : await controller.preview(id, file, session, { overwrite, markVerified });
     if ('error' in result) {
       const { error } = result as ErrResult;
       return apiError({ message: error.message, errors: error.errors, status: error.status });

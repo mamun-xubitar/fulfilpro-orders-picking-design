@@ -7,10 +7,11 @@ import type { ProductRecord, StocktakeRecord } from '../types';
 
 type UseStocktakeArgs = {
   product: ProductRecord | null;
-  refreshCatalog: () => void;
+  /** Patches the product in place with the server's response — no full-catalogue refetch. */
+  onSaved: (product: ProductRecord) => void;
 };
 
-export function useStocktake({ product, refreshCatalog }: UseStocktakeArgs) {
+export function useStocktake({ product, onSaved }: UseStocktakeArgs) {
   const [active, setActive] = useState<StocktakeRecord | null>(null);
   const [counts, setCounts] = useState<Record<string, string>>({});
   const { request: requestStart, loading: starting } = useRequest<StocktakeRecord>();
@@ -40,9 +41,9 @@ export function useStocktake({ product, refreshCatalog }: UseStocktakeArgs) {
       method: 'PATCH',
       data: { items },
       successMessage: 'Stocktake completed',
-      onSuccess: () => {
+      onSuccess: ({ data }) => {
         setActive(null);
-        refreshCatalog();
+        onSaved(data.product);
       },
     });
   };

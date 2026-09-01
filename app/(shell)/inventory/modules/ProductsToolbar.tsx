@@ -2,9 +2,9 @@
 
 import ProductSearchBox from './ProductSearchBox';
 import { QUICK_FILTERS } from './constants';
-import { ChevronLeft, ChevronRight, First, Last, Plus, Search } from './icons';
-import { formatNumber } from './utils';
 import type { InventoryPage } from './hooks/useInventoryPage';
+import { ChevronLeft, ChevronRight, First, Last, Plus, Search, Upload } from './icons';
+import { formatNumber } from './utils';
 
 export default function ProductsToolbar(p: InventoryPage) {
   const { nav } = p;
@@ -61,10 +61,18 @@ export default function ProductsToolbar(p: InventoryPage) {
             <button
               type="button"
               onClick={p.openNewProduct}
-              className="flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition-colors duration-150 hover:bg-emerald-700 cursor-pointer"
+              className="flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-emerald-600 p-2 text-sm font-semibold text-white shadow-sm transition-colors duration-150 hover:bg-emerald-700 cursor-pointer"
             >
               <Plus />
               New Product
+            </button>
+            <button
+              type="button"
+              onClick={p.importProducts.openModal}
+              className="flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-emerald-300 bg-emerald-50 p-2 text-sm font-semibold text-emerald-700 shadow-sm transition-colors duration-150 hover:bg-emerald-100 cursor-pointer"
+            >
+              <Upload className="h-4 w-4" />
+              Import Products
             </button>
           </div>
         </div>

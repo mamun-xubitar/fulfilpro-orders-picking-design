@@ -56,8 +56,8 @@ function VariantsMatrixRow({
         ) : (
           <label className="flex cursor-pointer items-center gap-2">
             <SelectCheckbox name={name} selected={selected} onToggleSelect={() => onToggleSelect(variant.id)} />
-            <span className="h-2.5 w-2.5 shrink-0 rounded-full ring-1 ring-black/10" style={{ backgroundColor: swatch }} />
-            <span className="whitespace-nowrap text-[13px] font-medium text-gray-900">{variant.colour}</span>
+            {variant.colour && <span className="h-2.5 w-2.5 shrink-0 rounded-full ring-1 ring-black/10" style={{ backgroundColor: swatch }} />}
+            <span className="whitespace-nowrap text-[13px] font-medium text-gray-900">{variant.colour || '—'}</span>
           </label>
         )}
       </td>
@@ -65,7 +65,7 @@ function VariantsMatrixRow({
       {editing ? (
         <SizeCell value={variant.size} sizes={sizes} label="Size" onChange={(size) => set({ size })} />
       ) : (
-        <td className="px-2 py-2 text-[13px] text-gray-700">{variant.size}</td>
+        <td className="px-2 py-2 text-[13px] text-gray-700">{variant.size || '—'}</td>
       )}
 
       {editing ? (

@@ -1,6 +1,7 @@
 'use client';
 
 import { ModalActions, ModalShell } from '@/components/ModalShell';
+import { variantTitle } from './utils';
 import type { usePurchaseOrder } from './hooks/usePurchaseOrder';
 import type { VariantRow } from './types';
 
@@ -73,9 +74,7 @@ function CreatePoModal({ po, variants }: { po: ReturnType<typeof usePurchaseOrde
             <div className="divide-y divide-gray-100">
               {rows.map((v) => (
                 <div key={v.id} className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-3 px-3 py-1.5 text-sm">
-                  <span className="min-w-0 truncate text-gray-700">
-                    {v.colour} / {v.size}
-                  </span>
+                  <span className="min-w-0 truncate text-gray-700">{variantTitle(v)}</span>
                   <span className="w-24 truncate text-right text-gray-400">{v.sku ?? '—'}</span>
                   <span className="w-16 text-right tabular-nums text-gray-500">{v.stockOnHand}</span>
                   <input

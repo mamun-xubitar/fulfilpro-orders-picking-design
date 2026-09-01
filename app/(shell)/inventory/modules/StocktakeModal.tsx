@@ -1,6 +1,7 @@
 'use client';
 
 import { ModalActions, ModalShell } from '@/components/ModalShell';
+import { variantTitle } from './utils';
 import type { useStocktake } from './hooks/useStocktake';
 
 export default function StocktakeModal({ stocktake }: { stocktake: ReturnType<typeof useStocktake> }) {
@@ -28,9 +29,7 @@ export default function StocktakeModal({ stocktake }: { stocktake: ReturnType<ty
           <tbody>
             {active.items.map((item) => (
               <tr key={item.id} className="border-b border-gray-100 last:border-0">
-                <td className="px-3 py-2 text-gray-800">
-                  {item.colour} / {item.size}
-                </td>
+                <td className="px-3 py-2 text-gray-800">{variantTitle(item)}</td>
                 <td className="px-3 py-2 text-gray-500">{item.sku ?? '—'}</td>
                 <td className="px-3 py-2 text-right tabular-nums text-gray-500">{item.expectedQty}</td>
                 <td className="px-3 py-2 text-right">

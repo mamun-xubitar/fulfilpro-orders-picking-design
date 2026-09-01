@@ -1,27 +1,23 @@
 'use client';
 
-import { useRef, useState } from 'react';
-import { toast } from 'react-toastify';
+import { useState } from 'react';
 import { ModalActions, ModalShell } from '@/components/ModalShell';
+import { slugifyHandle } from '@/lib/inventory/handle';
 import AdjustmentModals from './AdjustmentModals';
+import EditImagesModal from './EditImagesModal';
 import GalleryPreview from './GalleryPreview';
 import GalleryThumbRow from './GalleryThumbRow';
 import ImportModal from './ImportModal';
+import ImportProductsModal from './ImportProductsModal';
 import PoModals from './PoModals';
 import StocktakeModal from './StocktakeModal';
-import { ChevronLeft, ChevronRight, Close, Plus, Trash } from './icons';
-import { formatMoney, makeSwatchResolver } from './utils';
+import { ChevronLeft, ChevronRight, Close, Lock, Unlock } from './icons';
+import { formatMoney, variantTitle } from './utils';
 import type { InventoryPage } from './hooks/useInventoryPage';
-
-// Mirrors the limits enforced in app/api/inventory/catalog/[id]/images/upload/route.ts
-const MAX_FILES = 10;
-const MAX_SIZE = 10 * 1024 * 1024; // 10 MB per file
 
 export default function InventoryModals(p: InventoryPage) {
   const { gallery, pricing, imageMutations, matrix } = p;
-  const swatchOf = makeSwatchResolver(p.details.colours);
   const variants = p.product?.variants ?? [];
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   return (
     <>
@@ -36,81 +32,7 @@ export default function InventoryModals(p: InventoryPage) {
       )}
 
       {p.editImagesOpen && (
-        <ModalShell title="Edit images" onClose={p.closeEditImages} wide>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {gallery.images.map((image) => (
-              <figure key={image.id} className="overflow-hidden rounded-xl border border-gray-200">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={image.url} alt={image.altText ?? ''} className="aspect-square w-full object-cover" />
-                <figcaption className="flex items-center gap-1 bg-gray-50 px-2 py-1.5">
-                  {image.colour && <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: swatchOf(image.colour) }} />}
-                  <select
-                    value={image.colour ?? ''}
-                    onChange={(e) => imageMutations.updateImageColour(image.id, e.target.value || null)}
-                    disabled={imageMutations.updatingColourId === image.id}
-                    aria-label="Image colour"
-                    className="min-w-0 flex-1 rounded border border-gray-200 bg-white px-1.5 py-0.5 text-[11px] font-medium text-gray-600 outline-none focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <option value="">Unassigned</option>
-                    {image.colour && p.details.colours.every((c) => c.name.toLowerCase() !== image.colour!.toLowerCase()) && (
-                      <option value={image.colour}>{image.colour}</option>
-                    )}
-                    {p.details.colours.map((c) => (
-                      <option key={c.name} value={c.name}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={() => imageMutations.removeImage(image.id)}
-                    disabled={imageMutations.removingId === image.id}
-                    aria-label="Remove image"
-                    className="shrink-0 rounded p-0.5 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
-                  >
-                    <Trash className="h-3.5 w-3.5" />
-                  </button>
-                </figcaption>
-              </figure>
-            ))}
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={imageMutations.uploading}
-              className="flex aspect-square flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-gray-300 text-gray-400 transition-colors duration-150 hover:border-blue-400 hover:text-blue-500 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
-            >
-              <Plus className="h-5 w-5" />
-              <span className="text-[11px] font-semibold">{imageMutations.uploading ? 'Uploading…' : 'Add image'}</span>
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              className="hidden"
-              onChange={(e) => {
-                const files = Array.from(e.target.files ?? []);
-                e.target.value = '';
-                if (files.length === 0) return;
-                if (files.length > MAX_FILES) {
-                  toast.error(`You can upload at most ${MAX_FILES} files at once`);
-                  return;
-                }
-                const nonImage = files.find((f) => !f.type.startsWith('image/'));
-                if (nonImage) {
-                  toast.error(`${nonImage.name} is not an image`);
-                  return;
-                }
-                const oversized = files.find((f) => f.size > MAX_SIZE);
-                if (oversized) {
-                  toast.error(`${oversized.name} exceeds the 10 MB limit`);
-                  return;
-                }
-                void imageMutations.uploadImages(files, null);
-              }}
-            />
-          </div>
-        </ModalShell>
+        <EditImagesModal images={gallery.images} variants={variants} imageMutations={imageMutations} onClose={p.closeEditImages} />
       )}
 
       {gallery.lightboxOpen && gallery.lightboxActive && (
@@ -151,7 +73,7 @@ export default function InventoryModals(p: InventoryPage) {
           </div>
 
           <div className="absolute inset-x-0 bottom-4 flex justify-center px-16" onClick={(e) => e.stopPropagation()}>
-            <GalleryThumbRow groups={gallery.lightboxItems} activeKey={gallery.lightboxActiveKey} onSelect={gallery.setLightboxActiveKey} />
+            <GalleryThumbRow tiles={gallery.lightboxItems} activeKey={gallery.lightboxActiveKey} onSelect={gallery.setLightboxActiveKey} />
           </div>
         </div>
       )}
@@ -188,7 +110,7 @@ export default function InventoryModals(p: InventoryPage) {
           footer={<ModalActions onCancel={matrix.cancelDeleteRow} onConfirm={matrix.confirmDeleteRow} confirmLabel="Delete variant" disabled={matrix.deleting} />}
         >
           <p className="text-sm text-gray-600">
-            This removes <strong className="font-semibold text-gray-900">{matrix.deleteTarget.colour} / {matrix.deleteTarget.size}</strong>
+            This removes <strong className="font-semibold text-gray-900">{variantTitle(matrix.deleteTarget)}</strong>
             {matrix.deleteTarget.sku ? ` (${matrix.deleteTarget.sku})` : ''} and its stock history. This can&apos;t be undone.
           </p>
         </ModalShell>
@@ -198,6 +120,7 @@ export default function InventoryModals(p: InventoryPage) {
       <StocktakeModal stocktake={p.stocktake} />
       <AdjustmentModals adjustments={p.adjustments} variants={variants} />
       <ImportModal importExport={p.importExport} />
+      <ImportProductsModal importProducts={p.importProducts} suppliers={p.supplierOptions} />
     </>
   );
 }
@@ -260,13 +183,31 @@ function NewProductModal({
 }: {
   suppliers: { id: string; name: string }[];
   onClose: () => void;
-  onCreate: (form: { supplierId: string; itemNo: string; name: string; brand: string }) => void;
+  onCreate: (form: { supplierId: string; itemNo: string; name: string; brand: string; handle: string }) => void;
   saving: boolean;
   errors: Record<string, string>;
 }) {
-  const [form, setForm] = useState({ supplierId: suppliers[0]?.id ?? '', itemNo: '', name: '', brand: '' });
-  const set = (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setForm((prev) => ({ ...prev, [field]: e.target.value }));
-  const disabled = form.itemNo.trim() === '' || form.name.trim() === '' || form.supplierId === '';
+  const [form, setForm] = useState({ supplierId: suppliers[0]?.id ?? '', itemNo: '', name: '', brand: '', handle: '' });
+  // Locked (the default): the handle field is disabled and re-derives from the product name on
+  // every keystroke. Unlocking hands control to the user; re-locking re-derives immediately.
+  const [handleLocked, setHandleLocked] = useState(true);
+
+  const set = (field: 'supplierId' | 'itemNo' | 'brand') => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    setForm((prev) => ({ ...prev, [field]: e.target.value }));
+  const setName = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const name = e.target.value;
+    setForm((prev) => ({ ...prev, name, ...(handleLocked ? { handle: slugifyHandle(name) } : {}) }));
+  };
+  const setHandle = (e: React.ChangeEvent<HTMLInputElement>) => setForm((prev) => ({ ...prev, handle: e.target.value }));
+  const toggleHandleLock = () => {
+    setHandleLocked((prev) => {
+      const next = !prev;
+      if (next) setForm((f) => ({ ...f, handle: slugifyHandle(f.name) }));
+      return next;
+    });
+  };
+
+  const disabled = form.itemNo.trim() === '' || form.name.trim() === '' || form.supplierId === '' || form.handle.trim() === '';
 
   return (
     <ModalShell
@@ -292,7 +233,30 @@ function NewProductModal({
           {errors.supplierId && <p className="mt-1 text-xs text-red-600">{errors.supplierId}</p>}
         </div>
         <TextField label="Item no." value={form.itemNo} onChange={set('itemNo')} placeholder="09419" error={errors.itemNo} />
-        <TextField label="Product name" value={form.name} onChange={set('name')} placeholder="FLEX KINDY WIDE BRIM HAT" error={errors.name} />
+        <TextField label="Product name" value={form.name} onChange={setName} placeholder="FLEX KINDY WIDE BRIM HAT" error={errors.name} />
+        <div>
+          <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-gray-500">Handle</label>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={form.handle}
+              onChange={setHandle}
+              disabled={handleLocked}
+              placeholder="flex-kindy-wide-brim-hat"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500"
+            />
+            <button
+              type="button"
+              onClick={toggleHandleLock}
+              aria-label={handleLocked ? 'Edit handle' : 'Auto-generate handle'}
+              title={handleLocked ? 'Edit handle' : 'Auto-generate handle'}
+              className="shrink-0 rounded-lg border border-gray-300 bg-white p-2.5 text-gray-500 transition-colors duration-150 hover:bg-gray-50 hover:text-gray-700 cursor-pointer"
+            >
+              {handleLocked ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
+            </button>
+          </div>
+          {errors.handle && <p className="mt-1 text-xs text-red-600">{errors.handle}</p>}
+        </div>
         <TextField label="Brand" value={form.brand} onChange={set('brand')} placeholder="FLEX KINDY" />
       </div>
     </ModalShell>

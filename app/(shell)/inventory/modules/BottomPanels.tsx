@@ -39,7 +39,7 @@ export default function BottomPanels({ p }: BottomPanelsProps) {
           className="mt-auto flex w-full items-center justify-center gap-1.5 rounded-lg bg-emerald-600 py-2 text-[13px] font-semibold text-white transition-colors duration-150 hover:bg-emerald-700 cursor-pointer"
         >
           <Upload className="h-4 w-4" />
-          Import CSV
+          Import Product/PO CSV
         </button>
         {/* Not pinned: this card has no stat rows, so the exports sit with the import
             rather than being stranded at the bottom of a stretched grid cell. */}

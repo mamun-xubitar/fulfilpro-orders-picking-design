@@ -16,7 +16,10 @@ type UseProductsTableArgs = {
   /** From the Verified toolbar checkbox — filters the table instead of being disabled by it. */
   verifiedOnly: boolean;
   onView: (id: string) => void;
-  refreshCatalog: () => void;
+  /** Patches products in place with the server's response — no full-catalogue refetch, so the
+   * table never flashes to a loading row after a bulk action or delete. */
+  removeProducts: (ids: string[]) => void;
+  patchProducts: (ids: string[], patch: Partial<ProductRecord>) => void;
 };
 
 export function totalStockOf(p: ProductRecord): number {
@@ -31,7 +34,7 @@ export function stockValueOf(p: ProductRecord): number {
   return p.variants.reduce((sum, v) => sum + v.stockOnHand * v.sellPrice, 0);
 }
 
-export function useProductsTable({ products, verifiedOnly, onView, refreshCatalog }: UseProductsTableArgs) {
+export function useProductsTable({ products, verifiedOnly, onView, removeProducts, patchProducts }: UseProductsTableArgs) {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSizeState] = useState(PAGE_SIZE_OPTIONS[0]);
 
@@ -84,6 +87,7 @@ export function useProductsTable({ products, verifiedOnly, onView, refreshCatalo
         (p) =>
           p.name.toLowerCase().includes(term) ||
           p.itemNo.toLowerCase().includes(term) ||
+          p.handle.toLowerCase().includes(term) ||
           p.sku.toLowerCase().includes(term) ||
           p.brand.toLowerCase().includes(term) ||
           p.variants.some((v) => v.sku?.toLowerCase().includes(term) || v.barcode?.toLowerCase().includes(term))
@@ -171,17 +175,20 @@ export function useProductsTable({ products, verifiedOnly, onView, refreshCatalo
 
   const runBulk = async (body: Record<string, unknown>) => {
     setBulkRunning(true);
+    const ids = targetIds();
     try {
       const res = await fetch('/api/inventory/catalog/bulk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...body, productIds: targetIds() }),
+        body: JSON.stringify({ ...body, productIds: ids }),
       });
       const json = (await res.json()) as { success: boolean; message: string };
       if (!res.ok || !json.success) throw new Error(json.message || 'Bulk action failed');
       toast.success(json.message);
       clearSelection();
-      refreshCatalog();
+      if (body.action === 'delete') removeProducts(ids);
+      else if (body.action === 'set_status') patchProducts(ids, { status: body.status as ProductStatusValue });
+      else if (body.action === 'set_verified') patchProducts(ids, { verified: body.verified as boolean });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Bulk action failed');
     } finally {
@@ -196,7 +203,7 @@ export function useProductsTable({ products, verifiedOnly, onView, refreshCatalo
       const json = (await res.json()) as { success: boolean; message: string };
       if (!res.ok || !json.success) throw new Error(json.message || 'Failed to delete product');
       toast.success('Product deleted');
-      refreshCatalog();
+      removeProducts([id]);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to delete product');
     } finally {
