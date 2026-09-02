@@ -21,12 +21,7 @@ export default function ProductDetailsTab({ p }: { p: InventoryPage }) {
       <ProductFieldsPanel details={p.details} />
       <PricingMarginPanel {...p.pricing} />
       <StockSummaryPanel summary={p.summary} />
-      <OnlineStoresPanel
-        stores={p.demoStores}
-        baseCurrency={p.globals.baseCurrency}
-        onEditPrice={p.setStorePriceTarget}
-        onAction={p.notImplemented}
-      />
+      <OnlineStoresPanel storeListings={p.storeListings} onEditPrice={p.setStorePriceTarget} onAction={p.notImplemented} />
     </div>
   );
 }

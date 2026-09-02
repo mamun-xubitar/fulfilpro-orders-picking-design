@@ -6,13 +6,18 @@ import { deriveColorFromName } from '@/lib/inventory/colour';
 import { isValidHandle, slugifyHandle } from '@/lib/inventory/handle';
 import { sanitizeHtml } from '@/lib/sanitize-html';
 import { SupplierProductStatus } from '@prisma/client';
+import type { CatalogueListParams, ProductsSortKey, QuickFilterId } from '@/models/supplier-product.model.server';
 
 const model = new SupplierProductModel();
 const currencyModel = new CurrencyRateModel();
 
 const STATUS_VALUES = new Set<string>(Object.values(SupplierProductStatus));
+const QUICK_FILTER_IDS = new Set<string>(['buying-lt-1', 'profit-lt-5', 'selling-lt-1', 'selling-lt-5']);
+const SORT_KEYS = new Set<string>(['name', 'brand', 'category', 'sku', 'status', 'variants', 'stock', 'stockValue', 'createdAt']);
+const CATALOGUE_MODES = new Set(['detail', 'table', 'search', 'ids']);
 
 type Session = { user?: { id?: string | null; name?: string | null; email?: string | null; role?: string | null } | null } | null;
+type CataloguePagination = { page: number; pageSize: number; total: number; totalPages: number; hasPrev: boolean; hasNext: boolean };
 
 function isAdmin(session: Session) {
   return session?.user?.role === 'admin';
@@ -22,34 +27,93 @@ function actorFromSession(session: Session) {
   return { id: session?.user?.id ?? null, name: session?.user?.name ?? session?.user?.email ?? 'Unknown' };
 }
 
-export class SupplierProductController {
-  async list(searchParams: URLSearchParams, session: Session) {
-    if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
+function paginationOf(page: number, pageSize: number, total: number): CataloguePagination {
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const clampedPage = Math.min(Math.max(page, 1), totalPages);
+  return { page: clampedPage, pageSize, total, totalPages, hasPrev: clampedPage > 1, hasNext: clampedPage < totalPages };
+}
 
-    const search = searchParams.get('search')?.trim() ?? '';
-    const [allProducts, settings, currencies] = await Promise.all([
-      model.listAll(),
+export class SupplierProductController {
+  private async loadGlobals() {
+    const [settings, currencies] = await Promise.all([
       prisma.appSettings.upsert({ where: { id: 'default' }, update: {}, create: { id: 'default' }, select: { globalMarginPercent: true, globalExchangeRate: true } }),
       currencyModel.list(),
     ]);
-
-    const products = search ? allProducts.filter((p) => matchesSearch(p, search)) : allProducts;
-
     // USD is always offered in the currency picker even if no CurrencyRate row has been configured
     // for it yet — the pricing panel defaults new products to USD, so the option must always exist.
     const configuredUsd = currencies.find((c) => c.code === 'USD');
     const usdRate = configuredUsd?.rate ?? Number(settings.globalExchangeRate);
     const extraCurrencies = currencies.filter((c) => c.code !== 'USD').map((c) => ({ code: c.code, rate: c.rate }));
+    return {
+      exchangeRate: Number(settings.globalExchangeRate),
+      marginPercent: Number(settings.globalMarginPercent),
+      baseCurrency: 'AUD',
+      currencies: [{ code: 'AUD', rate: 1 }, { code: 'USD', rate: usdRate }, ...extraCurrencies],
+    };
+  }
+
+  async list(searchParams: URLSearchParams, session: Session) {
+    if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
+
+    const modeParam = searchParams.get('mode') ?? 'detail';
+    const mode = CATALOGUE_MODES.has(modeParam) ? (modeParam as 'detail' | 'table' | 'search' | 'ids') : 'detail';
+
+    const verifiedParam = searchParams.get('verified');
+    const verified = verifiedParam === '1' ? true : verifiedParam === '0' ? false : undefined;
+    const quickFilterParam = searchParams.get('quickFilter');
+    const quickFilter = quickFilterParam && QUICK_FILTER_IDS.has(quickFilterParam) ? (quickFilterParam as QuickFilterId) : null;
+    const statusParam = searchParams.get('status');
+    const status = statusParam && STATUS_VALUES.has(statusParam) ? (statusParam as SupplierProductStatus) : undefined;
+    const supplierName = searchParams.get('supplier')?.trim() || undefined;
+    const sortParam = searchParams.get('sort');
+    const sort = sortParam && SORT_KEYS.has(sortParam) ? (sortParam as ProductsSortKey) : 'createdAt';
+    const dir = searchParams.get('dir') === 'desc' ? 'desc' : searchParams.get('dir') === 'asc' ? 'asc' : sort === 'createdAt' ? 'desc' : 'asc';
+
+    if (mode === 'ids') {
+      const ids = await model.listIds({ search: searchParams.get('search')?.trim() || undefined, verified, status, supplierName, quickFilter, sort, dir });
+      return { data: { ids } };
+    }
+
+    const globals = await this.loadGlobals();
+
+    if (mode === 'search') {
+      const term = searchParams.get('search')?.trim() ?? '';
+      if (!term) return { data: { products: [], pagination: paginationOf(1, 8, 0), totalAll: 0, globals, supplierOptions: [] } };
+      const { products, total } = await model.list({ page: 1, pageSize: 8, search: term, sort: 'name', dir: 'asc' });
+      return { data: { products, pagination: paginationOf(1, 8, total), totalAll: total, globals, supplierOptions: [] } };
+    }
+
+    if (mode === 'table') {
+      const page = Math.max(1, Number(searchParams.get('page')) || 1);
+      const pageSize = [20, 50, 100].includes(Number(searchParams.get('pageSize'))) ? Number(searchParams.get('pageSize')) : 20;
+      const search = searchParams.get('search')?.trim() || undefined;
+      const params: CatalogueListParams = { page, pageSize, search, verified, status, supplierName, quickFilter, sort, dir };
+      const [{ products, total }, supplierOptions, totalAll] = await Promise.all([model.list(params), model.listSupplierNames(), model.countAll()]);
+      return { data: { products, pagination: paginationOf(page, pageSize, total), totalAll, globals, supplierOptions } };
+    }
+
+    // detail mode — the quick filter deliberately never reaches here: it only narrows the
+    // focused product's own variants matrix client-side (see useVariantsMatrix), so it must
+    // never move the record stepper's position or "of Y" counts.
+    const focusId = searchParams.get('focusId');
+    let page = Math.max(1, Number(searchParams.get('page')) || 1);
+    if (focusId) {
+      const found = await model.findPosition(focusId, { verified });
+      if (found) page = found.position;
+    }
+    const [{ products, total }, totalAll] = await Promise.all([
+      model.list({ page, pageSize: 1, verified, sort: 'createdAt', dir: 'desc' }),
+      model.countAll(),
+    ]);
+    const focused = products[0] ?? null;
 
     return {
       data: {
-        products,
-        globals: {
-          exchangeRate: Number(settings.globalExchangeRate),
-          marginPercent: Number(settings.globalMarginPercent),
-          baseCurrency: 'AUD',
-          currencies: [{ code: 'AUD', rate: 1 }, { code: 'USD', rate: usdRate }, ...extraCurrencies],
-        },
+        products: focused ? [focused] : [],
+        pagination: paginationOf(page, 1, total),
+        totalAll,
+        globals,
+        supplierOptions: [] as string[],
       },
     };
   }
@@ -194,7 +258,7 @@ export class SupplierProductController {
       return { error: { message: 'Validation failed', errors: ['sellPrice: Enter valid prices'], status: 400 } };
     }
 
-    const targetColours = colours.length > 0 ? colours : product.colours.map((c) => c.name);
+    const targetColours = colours.length > 0 ? colours : null;
     const count = await model.applyPriceToColours(id, targetColours, sellPrice, buyPrice);
     await model.logActivity(id, `Price applied to ${count} variant${count === 1 ? '' : 's'}`, 'price_applied', actorFromSession(session));
     const updated = await model.findById(id);
@@ -366,14 +430,3 @@ export class SupplierProductController {
   }
 }
 
-function matchesSearch(
-  product: { name: string; sku: string; itemNo: string; handle: string; variants: Array<{ sku: string | null; barcode: string | null }> },
-  term: string
-): boolean {
-  const q = term.toLowerCase();
-  if (product.name.toLowerCase().includes(q)) return true;
-  if (product.sku.toLowerCase().includes(q)) return true;
-  if (product.itemNo.toLowerCase().includes(q)) return true;
-  if (product.handle.toLowerCase().includes(q)) return true;
-  return product.variants.some((v) => v.sku?.toLowerCase().includes(q) || v.barcode?.toLowerCase().includes(q));
-}

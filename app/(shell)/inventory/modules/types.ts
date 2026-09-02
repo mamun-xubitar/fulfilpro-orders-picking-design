@@ -72,21 +72,33 @@ export type ProductImage = {
   colour: string | null;
 };
 
-/** A storefront the product is published to. */
-export type StoreListing = {
+/** One variant of the product as it exists on a single connected store, fetched live from Shopify. */
+export type StoreListingVariant = {
   id: string;
-  /** Store.name */
-  name: string;
-  /** Store.storeDomain */
-  domain: string;
-  /** Product.status on that store */
-  status: ProductStatusValue;
-  /** Product.shopifyId on that store */
-  externalId: string;
-  /** Listed price on that store, in base currency. */
+  title: string;
+  sku: string | null;
   price: number;
-  /** Product.onlineStoreUrl */
+  optionValues: string[];
+  inventoryQuantity: number | null;
+};
+
+/** A connected store, and (if this product is published there) its live Shopify listing —
+ * looked up by handle. One entry per connected store, whether or not the product is found. */
+export type StoreListingResult = {
+  storeId: string;
+  storeName: string;
+  storeDomain: string;
+  found: boolean;
+  /** Product.title on that store — null when not found there. */
+  productTitle: string | null;
+  productGid: string | null;
+  externalId: string | null;
+  status: 'ACTIVE' | 'DRAFT' | 'ARCHIVED' | null;
   url: string | null;
+  currencyCode: string | null;
+  variants: StoreListingVariant[];
+  /** Set when this store's lookup failed (e.g. throttled, bad token) — the other stores still resolve. */
+  error: string | null;
 };
 
 /** Raw pricing inputs. Mirrors the ProductPricing table one-for-one. */
@@ -166,7 +178,6 @@ export type ProductRecord = {
   colours: ColourOption[];
   variants: VariantRow[];
   pricing: PricingInputs;
-  stores: StoreListing[];
   stocktake: StocktakeInfo;
   adjustments: AdjustmentsInfo;
   activity: ActivityEntry[];
@@ -180,10 +191,23 @@ export type InventoryGlobals = {
   currencies: { code: string; rate: number }[];
 };
 
-/** The payload the page loads on mount. */
+export type CataloguePagination = {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  hasPrev: boolean;
+  hasNext: boolean;
+};
+
+/** The payload `GET /api/inventory/catalog` returns for every mode. */
 export type ProductsResponse = {
   products: ProductRecord[];
+  pagination: CataloguePagination;
+  /** Whole-catalogue count, ignoring every filter — the "of Y" half of the record stepper. */
+  totalAll: number;
   globals: InventoryGlobals;
+  supplierOptions: string[];
 };
 
 // — UI-only types —

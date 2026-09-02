@@ -4,7 +4,6 @@ import { useMemo, useState } from 'react';
 import { toast } from 'react-toastify';
 import useRequest from '@/hooks/useRequest';
 import { isValidHandle } from '@/lib/inventory/handle';
-import { DEMO_ONLINE_STORES } from '../constants';
 import { summariseVariants } from '../utils';
 import { useAdjustments } from './useAdjustments';
 import { useCatalogData } from './useCatalogData';
@@ -18,8 +17,9 @@ import { useProductPricing } from './useProductPricing';
 import { useProductsTable } from './useProductsTable';
 import { usePurchaseOrder } from './usePurchaseOrder';
 import { useStocktake } from './useStocktake';
+import { useStoreListings } from './useStoreListings';
 import { useVariantsMatrix } from './useVariantsMatrix';
-import type { ModuleTabId, ProductRecord, ProductTabId, StoreListing } from '../types';
+import type { ModuleTabId, ProductRecord, ProductTabId, StoreListingResult } from '../types';
 
 export function useInventoryPage() {
   const data = useCatalogData();
@@ -28,13 +28,20 @@ export function useInventoryPage() {
   const [productTab, setProductTab] = useState<ProductTabId>('details');
   const [newProductOpen, setNewProductOpen] = useState(false);
   const [editImagesOpen, setEditImagesOpen] = useState(false);
-  const [storePriceTarget, setStorePriceTarget] = useState<StoreListing | null>(null);
-  /** "Online stores & prices" has no backend yet — kept on the static design mock-up, edited only in-session. */
-  const [demoStores, setDemoStores] = useState<StoreListing[]>(DEMO_ONLINE_STORES);
+  const [storePriceTarget, setStorePriceTarget] = useState<StoreListingResult | null>(null);
   const { request: requestCreate, loading: creatingProduct, errors: createErrors } = useRequest<ProductRecord>();
 
-  const nav = useProductNavigation(data.products);
+  const nav = useProductNavigation(data);
   const product = nav.product;
+  const storeListings = useStoreListings(product?.id ?? null);
+  // Stepping to another product invalidates any open store-price modal — its variant snapshot
+  // belongs to the product that was on screen when it opened. Adjusted during render (React's
+  // recommended pattern for resetting state on a prop change) rather than in an effect.
+  const [renderedProductId, setRenderedProductId] = useState(product?.id);
+  if (product?.id !== renderedProductId) {
+    setRenderedProductId(product?.id);
+    if (storePriceTarget !== null) setStorePriceTarget(null);
+  }
 
   const onProductSaved = (updated: ProductRecord) => data.updateProduct(updated.id, updated);
 
@@ -48,13 +55,13 @@ export function useInventoryPage() {
     onProductSaved(updated);
     details.syncListsFromProduct(updated);
   };
-  const matrix = useVariantsMatrix({ product, sizes: details.sizes, colours: details.colours, onVariantSaved });
+  const matrix = useVariantsMatrix({ product, sizes: details.sizes, colours: details.colours, quickFilter: data.quickFilter, onVariantSaved });
   const po = usePurchaseOrder({ product, onSaved: onProductSaved });
   const stocktake = useStocktake({ product, onSaved: onProductSaved });
   const adjustments = useAdjustments({ product, onSaved: onProductSaved });
   const importExport = useImportExport({ product, onSaved: onProductSaved, onPoImported: po.loadPurchaseOrders });
-  const importProducts = useImportProducts({ supplierOptions: po.supplierOptions, addProduct: data.addProduct, updateProduct: data.updateProduct });
-  const productsTable = useProductsTable({ products: data.products, verifiedOnly: nav.verifiedOnly, onView: nav.viewProduct, removeProducts: data.removeProducts, patchProducts: data.patchProducts });
+  const productsTable = useProductsTable({ enabled: data.allRecords, verifiedOnly: nav.verifiedOnly, quickFilter: nav.quickFilter, onView: nav.viewProduct });
+  const importProducts = useImportProducts({ supplierOptions: po.supplierOptions, onImported: () => { data.refresh(); productsTable.refresh(); } });
 
   /** Stock Summary always reflects the whole product, not the matrix's filtered rows. */
   const summary = useMemo(() => summariseVariants(product?.variants ?? []), [product]);
@@ -79,17 +86,10 @@ export function useInventoryPage() {
         return errors;
       },
       onSuccess: ({ data: created }) => {
-        data.addProduct(created);
         nav.selectProduct(created.id);
         setNewProductOpen(false);
       },
     });
-  };
-
-  const saveStorePrice = (storeId: string, price: number) => {
-    setDemoStores((prev) => prev.map((s) => (s.id === storeId ? { ...s, price } : s)));
-    setStorePriceTarget(null);
-    toast.success('Store price updated (design preview only)');
   };
 
   return {
@@ -135,8 +135,7 @@ export function useInventoryPage() {
     closeEditImages: () => setEditImagesOpen(false),
     storePriceTarget,
     setStorePriceTarget,
-    saveStorePrice,
-    demoStores,
+    storeListings,
   };
 }
 

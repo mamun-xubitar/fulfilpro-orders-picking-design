@@ -43,6 +43,29 @@ export type SupplierProductPricingRow = {
 
 export type SupplierProductActivityRow = { id: string; at: string; actor: string; message: string };
 
+export type ProductsSortKey = 'name' | 'brand' | 'category' | 'sku' | 'status' | 'variants' | 'stock' | 'stockValue' | 'createdAt';
+
+/** The four price-shortcut buttons — matched against a variant's effective (weighted-average
+ * received cost, falling back to the stored buyPrice) buy price and its sell price. */
+export type QuickFilterId = 'buying-lt-1' | 'profit-lt-5' | 'selling-lt-1' | 'selling-lt-5';
+
+export type CatalogueListParams = {
+  page: number;
+  pageSize: number;
+  search?: string;
+  verified?: boolean;
+  status?: SupplierProductStatus;
+  supplierName?: string;
+  quickFilter?: QuickFilterId | null;
+  sort?: ProductsSortKey;
+  dir?: 'asc' | 'desc';
+};
+
+export type CatalogueListResult = {
+  products: SupplierProductRow[];
+  total: number;
+};
+
 export type SupplierProductRow = {
   id: string;
   supplierId: string;
@@ -65,8 +88,6 @@ export type SupplierProductRow = {
   colours: ColourOptionData[];
   variants: SupplierProductVariantRow[];
   pricing: SupplierProductPricingRow;
-  /** Always empty this pass — the hub has no Shopify store link yet. */
-  stores: [];
   stocktake: { lastAt: string | null; nextAt: string | null };
   adjustments: { lastAt: string | null; thisMonth: number };
   activity: SupplierProductActivityRow[];
@@ -96,13 +117,77 @@ const catalogueInclude = {
 type CatalogueRow = Prisma.SupplierProductGetPayload<{ include: typeof catalogueInclude }>;
 
 export class SupplierProductModel {
-  /** Loads the whole catalogue for the page's single fetch-on-mount — newest first. */
-  async listAll(): Promise<SupplierProductRow[]> {
+  /** Server-side filtered/sorted/paginated catalogue page. Every filter — verified, quick
+   * filter, status, supplier, search — and the sort/page decision happens in SQL; the caller
+   * never receives more than one page. */
+  async list(params: CatalogueListParams): Promise<CatalogueListResult> {
+    const whereSql = buildCatalogueWhereSql(params);
+    const orderSql = buildCatalogueOrderSql(params.sort ?? 'createdAt', params.dir ?? 'desc');
+    const skip = (params.page - 1) * params.pageSize;
+
+    const rows = await prisma.$queryRaw<{ total: number; ids: string[] }[]>(Prisma.sql`
+      ${CATALOGUE_CTE_SQL},
+      filtered AS (${buildCatalogueFilteredSql(whereSql)})
+      SELECT
+        (SELECT COUNT(*)::integer FROM filtered) AS total,
+        COALESCE(
+          (SELECT array_agg(id) FROM (SELECT id FROM filtered ORDER BY ${orderSql} OFFSET ${skip} LIMIT ${params.pageSize}) paged),
+          ARRAY[]::text[]
+        ) AS ids
+    `);
+
+    const { total, ids } = rows[0] ?? { total: 0, ids: [] };
+    if (ids.length === 0) return { products: [], total };
+
+    const catalogueRows = await prisma.supplierProduct.findMany({ where: { id: { in: ids } }, include: catalogueInclude });
+    const hydrated = await this.hydrate(catalogueRows);
+    const byId = new Map(hydrated.map((p) => [p.id, p]));
+    return { products: ids.map((id) => byId.get(id)!).filter(Boolean), total };
+  }
+
+  /** Every id matching the current filters, in the same order `list()` would page through them —
+   * for "select all matching filters" bulk actions. No row hydration, no limit. */
+  async listIds(params: Omit<CatalogueListParams, 'page' | 'pageSize'>): Promise<string[]> {
+    const whereSql = buildCatalogueWhereSql(params);
+    const orderSql = buildCatalogueOrderSql(params.sort ?? 'createdAt', params.dir ?? 'desc');
+    const rows = await prisma.$queryRaw<{ ids: string[] }[]>(Prisma.sql`
+      ${CATALOGUE_CTE_SQL},
+      filtered AS (${buildCatalogueFilteredSql(whereSql)})
+      SELECT COALESCE((SELECT array_agg(id ORDER BY ${orderSql}) FROM filtered), ARRAY[]::text[]) AS ids
+    `);
+    return rows[0]?.ids ?? [];
+  }
+
+  /** 1-indexed position of `id` within the given filter set (detail-mode ordering is always
+   * createdAt desc), plus the total row count under that filter set. Null when `id` doesn't
+   * match the filters at all. */
+  async findPosition(id: string, params: Pick<CatalogueListParams, 'verified'>): Promise<{ position: number; total: number } | null> {
+    const whereSql = buildCatalogueWhereSql(params);
+    const orderSql = buildCatalogueOrderSql('createdAt', 'desc');
+    const rows = await prisma.$queryRaw<{ position: number; total: number }[]>(Prisma.sql`
+      ${CATALOGUE_CTE_SQL},
+      filtered AS (${buildCatalogueFilteredSql(whereSql)}),
+      ranked AS (
+        SELECT id, row_number() OVER (ORDER BY ${orderSql}) AS position, COUNT(*) OVER () AS total
+        FROM filtered
+      )
+      SELECT position::integer, total::integer FROM ranked WHERE id = ${id}
+    `);
+    return rows[0] ?? null;
+  }
+
+  /** Distinct supplier names among products — for the products table's supplier filter dropdown. */
+  async listSupplierNames(): Promise<string[]> {
     const rows = await prisma.supplierProduct.findMany({
-      include: catalogueInclude,
-      orderBy: { createdAt: 'desc' },
+      select: { supplier: { select: { name: true } } },
+      distinct: ['supplierId'],
     });
-    return this.hydrate(rows);
+    return [...new Set(rows.map((r) => r.supplier.name))].sort();
+  }
+
+  /** Whole-catalogue count, ignoring every filter — the "of Y" half of the record stepper. */
+  async countAll(): Promise<number> {
+    return prisma.supplierProduct.count();
   }
 
   async findById(id: string): Promise<SupplierProductRow | null> {
@@ -115,6 +200,13 @@ export class SupplierProductModel {
   async exists(id: string): Promise<boolean> {
     const row = await prisma.supplierProduct.findUnique({ where: { id }, select: { id: true } });
     return !!row;
+  }
+
+  /** Lightweight lookup for callers that only need the handle (e.g. the store-listings lookup) —
+   * avoids the full hydrate() pass that findById() does. */
+  async findHandle(id: string): Promise<string | null> {
+    const row = await prisma.supplierProduct.findUnique({ where: { id }, select: { handle: true } });
+    return row?.handle ?? null;
   }
 
   async create(data: {
@@ -407,9 +499,11 @@ export class SupplierProductModel {
     return result.count;
   }
 
-  async applyPriceToColours(supplierProductId: string, colours: string[], sellPrice: number, buyPrice: number): Promise<number> {
+  /** `colours: null` means "every variant of this product" — no colour filter at all. Pass an
+   * array only when the caller is explicitly scoping the update to a set of colourways. */
+  async applyPriceToColours(supplierProductId: string, colours: string[] | null, sellPrice: number, buyPrice: number): Promise<number> {
     const result = await prisma.supplierProductVariant.updateMany({
-      where: { supplierProductId, colour: { in: colours } },
+      where: { supplierProductId, ...(colours ? { colour: { in: colours } } : {}) },
       data: { sellPrice, buyPrice },
     });
     return result.count;
@@ -597,7 +691,6 @@ export class SupplierProductModel {
             tax: Number(row.pricing.tax),
           }
         : EMPTY_PRICING,
-      stores: [],
       stocktake: {
         lastAt: row.stocktakes[0]?.completedAt?.toISOString() ?? null,
         nextAt: row.nextStocktakeAt?.toISOString() ?? null,
@@ -626,4 +719,149 @@ function normalizeColours(raw: unknown): ColourOptionData[] {
     const color = typeof c.color === 'string' && c.color ? c.color : typeof c.hex === 'string' && c.hex ? c.hex : deriveColorFromName(name);
     return { name, color };
   });
+}
+
+// — Server-driven catalogue list: SQL builders —
+
+/** Common table expressions shared by list/listIds/findPosition: a weighted-average received
+ * cost per variant (mirrors hydrate()'s buyPrice fallback), and a per-product rollup used for
+ * sorting (variant count, total stock, stock value) and for the quick-filter EXISTS check. */
+const CATALOGUE_CTE_SQL = Prisma.sql`
+  WITH avg_cost AS (
+    SELECT "variantId", SUM("unitCost" * "receivedQuantity") / NULLIF(SUM("receivedQuantity"), 0) AS wac
+    FROM "PurchaseOrderItem"
+    WHERE "receivedQuantity" > 0 AND "unitCost" IS NOT NULL
+    GROUP BY "variantId"
+  ),
+  variant_eff AS (
+    SELECT
+      v.id,
+      v."supplierProductId" AS pid,
+      v."stockOnHand" AS stock,
+      v."sellPrice" AS sell,
+      COALESCE(a.wac, v."buyPrice") AS buy
+    FROM "SupplierProductVariant" v
+    LEFT JOIN avg_cost a ON a."variantId" = v.id
+  ),
+  product_agg AS (
+    SELECT
+      pid,
+      COUNT(*) AS variant_count,
+      SUM(stock) AS total_stock,
+      SUM(stock * sell) AS stock_value
+    FROM variant_eff
+    GROUP BY pid
+  )
+`;
+
+function buildLikePattern(value: string): string {
+  const escaped = value.replace(/[\\%_]/g, (char) => `\\${char}`);
+  return `%${escaped}%`;
+}
+
+function quickFilterPredicateSql(quickFilter: QuickFilterId): Prisma.Sql {
+  switch (quickFilter) {
+    case 'buying-lt-1':
+      return Prisma.sql`buy < 1`;
+    case 'profit-lt-5':
+      return Prisma.sql`(sell - buy) < 5`;
+    case 'selling-lt-1':
+      return Prisma.sql`sell < 1`;
+    case 'selling-lt-5':
+      return Prisma.sql`sell < 5`;
+    default:
+      return Prisma.sql`false`;
+  }
+}
+
+function buildCatalogueWhereSql(params: {
+  search?: string;
+  verified?: boolean;
+  status?: SupplierProductStatus;
+  supplierName?: string;
+  quickFilter?: QuickFilterId | null;
+}): Prisma.Sql {
+  const whereParts: Prisma.Sql[] = [Prisma.sql`1 = 1`];
+
+  if (params.verified !== undefined) {
+    whereParts.push(Prisma.sql`sp.verified = ${params.verified}`);
+  }
+  if (params.status) {
+    whereParts.push(Prisma.sql`sp.status = ${params.status}::"SupplierProductStatus"`);
+  }
+  if (params.supplierName) {
+    whereParts.push(Prisma.sql`su.name = ${params.supplierName}`);
+  }
+
+  const term = params.search?.trim();
+  if (term) {
+    const pattern = buildLikePattern(term);
+    whereParts.push(Prisma.sql`(
+      sp.name ILIKE ${pattern} ESCAPE '\\'
+      OR sp.sku ILIKE ${pattern} ESCAPE '\\'
+      OR sp."itemNo" ILIKE ${pattern} ESCAPE '\\'
+      OR sp.handle ILIKE ${pattern} ESCAPE '\\'
+      OR COALESCE(sp.brand, '') ILIKE ${pattern} ESCAPE '\\'
+      OR EXISTS (
+        SELECT 1 FROM "SupplierProductVariant" v
+        WHERE v."supplierProductId" = sp.id
+          AND (COALESCE(v.sku, '') ILIKE ${pattern} ESCAPE '\\' OR COALESCE(v.barcode, '') ILIKE ${pattern} ESCAPE '\\')
+      )
+    )`);
+  }
+
+  if (params.quickFilter) {
+    const predicate = quickFilterPredicateSql(params.quickFilter);
+    whereParts.push(Prisma.sql`EXISTS (SELECT 1 FROM variant_eff ve WHERE ve.pid = sp.id AND ${predicate})`);
+  }
+
+  return Prisma.join(whereParts, ' AND ');
+}
+
+/** Projects every column ORDER BY / the caller might need, so downstream queries can select
+ * just `id` from `filtered` and still ORDER BY the other columns (Postgres allows ordering by
+ * a CTE's non-selected columns as long as the FROM is a simple relation reference). */
+function buildCatalogueFilteredSql(whereSql: Prisma.Sql): Prisma.Sql {
+  return Prisma.sql`
+    SELECT
+      sp.id,
+      sp.name,
+      sp.brand,
+      sp.category,
+      sp.sku,
+      sp.status,
+      sp."createdAt",
+      COALESCE(pa.variant_count, 0) AS variant_count,
+      COALESCE(pa.total_stock, 0) AS total_stock,
+      COALESCE(pa.stock_value, 0) AS stock_value
+    FROM "SupplierProduct" sp
+    JOIN "Supplier" su ON su.id = sp."supplierId"
+    LEFT JOIN product_agg pa ON pa.pid = sp.id
+    WHERE ${whereSql}
+  `;
+}
+
+function buildCatalogueOrderSql(sort: ProductsSortKey, dir: 'asc' | 'desc'): Prisma.Sql {
+  const dirSql = dir === 'desc' ? Prisma.sql`DESC` : Prisma.sql`ASC`;
+  switch (sort) {
+    case 'name':
+      return Prisma.sql`LOWER(name) ${dirSql}, id ASC`;
+    case 'brand':
+      return Prisma.sql`LOWER(COALESCE(brand, '')) ${dirSql}, id ASC`;
+    case 'category':
+      return Prisma.sql`LOWER(COALESCE(category, '')) ${dirSql}, id ASC`;
+    case 'sku':
+      return Prisma.sql`LOWER(sku) ${dirSql}, id ASC`;
+    case 'status':
+      return Prisma.sql`status ${dirSql}, id ASC`;
+    case 'variants':
+      return Prisma.sql`variant_count ${dirSql}, id ASC`;
+    case 'stock':
+      return Prisma.sql`total_stock ${dirSql}, id ASC`;
+    case 'stockValue':
+      return Prisma.sql`stock_value ${dirSql}, id ASC`;
+    case 'createdAt':
+    default:
+      return Prisma.sql`"createdAt" ${dirSql}, id ASC`;
+  }
 }

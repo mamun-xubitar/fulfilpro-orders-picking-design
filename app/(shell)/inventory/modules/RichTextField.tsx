@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { ModalActions, ModalShell } from '@/components/ModalShell';
+import { ModalShell } from '@/components/ModalShell';
 import { sanitizeHtml } from '@/lib/sanitize-html';
 import { BulletList, LinkIcon, NumberedList, Palette } from './icons';
 import { FieldLabel } from './ProductFieldRows';
@@ -39,6 +39,10 @@ export default function RichTextField({ label, value, onChange }: RichTextFieldP
   const [linkModalOpen, setLinkModalOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState('');
   const [linkText, setLinkText] = useState('');
+  // The anchor being edited lives in a ref (imperative DOM handle, mutated directly on Save) —
+  // `isEditingLink` is the reactive flag that drives the modal's title/footer.
+  const editingAnchorRef = useRef<HTMLAnchorElement | null>(null);
+  const [isEditingLink, setIsEditingLink] = useState(false);
   const [colorOpen, setColorOpen] = useState(false);
   const colorPopoverRef = useRef<HTMLDivElement>(null);
 
@@ -109,20 +113,66 @@ export default function RichTextField({ label, value, onChange }: RichTextFieldP
     refreshActiveState();
   };
 
-  const openLinkModal = () => {
-    saveSelection();
-    const sel = window.getSelection();
-    setLinkText(sel && !sel.isCollapsed ? sel.toString() : '');
-    setLinkUrl('');
+  /** Walks up from `node` to the nearest enclosing `<a>`, stopping at the editor boundary. */
+  const findEnclosingAnchor = (node: Node | null): HTMLAnchorElement | null => {
+    const root = ref.current;
+    if (!node || !root) return null;
+    let el: HTMLElement | null = node.nodeType === Node.ELEMENT_NODE ? (node as HTMLElement) : node.parentElement;
+    while (el && el !== root) {
+      if (el.tagName === 'A') return el as HTMLAnchorElement;
+      el = el.parentElement;
+    }
+    return null;
+  };
+
+  /** Opens the link modal. With an anchor (clicked directly, or found enclosing the current
+   * selection) it edits that link in place; otherwise it inserts a new one around the
+   * selection, exactly as before. */
+  const openLinkModal = (anchorOverride?: HTMLAnchorElement) => {
+    let anchor = anchorOverride ?? null;
+    if (!anchor) {
+      saveSelection();
+      const sel = window.getSelection();
+      anchor = sel && ref.current?.contains(sel.anchorNode) ? findEnclosingAnchor(sel.anchorNode) : null;
+    } else {
+      saveSelection();
+    }
+    editingAnchorRef.current = anchor;
+    setIsEditingLink(!!anchor);
+    if (anchor) {
+      setLinkUrl(anchor.getAttribute('href') ?? '');
+      setLinkText(anchor.textContent ?? '');
+    } else {
+      const sel = window.getSelection();
+      setLinkText(sel && !sel.isCollapsed ? sel.toString() : '');
+      setLinkUrl('');
+    }
     setLinkModalOpen(true);
   };
 
-  /** Builds the `<a>` directly via the Range API instead of `execCommand('createLink', ...)`, so
-   * the anchor's visible text always matches the modal's "Link text" field, whether or not that
-   * differs from whatever was originally selected. */
-  const insertLink = () => {
+  const closeLinkModal = () => {
+    setLinkModalOpen(false);
+    setIsEditingLink(false);
+    editingAnchorRef.current = null;
+  };
+
+  /** Editing an existing link mutates that anchor in place (no delete/reinsert, so it can't
+   * duplicate). Inserting a new one still builds the `<a>` directly via the Range API instead of
+   * `execCommand('createLink', ...)`, so its visible text always matches the modal's "Link text"
+   * field, whether or not that differs from whatever was originally selected. */
+  const applyLink = () => {
     const url = linkUrl.trim();
     if (!url || !ref.current) return;
+
+    const editingAnchor = editingAnchorRef.current;
+    if (editingAnchor) {
+      editingAnchor.href = url;
+      editingAnchor.textContent = linkText.trim() || url;
+      onChange(ref.current.innerHTML);
+      closeLinkModal();
+      return;
+    }
+
     const range = getInsertionRange();
     if (!range) return;
     const a = document.createElement('a');
@@ -138,7 +188,16 @@ export default function RichTextField({ label, value, onChange }: RichTextFieldP
     sel?.removeAllRanges();
     sel?.addRange(range);
     onChange(ref.current.innerHTML);
-    setLinkModalOpen(false);
+    closeLinkModal();
+  };
+
+  /** Unwraps the anchor being edited back to plain text — only reachable in edit mode. */
+  const removeLink = () => {
+    const editingAnchor = editingAnchorRef.current;
+    if (!editingAnchor || !ref.current) return;
+    editingAnchor.replaceWith(document.createTextNode(editingAnchor.textContent ?? ''));
+    onChange(ref.current.innerHTML);
+    closeLinkModal();
   };
 
   const applyColor = (hex: string) => {
@@ -229,6 +288,15 @@ export default function RichTextField({ label, value, onChange }: RichTextFieldP
             focused.current = false;
           }}
           onInput={() => ref.current && onChange(ref.current.innerHTML)}
+          onClick={(e) => {
+            // Browsers already block navigation on a plain click inside a contentEditable
+            // region, so this only ever needs to redirect the click into "edit this link".
+            const anchor = (e.target as HTMLElement).closest('a');
+            if (anchor && ref.current?.contains(anchor)) {
+              e.preventDefault();
+              openLinkModal(anchor);
+            }
+          }}
           aria-label={label}
           className="min-h-24 w-full px-2.5 py-2 text-[13px] text-gray-900 outline-none [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-4 [&_ol]:pl-4 [&_a]:text-blue-600 [&_a]:underline"
         />
@@ -236,9 +304,36 @@ export default function RichTextField({ label, value, onChange }: RichTextFieldP
 
       {linkModalOpen && (
         <ModalShell
-          title="Insert link"
-          onClose={() => setLinkModalOpen(false)}
-          footer={<ModalActions onCancel={() => setLinkModalOpen(false)} onConfirm={insertLink} confirmLabel="Insert" disabled={!linkUrl.trim()} />}
+          title={isEditingLink ? 'Edit link' : 'Insert link'}
+          onClose={closeLinkModal}
+          footer={
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={closeLinkModal}
+                className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50 cursor-pointer"
+              >
+                Cancel
+              </button>
+              {isEditingLink && (
+                <button
+                  type="button"
+                  onClick={removeLink}
+                  className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 cursor-pointer"
+                >
+                  Remove link
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={applyLink}
+                disabled={!linkUrl.trim()}
+                className="ml-auto flex-1 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+              >
+                {isEditingLink ? 'Save' : 'Insert'}
+              </button>
+            </div>
+          }
         >
           <div className="space-y-3">
             <div>

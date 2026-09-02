@@ -40,17 +40,17 @@ async function postImportFile<T>(file: File, supplierId: string, commit: boolean
 
 type UseImportProductsArgs = {
   supplierOptions: { id: string; name: string }[];
-  /** Prepends each newly created product — no full-catalogue refetch. */
-  addProduct: (product: ProductRecord) => void;
-  /** Patches an updated product in place — no full-catalogue refetch. */
-  updateProduct: (productId: string, product: ProductRecord) => void;
+  /** Called once after a successful commit — the catalogue is server-paginated now, so a bulk
+   * import (which can create or update many products at once) just triggers a refetch of
+   * whatever view is on screen instead of patching a client-held list. */
+  onImported: () => void;
 };
 
 /** Bulk "Import products" — creates one product per Handle group in a Shopify product CSV; with
  * "Overwrite" ticked, a handle that already exists updates that product in place instead of
  * being skipped. Mirrors useImportExport's two-phase preview/commit flow against the separate
  * bulk endpoint. */
-export function useImportProducts({ supplierOptions, addProduct, updateProduct }: UseImportProductsArgs) {
+export function useImportProducts({ supplierOptions, onImported }: UseImportProductsArgs) {
   const [modalOpen, setModalOpen] = useState(false);
   const [supplierId, setSupplierId] = useState('');
   const [pendingFile, setPendingFile] = useState<File | null>(null);
@@ -110,8 +110,7 @@ export function useImportProducts({ supplierOptions, addProduct, updateProduct }
         { overwrite, markVerified }
       );
       toast.success(json.message);
-      json.data.created.forEach(addProduct);
-      json.data.updated.forEach((product) => updateProduct(product.id, product));
+      onImported();
       setModalOpen(false);
       setPendingFile(null);
       setPreview(null);

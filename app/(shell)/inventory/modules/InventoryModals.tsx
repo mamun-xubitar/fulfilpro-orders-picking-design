@@ -11,6 +11,7 @@ import ImportModal from './ImportModal';
 import ImportProductsModal from './ImportProductsModal';
 import PoModals from './PoModals';
 import StocktakeModal from './StocktakeModal';
+import StorePricesModal from './StorePricesModal';
 import { ChevronLeft, ChevronRight, Close, Lock, Unlock } from './icons';
 import { formatMoney, variantTitle } from './utils';
 import type { InventoryPage } from './hooks/useInventoryPage';
@@ -79,13 +80,15 @@ export default function InventoryModals(p: InventoryPage) {
       )}
 
       {p.storePriceTarget && (
-        <StorePriceModal
-          key={p.storePriceTarget.id}
-          storeName={p.storePriceTarget.name}
-          currentPrice={p.storePriceTarget.price}
-          baseCurrency={p.globals.baseCurrency}
-          onCancel={() => p.setStorePriceTarget(null)}
-          onSave={(price) => p.saveStorePrice(p.storePriceTarget!.id, price)}
+        <StorePricesModal
+          key={p.storePriceTarget.storeId}
+          listing={p.storePriceTarget}
+          onClose={() => p.setStorePriceTarget(null)}
+          saving={p.storeListings.savingStoreId === p.storePriceTarget.storeId}
+          onSaveOne={(variantId, price) =>
+            p.storeListings.savePrices(p.storePriceTarget!.storeId, p.storePriceTarget!.productGid!, [{ id: variantId, price }])
+          }
+          onSaveAll={(variants) => p.storeListings.savePrices(p.storePriceTarget!.storeId, p.storePriceTarget!.productGid!, variants)}
         />
       )}
 
@@ -131,46 +134,6 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
       <dt className="text-[13px] font-medium text-gray-600">{label}</dt>
       <dd className="text-[13px] font-bold text-gray-900 tabular-nums">{value}</dd>
     </div>
-  );
-}
-
-function StorePriceModal({
-  storeName,
-  currentPrice,
-  baseCurrency,
-  onCancel,
-  onSave,
-}: {
-  storeName: string;
-  currentPrice: number;
-  baseCurrency: string;
-  onCancel: () => void;
-  onSave: (price: number) => void;
-}) {
-  const [value, setValue] = useState(String(currentPrice));
-  const parsed = Number(value);
-  const invalid = !Number.isFinite(parsed) || parsed < 0;
-
-  return (
-    <ModalShell
-      title={`Edit price — ${storeName}`}
-      onClose={onCancel}
-      footer={<ModalActions onCancel={onCancel} onConfirm={() => onSave(parsed)} confirmLabel="Save price" disabled={invalid} />}
-    >
-      <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-gray-500" htmlFor="store-price">
-        Price ({baseCurrency})
-      </label>
-      <input
-        id="store-price"
-        type="number"
-        step="0.01"
-        min="0"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm tabular-nums outline-none focus:ring-2 focus:ring-blue-400"
-      />
-      {invalid && <p className="mt-1 text-[11px] text-red-600">Enter a price of 0 or more</p>}
-    </ModalShell>
   );
 }
 

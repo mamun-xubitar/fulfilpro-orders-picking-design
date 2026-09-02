@@ -24,9 +24,9 @@ export default function ProductsToolbar(p: InventoryPage) {
         <GlobalField label="System wide margin" value={p.marginInput} onChange={p.setMarginInput} onApply={p.applyGlobalMargin} step="1" suffix="%" />
       </div>
 
-      {/* Record navigation + search */}
+      {/* Record navigation + search — always two rows: view controls (+ Import) on top, find/create below. */}
       <div className="flex min-w-80 flex-1 flex-col justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 min-[1760px]:flex-nowrap">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <Toggle label="All records" checked={nav.allRecords} onChange={nav.setAllRecords} />
           <Toggle label="Verified" checked={nav.verifiedOnly} onChange={nav.setVerifiedOnly} />
 
@@ -48,33 +48,34 @@ export default function ProductsToolbar(p: InventoryPage) {
             </PagerButton>
           </div>
 
-          <div className="flex min-w-0 flex-1 basis-full items-center gap-2 min-[1760px]:basis-auto">
-            <ProductSearchBox
-              value={nav.searchInput}
-              onChange={nav.setSearchInput}
-              open={nav.searchOpen}
-              setOpen={nav.setSearchOpen}
-              results={nav.searchResults}
-              containerRef={nav.searchRef}
-              onSelect={nav.selectProduct}
-            />
-            <button
-              type="button"
-              onClick={p.openNewProduct}
-              className="flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-emerald-600 p-2 text-sm font-semibold text-white shadow-sm transition-colors duration-150 hover:bg-emerald-700 cursor-pointer"
-            >
-              <Plus />
-              New Product
-            </button>
-            <button
-              type="button"
-              onClick={p.importProducts.openModal}
-              className="flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-emerald-300 bg-emerald-50 p-2 text-sm font-semibold text-emerald-700 shadow-sm transition-colors duration-150 hover:bg-emerald-100 cursor-pointer"
-            >
-              <Upload className="h-4 w-4" />
-              Import Products
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={p.importProducts.openModal}
+            className="ml-auto flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-emerald-300 bg-emerald-50 p-2 text-sm font-semibold text-emerald-700 shadow-sm transition-colors duration-150 hover:bg-emerald-100 cursor-pointer"
+          >
+            <Upload className="h-4 w-4" />
+            Import Products
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <ProductSearchBox
+            value={nav.searchInput}
+            onChange={nav.setSearchInput}
+            open={nav.searchOpen}
+            setOpen={nav.setSearchOpen}
+            results={nav.searchResults}
+            containerRef={nav.searchRef}
+            onSelect={nav.selectProduct}
+          />
+          <button
+            type="button"
+            onClick={p.openNewProduct}
+            className="flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-emerald-600 p-2 text-sm font-semibold text-white shadow-sm transition-colors duration-150 hover:bg-emerald-700 cursor-pointer"
+          >
+            <Plus />
+            New Product
+          </button>
         </div>
       </div>
 
@@ -88,8 +89,7 @@ export default function ProductsToolbar(p: InventoryPage) {
               type="button"
               onClick={() => nav.toggleQuickFilter(filter.id)}
               aria-pressed={isActive}
-              disabled={nav.allRecords}
-              className={`flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border px-3 py-2 text-xs font-semibold transition-colors duration-150 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
+              className={`flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border px-3 py-2 text-xs font-semibold transition-colors duration-150 cursor-pointer ${
                 isActive ? 'border-amber-500 bg-amber-500 text-white' : 'border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100'
               }`}
             >

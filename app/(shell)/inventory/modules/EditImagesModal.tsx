@@ -1,12 +1,12 @@
 'use client';
 
+import { ModalShell } from '@/components/ModalShell';
 import { useRef } from 'react';
 import { toast } from 'react-toastify';
-import { ModalShell } from '@/components/ModalShell';
-import { variantTitle } from './utils';
-import { Close, Plus, Trash } from './icons';
 import type { useProductImageMutations } from './hooks/useProductImageMutations';
+import { Close, Plus, Trash } from './icons';
 import type { ProductImage, VariantRow } from './types';
+import { variantTitle } from './utils';
 
 // Mirrors the limits enforced in app/api/inventory/catalog/[id]/images/upload/route.ts
 const MAX_FILES = 10;
@@ -60,9 +60,9 @@ function ImageCard({
   const assigning = unassignedVariants.some((v) => v.id === imageMutations.settingImageForVariantId);
 
   return (
-    <figure className="overflow-hidden rounded-xl border border-gray-200">
+    <figure className="overflow-hidden rounded-xl border border-gray-200 flex flex-col justify-between">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={image.url} alt={image.altText ?? ''} className="aspect-square w-full object-cover" />
+      <img src={image.url} alt={image.altText ?? ''} className="aspect-square w-full object-cover " />
       <figcaption className="space-y-1.5 bg-gray-50 px-2 py-1.5">
         {linkedVariants.length > 0 && (
           <div className="flex flex-wrap gap-1">
@@ -96,7 +96,7 @@ function ImageCard({
             aria-label={`Assign a variant to this image`}
             className="min-w-0 flex-1 rounded border border-gray-200 bg-white px-1.5 py-0.5 text-[11px] font-medium text-gray-600 outline-none focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <option value="">{unassignedVariants.length === 0 ? 'No unassigned variants' : 'Assign variant…'}</option>
+            <option value="">{unassignedVariants.length === 0 ? 'No unassigned variants' : 'Assign variants'}</option>
             {unassignedVariants.map((v) => (
               <option key={v.id} value={v.id}>
                 {variantTitle(v)}

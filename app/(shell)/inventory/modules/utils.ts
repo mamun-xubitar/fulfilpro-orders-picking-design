@@ -9,6 +9,7 @@ import type {
   ProductImage,
   ProductRecord,
   PurchaseOrderRecord,
+  QuickFilterId,
   StockSummary,
   VariantComputed,
   VariantRow,
@@ -31,6 +32,23 @@ export function getAvailable(v: VariantRow): number {
 
 export function getStockValue(v: VariantRow): number {
   return v.stockOnHand * v.sellPrice;
+}
+
+/** The four price-shortcut buttons, applied to a single variant. In single-product view this
+ * runs entirely client-side against the already-loaded product — the server's `SupplierProductVariant`
+ * query (`models/supplier-product.model.server.ts`) uses the identical four predicates for
+ * All-records mode, where it decides which *products* to list rather than which rows to show. */
+export function quickFilterMatches(quickFilter: QuickFilterId, v: VariantRow): boolean {
+  switch (quickFilter) {
+    case 'buying-lt-1':
+      return v.buyPrice < 1;
+    case 'profit-lt-5':
+      return v.sellPrice - v.buyPrice < 5;
+    case 'selling-lt-1':
+      return v.sellPrice < 1;
+    case 'selling-lt-5':
+      return v.sellPrice < 5;
+  }
 }
 
 export function getStatus(v: VariantRow): VariantStatus {

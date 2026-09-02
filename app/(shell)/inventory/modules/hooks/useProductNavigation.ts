@@ -1,51 +1,45 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { matchesProduct } from '../utils';
-import type { ProductRecord, QuickFilterId } from '../types';
+import { useEffect, useRef, useState } from 'react';
+import type { CatalogData } from './useCatalogData';
+import type { ProductRecord, ProductsResponse } from '../types';
 
-/** Predicates behind the four orange shortcut buttons in the toolbar. */
-const QUICK_FILTER_TESTS: Record<QuickFilterId, (p: ProductRecord) => boolean> = {
-  'buying-lt-1': (p) => p.pricing.buyingPrice < 1,
-  'profit-lt-5': (p) => p.variants.some((v) => v.sellPrice - v.buyPrice < 5),
-  'selling-lt-1': (p) => p.variants.some((v) => v.sellPrice < 1),
-  'selling-lt-5': (p) => p.variants.some((v) => v.sellPrice < 5),
-};
+type ApiEnvelope = { success: boolean; message: string; data?: ProductsResponse };
 
-export function useProductNavigation(products: ProductRecord[]) {
-  const [allRecords, setAllRecords] = useState(false);
-  const [verifiedOnly, setVerifiedOnly] = useState(true);
-  const [quickFilter, setQuickFilter] = useState<QuickFilterId | null>(null);
+/**
+ * The toolbar's search typeahead — a thin layer on top of `useCatalogData`. Every other piece
+ * of "navigation" (All records, Verified, quick filter, the record stepper) is owned by
+ * `data` and just re-exposed here so components keep reading `nav.*` unchanged.
+ */
+export function useProductNavigation(data: CatalogData) {
   const [searchInput, setSearchInput] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [searchResults, setSearchResults] = useState<ProductRecord[]>([]);
   const searchRef = useRef<HTMLDivElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
-  // "All records" is a master override — it ignores the verified and quick filters.
-  const filtered = useMemo(() => {
-    if (allRecords) return products;
-    return products.filter((p) => {
-      if (verifiedOnly && !p.verified) return false;
-      if (quickFilter && !QUICK_FILTER_TESTS[quickFilter](p)) return false;
-      return true;
-    });
-  }, [products, allRecords, verifiedOnly, quickFilter]);
-
-  /**
-   * Derived rather than stored, so that when a filter change drops the selected
-   * product out of the set the page falls back to the first one on its own.
-   */
-  const index = useMemo(() => {
-    if (filtered.length === 0) return -1;
-    const found = selectedId ? filtered.findIndex((p) => p.id === selectedId) : -1;
-    return found >= 0 ? found : 0;
-  }, [filtered, selectedId]);
-
-  const searchResults = useMemo(() => {
+  // Server-side search, debounced 300ms and abortable — searches the whole catalogue
+  // regardless of the active filters, mirroring the old client-side behaviour.
+  useEffect(() => {
     const term = searchInput.trim();
-    if (!term) return [];
-    return products.filter((p) => matchesProduct(p, term)).slice(0, 8);
-  }, [products, searchInput]);
+    abortRef.current?.abort();
+    if (!term) return;
+    const timer = window.setTimeout(() => {
+      const controller = new AbortController();
+      abortRef.current = controller;
+      const params = new URLSearchParams({ mode: 'search', search: term });
+      fetch(`/api/inventory/catalog?${params.toString()}`, { signal: controller.signal })
+        .then((res) => res.json() as Promise<ApiEnvelope>)
+        .then((json) => {
+          if (!json.success || !json.data) return;
+          setSearchResults(json.data.products);
+        })
+        .catch((err: unknown) => {
+          if (err instanceof DOMException && err.name === 'AbortError') return;
+        });
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [searchInput]);
 
   useEffect(() => {
     if (!searchOpen) return;
@@ -57,20 +51,13 @@ export function useProductNavigation(products: ProductRecord[]) {
     return () => document.removeEventListener('mousedown', onPointerDown);
   }, [searchOpen]);
 
-  const product = index >= 0 ? filtered[index] : null;
-
-  const goTo = (next: number) => {
-    const clamped = Math.min(Math.max(next, 0), filtered.length - 1);
-    if (filtered[clamped]) setSelectedId(filtered[clamped].id);
-  };
-
   /** Always drops back to the single-product detail view for exactly this product —
    * used by the products table's row "view" action and by selectProduct below. */
   const viewProduct = (id: string) => {
-    setAllRecords(false);
-    setVerifiedOnly(false);
-    setQuickFilter(null);
-    setSelectedId(id);
+    data.setAllRecords(false);
+    data.setVerifiedOnly(false);
+    if (data.quickFilter) data.toggleQuickFilter(data.quickFilter);
+    data.focusProduct(id);
   };
 
   /** Picking a search result (or a newly created product) should always land on that
@@ -82,27 +69,29 @@ export function useProductNavigation(products: ProductRecord[]) {
   };
 
   return {
-    product,
-    position: index + 1,
-    filteredCount: filtered.length,
-    totalCount: products.length,
-    canPrev: index > 0,
-    canNext: index >= 0 && index < filtered.length - 1,
-    goFirst: () => goTo(0),
-    goPrev: () => goTo(index - 1),
-    goNext: () => goTo(index + 1),
-    goLast: () => goTo(filtered.length - 1),
-    allRecords,
-    setAllRecords,
-    verifiedOnly,
-    setVerifiedOnly,
-    quickFilter,
-    toggleQuickFilter: (id: QuickFilterId) => setQuickFilter((prev) => (prev === id ? null : id)),
+    allRecords: data.allRecords,
+    setAllRecords: data.setAllRecords,
+    verifiedOnly: data.verifiedOnly,
+    setVerifiedOnly: data.setVerifiedOnly,
+    quickFilter: data.quickFilter,
+    toggleQuickFilter: data.toggleQuickFilter,
+    product: data.product,
+    position: data.position,
+    filteredCount: data.filteredCount,
+    totalCount: data.totalCount,
+    canPrev: data.canPrev,
+    canNext: data.canNext,
+    goFirst: data.goFirst,
+    goPrev: data.goPrev,
+    goNext: data.goNext,
+    goLast: data.goLast,
     searchInput,
     setSearchInput,
     searchOpen,
     setSearchOpen,
-    searchResults,
+    // Derived: an emptied search box reads as no results immediately, without waiting for the
+    // (skipped) debounce effect to clear stale state from the previous term.
+    searchResults: searchInput.trim() ? searchResults : [],
     searchRef,
     selectProduct,
     viewProduct,
