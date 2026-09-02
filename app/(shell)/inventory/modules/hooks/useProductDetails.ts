@@ -8,6 +8,7 @@ import type { ProductDetailsForm, ProductRecord, ProductStatusValue } from '../t
 
 const EMPTY_FORM: ProductDetailsForm = {
   itemNo: '',
+  handle: '',
   brand: '',
   name: '',
   category: '',
@@ -24,6 +25,7 @@ const EMPTY_FORM: ProductDetailsForm = {
 function productToForm(product: ProductRecord): ProductDetailsForm {
   return {
     itemNo: product.itemNo,
+    handle: product.handle,
     brand: product.brand,
     name: product.name,
     category: product.category,
@@ -51,7 +53,7 @@ export function useProductDetails({ product, onSaved }: UseProductDetailsArgs) {
   // product discards them without an effect having to reset anything.
   const [draft, setDraft] = useState<{ productId: string; form: ProductDetailsForm } | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const { request, loading: saving, errors } = useRequest<ProductRecord>();
+  const { request, loading: saving, errors, setErrors } = useRequest<ProductRecord>();
 
   const saved = product ? productToForm(product) : EMPTY_FORM;
   const form = draft && draft.productId === product?.id ? draft.form : saved;
@@ -60,6 +62,7 @@ export function useProductDetails({ product, onSaved }: UseProductDetailsArgs) {
   const write = (next: ProductDetailsForm) => {
     if (!product) return;
     setDraft({ productId: product.id, form: next });
+    setErrors((prev) => (Object.keys(prev).length > 0 ? {} : prev));
   };
 
   const set = (field: TextField) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -70,6 +73,8 @@ export function useProductDetails({ product, onSaved }: UseProductDetailsArgs) {
     write({ ...form, category: category.name, categoryId: category.id });
   };
 
+  const setDescription = (description: string) => write({ ...form, description });
+
   const saveDetails = () => {
     if (!product) return;
     request({
@@ -77,6 +82,7 @@ export function useProductDetails({ product, onSaved }: UseProductDetailsArgs) {
       method: 'PATCH',
       data: {
         itemNo: form.itemNo,
+        handle: form.handle,
         brand: form.brand,
         name: form.name,
         category: form.category,
@@ -106,6 +112,19 @@ export function useProductDetails({ product, onSaved }: UseProductDetailsArgs) {
     });
   };
 
+  /** Rewrites only the draft's `sizes` / `colours` fields from the server's copy of the
+   * product, leaving any other in-progress edit untouched. Called after a variant delete (or any
+   * other server-side mutation) prunes a colour/size the draft doesn't know about yet — otherwise
+   * the draft keeps offering a value the server has already removed, or rejects one it already
+   * re-allows. */
+  const syncListsFromProduct = (updated: ProductRecord) => {
+    if (!draft || draft.productId !== updated.id) return;
+    setDraft({
+      productId: updated.id,
+      form: { ...draft.form, sizes: formatSizesInput(updated.sizes), colours: formatColoursInput(updated.colours) },
+    });
+  };
+
   /** Appends one size and saves immediately — for the matrix toolbar's "Add size" button,
    * which shouldn't require opening the Product Details edit form. Returns an error message
    * on a duplicate (case-insensitive) instead of adding it, or null on success. */
@@ -122,7 +141,10 @@ export function useProductDetails({ product, onSaved }: UseProductDetailsArgs) {
       method: 'PATCH',
       data: { sizes: nextSizes },
       successMessage: 'Size added',
-      onSuccess: ({ data }) => onSaved(data),
+      onSuccess: ({ data }) => {
+        onSaved(data);
+        syncListsFromProduct(data);
+      },
     });
     return null;
   };
@@ -142,7 +164,10 @@ export function useProductDetails({ product, onSaved }: UseProductDetailsArgs) {
       method: 'PATCH',
       data: { colours: nextColours },
       successMessage: 'Colour added',
-      onSuccess: ({ data }) => onSaved(data),
+      onSuccess: ({ data }) => {
+        onSaved(data);
+        syncListsFromProduct(data);
+      },
     });
     return null;
   };
@@ -154,16 +179,23 @@ export function useProductDetails({ product, onSaved }: UseProductDetailsArgs) {
     form,
     set,
     setCategory,
+    setDescription,
     setStatus: (status: ProductStatusValue) => write({ ...form, status }),
     setVerified: (verified: boolean) => write({ ...form, verified }),
-    startEdit: () => product && setEditingId(product.id),
+    startEdit: () => {
+      if (!product) return;
+      setEditingId(product.id);
+      setErrors({});
+    },
     cancelEdit: () => {
       setDraft(null);
       setEditingId(null);
+      setErrors({});
     },
     saveDetails,
     quickAddSize,
     quickAddColour,
+    syncListsFromProduct,
     // Effective lists, so the variants matrix reflects an in-progress edit.
     sizes: parseSizesInput(form.sizes),
     colours: parseColoursInput(form.colours),

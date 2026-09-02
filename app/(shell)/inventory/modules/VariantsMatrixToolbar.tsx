@@ -14,12 +14,17 @@ export default function VariantsMatrixToolbar({ p }: VariantsMatrixToolbarProps)
   const [addColourOpen, setAddColourOpen] = useState(false);
   const [addSizeOpen, setAddSizeOpen] = useState(false);
 
-  const exportCsv = () => p.importExport.exportVariants(matrix.rows);
-  const selectedColours = () => {
-    const source = matrix.rows.filter((r) => matrix.selectedIds.has(r.id));
-    return [...new Set(source.map((r) => r.colour))];
-  };
-  const applyToSelected = () => p.pricing.applyToColours(selectedColours());
+  // Always the whole product, not the matrix's active colour/size/status filter — "Export
+  // product CSV" means the full product, and filtering the rows here used to also mis-pair
+  // images against variants (buildShopifyProductCsv zips images positionally over the full pool).
+  const exportCsv = () => p.importExport.exportVariants(p.product?.variants ?? []);
+  // Re-enable: uncomment this block and the "Apply to selected colours" button below to restore
+  // applying the pricing panel's sell/buy price to every variant of the selected colours.
+  // const selectedColours = () => {
+  //   const source = matrix.rows.filter((r) => matrix.selectedIds.has(r.id));
+  //   return [...new Set(source.map((r) => r.colour))];
+  // };
+  // const applyToSelected = () => p.pricing.applyToColours(selectedColours());
   const createPo = () => p.po.openCreate(matrix.selectedIds.size > 0 ? [...matrix.selectedIds] : matrix.rows.map((r) => r.id));
   const adjustSelected = () => p.adjustments.openModal([...matrix.selectedIds]);
 
@@ -101,6 +106,7 @@ export default function VariantsMatrixToolbar({ p }: VariantsMatrixToolbarProps)
           Export product CSV
         </SecondaryButton>
         <SecondaryButton onClick={matrix.toggleAllRows}>{matrix.allRowsSelected ? 'Deselect all Colours' : 'Select all Colours'}</SecondaryButton>
+        {/* Re-enable: uncomment to restore the "Apply to selected colours" action (see selectedColours/applyToSelected above).
         <button
           type="button"
           onClick={applyToSelected}
@@ -110,6 +116,7 @@ export default function VariantsMatrixToolbar({ p }: VariantsMatrixToolbarProps)
         >
           Apply to selected colours
         </button>
+        */}
         <button
           type="button"
           onClick={adjustSelected}
@@ -123,7 +130,9 @@ export default function VariantsMatrixToolbar({ p }: VariantsMatrixToolbarProps)
         <button
           type="button"
           onClick={createPo}
-          className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white transition-colors duration-150 hover:bg-emerald-700 cursor-pointer"
+          disabled={matrix.selectedIds.size === 0 && matrix.rows.length === 0}
+          title={matrix.rows.length === 0 ? 'This product has no variants yet' : undefined}
+          className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white transition-colors duration-150 hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
         >
           <Plus className="h-3.5 w-3.5" />
           Create purchase order

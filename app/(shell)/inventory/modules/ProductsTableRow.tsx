@@ -4,7 +4,7 @@ import { truncate } from '@/lib/utils/common';
 import { PRODUCT_STATUS_BADGES } from './constants';
 import { Eye, Trash } from './icons';
 import { availableStockOf, stockValueOf, totalStockOf } from './hooks/useProductsTable';
-import { formatCurrencyValue, formatDate, formatNumber, getSwatch } from './utils';
+import { categoryLeaf, formatCurrencyValue, formatDate, formatNumber, getSwatch } from './utils';
 import type { ProductRecord } from './types';
 
 type ProductsTableRowProps = {
@@ -41,7 +41,9 @@ export default function ProductsTableRow({ product, selected, onToggleSelect, on
         </div>
       </td>
       <td className="px-4 py-3 text-sm text-gray-700">{product.brand || '—'}</td>
-      <td className="px-4 py-3 text-sm text-gray-700">{product.category || '—'}</td>
+      <td className="px-4 py-3 text-sm text-gray-700" title={product.category || undefined}>
+        {product.category ? categoryLeaf(product.category) : '—'}
+      </td>
       <td className="px-4 py-3 text-sm text-gray-700">{product.sku || '—'}</td>
       <td className="px-4 py-3 text-center">
         <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${badge}`}>

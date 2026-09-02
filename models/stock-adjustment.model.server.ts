@@ -1,6 +1,11 @@
 import prisma from '@/lib/prisma.server';
 import { StockAdjustmentReason } from '@prisma/client';
 
+/** "Black / M", "Black" (colour-only), "M" (size-only), or "—" (neither axis). */
+function variantTitle(colour: string, size: string): string {
+  return [colour, size].filter(Boolean).join(' / ') || '—';
+}
+
 export type StockAdjustmentRow = {
   id: string;
   variantId: string;
@@ -68,7 +73,7 @@ export class StockAdjustmentModel {
             supplierProductId: data.supplierProductId,
             variantId: data.variantId,
             type: 'stock_adjusted',
-            message: `${data.delta > 0 ? '+' : ''}${data.delta} on ${variant.colour} / ${variant.size} (${data.reason.toLowerCase()})`,
+            message: `${data.delta > 0 ? '+' : ''}${data.delta} on ${variantTitle(variant.colour, variant.size)} (${data.reason.toLowerCase()})`,
             actorId: data.actorId,
             actorName: data.actorName,
           },

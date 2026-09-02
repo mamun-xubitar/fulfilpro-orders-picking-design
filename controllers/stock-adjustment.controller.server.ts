@@ -1,8 +1,10 @@
 import prisma from '@/lib/prisma.server';
 import { StockAdjustmentModel } from '@/models/stock-adjustment.model.server';
+import { SupplierProductModel } from '@/models/supplier-product.model.server';
 import { StockAdjustmentReason } from '@prisma/client';
 
 const model = new StockAdjustmentModel();
+const productModel = new SupplierProductModel();
 const REASON_VALUES = new Set<string>(Object.values(StockAdjustmentReason));
 
 type Session = { user?: { id?: string | null; name?: string | null; email?: string | null; role?: string | null } | null } | null;
@@ -71,6 +73,7 @@ export class StockAdjustmentController {
     const actor = { id: session?.user?.id ?? '', name: session?.user?.name ?? session?.user?.email ?? 'Unknown' };
     await model.createMany(parsed.map((item) => ({ supplierProductId, ...item, actorId: actor.id, actorName: actor.name })));
 
-    return { data: null, message: parsed.length === 1 ? 'Stock adjusted' : `${parsed.length} adjustments saved` };
+    const product = await productModel.findById(supplierProductId);
+    return { data: product, message: parsed.length === 1 ? 'Stock adjusted' : `${parsed.length} adjustments saved` };
   }
 }

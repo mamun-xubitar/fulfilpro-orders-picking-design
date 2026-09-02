@@ -37,6 +37,9 @@ export type VariantRow = {
   incoming: number;
   /** One entry per open PO with unreceived quantity. */
   incomingLots: IncomingLot[];
+  /** The one image from the product's pool this variant is linked to, Shopify-style — several
+   * variants may point at the same image. Null when unlinked. */
+  imageId: string | null;
 };
 
 /** Below / near / above the reorder trigger. Drives row tint, badge and legend. */
@@ -69,21 +72,33 @@ export type ProductImage = {
   colour: string | null;
 };
 
-/** A storefront the product is published to. */
-export type StoreListing = {
+/** One variant of the product as it exists on a single connected store, fetched live from Shopify. */
+export type StoreListingVariant = {
   id: string;
-  /** Store.name */
-  name: string;
-  /** Store.storeDomain */
-  domain: string;
-  /** Product.status on that store */
-  status: ProductStatusValue;
-  /** Product.shopifyId on that store */
-  externalId: string;
-  /** Listed price on that store, in base currency. */
+  title: string;
+  sku: string | null;
   price: number;
-  /** Product.onlineStoreUrl */
+  optionValues: string[];
+  inventoryQuantity: number | null;
+};
+
+/** A connected store, and (if this product is published there) its live Shopify listing —
+ * looked up by handle. One entry per connected store, whether or not the product is found. */
+export type StoreListingResult = {
+  storeId: string;
+  storeName: string;
+  storeDomain: string;
+  found: boolean;
+  /** Product.title on that store — null when not found there. */
+  productTitle: string | null;
+  productGid: string | null;
+  externalId: string | null;
+  status: 'ACTIVE' | 'DRAFT' | 'ARCHIVED' | null;
   url: string | null;
+  currencyCode: string | null;
+  variants: StoreListingVariant[];
+  /** Set when this store's lookup failed (e.g. throttled, bad token) — the other stores still resolve. */
+  error: string | null;
 };
 
 /** Raw pricing inputs. Mirrors the ProductPricing table one-for-one. */
@@ -132,8 +147,10 @@ export type ProductRecord = {
   id: string;
   supplierId: string;
   supplierName: string;
-  /** Style code — Product.handle stands in for this today. */
+  /** The hub's own style code — distinct from `handle`. */
   itemNo: string;
+  /** Unique, URL-safe slug — Shopify's product Handle equivalent. */
+  handle: string;
   /** Product.vendor */
   brand: string;
   /** Product.title */
@@ -144,7 +161,8 @@ export type ProductRecord = {
   categoryId: string | null;
   /** Parent SKU. Shopify has no such field; derived from the variant prefix. */
   sku: string;
-  /** Plain text, from Product.descriptionHtml. */
+  /** Sanitized HTML — edited via a rich-text field, imported straight from Shopify's
+   * `Body (HTML)` CSV column, and rendered rather than escaped. */
   description: string;
   /** NOT IN PRISMA YET — free-text supplier delivery note. */
   deliveryRemarks: string;
@@ -160,7 +178,6 @@ export type ProductRecord = {
   colours: ColourOption[];
   variants: VariantRow[];
   pricing: PricingInputs;
-  stores: StoreListing[];
   stocktake: StocktakeInfo;
   adjustments: AdjustmentsInfo;
   activity: ActivityEntry[];
@@ -174,10 +191,23 @@ export type InventoryGlobals = {
   currencies: { code: string; rate: number }[];
 };
 
-/** The payload the page loads on mount. */
+export type CataloguePagination = {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  hasPrev: boolean;
+  hasNext: boolean;
+};
+
+/** The payload `GET /api/inventory/catalog` returns for every mode. */
 export type ProductsResponse = {
   products: ProductRecord[];
+  pagination: CataloguePagination;
+  /** Whole-catalogue count, ignoring every filter — the "of Y" half of the record stepper. */
+  totalAll: number;
   globals: InventoryGlobals;
+  supplierOptions: string[];
 };
 
 // — UI-only types —
@@ -228,6 +258,7 @@ export type PricingForm = {
 /** Editable copy of the product record while the details panel is in edit mode. */
 export type ProductDetailsForm = {
   itemNo: string;
+  handle: string;
   brand: string;
   name: string;
   category: string;
@@ -263,6 +294,7 @@ export type PurchaseOrderItemRecord = {
 export type PurchaseOrderRecord = {
   id: string;
   number: number;
+  referenceNumber: string | null;
   supplierId: string;
   supplierName: string;
   poEmail: string;

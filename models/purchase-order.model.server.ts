@@ -17,6 +17,7 @@ export type PurchaseOrderItemRow = {
 export type PurchaseOrderRow = {
   id: string;
   number: number;
+  referenceNumber: string | null;
   supplierId: string;
   supplierName: string;
   poEmail: string;
@@ -92,6 +93,7 @@ export class PurchaseOrderModel {
     poEmail: string;
     supplierProductId: string;
     productTitle: string;
+    referenceNumber: string | null;
     deliveryDate: Date | null;
     remark: string | null;
     createdById: string;
@@ -105,6 +107,7 @@ export class PurchaseOrderModel {
         poEmail: data.poEmail,
         supplierProductId: data.supplierProductId,
         productTitle: data.productTitle,
+        referenceNumber: data.referenceNumber,
         status: 'REQUESTED',
         deliveryDate: data.deliveryDate,
         remark: data.remark,
@@ -200,7 +203,7 @@ export class PurchaseOrderModel {
   }
 
   /** PO-level field patch for PO CSV import — blank/omitted fields leave the existing value untouched. */
-  async updateFields(id: string, data: Partial<{ status: PurchaseOrderStatus; deliveryDate: Date | null; remark: string | null }>): Promise<void> {
+  async updateFields(id: string, data: Partial<{ status: PurchaseOrderStatus; referenceNumber: string | null; deliveryDate: Date | null; remark: string | null }>): Promise<void> {
     await prisma.purchaseOrder.update({ where: { id }, data });
   }
 
@@ -243,6 +246,7 @@ function toPurchaseOrderRow(row: PurchaseOrderWithItems): PurchaseOrderRow {
   return {
     id: row.id,
     number: row.number,
+    referenceNumber: row.referenceNumber,
     supplierId: row.supplierId,
     supplierName: row.supplierName,
     poEmail: row.poEmail,

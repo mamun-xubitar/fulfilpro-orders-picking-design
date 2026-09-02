@@ -104,7 +104,10 @@ export class ProductController {
     }
 
     try {
-      const categories = await searchTaxonomyCategories(storeId, searchParams.get('q')?.trim() ?? '');
+      const categories = await searchTaxonomyCategories(storeId, {
+        search: searchParams.get('q') ?? undefined,
+        childrenOf: searchParams.get('parentId'),
+      });
       return { data: { categories } };
     } catch (error) {
       return { error: { message: error instanceof Error ? error.message : 'Failed to search categories', status: 400 } };

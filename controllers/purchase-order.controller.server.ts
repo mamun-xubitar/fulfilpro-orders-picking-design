@@ -1,8 +1,10 @@
 import prisma from '@/lib/prisma.server';
 import { PurchaseOrderModel } from '@/models/purchase-order.model.server';
+import { SupplierProductModel } from '@/models/supplier-product.model.server';
 import { PurchaseOrderStatus } from '@prisma/client';
 
 const model = new PurchaseOrderModel();
+const productModel = new SupplierProductModel();
 const STATUS_VALUES = new Set<string>(Object.values(PurchaseOrderStatus));
 
 type Session = { user?: { id?: string | null; name?: string | null; email?: string | null; role?: string | null } | null } | null;
@@ -13,6 +15,11 @@ function isAdmin(session: Session) {
 
 function actorFromSession(session: Session) {
   return { id: session?.user?.id ?? '', name: session?.user?.name ?? session?.user?.email ?? 'Unknown' };
+}
+
+/** "Black / M", "Black" (colour-only), "M" (size-only), or "—" (neither axis). */
+function variantTitle(colour: string, size: string): string {
+  return [colour, size].filter(Boolean).join(' / ') || '—';
 }
 
 export class PurchaseOrderController {
@@ -46,6 +53,7 @@ export class PurchaseOrderController {
     const value = (body ?? {}) as Record<string, unknown>;
     const supplierId = typeof value.supplierId === 'string' ? value.supplierId.trim() : '';
     const supplierProductId = typeof value.supplierProductId === 'string' ? value.supplierProductId.trim() : '';
+    const referenceNumberRaw = typeof value.referenceNumber === 'string' ? value.referenceNumber.trim() : '';
     const remarkRaw = typeof value.remark === 'string' ? value.remark.trim() : '';
     const deliveryDateRaw = typeof value.deliveryDate === 'string' ? value.deliveryDate.trim() : '';
     const rawItems = Array.isArray(value.items) ? value.items : [];
@@ -61,7 +69,7 @@ export class PurchaseOrderController {
       else deliveryDate = parsed;
     }
 
-    const items: Array<{ variantId: string; quantity: number; unitCost?: number }> = [];
+    const items: Array<{ variantId: string; quantity: number; unitCost?: number; sku?: string }> = [];
     for (const raw of rawItems) {
       if (!raw || typeof raw !== 'object') continue;
       const v = raw as Record<string, unknown>;
@@ -81,7 +89,8 @@ export class PurchaseOrderController {
         }
         unitCost = parsed;
       }
-      items.push({ variantId, quantity: Math.trunc(quantity), unitCost });
+      const sku = typeof v.sku === 'string' ? v.sku.trim() : undefined;
+      items.push({ variantId, quantity: Math.trunc(quantity), unitCost, sku: sku || undefined });
     }
     if (items.length === 0 && !errors.some((e) => e.startsWith('items:'))) errors.push('items: Select at least one variant');
 
@@ -110,6 +119,7 @@ export class PurchaseOrderController {
       poEmail: supplier.poEmail,
       supplierProductId: product.id,
       productTitle: product.name,
+      referenceNumber: referenceNumberRaw || null,
       deliveryDate,
       remark: remarkRaw || null,
       createdById: actor.id,
@@ -118,15 +128,16 @@ export class PurchaseOrderController {
         const variant = variantMap.get(i.variantId)!;
         return {
           variantId: variant.id,
-          variantTitle: `${variant.colour} / ${variant.size}`,
-          sku: variant.sku,
+          variantTitle: variantTitle(variant.colour, variant.size),
+          sku: i.sku ?? variant.sku,
           quantity: i.quantity,
           unitCost: i.unitCost ?? Number(variant.buyPrice),
         };
       }),
     });
 
-    return { data: purchaseOrder, message: 'Purchase order created' };
+    const updatedProduct = await productModel.findById(product.id);
+    return { data: { purchaseOrder, product: updatedProduct }, message: 'Purchase order created' };
   }
 
   async updateStatus(id: string, body: unknown, session: Session) {
@@ -191,6 +202,7 @@ export class PurchaseOrderController {
     if (errors.length) return { error: { message: 'Validation failed', errors, status: 400 } };
 
     const purchaseOrder = await model.receive(id, receipts, actorFromSession(session));
-    return { data: purchaseOrder, message: 'Inventory received' };
+    const product = await productModel.findById(po.supplierProductId);
+    return { data: { purchaseOrder, product }, message: 'Inventory received' };
   }
 }

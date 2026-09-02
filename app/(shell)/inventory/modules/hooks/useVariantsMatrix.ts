@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from 'react';
 import useRequest from '@/hooks/useRequest';
-import { getStatus, makeSwatchResolver, summariseVariants } from '../utils';
-import type { ColourOption, ProductRecord, VariantRow, VariantStatus } from '../types';
+import { getStatus, makeSwatchResolver, quickFilterMatches, summariseVariants } from '../utils';
+import type { ColourOption, ProductRecord, QuickFilterId, VariantRow, VariantStatus } from '../types';
 
 type MatrixFilters = {
   /** null means "untouched", which reads as every colour selected. */
@@ -21,10 +21,14 @@ type UseVariantsMatrixArgs = {
   /** Product-level lists, draft-aware — owned by the details hook. */
   sizes: string[];
   colours: ColourOption[];
+  /** The active price quick filter (buying/profit/selling) — null shows every variant. Applied
+   * entirely client-side against this product's own already-loaded variants, so switching it
+   * never triggers a request or moves the record stepper's position. */
+  quickFilter: QuickFilterId | null;
   onVariantSaved: (product: ProductRecord) => void;
 };
 
-export function useVariantsMatrix({ product, sizes, colours, onVariantSaved }: UseVariantsMatrixArgs) {
+export function useVariantsMatrix({ product, sizes, colours, quickFilter, onVariantSaved }: UseVariantsMatrixArgs) {
   // Filters are tagged with the product they belong to, so changing product
   // resets them without an effect having to clear five pieces of state.
   const [stored, setStored] = useState<{ productId: string; filters: MatrixFilters } | null>(null);
@@ -77,6 +81,7 @@ export function useVariantsMatrix({ product, sizes, colours, onVariantSaved }: U
 
   const rows = useMemo(() => {
     return variants.filter((v) => {
+      if (quickFilter && !quickFilterMatches(quickFilter, v)) return false;
       if (!allColoursSelected && !activeColours.some((c) => c.toLowerCase() === v.colour.toLowerCase())) return false;
       if (sizeFilter && v.size !== sizeFilter) return false;
       if (filters.status && getStatus(v) !== filters.status) return false;
@@ -84,7 +89,7 @@ export function useVariantsMatrix({ product, sizes, colours, onVariantSaved }: U
       if (filters.showZeroStock && v.stockOnHand > 0) return false;
       return true;
     });
-  }, [variants, allColoursSelected, activeColours, sizeFilter, filters.status, filters.showZeroStock]);
+  }, [variants, quickFilter, allColoursSelected, activeColours, sizeFilter, filters.status, filters.showZeroStock]);
 
   // Selection is narrowed to the visible rows here rather than pruned in an effect.
   const selectedIds = useMemo(() => {

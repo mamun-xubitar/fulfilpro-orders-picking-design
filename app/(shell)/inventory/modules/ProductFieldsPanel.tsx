@@ -4,8 +4,9 @@ import CategoryPicker from './CategoryPicker';
 import { PanelHeading } from './MainImagePanel';
 import { ActionButton } from './PricingMarginPanel';
 import ProductColoursField from './ProductColoursField';
-import { Field, FieldLabel, TextAreaField, TextField } from './ProductFieldRows';
+import { Field, FieldLabel, HtmlField, TextAreaField, TextField } from './ProductFieldRows';
 import ProductSizesField from './ProductSizesField';
+import RichTextField from './RichTextField';
 import { PRODUCT_STATUS_BADGES } from './constants';
 import { Check, Close, Document, Pencil } from './icons';
 import type { useProductDetails } from './hooks/useProductDetails';
@@ -17,7 +18,6 @@ type ProductFieldsPanelProps = {
 
 const STATUS_OPTIONS: ProductStatusValue[] = ['ACTIVE', 'DRAFT', 'ARCHIVED'];
 
-/** Demo mode: Save only leaves edit mode — nothing is written back to the product list. */
 export default function ProductFieldsPanel({ details: d }: ProductFieldsPanelProps) {
   const editing = d.editing;
 
@@ -30,21 +30,24 @@ export default function ProductFieldsPanel({ details: d }: ProductFieldsPanelPro
           {editing ? (
             <>
               <TextField label="Item no." value={d.form.itemNo} onChange={d.set('itemNo')} />
-              <TextField label="Brand" value={d.form.brand} onChange={d.set('brand')} />
+              <TextField label="Handle" value={d.form.handle} onChange={d.set('handle')} />
             </>
           ) : (
             <>
               <Field label="Item no." value={d.form.itemNo} />
-              <Field label="Brand" value={d.form.brand} />
+              <Field label="Handle" value={d.form.handle} />
             </>
           )}
         </div>
+        {d.errors?.handle && <p className="-mt-2 text-xs text-red-600">{d.errors.handle}</p>}
 
         {editing ? (
           <TextField label="Product name" value={d.form.name} onChange={d.set('name')} />
         ) : (
           <Field label="Product name" value={d.form.name} />
         )}
+
+        {editing ? <TextField label="Brand" value={d.form.brand} onChange={d.set('brand')} /> : <Field label="Brand" value={d.form.brand} />}
 
         <div className="grid grid-cols-2 gap-3">
           {editing ? (
@@ -62,12 +65,12 @@ export default function ProductFieldsPanel({ details: d }: ProductFieldsPanelPro
 
         {editing ? (
           <>
-            <TextAreaField label="Description" value={d.form.description} onChange={d.set('description')} />
+            <RichTextField label="Description" value={d.form.description} onChange={d.setDescription} />
             <TextAreaField label="Delivery remarks" value={d.form.deliveryRemarks} onChange={d.set('deliveryRemarks')} />
           </>
         ) : (
           <>
-            <Field label="Description" value={d.form.description} multiline />
+            <HtmlField label="Description" value={d.form.description} />
             <Field label="Delivery remarks" value={d.form.deliveryRemarks} multiline />
           </>
         )}

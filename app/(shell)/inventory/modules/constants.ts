@@ -1,4 +1,4 @@
-import type { ModuleTabId, ProductStatusValue, ProductTabId, QuickFilterId, StoreListing, TabDef, VariantStatus } from './types';
+import type { ModuleTabId, ProductStatusValue, ProductTabId, QuickFilterId, TabDef, VariantStatus } from './types';
 
 export const MODULE_TABS: TabDef<ModuleTabId>[] = [
   { id: 'products', label: 'Products', blurb: 'Browse and maintain the product catalogue.' },
@@ -59,16 +59,6 @@ export const STATUS_LEGEND: { id: VariantStatus; label: string; className: strin
   { id: 'below', label: 'Below trigger', className: 'bg-red-100 text-red-700 border-red-200' },
   { id: 'near', label: 'Within 20% of trigger', className: 'bg-amber-100 text-amber-800 border-amber-200' },
   { id: 'above', label: 'Above trigger', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-];
-
-/**
- * "Online stores & prices" stays on the original design mock-up — no store-connection
- * backend exists yet, so every product shows this same illustrative sample.
- */
-export const DEMO_ONLINE_STORES: StoreListing[] = [
-  { id: 'demo-store-1', name: 'Mad Hats', domain: 'madhats.com.au', status: 'ACTIVE', externalId: '6633188262024', price: 8.99, url: 'https://madhats.com.au' },
-  { id: 'demo-store-2', name: 'FunGear', domain: 'fungear.com.au', status: 'ACTIVE', externalId: '746075987080', price: 9.95, url: 'https://fungear.com.au' },
-  { id: 'demo-store-3', name: 'Flag Factory', domain: 'flagfactory.com.au', status: 'DRAFT', externalId: '8311174604936', price: 9.5, url: null },
 ];
 
 export const PRODUCT_STATUS_BADGES: Record<string, string> = {

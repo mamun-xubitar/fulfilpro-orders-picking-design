@@ -83,3 +83,39 @@ export const Document = (i: IconProps) => (
 );
 export const Clock = (i: IconProps) => <Icon {...i}>{p('M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z')}</Icon>;
 export const Info = (i: IconProps) => <Icon {...i}>{p('M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z')}</Icon>;
+export const Lock = (i: IconProps) => (
+  <Icon {...i}>{p('M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z')}</Icon>
+);
+export const Unlock = (i: IconProps) => (
+  <Icon {...i}>{p('M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zM8 11V7a4 4 0 018 0')}</Icon>
+);
+export const BulletList = (i: IconProps) => (
+  <Icon {...i}>
+    <circle cx="4" cy="6" r="1.1" fill="currentColor" stroke="none" />
+    <circle cx="4" cy="12" r="1.1" fill="currentColor" stroke="none" />
+    <circle cx="4" cy="18" r="1.1" fill="currentColor" stroke="none" />
+    {p('M8 6h12M8 12h12M8 18h12')}
+  </Icon>
+);
+export const NumberedList = (i: IconProps) => (
+  <Icon {...i}>
+    <text x="1.5" y="8" fontSize="6.5" fontFamily="sans-serif" fill="currentColor" stroke="none">1</text>
+    <text x="1.5" y="14" fontSize="6.5" fontFamily="sans-serif" fill="currentColor" stroke="none">2</text>
+    <text x="1.5" y="20" fontSize="6.5" fontFamily="sans-serif" fill="currentColor" stroke="none">3</text>
+    {p('M8 6h12M8 12h12M8 18h12')}
+  </Icon>
+);
+export const LinkIcon = (i: IconProps) => (
+  <Icon {...i}>
+    {p('M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 01-5.656-5.656l1.5-1.5M10.172 13.828a4 4 0 010-5.656l3-3a4 4 0 015.656 5.656l-1.5 1.5')}
+  </Icon>
+);
+export const Palette = (i: IconProps) => (
+  <Icon {...i}>
+    {p('M12 3a9 9 0 100 18c1 0 1.5-.5 1.5-1.3 0-.4-.15-.7-.4-1-.25-.3-.4-.6-.4-1a1.4 1.4 0 011.4-1.4h1.6A4.3 4.3 0 0020 12a9 9 0 00-8-9z')}
+    <circle cx="7.5" cy="10.5" r="1.1" fill="currentColor" stroke="none" />
+    <circle cx="9.5" cy="7" r="1.1" fill="currentColor" stroke="none" />
+    <circle cx="14.5" cy="7" r="1.1" fill="currentColor" stroke="none" />
+    <circle cx="16.5" cy="10.5" r="1.1" fill="currentColor" stroke="none" />
+  </Icon>
+);

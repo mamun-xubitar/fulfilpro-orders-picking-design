@@ -25,6 +25,8 @@ export type SupplierProductVariantRow = {
   incoming: number;
   /** One entry per open PO with unreceived quantity, oldest delivery date first. */
   incomingLots: IncomingLotRow[];
+  /** One image from the product's pool, Shopify-style. Several variants may point at the same image. */
+  imageId: string | null;
 };
 
 export type SupplierProductImageRow = { id: string; url: string; altText: string | null; colour: string | null };
@@ -41,11 +43,36 @@ export type SupplierProductPricingRow = {
 
 export type SupplierProductActivityRow = { id: string; at: string; actor: string; message: string };
 
+export type ProductsSortKey = 'name' | 'brand' | 'category' | 'sku' | 'status' | 'variants' | 'stock' | 'stockValue' | 'createdAt';
+
+/** The four price-shortcut buttons — matched against a variant's effective (weighted-average
+ * received cost, falling back to the stored buyPrice) buy price and its sell price. */
+export type QuickFilterId = 'buying-lt-1' | 'profit-lt-5' | 'selling-lt-1' | 'selling-lt-5';
+
+export type CatalogueListParams = {
+  page: number;
+  pageSize: number;
+  search?: string;
+  verified?: boolean;
+  status?: SupplierProductStatus;
+  supplierName?: string;
+  quickFilter?: QuickFilterId | null;
+  sort?: ProductsSortKey;
+  dir?: 'asc' | 'desc';
+};
+
+export type CatalogueListResult = {
+  products: SupplierProductRow[];
+  total: number;
+};
+
 export type SupplierProductRow = {
   id: string;
   supplierId: string;
   supplierName: string;
   itemNo: string;
+  /** Unique URL-safe slug — Shopify's product Handle equivalent. */
+  handle: string;
   brand: string;
   name: string;
   category: string;
@@ -61,8 +88,6 @@ export type SupplierProductRow = {
   colours: ColourOptionData[];
   variants: SupplierProductVariantRow[];
   pricing: SupplierProductPricingRow;
-  /** Always empty this pass — the hub has no Shopify store link yet. */
-  stores: [];
   stocktake: { lastAt: string | null; nextAt: string | null };
   adjustments: { lastAt: string | null; thisMonth: number };
   activity: SupplierProductActivityRow[];
@@ -92,13 +117,77 @@ const catalogueInclude = {
 type CatalogueRow = Prisma.SupplierProductGetPayload<{ include: typeof catalogueInclude }>;
 
 export class SupplierProductModel {
-  /** Loads the whole catalogue for the page's single fetch-on-mount — newest first. */
-  async listAll(): Promise<SupplierProductRow[]> {
+  /** Server-side filtered/sorted/paginated catalogue page. Every filter — verified, quick
+   * filter, status, supplier, search — and the sort/page decision happens in SQL; the caller
+   * never receives more than one page. */
+  async list(params: CatalogueListParams): Promise<CatalogueListResult> {
+    const whereSql = buildCatalogueWhereSql(params);
+    const orderSql = buildCatalogueOrderSql(params.sort ?? 'createdAt', params.dir ?? 'desc');
+    const skip = (params.page - 1) * params.pageSize;
+
+    const rows = await prisma.$queryRaw<{ total: number; ids: string[] }[]>(Prisma.sql`
+      ${CATALOGUE_CTE_SQL},
+      filtered AS (${buildCatalogueFilteredSql(whereSql)})
+      SELECT
+        (SELECT COUNT(*)::integer FROM filtered) AS total,
+        COALESCE(
+          (SELECT array_agg(id) FROM (SELECT id FROM filtered ORDER BY ${orderSql} OFFSET ${skip} LIMIT ${params.pageSize}) paged),
+          ARRAY[]::text[]
+        ) AS ids
+    `);
+
+    const { total, ids } = rows[0] ?? { total: 0, ids: [] };
+    if (ids.length === 0) return { products: [], total };
+
+    const catalogueRows = await prisma.supplierProduct.findMany({ where: { id: { in: ids } }, include: catalogueInclude });
+    const hydrated = await this.hydrate(catalogueRows);
+    const byId = new Map(hydrated.map((p) => [p.id, p]));
+    return { products: ids.map((id) => byId.get(id)!).filter(Boolean), total };
+  }
+
+  /** Every id matching the current filters, in the same order `list()` would page through them —
+   * for "select all matching filters" bulk actions. No row hydration, no limit. */
+  async listIds(params: Omit<CatalogueListParams, 'page' | 'pageSize'>): Promise<string[]> {
+    const whereSql = buildCatalogueWhereSql(params);
+    const orderSql = buildCatalogueOrderSql(params.sort ?? 'createdAt', params.dir ?? 'desc');
+    const rows = await prisma.$queryRaw<{ ids: string[] }[]>(Prisma.sql`
+      ${CATALOGUE_CTE_SQL},
+      filtered AS (${buildCatalogueFilteredSql(whereSql)})
+      SELECT COALESCE((SELECT array_agg(id ORDER BY ${orderSql}) FROM filtered), ARRAY[]::text[]) AS ids
+    `);
+    return rows[0]?.ids ?? [];
+  }
+
+  /** 1-indexed position of `id` within the given filter set (detail-mode ordering is always
+   * createdAt desc), plus the total row count under that filter set. Null when `id` doesn't
+   * match the filters at all. */
+  async findPosition(id: string, params: Pick<CatalogueListParams, 'verified'>): Promise<{ position: number; total: number } | null> {
+    const whereSql = buildCatalogueWhereSql(params);
+    const orderSql = buildCatalogueOrderSql('createdAt', 'desc');
+    const rows = await prisma.$queryRaw<{ position: number; total: number }[]>(Prisma.sql`
+      ${CATALOGUE_CTE_SQL},
+      filtered AS (${buildCatalogueFilteredSql(whereSql)}),
+      ranked AS (
+        SELECT id, row_number() OVER (ORDER BY ${orderSql}) AS position, COUNT(*) OVER () AS total
+        FROM filtered
+      )
+      SELECT position::integer, total::integer FROM ranked WHERE id = ${id}
+    `);
+    return rows[0] ?? null;
+  }
+
+  /** Distinct supplier names among products — for the products table's supplier filter dropdown. */
+  async listSupplierNames(): Promise<string[]> {
     const rows = await prisma.supplierProduct.findMany({
-      include: catalogueInclude,
-      orderBy: { createdAt: 'desc' },
+      select: { supplier: { select: { name: true } } },
+      distinct: ['supplierId'],
     });
-    return this.hydrate(rows);
+    return [...new Set(rows.map((r) => r.supplier.name))].sort();
+  }
+
+  /** Whole-catalogue count, ignoring every filter — the "of Y" half of the record stepper. */
+  async countAll(): Promise<number> {
+    return prisma.supplierProduct.count();
   }
 
   async findById(id: string): Promise<SupplierProductRow | null> {
@@ -113,18 +202,28 @@ export class SupplierProductModel {
     return !!row;
   }
 
+  /** Lightweight lookup for callers that only need the handle (e.g. the store-listings lookup) —
+   * avoids the full hydrate() pass that findById() does. */
+  async findHandle(id: string): Promise<string | null> {
+    const row = await prisma.supplierProduct.findUnique({ where: { id }, select: { handle: true } });
+    return row?.handle ?? null;
+  }
+
   async create(data: {
     supplierId: string;
     itemNo: string;
+    handle: string;
     name: string;
     brand: string | null;
     marginPercent: number;
     exchangeRate: number;
+    actor?: { id?: string | null; name: string };
   }): Promise<string> {
     const row = await prisma.supplierProduct.create({
       data: {
         supplierId: data.supplierId,
         itemNo: data.itemNo,
+        handle: data.handle,
         name: data.name,
         brand: data.brand,
         sku: data.itemNo,
@@ -133,7 +232,13 @@ export class SupplierProductModel {
       },
     });
     await prisma.inventoryActivity.create({
-      data: { supplierProductId: row.id, type: 'created', message: `Product "${data.name}" created`, actorName: 'System' },
+      data: {
+        supplierProductId: row.id,
+        type: 'created',
+        message: `Product "${data.name}" created`,
+        actorId: data.actor?.id ?? null,
+        actorName: data.actor?.name ?? 'System',
+      },
     });
     return row.id;
   }
@@ -142,6 +247,7 @@ export class SupplierProductModel {
     id: string,
     data: Partial<{
       itemNo: string;
+      handle: string;
       brand: string;
       name: string;
       category: string;
@@ -169,6 +275,7 @@ export class SupplierProductModel {
       where: { id },
       data: {
         ...(data.itemNo !== undefined ? { itemNo: data.itemNo } : {}),
+        ...(data.handle !== undefined ? { handle: data.handle } : {}),
         ...(data.brand !== undefined ? { brand: data.brand } : {}),
         ...(data.name !== undefined ? { name: data.name } : {}),
         ...(data.category !== undefined ? { category: data.category } : {}),
@@ -239,20 +346,29 @@ export class SupplierProductModel {
   }
 
   /**
-   * Ensures every colour × size combo has a variant row, and removes rows whose combo is no
+   * Ensures every colour x size combo has a variant row, and removes rows whose combo is no
    * longer in the saved sizes/colours lists (so the matrix always matches Product Details).
+   * A missing axis (no sizes, or no colours) is represented by the empty-string sentinel '' on
+   * that axis instead of skipping variant generation entirely, so a colour-only or size-only
+   * product still gets one variant per declared value on its one axis.
    */
   private async reconcileVariants(supplierProductId: string, sizes: string[], colours: string[]) {
-    if (sizes.length === 0 || colours.length === 0) return;
+    if (sizes.length === 0 && colours.length === 0) return;
+    const colourAxis = colours.length > 0 ? colours : [''];
+    const sizeAxis = sizes.length > 0 ? sizes : [''];
+
     const existing = await prisma.supplierProductVariant.findMany({ where: { supplierProductId }, select: { id: true, colour: true, size: true } });
+    await this.promoteSentinelAxis(existing, 'size', sizes);
+    await this.promoteSentinelAxis(existing, 'colour', colours);
+
     const existingKeys = new Set(existing.map((v) => `${v.colour.toLowerCase()}::${v.size}`));
     const lowStockThreshold = (await prisma.appSettings.findUnique({ where: { id: 'default' }, select: { lowStockThreshold: true } }))
       ?.lowStockThreshold ?? 10;
 
     const toCreate: Prisma.SupplierProductVariantCreateManyInput[] = [];
     let position = existing.length;
-    for (const colour of colours) {
-      for (const size of sizes) {
+    for (const colour of colourAxis) {
+      for (const size of sizeAxis) {
         const key = `${colour.toLowerCase()}::${size}`;
         if (existingKeys.has(key)) continue;
         toCreate.push({ supplierProductId, colour, size, trigger: lowStockThreshold, position: position++ });
@@ -261,9 +377,39 @@ export class SupplierProductModel {
     }
     if (toCreate.length > 0) await prisma.supplierProductVariant.createMany({ data: toCreate });
 
-    const validKeys = new Set(colours.flatMap((colour) => sizes.map((size) => `${colour.toLowerCase()}::${size}`)));
+    const validKeys = new Set(colourAxis.flatMap((colour) => sizeAxis.map((size) => `${colour.toLowerCase()}::${size}`)));
     const staleIds = existing.filter((v) => !validKeys.has(`${v.colour.toLowerCase()}::${v.size}`)).map((v) => v.id);
     if (staleIds.length > 0) await prisma.supplierProductVariant.deleteMany({ where: { supplierProductId, id: { in: staleIds } } });
+  }
+
+  /**
+   * Promotes variant rows still on the '' sentinel for the given axis to the first declared
+   * value on that axis, in place — so stock/pricing on a colour-only (or size-only) product
+   * survives the moment its first size (or colour) is added, instead of the sentinel row being
+   * deleted and a fresh zero-stock row created in its place. Mutates `existing` in place so the
+   * caller's key sets reflect the promotion. No-ops when the axis has nothing declared yet, or
+   * a real row already occupies the promoted row's target combo (the stale-row pass then drops
+   * the now-redundant sentinel).
+   */
+  private async promoteSentinelAxis(
+    existing: { id: string; colour: string; size: string }[],
+    axis: 'colour' | 'size',
+    values: string[]
+  ): Promise<void> {
+    if (values.length === 0) return;
+    const target = values[0];
+    const key = (v: { colour: string; size: string }) => `${v.colour.toLowerCase()}::${v.size}`;
+    const takenKeys = new Set(existing.filter((v) => v[axis] !== '').map(key));
+
+    for (const v of existing) {
+      if (v[axis] !== '') continue;
+      const promoted = axis === 'colour' ? { colour: target, size: v.size } : { colour: v.colour, size: target };
+      const promotedKey = key(promoted);
+      if (takenKeys.has(promotedKey)) continue; // a real row already occupies the target — the stale-row pass drops this sentinel
+      await prisma.supplierProductVariant.update({ where: { id: v.id }, data: { [axis]: target } });
+      v[axis] = target;
+      takenKeys.add(promotedKey);
+    }
   }
 
   async upsertPricing(id: string, data: SupplierProductPricingRow): Promise<void> {
@@ -288,9 +434,49 @@ export class SupplierProductModel {
     }
   }
 
+  /**
+   * Deletes one variant, then prunes any colour/size from the product's declared lists that no
+   * remaining variant uses — otherwise the next Product Details save would re-create the row
+   * just deleted (reconcileVariants treats every declared colour x size as required). Images
+   * tagged with a pruned colour are untagged (mirrors applyColourRenames' removal branch)
+   * rather than left pointing at a colour that no longer exists anywhere on the product.
+   */
   async deleteVariant(supplierProductId: string, variantId: string): Promise<boolean> {
-    const result = await prisma.supplierProductVariant.deleteMany({ where: { id: variantId, supplierProductId } });
-    return result.count > 0;
+    return prisma.$transaction(async (tx) => {
+      const result = await tx.supplierProductVariant.deleteMany({ where: { id: variantId, supplierProductId } });
+      if (result.count === 0) return false;
+
+      const product = await tx.supplierProduct.findUnique({ where: { id: supplierProductId }, select: { sizes: true, colours: true } });
+      if (!product) return true;
+
+      const remaining = await tx.supplierProductVariant.findMany({ where: { supplierProductId }, select: { colour: true, size: true } });
+      const usedColours = new Set(remaining.map((v) => v.colour.toLowerCase()).filter(Boolean));
+      const usedSizes = new Set(remaining.map((v) => v.size.toLowerCase()).filter(Boolean));
+
+      const currentColours = normalizeColours(product.colours);
+      const currentSizes = product.sizes as string[];
+      const nextColours = currentColours.filter((c) => usedColours.has(c.name.toLowerCase()));
+      const nextSizes = currentSizes.filter((s) => usedSizes.has(s.toLowerCase()));
+      const prunedColours = currentColours.filter((c) => !usedColours.has(c.name.toLowerCase()));
+
+      if (nextColours.length !== currentColours.length || nextSizes.length !== currentSizes.length) {
+        await tx.supplierProduct.update({
+          where: { id: supplierProductId },
+          data: {
+            ...(nextColours.length !== currentColours.length ? { colours: nextColours as unknown as Prisma.InputJsonValue } : {}),
+            ...(nextSizes.length !== currentSizes.length ? { sizes: nextSizes } : {}),
+          },
+        });
+      }
+      for (const colour of prunedColours) {
+        await tx.supplierProductImage.updateMany({
+          where: { supplierProductId, colour: { equals: colour.name, mode: 'insensitive' } },
+          data: { colour: null },
+        });
+      }
+
+      return true;
+    });
   }
 
   async delete(id: string): Promise<boolean> {
@@ -313,9 +499,11 @@ export class SupplierProductModel {
     return result.count;
   }
 
-  async applyPriceToColours(supplierProductId: string, colours: string[], sellPrice: number, buyPrice: number): Promise<number> {
+  /** `colours: null` means "every variant of this product" — no colour filter at all. Pass an
+   * array only when the caller is explicitly scoping the update to a set of colourways. */
+  async applyPriceToColours(supplierProductId: string, colours: string[] | null, sellPrice: number, buyPrice: number): Promise<number> {
     const result = await prisma.supplierProductVariant.updateMany({
-      where: { supplierProductId, colour: { in: colours } },
+      where: { supplierProductId, ...(colours ? { colour: { in: colours } } : {}) },
       data: { sellPrice, buyPrice },
     });
     return result.count;
@@ -326,11 +514,28 @@ export class SupplierProductModel {
     await prisma.supplierProductImage.create({ data: { supplierProductId, ...data, position } });
   }
 
-  async addImages(supplierProductId: string, images: { url: string; altText: string | null; colour: string | null }[]): Promise<void> {
+  /** Returns the created rows (id + url) so a caller can link them to variants — e.g. the first
+   * one to a variant after an upload, or a whole CSV import's `Variant Image` URLs by lookup. */
+  async addImages(
+    supplierProductId: string,
+    images: { url: string; altText: string | null; colour: string | null }[]
+  ): Promise<{ id: string; url: string }[]> {
     let position = await prisma.supplierProductImage.count({ where: { supplierProductId } });
-    await prisma.supplierProductImage.createMany({
+    return prisma.supplierProductImage.createManyAndReturn({
       data: images.map((image) => ({ supplierProductId, ...image, position: position++ })),
+      select: { id: true, url: true },
     });
+  }
+
+  /** Links a variant to one image from the product's own pool, or unlinks when imageId is null.
+   * Rejects an imageId that belongs to a different product's pool. */
+  async setVariantImage(supplierProductId: string, variantId: string, imageId: string | null): Promise<boolean> {
+    if (imageId !== null) {
+      const image = await prisma.supplierProductImage.findUnique({ where: { id: imageId }, select: { supplierProductId: true } });
+      if (!image || image.supplierProductId !== supplierProductId) throw new Error('Image not found on this product');
+    }
+    const result = await prisma.supplierProductVariant.updateMany({ where: { id: variantId, supplierProductId }, data: { imageId } });
+    return result.count > 0;
   }
 
   async removeImage(supplierProductId: string, imageId: string): Promise<boolean> {
@@ -441,6 +646,7 @@ export class SupplierProductModel {
       supplierId: row.supplierId,
       supplierName: row.supplier?.name ?? '',
       itemNo: row.itemNo,
+      handle: row.handle,
       brand: row.brand ?? '',
       name: row.name,
       category: row.category ?? '',
@@ -471,6 +677,7 @@ export class SupplierProductModel {
           allocatedFromOrders: v.sku ? allocatedBySku.get(v.sku) ?? 0 : 0,
           incoming: incomingLots.reduce((sum, lot) => sum + lot.quantity, 0),
           incomingLots,
+          imageId: v.imageId,
         };
       }),
       pricing: row.pricing
@@ -484,7 +691,6 @@ export class SupplierProductModel {
             tax: Number(row.pricing.tax),
           }
         : EMPTY_PRICING,
-      stores: [],
       stocktake: {
         lastAt: row.stocktakes[0]?.completedAt?.toISOString() ?? null,
         nextAt: row.nextStocktakeAt?.toISOString() ?? null,
@@ -513,4 +719,149 @@ function normalizeColours(raw: unknown): ColourOptionData[] {
     const color = typeof c.color === 'string' && c.color ? c.color : typeof c.hex === 'string' && c.hex ? c.hex : deriveColorFromName(name);
     return { name, color };
   });
+}
+
+// — Server-driven catalogue list: SQL builders —
+
+/** Common table expressions shared by list/listIds/findPosition: a weighted-average received
+ * cost per variant (mirrors hydrate()'s buyPrice fallback), and a per-product rollup used for
+ * sorting (variant count, total stock, stock value) and for the quick-filter EXISTS check. */
+const CATALOGUE_CTE_SQL = Prisma.sql`
+  WITH avg_cost AS (
+    SELECT "variantId", SUM("unitCost" * "receivedQuantity") / NULLIF(SUM("receivedQuantity"), 0) AS wac
+    FROM "PurchaseOrderItem"
+    WHERE "receivedQuantity" > 0 AND "unitCost" IS NOT NULL
+    GROUP BY "variantId"
+  ),
+  variant_eff AS (
+    SELECT
+      v.id,
+      v."supplierProductId" AS pid,
+      v."stockOnHand" AS stock,
+      v."sellPrice" AS sell,
+      COALESCE(a.wac, v."buyPrice") AS buy
+    FROM "SupplierProductVariant" v
+    LEFT JOIN avg_cost a ON a."variantId" = v.id
+  ),
+  product_agg AS (
+    SELECT
+      pid,
+      COUNT(*) AS variant_count,
+      SUM(stock) AS total_stock,
+      SUM(stock * sell) AS stock_value
+    FROM variant_eff
+    GROUP BY pid
+  )
+`;
+
+function buildLikePattern(value: string): string {
+  const escaped = value.replace(/[\\%_]/g, (char) => `\\${char}`);
+  return `%${escaped}%`;
+}
+
+function quickFilterPredicateSql(quickFilter: QuickFilterId): Prisma.Sql {
+  switch (quickFilter) {
+    case 'buying-lt-1':
+      return Prisma.sql`buy < 1`;
+    case 'profit-lt-5':
+      return Prisma.sql`(sell - buy) < 5`;
+    case 'selling-lt-1':
+      return Prisma.sql`sell < 1`;
+    case 'selling-lt-5':
+      return Prisma.sql`sell < 5`;
+    default:
+      return Prisma.sql`false`;
+  }
+}
+
+function buildCatalogueWhereSql(params: {
+  search?: string;
+  verified?: boolean;
+  status?: SupplierProductStatus;
+  supplierName?: string;
+  quickFilter?: QuickFilterId | null;
+}): Prisma.Sql {
+  const whereParts: Prisma.Sql[] = [Prisma.sql`1 = 1`];
+
+  if (params.verified !== undefined) {
+    whereParts.push(Prisma.sql`sp.verified = ${params.verified}`);
+  }
+  if (params.status) {
+    whereParts.push(Prisma.sql`sp.status = ${params.status}::"SupplierProductStatus"`);
+  }
+  if (params.supplierName) {
+    whereParts.push(Prisma.sql`su.name = ${params.supplierName}`);
+  }
+
+  const term = params.search?.trim();
+  if (term) {
+    const pattern = buildLikePattern(term);
+    whereParts.push(Prisma.sql`(
+      sp.name ILIKE ${pattern} ESCAPE '\\'
+      OR sp.sku ILIKE ${pattern} ESCAPE '\\'
+      OR sp."itemNo" ILIKE ${pattern} ESCAPE '\\'
+      OR sp.handle ILIKE ${pattern} ESCAPE '\\'
+      OR COALESCE(sp.brand, '') ILIKE ${pattern} ESCAPE '\\'
+      OR EXISTS (
+        SELECT 1 FROM "SupplierProductVariant" v
+        WHERE v."supplierProductId" = sp.id
+          AND (COALESCE(v.sku, '') ILIKE ${pattern} ESCAPE '\\' OR COALESCE(v.barcode, '') ILIKE ${pattern} ESCAPE '\\')
+      )
+    )`);
+  }
+
+  if (params.quickFilter) {
+    const predicate = quickFilterPredicateSql(params.quickFilter);
+    whereParts.push(Prisma.sql`EXISTS (SELECT 1 FROM variant_eff ve WHERE ve.pid = sp.id AND ${predicate})`);
+  }
+
+  return Prisma.join(whereParts, ' AND ');
+}
+
+/** Projects every column ORDER BY / the caller might need, so downstream queries can select
+ * just `id` from `filtered` and still ORDER BY the other columns (Postgres allows ordering by
+ * a CTE's non-selected columns as long as the FROM is a simple relation reference). */
+function buildCatalogueFilteredSql(whereSql: Prisma.Sql): Prisma.Sql {
+  return Prisma.sql`
+    SELECT
+      sp.id,
+      sp.name,
+      sp.brand,
+      sp.category,
+      sp.sku,
+      sp.status,
+      sp."createdAt",
+      COALESCE(pa.variant_count, 0) AS variant_count,
+      COALESCE(pa.total_stock, 0) AS total_stock,
+      COALESCE(pa.stock_value, 0) AS stock_value
+    FROM "SupplierProduct" sp
+    JOIN "Supplier" su ON su.id = sp."supplierId"
+    LEFT JOIN product_agg pa ON pa.pid = sp.id
+    WHERE ${whereSql}
+  `;
+}
+
+function buildCatalogueOrderSql(sort: ProductsSortKey, dir: 'asc' | 'desc'): Prisma.Sql {
+  const dirSql = dir === 'desc' ? Prisma.sql`DESC` : Prisma.sql`ASC`;
+  switch (sort) {
+    case 'name':
+      return Prisma.sql`LOWER(name) ${dirSql}, id ASC`;
+    case 'brand':
+      return Prisma.sql`LOWER(COALESCE(brand, '')) ${dirSql}, id ASC`;
+    case 'category':
+      return Prisma.sql`LOWER(COALESCE(category, '')) ${dirSql}, id ASC`;
+    case 'sku':
+      return Prisma.sql`LOWER(sku) ${dirSql}, id ASC`;
+    case 'status':
+      return Prisma.sql`status ${dirSql}, id ASC`;
+    case 'variants':
+      return Prisma.sql`variant_count ${dirSql}, id ASC`;
+    case 'stock':
+      return Prisma.sql`total_stock ${dirSql}, id ASC`;
+    case 'stockValue':
+      return Prisma.sql`stock_value ${dirSql}, id ASC`;
+    case 'createdAt':
+    default:
+      return Prisma.sql`"createdAt" ${dirSql}, id ASC`;
+  }
 }

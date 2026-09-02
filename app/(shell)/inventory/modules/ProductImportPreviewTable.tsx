@@ -27,7 +27,7 @@ export default function ProductImportPreviewTable({ preview }: { preview: Produc
             )}
             {preview.product.category && (
               <div>
-                <dt className="inline font-semibold text-gray-600">Type: </dt>
+                <dt className="inline font-semibold text-gray-600">Category: </dt>
                 <dd className="inline">{preview.product.category}</dd>
               </div>
             )}

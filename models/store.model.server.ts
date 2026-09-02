@@ -70,6 +70,17 @@ export class StoreModel {
     return prisma.store.findUnique({ where: { storeDomain } });
   }
 
+  /** Connected stores with their access token — for server-only Shopify Admin API calls
+   * (e.g. store-listing lookups). `findMany` deliberately omits the token. */
+  async findConnectedWithTokens(): Promise<{ id: string; storeDomain: string; name: string | null; accessToken: string }[]> {
+    const stores = await prisma.store.findMany({
+      where: { status: 'connected', accessToken: { not: null } },
+      select: { id: true, storeDomain: true, name: true, accessToken: true },
+      orderBy: [{ name: 'asc' }, { storeDomain: 'asc' }],
+    });
+    return stores as { id: string; storeDomain: string; name: string | null; accessToken: string }[];
+  }
+
   async create(data: CreateStoreData) {
     return prisma.store.create({
       data: {

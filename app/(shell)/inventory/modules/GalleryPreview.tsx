@@ -3,10 +3,10 @@
 import { resolveSwatch } from '@/lib/inventory/colour';
 import { Image as ImageIcon } from './icons';
 import { deriveImageFilename } from './utils';
-import type { GalleryGroup } from './utils';
+import type { GalleryTile } from './utils';
 
 type GalleryPreviewProps = {
-  active: GalleryGroup | null;
+  active: GalleryTile | null;
   productName: string;
 };
 
@@ -24,7 +24,7 @@ export default function GalleryPreview({ active, productName }: GalleryPreviewPr
               style={{ backgroundColor: resolveSwatch(active.color) }}
             >
               <span className="text-lg font-semibold text-white line-clamp-2" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.35)' }}>
-                {productName || active.colourName}
+                {productName || active.label}
               </span>
             </div>
           )
@@ -41,9 +41,9 @@ export default function GalleryPreview({ active, productName }: GalleryPreviewPr
   );
 }
 
-function captionFor(active: GalleryGroup | null, productName: string): string {
+function captionFor(active: GalleryTile | null, productName: string): string {
   if (!active) return '';
   if (active.kind === 'placeholder') return productName ? `${productName} — ${active.colourName}` : active.colourName;
   if (productName) return productName;
-  return active.image.altText || deriveImageFilename(active.image.url);
+  return active.image.altText || deriveImageFilename(active.image.url) || active.label;
 }

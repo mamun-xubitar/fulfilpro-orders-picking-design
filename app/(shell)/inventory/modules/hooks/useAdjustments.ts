@@ -12,12 +12,15 @@ type AdjustmentRowState = { delta: string; reason: StockAdjustmentReasonValue; n
 
 type UseAdjustmentsArgs = {
   product: ProductRecord | null;
-  refreshCatalog: () => void;
+  /** Patches the product in place with the server's response — no full-catalogue refetch, so
+   * the page never flashes to skeletons while this modal is open. */
+  onSaved: (product: ProductRecord) => void;
 };
 
-export function useAdjustments({ product, refreshCatalog }: UseAdjustmentsArgs) {
+export function useAdjustments({ product, onSaved }: UseAdjustmentsArgs) {
   const [modalOpen, setModalOpen] = useState(false);
   const [variantIds, setVariantIds] = useState<string[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [rows, setRows] = useState<Record<string, AdjustmentRowState>>({});
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
@@ -28,16 +31,34 @@ export function useAdjustments({ product, refreshCatalog }: UseAdjustmentsArgs) 
   const { request: requestHistory, loading: loadingHistory } = useRequest<{ adjustments: StockAdjustmentRecord[] }>();
 
   /** Opens the modal for the given variants, or every variant on the product when omitted
-   * (the "New adjustment" entry point in Bottom panels vs. the matrix's "Adjust Stock" button). */
+   * (the "New adjustment" entry point in Bottom panels vs. the matrix's "Adjust Stock" button).
+   * Every row starts unchecked — a row is selected either by ticking it or by typing an
+   * adjustment into it (see `setRowField`), so "Save all" never touches a row the user hasn't
+   * actually looked at. */
   const openModal = (ids?: string[]) => {
     if (!product) return;
     const targetIds = ids && ids.length > 0 ? ids : product.variants.map((v) => v.id);
     setVariantIds(targetIds);
+    setSelectedIds(new Set());
     setRows(Object.fromEntries(targetIds.map((id) => [id, { delta: '', reason: 'CORRECTION' as StockAdjustmentReasonValue, note: '' }])));
     setRowErrors({});
     setModalOpen(true);
   };
   const closeModal = () => setModalOpen(false);
+
+  const toggleSelect = (variantId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(variantId)) next.delete(variantId);
+      else next.add(variantId);
+      return next;
+    });
+  };
+  const toggleSelectAll = () => {
+    setSelectedIds((prev) => (prev.size === variantIds.length ? new Set() : new Set(variantIds)));
+  };
+  const allSelected = variantIds.length > 0 && selectedIds.size === variantIds.length;
+  const someSelected = selectedIds.size > 0 && selectedIds.size < variantIds.length;
 
   const setRowField = (variantId: string, patch: Partial<AdjustmentRowState>) => {
     setRows((prev) => ({ ...prev, [variantId]: { ...prev[variantId], ...patch } }));
@@ -47,18 +68,37 @@ export function useAdjustments({ product, refreshCatalog }: UseAdjustmentsArgs) 
       delete next[variantId];
       return next;
     });
+    // Typing an adjustment selects the row, so a value never sits uncommitted in an unselected
+    // (and now non-disabled) input without "Save all" picking it up.
+    if (patch.delta) setSelectedIds((prev) => (prev.has(variantId) ? prev : new Set(prev).add(variantId)));
   };
 
-  const applyPreset = (variantId: string, preset: number) => setRowField(variantId, { delta: String(preset) });
+  /** Writes one delta (or clears it) into every currently-selected row — the chips strip above
+   * the table drives this instead of a per-row preset dropdown. */
+  const applyChip = (delta: number | null) => {
+    setRows((prev) => {
+      const next = { ...prev };
+      for (const id of selectedIds) next[id] = { ...next[id], delta: delta === null ? '' : String(delta) };
+      return next;
+    });
+    setRowErrors((prev) => {
+      const next = { ...prev };
+      for (const id of selectedIds) delete next[id];
+      return next;
+    });
+  };
 
-  const postAdjustments = async (items: { variantId: string; delta: number; reason: StockAdjustmentReasonValue; note?: string }[]) => {
+  const dirtyCount = variantIds.filter((id) => selectedIds.has(id) && rows[id]?.delta && Number(rows[id]?.delta) !== 0).length;
+
+  const postAdjustments = async (items: { variantId: string; delta: number; reason: StockAdjustmentReasonValue; note?: string }[]): Promise<ProductRecord | null> => {
     const res = await fetch(`/api/inventory/catalog/${product!.id}/adjustments`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(items.length === 1 ? items[0] : { items }),
     });
-    const json = (await res.json()) as { success: boolean; message: string };
+    const json = (await res.json()) as { success: boolean; message: string; data?: ProductRecord | null };
     if (!res.ok || !json.success) throw new Error(json.message || 'Failed to save adjustment');
+    return json.data ?? null;
   };
 
   /** Saves one row without closing the modal, so each variant can be committed independently. */
@@ -77,10 +117,10 @@ export function useAdjustments({ product, refreshCatalog }: UseAdjustmentsArgs) 
     });
     setSavingIds((prev) => new Set(prev).add(variantId));
     try {
-      await postAdjustments([{ variantId, delta, reason: row.reason, note: row.note || undefined }]);
+      const updated = await postAdjustments([{ variantId, delta, reason: row.reason, note: row.note || undefined }]);
       toast.success('Stock adjusted');
       setRowField(variantId, { delta: '' });
-      refreshCatalog();
+      if (updated) onSaved(updated);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to save adjustment');
     } finally {
@@ -92,25 +132,27 @@ export function useAdjustments({ product, refreshCatalog }: UseAdjustmentsArgs) 
     }
   };
 
-  /** Saves every row with a non-zero delta in one request; rows left at 0 are skipped. */
+  /** Saves every selected row with a non-zero delta in one request; unselected or zero-delta
+   * rows are skipped. */
   const saveAll = async () => {
     if (!product) return;
     const items = variantIds
+      .filter((id) => selectedIds.has(id))
       .map((variantId) => ({ variantId, row: rows[variantId] }))
       .filter(({ row }) => row?.delta && Number(row.delta) !== 0)
       .map(({ variantId, row }) => ({ variantId, delta: Number(row.delta), reason: row.reason, note: row.note || undefined }));
 
     if (items.length === 0) {
-      toast.info('Enter a quantity change for at least one row');
+      toast.info('Enter a quantity change for at least one selected row');
       return;
     }
 
     setSavingAll(true);
     try {
-      await postAdjustments(items);
+      const updated = await postAdjustments(items);
       toast.success(`${items.length} adjustment${items.length === 1 ? '' : 's'} saved`);
       setModalOpen(false);
-      refreshCatalog();
+      if (updated) onSaved(updated);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to save adjustments');
     } finally {
@@ -137,9 +179,15 @@ export function useAdjustments({ product, refreshCatalog }: UseAdjustmentsArgs) 
     openModal,
     closeModal,
     variantIds,
+    selectedIds,
+    toggleSelect,
+    toggleSelectAll,
+    allSelected,
+    someSelected,
     rows,
     setRowField,
-    applyPreset,
+    applyChip,
+    dirtyCount,
     rowErrors,
     savingIds,
     savingAll,

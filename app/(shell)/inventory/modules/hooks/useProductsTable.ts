@@ -1,22 +1,25 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'react-toastify';
 import { buildPageNumbers } from '@/hooks/usePagination';
-import type { ProductRecord, ProductStatusValue } from '../types';
+import type { CataloguePagination, ProductRecord, ProductStatusValue, ProductsResponse, QuickFilterId } from '../types';
 
 export type ProductsSortKey = 'name' | 'brand' | 'category' | 'sku' | 'status' | 'variants' | 'stock' | 'stockValue' | 'createdAt';
 
 const PAGE_SIZE_OPTIONS = [20, 50, 100];
+const EMPTY_PAGINATION: CataloguePagination = { page: 1, pageSize: PAGE_SIZE_OPTIONS[0], total: 0, totalPages: 1, hasPrev: false, hasNext: false };
 
 type DeleteTarget = { kind: 'selection' } | { kind: 'single'; id: string; name: string };
+type ApiEnvelope<T> = { success: boolean; message: string; data?: T; errors?: string[] };
 
 type UseProductsTableArgs = {
-  products: ProductRecord[];
-  /** From the Verified toolbar checkbox — filters the table instead of being disabled by it. */
+  /** Only fetches while "All records" is on — the record stepper (useCatalogData) owns the
+   * detail-mode fetch the rest of the time. */
+  enabled: boolean;
   verifiedOnly: boolean;
+  quickFilter: QuickFilterId | null;
   onView: (id: string) => void;
-  refreshCatalog: () => void;
 };
 
 export function totalStockOf(p: ProductRecord): number {
@@ -31,7 +34,16 @@ export function stockValueOf(p: ProductRecord): number {
   return p.variants.reduce((sum, v) => sum + v.stockOnHand * v.sellPrice, 0);
 }
 
-export function useProductsTable({ products, verifiedOnly, onView, refreshCatalog }: UseProductsTableArgs) {
+export function useProductsTable({ enabled, verifiedOnly, quickFilter, onView }: UseProductsTableArgs) {
+  const [rows, setRows] = useState<ProductRecord[]>([]);
+  const [pagination, setPagination] = useState<CataloguePagination>(EMPTY_PAGINATION);
+  const [supplierOptions, setSupplierOptions] = useState<string[]>([]);
+  // Named distinctly from the exposed `loading` below — see useCatalogData's `fetching` for why.
+  const [fetching, setFetching] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [refreshTick, setRefreshTick] = useState(0);
+  const abortRef = useRef<AbortController | null>(null);
+
   const [page, setPage] = useState(1);
   const [pageSize, setPageSizeState] = useState(PAGE_SIZE_OPTIONS[0]);
 
@@ -65,8 +77,6 @@ export function useProductsTable({ products, verifiedOnly, onView, refreshCatalo
   const [deleteConfirm, setDeleteConfirm] = useState<DeleteTarget | null>(null);
   const [statusModal, setStatusModal] = useState<ProductStatusValue | null>(null);
 
-  const supplierOptions = useMemo(() => [...new Set(products.map((p) => p.supplierName).filter(Boolean))].sort(), [products]);
-
   const hasActiveFilters = search.trim() !== '' || status !== '' || supplierName !== '';
   const handleClearFilters = () => {
     setSearch('');
@@ -74,64 +84,56 @@ export function useProductsTable({ products, verifiedOnly, onView, refreshCatalo
     setSupplierName('');
   };
 
-  const filtered = useMemo(() => {
-    let rows = verifiedOnly ? products.filter((p) => p.verified) : products;
-    if (status) rows = rows.filter((p) => p.status === status);
-    if (supplierName) rows = rows.filter((p) => p.supplierName === supplierName);
-    const term = search.trim().toLowerCase();
-    if (term) {
-      rows = rows.filter(
-        (p) =>
-          p.name.toLowerCase().includes(term) ||
-          p.itemNo.toLowerCase().includes(term) ||
-          p.sku.toLowerCase().includes(term) ||
-          p.brand.toLowerCase().includes(term) ||
-          p.variants.some((v) => v.sku?.toLowerCase().includes(term) || v.barcode?.toLowerCase().includes(term))
-      );
-    }
-    return rows;
-  }, [products, verifiedOnly, status, supplierName, search]);
-
-  const sorted = useMemo(() => {
-    const factor = dir === 'asc' ? 1 : -1;
-    return [...filtered].sort((a, b) => {
-      switch (sort) {
-        case 'name':
-          return a.name.localeCompare(b.name) * factor;
-        case 'brand':
-          return a.brand.localeCompare(b.brand) * factor;
-        case 'category':
-          return a.category.localeCompare(b.category) * factor;
-        case 'sku':
-          return a.sku.localeCompare(b.sku) * factor;
-        case 'status':
-          return a.status.localeCompare(b.status) * factor;
-        case 'variants':
-          return (a.variants.length - b.variants.length) * factor;
-        case 'stock':
-          return (totalStockOf(a) - totalStockOf(b)) * factor;
-        case 'stockValue':
-          return (stockValueOf(a) - stockValueOf(b)) * factor;
-        case 'createdAt':
-          return a.createdAt.localeCompare(b.createdAt) * factor;
-        default:
-          return 0;
-      }
+  const buildParams = (overrides?: { page?: number; pageSize?: number }) => {
+    const params = new URLSearchParams({
+      mode: 'table',
+      page: String(overrides?.page ?? page),
+      pageSize: String(overrides?.pageSize ?? pageSize),
+      sort,
+      dir,
     });
-  }, [filtered, sort, dir]);
-
-  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
-  const clampedPage = Math.min(page, totalPages);
-  const pageRows = sorted.slice((clampedPage - 1) * pageSize, clampedPage * pageSize);
-  const pagination = {
-    page: clampedPage,
-    pageSize,
-    total: sorted.length,
-    totalPages,
-    hasPrev: clampedPage > 1,
-    hasNext: clampedPage < totalPages,
+    // Unchecked "Verified" means no constraint at all — only send the param when active.
+    if (verifiedOnly) params.set('verified', '1');
+    if (quickFilter) params.set('quickFilter', quickFilter);
+    if (search.trim()) params.set('search', search.trim());
+    if (status) params.set('status', status);
+    if (supplierName) params.set('supplier', supplierName);
+    return params;
   };
-  const pageNumbers = useMemo(() => buildPageNumbers(clampedPage, totalPages), [clampedPage, totalPages]);
+
+  useEffect(() => {
+    abortRef.current?.abort();
+    if (!enabled) return;
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setFetching(true);
+
+    fetch(`/api/inventory/catalog?${buildParams().toString()}`, { signal: controller.signal })
+      .then((res) => res.json() as Promise<ApiEnvelope<ProductsResponse>>)
+      .then((json) => {
+        if (!json.success || !json.data) throw new Error(json.message || 'Failed to load products');
+        setRows(json.data.products);
+        setPagination(json.data.pagination);
+        setSupplierOptions(json.data.supplierOptions);
+        setLoaded(true);
+      })
+      .catch((err: unknown) => {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        toast.error(err instanceof Error ? err.message : 'Failed to load products');
+      })
+      .finally(() => {
+        if (abortRef.current === controller) setFetching(false);
+      });
+
+    return () => controller.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled, verifiedOnly, quickFilter, search, status, supplierName, sort, dir, page, pageSize, refreshTick]);
+
+  const refresh = () => setRefreshTick((n) => n + 1);
+  const pageNumbers = buildPageNumbers(pagination.page, pagination.totalPages);
+  // Derived, not stored: reads false immediately once "All records" flips off, without waiting
+  // for the (skipped) fetch effect to reset it.
+  const loading = fetching && enabled;
 
   const handleSortChange = (key: ProductsSortKey) => {
     if (sort === key) {
@@ -143,7 +145,7 @@ export function useProductsTable({ products, verifiedOnly, onView, refreshCatalo
     setPage(1);
   };
 
-  const isCurrentPageAllSelected = pageRows.length > 0 && pageRows.every((p) => selectedIds.includes(p.id));
+  const isCurrentPageAllSelected = rows.length > 0 && rows.every((p) => selectedIds.includes(p.id));
 
   const toggleSelect = (id: string) => {
     setSelectAllFilters(false);
@@ -152,9 +154,7 @@ export function useProductsTable({ products, verifiedOnly, onView, refreshCatalo
 
   const toggleSelectAllOnPage = () => {
     setSelectAllFilters(false);
-    setSelectedIds((prev) =>
-      isCurrentPageAllSelected ? prev.filter((id) => !pageRows.some((p) => p.id === id)) : [...new Set([...prev, ...pageRows.map((p) => p.id)])]
-    );
+    setSelectedIds((prev) => (isCurrentPageAllSelected ? prev.filter((id) => !rows.some((p) => p.id === id)) : [...new Set([...prev, ...rows.map((p) => p.id)])]));
   };
 
   const toggleSelectAllFilters = () => {
@@ -167,21 +167,34 @@ export function useProductsTable({ products, verifiedOnly, onView, refreshCatalo
     setSelectAllFilters(false);
   };
 
-  const targetIds = () => (selectAllFilters ? filtered.map((p) => p.id) : selectedIds);
+  /** Resolves the target id set server-side when "select all matching filters" is on, instead
+   * of assuming the client already has every matching id (it only ever holds one page). */
+  const targetIds = async (): Promise<string[]> => {
+    if (!selectAllFilters) return selectedIds;
+    const params = buildParams();
+    params.set('mode', 'ids');
+    const res = await fetch(`/api/inventory/catalog?${params.toString()}`);
+    const json = (await res.json()) as ApiEnvelope<{ ids: string[] }>;
+    if (!res.ok || !json.success || !json.data) throw new Error(json.message || 'Failed to resolve selection');
+    return json.data.ids;
+  };
 
   const runBulk = async (body: Record<string, unknown>) => {
     setBulkRunning(true);
     try {
+      const ids = await targetIds();
       const res = await fetch('/api/inventory/catalog/bulk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...body, productIds: targetIds() }),
+        body: JSON.stringify({ ...body, productIds: ids }),
       });
       const json = (await res.json()) as { success: boolean; message: string };
       if (!res.ok || !json.success) throw new Error(json.message || 'Bulk action failed');
       toast.success(json.message);
       clearSelection();
-      refreshCatalog();
+      // Re-fetches rather than patching in place — a bulk status/verified change can move rows
+      // out of the current filter set entirely (e.g. unverifying while "Verified" is checked).
+      refresh();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Bulk action failed');
     } finally {
@@ -196,7 +209,7 @@ export function useProductsTable({ products, verifiedOnly, onView, refreshCatalo
       const json = (await res.json()) as { success: boolean; message: string };
       if (!res.ok || !json.success) throw new Error(json.message || 'Failed to delete product');
       toast.success('Product deleted');
-      refreshCatalog();
+      refresh();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to delete product');
     } finally {
@@ -235,7 +248,9 @@ export function useProductsTable({ products, verifiedOnly, onView, refreshCatalo
     sort,
     dir,
     handleSortChange,
-    products: pageRows,
+    products: rows,
+    loading,
+    initialLoading: loading && !loaded,
     pagination,
     pageNumbers,
     goToPage: setPage,
@@ -258,5 +273,6 @@ export function useProductsTable({ products, verifiedOnly, onView, refreshCatalo
     applyStatus,
     setVerified,
     onView,
+    refresh,
   };
 }

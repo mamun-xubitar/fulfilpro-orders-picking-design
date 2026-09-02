@@ -20,10 +20,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       if (file.size > MAX_SIZE) return apiError({ message: `${file.name} exceeds the 10 MB limit`, status: 400 });
     }
 
-    const colourRaw = formData.get('colour');
-    const colour = typeof colourRaw === 'string' && colourRaw.trim() ? colourRaw.trim() : null;
+    const variantIdRaw = formData.get('variantId');
+    const variantId = typeof variantIdRaw === 'string' && variantIdRaw.trim() ? variantIdRaw.trim() : null;
 
-    const result = await controller.uploadImages(id, entries, colour, session);
+    const result = await controller.uploadImages(id, entries, null, session, variantId);
     if ('error' in result) {
       const { error } = result as ErrResult;
       return apiError({ message: error.message, errors: error.errors, status: error.status });

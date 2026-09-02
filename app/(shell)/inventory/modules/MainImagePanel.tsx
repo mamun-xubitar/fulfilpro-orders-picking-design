@@ -15,7 +15,7 @@ export default function MainImagePanel({
   productName,
   onEditImages,
 }: MainImagePanelProps) {
-  const { images, groups, active, activeKey, setActiveKey } = gallery;
+  const { images, tiles, active, activeKey, setActiveKey } = gallery;
 
   return (
     <section className="flex min-w-0 flex-col rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -26,18 +26,17 @@ export default function MainImagePanel({
       />
 
       <div className="flex flex-1 gap-2 p-3">
-        {groups.length > 0 && (
+        {tiles.length > 0 && (
           <div className="max-h-72 w-14 shrink-0 space-y-2 overflow-y-auto pr-1">
-            {groups.map((group) => {
-              const isActive = group.key === activeKey;
-              const label = group.colourName ?? "Unassigned";
+            {tiles.map((tile) => {
+              const isActive = tile.key === activeKey;
               return (
                 <button
-                  key={group.key}
+                  key={tile.key}
                   type="button"
-                  onClick={() => setActiveKey(group.key)}
-                  title={label}
-                  aria-label={`Show ${label}`}
+                  onClick={() => setActiveKey(tile.key)}
+                  title={tile.label}
+                  aria-label={`Show ${tile.label}`}
                   aria-pressed={isActive}
                   className={`block w-full overflow-hidden rounded-lg border-2 transition-colors duration-150 cursor-pointer ${
                     isActive
@@ -45,22 +44,22 @@ export default function MainImagePanel({
                       : "border-transparent hover:border-gray-300"
                   }`}
                 >
-                  {group.kind === "photo" ? (
+                  {tile.kind === "photo" ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={group.image.url}
-                      alt={group.image.altText ?? ""}
+                      src={tile.image.url}
+                      alt={tile.image.altText ?? ""}
                       className="aspect-square w-full object-cover"
                     />
                   ) : (
                     <div
                       className="flex aspect-square w-full items-center justify-center text-[9px] font-semibold text-white"
                       style={{
-                        backgroundColor: resolveSwatch(group.color),
+                        backgroundColor: resolveSwatch(tile.color),
                         textShadow: "0 1px 2px rgba(0,0,0,0.35)",
                       }}
                     >
-                      {group.colourName.slice(0, 3).toUpperCase()}
+                      {tile.colourName.slice(0, 3).toUpperCase()}
                     </div>
                   )}
                 </button>
@@ -94,7 +93,7 @@ export default function MainImagePanel({
                     className="text-base font-semibold text-white line-clamp-2"
                     style={{ textShadow: "0 1px 3px rgba(0,0,0,0.35)" }}
                   >
-                    {productName || active.colourName}
+                    {productName || active.label}
                   </span>
                 </div>
               )

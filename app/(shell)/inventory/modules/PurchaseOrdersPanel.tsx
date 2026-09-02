@@ -34,6 +34,7 @@ export default function PurchaseOrdersPanel({ po }: PurchaseOrdersPanelProps) {
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="text-[13px] font-semibold text-gray-900">{formatPoNumber(row.number)}</span>
+                      {row.referenceNumber && <span className="text-[11px] text-gray-400">· Ref {row.referenceNumber}</span>}
                       <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${STATUS_BADGES[row.status]}`}>
                         {row.status.replace('_', ' ')}
                       </span>

@@ -9,6 +9,7 @@ import type {
   ProductImage,
   ProductRecord,
   PurchaseOrderRecord,
+  QuickFilterId,
   StockSummary,
   VariantComputed,
   VariantRow,
@@ -17,12 +18,37 @@ import type {
 
 // — Stock maths —
 
+/** "Black / M", "Black" (colour-only), "M" (size-only), or "—" (neither axis) — a single
+ * source of truth for labelling a variant, so a colour-only or size-only product never shows a
+ * dangling "Black / " or " / M". */
+export function variantTitle(v: { colour: string; size: string }): string {
+  const parts = [v.colour, v.size].filter(Boolean);
+  return parts.length > 0 ? parts.join(' / ') : '—';
+}
+
 export function getAvailable(v: VariantRow): number {
   return v.stockOnHand - v.allocated;
 }
 
 export function getStockValue(v: VariantRow): number {
   return v.stockOnHand * v.sellPrice;
+}
+
+/** The four price-shortcut buttons, applied to a single variant. In single-product view this
+ * runs entirely client-side against the already-loaded product — the server's `SupplierProductVariant`
+ * query (`models/supplier-product.model.server.ts`) uses the identical four predicates for
+ * All-records mode, where it decides which *products* to list rather than which rows to show. */
+export function quickFilterMatches(quickFilter: QuickFilterId, v: VariantRow): boolean {
+  switch (quickFilter) {
+    case 'buying-lt-1':
+      return v.buyPrice < 1;
+    case 'profit-lt-5':
+      return v.sellPrice - v.buyPrice < 5;
+    case 'selling-lt-1':
+      return v.sellPrice < 1;
+    case 'selling-lt-5':
+      return v.sellPrice < 5;
+  }
 }
 
 export function getStatus(v: VariantRow): VariantStatus {
@@ -172,105 +198,78 @@ export function findCaseInsensitiveDuplicate(values: string[]): string | null {
   return null;
 }
 
-/** One tile in the grouped gallery: a colourway's representative photo, or a colour-swatch stand-in when it has none. */
-export type GalleryGroup =
-  | { kind: 'photo'; key: string; colourName: string | null; color: string | null; image: ProductImage }
-  | { kind: 'placeholder'; key: string; colourName: string; color: string; image: null };
-
-/**
- * Groups a product's images into one gallery tile per colourway: a photo tile for colours
- * with at least one image (first by position), a placeholder swatch tile for colours with
- * none, and a trailing "Unassigned" tile if any image has no colour at all.
- */
-export function groupImagesByColour(images: ProductImage[], colours: ColourOption[]): GalleryGroup[] {
-  const swatchOf = makeSwatchResolver(colours);
-  const byColour = new Map<string, ProductImage[]>();
-  const unassigned: ProductImage[] = [];
-
-  for (const image of images) {
-    if (image.colour === null) {
-      unassigned.push(image);
-      continue;
-    }
-    const key = image.colour.trim().toLowerCase();
-    const bucket = byColour.get(key) ?? [];
-    bucket.push(image);
-    byColour.set(key, bucket);
-  }
-
-  const seen = new Set<string>();
-  const groups: GalleryGroup[] = [];
-
-  for (const colour of colours) {
-    const key = colour.name.trim().toLowerCase();
-    seen.add(key);
-    const bucket = byColour.get(key);
-    groups.push(
-      bucket && bucket.length > 0
-        ? { kind: 'photo', key, colourName: colour.name, color: colour.color, image: bucket[0] }
-        : { kind: 'placeholder', key, colourName: colour.name, color: colour.color, image: null }
-    );
-  }
-
-  for (const image of images) {
-    if (image.colour === null) continue;
-    const key = image.colour.trim().toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    groups.push({ kind: 'photo', key, colourName: image.colour, color: swatchOf(image.colour), image });
-  }
-
-  if (unassigned.length > 0) {
-    groups.push({ kind: 'photo', key: '__unassigned__', colourName: null, color: null, image: unassigned[0] });
-  }
-
-  return groups;
+/** `product.category` stores the full Shopify taxonomy path ("Apparel & Accessories > … >
+ * Visors") — this is the compact display form for space-constrained rows (the products table),
+ * which show the leaf with the full path as a `title` tooltip instead. */
+export function categoryLeaf(category: string): string {
+  const parts = category.split('>').map((p) => p.trim());
+  return parts[parts.length - 1] ?? '';
 }
 
+/** One tile in the gallery: an image linked to one or more variants, a colour-swatch stand-in
+ * for a colour that still has a variant with no linked image, or an unassigned image (linked to
+ * no variant at all — kept as its own tile, never folded together with other unassigned images). */
+export type GalleryTile =
+  | { kind: 'photo'; key: string; image: ProductImage; label: string; variantIds: string[] }
+  | { kind: 'placeholder'; key: string; colourName: string; color: string; label: string };
+
 /**
- * Builds the full lightbox rail: every image individually (not deduped), plus a
- * placeholder swatch tile for each colour that has no images at all.
+ * Builds the gallery rail (and the lightbox, which shares this same list) from the
+ * variant→image link — `VariantRow.imageId` — rather than an image-level colour tag, mirroring
+ * how Shopify itself models `Variant Image`. Order: every image linked to at least one variant,
+ * in pool order (one tile per image, even when several variants share it — its label lists all
+ * of them); then one placeholder swatch per colour that still has a variant with no linked
+ * image; then every image linked to no variant at all, one tile each, labelled "Unassigned".
  */
-export function buildLightboxItems(images: ProductImage[], colours: ColourOption[]): GalleryGroup[] {
+export function buildGalleryTiles(images: ProductImage[], variants: VariantRow[], colours: ColourOption[]): GalleryTile[] {
   const swatchOf = makeSwatchResolver(colours);
-  const byColour = new Map<string, ProductImage[]>();
-  const unassigned: ProductImage[] = [];
+  const variantsByImageId = new Map<string, VariantRow[]>();
+  for (const v of variants) {
+    if (!v.imageId) continue;
+    const bucket = variantsByImageId.get(v.imageId) ?? [];
+    bucket.push(v);
+    variantsByImageId.set(v.imageId, bucket);
+  }
+
+  const tiles: GalleryTile[] = [];
+  for (const image of images) {
+    const linked = variantsByImageId.get(image.id);
+    if (!linked || linked.length === 0) continue;
+    tiles.push({ kind: 'photo', key: image.id, image, label: linked.map(variantTitle).join(', '), variantIds: linked.map((v) => v.id) });
+  }
+
+  // Declared colours first, then any stray colour only a variant carries — mirrors the old
+  // grouping's colour ordering.
+  const colourNames: string[] = [];
+  const seenColour = new Set<string>();
+  for (const c of colours) {
+    const key = c.name.trim().toLowerCase();
+    if (seenColour.has(key)) continue;
+    seenColour.add(key);
+    colourNames.push(c.name);
+  }
+  for (const v of variants) {
+    if (!v.colour) continue;
+    const key = v.colour.trim().toLowerCase();
+    if (seenColour.has(key)) continue;
+    seenColour.add(key);
+    colourNames.push(v.colour);
+  }
+
+  for (const colourName of colourNames) {
+    const key = colourName.trim().toLowerCase();
+    const hasUnlinkedVariant = variants.some((v) => v.colour.trim().toLowerCase() === key && !v.imageId);
+    if (!hasUnlinkedVariant) continue;
+    tiles.push({ kind: 'placeholder', key: `placeholder:${key}`, colourName, color: swatchOf(colourName), label: colourName });
+  }
 
   for (const image of images) {
-    if (image.colour === null) {
-      unassigned.push(image);
-      continue;
-    }
-    const key = image.colour.trim().toLowerCase();
-    const bucket = byColour.get(key) ?? [];
-    bucket.push(image);
-    byColour.set(key, bucket);
+    const linked = variantsByImageId.get(image.id);
+    if (linked && linked.length > 0) continue;
+    tiles.push({ kind: 'photo', key: image.id, image, label: 'Unassigned', variantIds: [] });
   }
 
-  const seen = new Set<string>();
-  const items: GalleryGroup[] = [];
-
-  for (const colour of colours) {
-    const key = colour.name.trim().toLowerCase();
-    seen.add(key);
-    const bucket = byColour.get(key);
-    if (bucket && bucket.length > 0) {
-      for (const image of bucket) items.push({ kind: 'photo', key: image.id, colourName: colour.name, color: colour.color, image });
-    } else {
-      items.push({ kind: 'placeholder', key: `placeholder:${key}`, colourName: colour.name, color: colour.color, image: null });
-    }
-  }
-
-  for (const [key, bucket] of byColour) {
-    if (seen.has(key)) continue;
-    for (const image of bucket) items.push({ kind: 'photo', key: image.id, colourName: image.colour, color: swatchOf(image.colour!), image });
-  }
-
-  for (const image of unassigned) {
-    items.push({ kind: 'photo', key: image.id, colourName: null, color: null, image });
-  }
-
-  return items;
+  return tiles;
 }
 
 /** Derives a display filename from an image URL, for images with no stored altText. */
@@ -293,6 +292,7 @@ export function matchesProduct(product: ProductRecord, term: string): boolean {
   if (product.name.toLowerCase().includes(q)) return true;
   if (product.sku.toLowerCase().includes(q)) return true;
   if (product.itemNo.toLowerCase().includes(q)) return true;
+  if (product.handle.toLowerCase().includes(q)) return true;
   return product.variants.some((v) => v.sku?.toLowerCase().includes(q) || v.barcode?.toLowerCase().includes(q));
 }
 
@@ -314,11 +314,15 @@ export function downloadCsv(filename: string, csv: string): void {
   URL.revokeObjectURL(url);
 }
 
+/** Shopify's own product-CSV column order. Building rows as `{ [header]: value }` objects
+ * (below) rather than positional arrays keeps every row aligned to this list even as columns
+ * are added, instead of relying on array-index bookkeeping. */
 const SHOPIFY_CSV_HEADERS = [
   'Handle',
   'Title',
   'Body (HTML)',
   'Vendor',
+  'Product Category',
   'Type',
   'Tags',
   'Published',
@@ -326,71 +330,125 @@ const SHOPIFY_CSV_HEADERS = [
   'Option1 Value',
   'Option2 Name',
   'Option2 Value',
+  'Option3 Name',
+  'Option3 Value',
   'Variant SKU',
   'Variant Grams',
   'Variant Inventory Tracker',
+  'Variant Inventory Qty',
   'Variant Inventory Policy',
   'Variant Fulfillment Service',
   'Variant Price',
+  'Variant Compare At Price',
   'Variant Requires Shipping',
   'Variant Taxable',
   'Variant Barcode',
-  'Variant Inventory Qty',
-  'Cost per item',
   'Image Src',
+  'Image Position',
+  'Image Alt Text',
+  'Gift Card',
+  'SEO Title',
+  'SEO Description',
+  'Variant Image',
+  'Variant Weight Unit',
+  'Cost per item',
   'Status',
-];
+] as const;
+
+type ShopifyCsvHeader = (typeof SHOPIFY_CSV_HEADERS)[number];
+
+function csvRowToLine(row: Partial<Record<ShopifyCsvHeader, string>>): string {
+  return SHOPIFY_CSV_HEADERS.map((header) => escapeCsv(row[header] ?? '')).join(',');
+}
 
 const PRODUCT_STATUS_TO_SHOPIFY: Record<ProductRecord['status'], string> = { ACTIVE: 'active', DRAFT: 'draft', ARCHIVED: 'archived' };
 
+/** Resolves a stored (possibly relative, `/api/uploads/...`) image URL to an absolute one, so
+ * an exported CSV is importable by Shopify — its importer can't fetch a site-relative path. */
+export function toAbsoluteUrl(url: string): string {
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(url)) return url;
+  if (typeof window === 'undefined') return url;
+  return new URL(url, window.location.origin).href;
+}
+
 /**
- * Best-effort Shopify product-CSV export — the columns Shopify's own product importer expects,
- * built from what the hub schema tracks today. Fields it doesn't track yet (Tags, weight) are left
- * blank/zero rather than guessed.
+ * Shopify product-CSV export, built to be re-importable by both Shopify and this system.
+ * `Handle` is the product's own handle (not itemNo); a colour-only or size-only product writes
+ * only the axis it has (falling back to a "Title" / "Default Title" row when it has neither);
+ * `Image Src` walks the product's full image pool one per row — variant rows first, then extra
+ * image-only rows for any pool images left over — while `Variant Image` points at the specific
+ * image each variant is linked to, if any. Fields the hub doesn't track (Tags, weight, SEO) are
+ * left blank rather than guessed.
  */
 export function buildShopifyProductCsv(product: ProductRecord, rows: VariantRow[]): string {
   const lines = [SHOPIFY_CSV_HEADERS.join(',')];
-  const handle = product.itemNo;
-  const imageByColour = new Map(product.images.filter((i) => i.colour).map((i) => [i.colour!.toLowerCase(), i.url]));
-  const fallbackImage = product.images[0]?.url ?? '';
+  const pool = product.images;
+  const imageById = new Map(pool.map((image) => [image.id, image]));
+
+  const hasColourAxis = product.colours.length > 0 || rows.some((v) => v.colour !== '');
+  const hasSizeAxis = product.sizes.length > 0 || rows.some((v) => v.size !== '');
+  const option1Name = hasColourAxis ? 'Colour' : hasSizeAxis ? 'Size' : 'Title';
+  const option2Name = hasColourAxis && hasSizeAxis ? 'Size' : '';
+  const option1Value = (v: VariantRow) => (hasColourAxis ? v.colour : hasSizeAxis ? v.size : 'Default Title');
+  const option2Value = (v: VariantRow) => (hasColourAxis && hasSizeAxis ? v.size : '');
 
   rows.forEach((v, index) => {
-    const image = imageByColour.get(v.colour.toLowerCase()) ?? fallbackImage;
-    lines.push(
-      [
-        handle,
-        index === 0 ? product.name : '',
-        index === 0 ? product.description : '',
-        product.brand,
-        product.category,
-        '',
-        product.status === 'ACTIVE' ? 'TRUE' : 'FALSE',
-        'Colour',
-        v.colour,
-        'Size',
-        v.size,
-        v.sku ?? '',
-        '0',
-        'shopify',
-        'deny',
-        'manual',
-        v.sellPrice.toFixed(2),
-        'TRUE',
-        'TRUE',
-        v.barcode ?? '',
-        String(v.stockOnHand),
-        v.buyPrice.toFixed(2),
-        image,
-        PRODUCT_STATUS_TO_SHOPIFY[product.status],
-      ]
-        .map(escapeCsv)
-        .join(',')
-    );
+    const poolImage = pool[index];
+    const variantImage = v.imageId ? imageById.get(v.imageId) : undefined;
+    const row: Partial<Record<ShopifyCsvHeader, string>> = {
+      Handle: product.handle,
+      'Option1 Value': option1Value(v),
+      'Option2 Value': option2Value(v),
+      'Variant SKU': v.sku ?? '',
+      'Variant Grams': '0',
+      'Variant Inventory Tracker': 'shopify',
+      'Variant Inventory Qty': String(v.stockOnHand),
+      'Variant Inventory Policy': 'deny',
+      'Variant Fulfillment Service': 'manual',
+      'Variant Price': v.sellPrice.toFixed(2),
+      'Variant Requires Shipping': 'TRUE',
+      'Variant Taxable': 'TRUE',
+      'Variant Barcode': v.barcode ?? '',
+      'Cost per item': v.buyPrice.toFixed(2),
+      'Variant Image': variantImage ? toAbsoluteUrl(variantImage.url) : '',
+    };
+    if (poolImage) {
+      row['Image Src'] = toAbsoluteUrl(poolImage.url);
+      row['Image Position'] = String(index + 1);
+      row['Image Alt Text'] = poolImage.altText ?? '';
+    }
+    if (index === 0) {
+      row.Title = product.name;
+      row['Body (HTML)'] = product.description;
+      row.Vendor = product.brand;
+      row['Product Category'] = product.category;
+      row.Published = product.status === 'ACTIVE' ? 'TRUE' : 'FALSE';
+      row['Option1 Name'] = option1Name;
+      row['Option2 Name'] = option2Name;
+      row['Gift Card'] = 'FALSE';
+      row.Status = PRODUCT_STATUS_TO_SHOPIFY[product.status];
+    }
+    lines.push(csvRowToLine(row));
   });
+
+  // The pool can hold more images than there are variant rows (e.g. a hero shot with no
+  // colour, or extra angles) — carry the rest as trailing image-only rows.
+  for (let i = rows.length; i < pool.length; i++) {
+    const image = pool[i];
+    lines.push(
+      csvRowToLine({
+        Handle: product.handle,
+        'Image Src': toAbsoluteUrl(image.url),
+        'Image Position': String(i + 1),
+        'Image Alt Text': image.altText ?? '',
+      })
+    );
+  }
+
   return lines.join('\r\n');
 }
 
-const PO_CSV_HEADERS = ['PO Number', 'Status', 'Delivery Date', 'Remark', 'Colour', 'Size', 'SKU', 'Quantity', 'Received Quantity', 'Unit Cost'];
+const PO_CSV_HEADERS = ['PO Number', 'Reference', 'Status', 'Delivery Date', 'Remark', 'Colour', 'Size', 'SKU', 'Quantity', 'Received Quantity', 'Unit Cost'];
 
 /**
  * Round-trippable PO export — one row per line item. Re-importing this file (via the unified
@@ -404,6 +462,7 @@ export function buildPoCsv(purchaseOrders: PurchaseOrderRecord[]): string {
       lines.push(
         [
           formatPoNumber(po.number),
+          po.referenceNumber ?? '',
           po.status,
           po.deliveryDate ? po.deliveryDate.slice(0, 10) : '',
           po.remark ?? '',
@@ -432,20 +491,28 @@ type PoEmailSource = {
   number: number;
   productTitle: string;
   supplierName: string;
+  referenceNumber: string | null;
   deliveryDate: string | null;
   remark: string | null;
-  items: { quantity: number; variantTitle: string; sku: string | null }[];
+  items: { quantity: number; variantTitle: string; sku: string | null; unitCost: number | null }[];
 };
 
 export function buildPoEmail(po: PoEmailSource): { subject: string; body: string } {
   const totalUnits = po.items.reduce((sum, item) => sum + item.quantity, 0);
+  const grandTotal = po.items.reduce((sum, item) => sum + item.quantity * (item.unitCost ?? 0), 0);
   const subject = `Purchase Order ${formatPoNumber(po.number)} — ${po.productTitle}`;
-  const totalLine = `Total: ${totalUnits} units across ${po.items.length} variant${po.items.length === 1 ? '' : 's'}`;
+  const totalLine = `Total: ${totalUnits} units across ${po.items.length} variant${po.items.length === 1 ? '' : 's'} — ${formatCurrencyValue(grandTotal)}`;
 
   const headerLines = [`Hi ${po.supplierName},`, '', 'Please supply the following items for the product below.', '', `Product: ${po.productTitle}`];
+  if (po.referenceNumber) headerLines.push(`Reference: ${po.referenceNumber}`);
   if (po.deliveryDate) headerLines.push(`Delivery required by: ${formatDate(po.deliveryDate)}`);
 
-  const itemLines = po.items.map((item) => `- Qty: ${item.quantity} | Variant: ${item.variantTitle} | SKU: ${item.sku ?? '-'}`);
+  const itemLines = po.items.map(
+    (item) =>
+      `- Qty: ${item.quantity} | Variant: ${item.variantTitle} | SKU: ${item.sku ?? '-'} | Cost: ${item.unitCost !== null ? formatMoney(item.unitCost) : '-'} | Total: ${
+        item.unitCost !== null ? formatCurrencyValue(item.quantity * item.unitCost) : '-'
+      }`
+  );
   const footerLines = [...(po.remark ? ['', `Remark: ${po.remark}`] : []), '', 'Thanks'];
 
   const body = [...headerLines, '', ...itemLines, '', totalLine, ...footerLines].join('\n');

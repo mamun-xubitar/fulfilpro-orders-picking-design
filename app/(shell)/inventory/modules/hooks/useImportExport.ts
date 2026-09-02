@@ -11,7 +11,7 @@ export type ProductImportPreviewRow = { colour: string; size: string; sku: strin
  * images are updated by import. itemNo is never imported: it's the hub's own style code, and the
  * CSV's Handle is a Shopify URL slug that can collide with another product's itemNo. */
 export type ProductImportPreviewFields = { name?: string; description?: string; brand?: string; category?: string; status?: ProductStatusValue };
-export type ProductImportPreviewImage = { url: string; colour: string | null };
+export type ProductImportPreviewImage = { url: string; altText: string | null };
 
 export type PoImportPreviewItem = { variantId: string; variantTitle: string; sku: string | null; quantity: number; receivedQuantity: number; unitCost: number | null };
 export type PoImportPreviewGroup = { poNumber: string; isNew: boolean; status?: string; deliveryDate?: string; remark?: string; items: PoImportPreviewItem[] };
@@ -34,11 +34,20 @@ async function parseApiResponse<T>(res: Response): Promise<ApiEnvelope<T>> {
 }
 
 /** File uploads use raw `fetch` with `FormData` — `useRequest` only speaks JSON. Auto-detects
- * Shopify product CSV vs. our own PO CSV server-side; `commit` distinguishes preview from apply. */
-async function postImportFile<T>(productId: string, file: File, commit: boolean): Promise<ApiEnvelope<T>> {
+ * Shopify product CSV vs. our own PO CSV server-side; `commit` distinguishes preview from apply.
+ * `overwrite` / `markVerified` only affect a product CSV — a PO CSV ignores them — and are sent
+ * on the preview call too, so a refused overwrite surfaces before the user commits. */
+async function postImportFile<T>(
+  productId: string,
+  file: File,
+  commit: boolean,
+  options: { overwrite: boolean; markVerified: boolean }
+): Promise<ApiEnvelope<T>> {
   const formData = new FormData();
   formData.append('file', file);
   formData.append('commit', String(commit));
+  formData.append('overwrite', String(options.overwrite));
+  formData.append('markVerified', String(options.markVerified));
   const res = await fetch(`/api/inventory/catalog/${productId}/import`, { method: 'POST', body: formData });
   const json = await parseApiResponse<T>(res);
   if (!res.ok || !json.success) throw new Error(json.message || 'Import failed');
@@ -47,21 +56,39 @@ async function postImportFile<T>(productId: string, file: File, commit: boolean)
 
 type UseImportExportArgs = {
   product: ProductRecord | null;
-  refreshCatalog: () => void;
+  /** Patches the product in place with the server's response — no full-catalogue refetch. */
+  onSaved: (product: ProductRecord) => void;
   /** Called after a PO-type import commits, so the Purchase Orders panel's own list refreshes too. */
   onPoImported: () => void;
 };
 
-export function useImportExport({ product, refreshCatalog, onPoImported }: UseImportExportArgs) {
+export function useImportExport({ product, onSaved, onPoImported }: UseImportExportArgs) {
   const [importOpen, setImportOpen] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [previewing, setPreviewing] = useState(false);
   const [importing, setImporting] = useState(false);
+  // Overwrite defaults checked — matches today's always-replace behaviour.
+  const [overwrite, setOverwrite] = useState(true);
+  const [markVerified, setMarkVerified] = useState(false);
 
   const exportVariants = (rows: VariantRow[]) => {
     if (!product) return;
-    downloadCsv(`${product.itemNo}-product.csv`, buildShopifyProductCsv(product, rows));
+    // Belt and braces against any variant that's already partial in the database (blank colour or
+    // size on an axis the product otherwise declares) — every write path now rejects these going
+    // forward, but a row from before that fix could still be sitting here. Exporting it as-is
+    // would produce a CSV Shopify rejects with "Each variant must have exactly one option value
+    // for each product option", so it's dropped from the export and the admin is told to fix it.
+    const hasColourAxis = product.colours.length > 0;
+    const hasSizeAxis = product.sizes.length > 0;
+    const valid = rows.filter((v) => !((hasColourAxis && v.colour === '') || (hasSizeAxis && v.size === '')));
+    const skippedCount = rows.length - valid.length;
+    if (skippedCount > 0) {
+      toast.warning(
+        `${skippedCount} variant${skippedCount === 1 ? '' : 's'} skipped — missing colour or size. Fix ${skippedCount === 1 ? 'it' : 'them'} in the matrix and export again.`
+      );
+    }
+    downloadCsv(`${product.handle}-product.csv`, buildShopifyProductCsv(product, valid));
   };
 
   const exportPurchaseOrders = (purchaseOrders: PurchaseOrderRecord[]) => {
@@ -72,17 +99,19 @@ export function useImportExport({ product, refreshCatalog, onPoImported }: UseIm
   const openImport = () => {
     setPendingFile(null);
     setPreview(null);
+    setOverwrite(true);
+    setMarkVerified(false);
     setImportOpen(true);
   };
   const closeImport = () => setImportOpen(false);
 
-  const handleFile = async (file: File) => {
+  const previewFile = async (file: File, opts: { overwrite: boolean; markVerified: boolean }) => {
     if (!product) return;
     setPendingFile(file);
     setPreview(null);
     setPreviewing(true);
     try {
-      const json = await postImportFile<ImportPreview>(product.id, file, false);
+      const json = await postImportFile<ImportPreview>(product.id, file, false, opts);
       setPreview(json.data);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Could not read this file');
@@ -92,16 +121,29 @@ export function useImportExport({ product, refreshCatalog, onPoImported }: UseIm
     }
   };
 
+  const handleFile = (file: File) => previewFile(file, { overwrite, markVerified });
+
+  // Toggling either option can change whether the file is even importable (the "Overwrite"
+  // refusal), so re-run the preview against the file already selected.
+  const toggleOverwrite = (value: boolean) => {
+    setOverwrite(value);
+    if (pendingFile) void previewFile(pendingFile, { overwrite: value, markVerified });
+  };
+  const toggleMarkVerified = (value: boolean) => {
+    setMarkVerified(value);
+    if (pendingFile) void previewFile(pendingFile, { overwrite, markVerified: value });
+  };
+
   const commitImport = async () => {
     if (!product || !pendingFile || !preview) return;
     setImporting(true);
     try {
-      const json = await postImportFile<unknown>(product.id, pendingFile, true);
+      const json = await postImportFile<{ product: ProductRecord }>(product.id, pendingFile, true, { overwrite, markVerified });
       toast.success(json.message);
       setImportOpen(false);
       setPendingFile(null);
       setPreview(null);
-      refreshCatalog();
+      onSaved(json.data.product);
       if (preview.type === 'po') onPoImported();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Import failed');
@@ -121,5 +163,9 @@ export function useImportExport({ product, refreshCatalog, onPoImported }: UseIm
     commitImport,
     exportVariants,
     exportPurchaseOrders,
+    overwrite,
+    setOverwrite: toggleOverwrite,
+    markVerified,
+    setMarkVerified: toggleMarkVerified,
   };
 }

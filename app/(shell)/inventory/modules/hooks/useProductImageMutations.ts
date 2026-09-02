@@ -26,15 +26,16 @@ type UseProductImageMutationsArgs = {
 export function useProductImageMutations({ product, onSaved }: UseProductImageMutationsArgs) {
   const [uploading, setUploading] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
-  const [updatingColourId, setUpdatingColourId] = useState<string | null>(null);
+  const [settingImageForVariantId, setSettingImageForVariantId] = useState<string | null>(null);
 
-  const uploadImages = async (files: File[], colour: string | null) => {
+  /** `variantId` links the first uploaded image straight into that variant's image slot. */
+  const uploadImages = async (files: File[], variantId?: string) => {
     if (!product || files.length === 0) return;
     setUploading(true);
     try {
       const formData = new FormData();
       for (const file of files) formData.append('files', file);
-      if (colour) formData.append('colour', colour);
+      if (variantId) formData.append('variantId', variantId);
 
       const res = await fetch(`/api/inventory/catalog/${product.id}/images/upload`, { method: 'POST', body: formData });
       const json = await parseApiResponse<ProductRecord>(res);
@@ -45,6 +46,27 @@ export function useProductImageMutations({ product, onSaved }: UseProductImageMu
       toast.error(error instanceof Error ? error.message : 'Upload failed');
     } finally {
       setUploading(false);
+    }
+  };
+
+  /** Links a variant to one image from the product's own pool, or unlinks it when `imageId` is
+   * null — the per-variant "pick from pool" / "unlink" controls in the images modal. */
+  const setVariantImage = async (variantId: string, imageId: string | null) => {
+    if (!product) return;
+    setSettingImageForVariantId(variantId);
+    try {
+      const res = await fetch(`/api/inventory/catalog/${product.id}/variants/${variantId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageId }),
+      });
+      const json = await parseApiResponse<ProductRecord>(res);
+      if (!res.ok || !json.success) throw new Error(json.message || 'Failed to update variant image');
+      onSaved(json.data);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to update variant image');
+    } finally {
+      setSettingImageForVariantId(null);
     }
   };
 
@@ -64,25 +86,5 @@ export function useProductImageMutations({ product, onSaved }: UseProductImageMu
     }
   };
 
-  const updateImageColour = async (imageId: string, colour: string | null) => {
-    if (!product) return;
-    setUpdatingColourId(imageId);
-    try {
-      const res = await fetch(`/api/inventory/catalog/${product.id}/images/${imageId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ colour }),
-      });
-      const json = await parseApiResponse<ProductRecord>(res);
-      if (!res.ok || !json.success) throw new Error(json.message || 'Failed to update image colour');
-      onSaved(json.data);
-      toast.success('Image colour updated');
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to update image colour');
-    } finally {
-      setUpdatingColourId(null);
-    }
-  };
-
-  return { uploading, removingId, updatingColourId, uploadImages, removeImage, updateImageColour };
+  return { uploading, removingId, settingImageForVariantId, uploadImages, removeImage, setVariantImage };
 }
