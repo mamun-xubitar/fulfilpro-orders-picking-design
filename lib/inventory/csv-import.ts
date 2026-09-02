@@ -230,6 +230,7 @@ export function parseShopifyProductCsv(text: string): ParsedProductGroup[] {
 export type ParsedPoRow = {
   /** Raw cell — "PO-00042" style numeric reference, or a free-form label grouping new-PO rows. */
   poNumber: string;
+  referenceNumber?: string;
   status?: string;
   deliveryDate?: string;
   remark?: string;
@@ -264,6 +265,7 @@ export function parsePoCsv(text: string): ParsedPoImport {
     const unitCost = get('unit cost');
     rows.push({
       poNumber,
+      referenceNumber: get('reference') || undefined,
       status: get('status') || undefined,
       deliveryDate: get('delivery date') || undefined,
       remark: get('remark') || undefined,

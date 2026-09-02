@@ -206,6 +206,7 @@ export class InventoryCsvImportController {
     type ResolvedGroup = {
       poNumber: string;
       existingId: string | null;
+      referenceNumber?: string;
       status?: PurchaseOrderStatus;
       deliveryDate?: Date;
       remark?: string;
@@ -260,14 +261,14 @@ export class InventoryCsvImportController {
         items.push({
           variantId: variant.id,
           variantTitle: variantTitle(variant.colour, variant.size),
-          sku: variant.sku,
+          sku: row.sku || variant.sku,
           quantity: Math.trunc(row.quantity),
           receivedQuantity: row.receivedQuantity !== undefined ? Math.trunc(row.receivedQuantity) : 0,
           unitCost: row.unitCost ?? null,
         });
       }
 
-      groups.push({ poNumber, existingId, status, deliveryDate, remark: first.remark, items });
+      groups.push({ poNumber, existingId, referenceNumber: first.referenceNumber, status, deliveryDate, remark: first.remark, items });
     }
 
     if (errors.length > 0) return { error: { message: 'Validation failed', errors, status: 400 } };
@@ -276,7 +277,7 @@ export class InventoryCsvImportController {
       return {
         data: {
           type: 'po' as const,
-          groups: groups.map((g) => ({ poNumber: g.poNumber, isNew: !g.existingId, status: g.status, deliveryDate: g.deliveryDate?.toISOString(), remark: g.remark, items: g.items })),
+          groups: groups.map((g) => ({ poNumber: g.poNumber, isNew: !g.existingId, referenceNumber: g.referenceNumber, status: g.status, deliveryDate: g.deliveryDate?.toISOString(), remark: g.remark, items: g.items })),
         },
         message: 'Preview ready',
       };
@@ -302,6 +303,7 @@ export class InventoryCsvImportController {
           poEmail: supplierInfo.poEmail,
           supplierProductId: product.id,
           productTitle: product.name,
+          referenceNumber: group.referenceNumber ?? null,
           deliveryDate: group.deliveryDate ?? null,
           remark: group.remark ?? null,
           createdById: actor.id ?? '',
@@ -313,6 +315,7 @@ export class InventoryCsvImportController {
       }
 
       await poModel.updateFields(poId, {
+        ...(group.referenceNumber !== undefined && { referenceNumber: group.referenceNumber }),
         ...(group.status && { status: group.status }),
         ...(group.deliveryDate !== undefined && { deliveryDate: group.deliveryDate }),
         ...(group.remark !== undefined && { remark: group.remark }),

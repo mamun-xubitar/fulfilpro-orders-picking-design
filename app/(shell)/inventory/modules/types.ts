@@ -294,6 +294,7 @@ export type PurchaseOrderItemRecord = {
 export type PurchaseOrderRecord = {
   id: string;
   number: number;
+  referenceNumber: string | null;
   supplierId: string;
   supplierName: string;
   poEmail: string;

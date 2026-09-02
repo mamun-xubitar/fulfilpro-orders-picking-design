@@ -21,7 +21,10 @@ export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
   const [supplierId, setSupplierId] = useState('');
   const [deliveryDate, setDeliveryDate] = useState('');
   const [remark, setRemark] = useState('');
+  const [referenceNumber, setReferenceNumber] = useState('');
   const [quantities, setQuantities] = useState<Record<string, string>>({});
+  const [skus, setSkus] = useState<Record<string, string>>({});
+  const [costs, setCosts] = useState<Record<string, string>>({});
   const { request: requestCreate, loading: saving, errors: createErrors } = useRequest<{ purchaseOrder: PurchaseOrderRecord; product: ProductRecord | null }>();
 
   const [receiveTarget, setReceiveTarget] = useState<PurchaseOrderRecord | null>(null);
@@ -58,25 +61,36 @@ export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
     setSupplierId(supplierOptions[0]?.id ?? '');
     setDeliveryDate('');
     setRemark('');
+    setReferenceNumber('');
     const ids = variantIds.length > 0 ? variantIds : product.variants.map((v) => v.id);
+    const variantById = new Map(product.variants.map((v) => [v.id, v]));
     setQuantities(Object.fromEntries(ids.map((id) => [id, '1'])));
+    setSkus(Object.fromEntries(ids.map((id) => [id, variantById.get(id)?.sku ?? ''])));
+    setCosts(Object.fromEntries(ids.map((id) => [id, (variantById.get(id)?.buyPrice ?? 0).toFixed(2)])));
     setCreateOpen(true);
   };
 
   const closeCreate = () => setCreateOpen(false);
   const setQuantity = (variantId: string, value: string) => setQuantities((prev) => ({ ...prev, [variantId]: value }));
+  const setSku = (variantId: string, value: string) => setSkus((prev) => ({ ...prev, [variantId]: value }));
+  const setCost = (variantId: string, value: string) => setCosts((prev) => ({ ...prev, [variantId]: value }));
 
   const saveAndSend = () => {
     if (!product) return;
     const supplier = supplierOptions.find((s) => s.id === supplierId);
     const items = Object.entries(quantities)
       .filter(([, v]) => Number(v) > 0)
-      .map(([variantId, v]) => ({ variantId, quantity: Number(v) }));
+      .map(([variantId, v]) => ({
+        variantId,
+        quantity: Number(v),
+        sku: skus[variantId]?.trim() || undefined,
+        unitCost: costs[variantId] !== '' && Number.isFinite(Number(costs[variantId])) ? Number(costs[variantId]) : undefined,
+      }));
 
     requestCreate({
       url: '/api/inventory/purchase-orders',
       method: 'POST',
-      data: { supplierId, supplierProductId: product.id, deliveryDate: deliveryDate || undefined, remark: remark || undefined, items },
+      data: { supplierId, supplierProductId: product.id, referenceNumber: referenceNumber || undefined, deliveryDate: deliveryDate || undefined, remark: remark || undefined, items },
       successMessage: 'Purchase order created',
       validation: async () => {
         const errors: Record<string, string> = {};
@@ -92,9 +106,15 @@ export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
             number: po.number,
             productTitle: po.productTitle,
             supplierName: supplier.name,
+            referenceNumber: po.referenceNumber,
             deliveryDate: po.deliveryDate,
             remark: po.remark,
-            items: po.items.map((item) => ({ quantity: item.quantity, variantTitle: item.variantTitle, sku: item.sku ?? variantById.get(item.variantId ?? '')?.sku ?? null })),
+            items: po.items.map((item) => ({
+              quantity: item.quantity,
+              variantTitle: item.variantTitle,
+              sku: item.sku ?? variantById.get(item.variantId ?? '')?.sku ?? null,
+              unitCost: item.unitCost,
+            })),
           });
           window.location.href = buildMailtoHref({ to: supplier.poEmail, subject, body });
         }
@@ -151,8 +171,14 @@ export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
     setDeliveryDate,
     remark,
     setRemark,
+    referenceNumber,
+    setReferenceNumber,
     quantities,
     setQuantity,
+    skus,
+    setSku,
+    costs,
+    setCost,
     saving,
     createErrors,
     saveAndSend,

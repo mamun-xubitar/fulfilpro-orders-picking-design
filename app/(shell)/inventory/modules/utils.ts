@@ -448,7 +448,7 @@ export function buildShopifyProductCsv(product: ProductRecord, rows: VariantRow[
   return lines.join('\r\n');
 }
 
-const PO_CSV_HEADERS = ['PO Number', 'Status', 'Delivery Date', 'Remark', 'Colour', 'Size', 'SKU', 'Quantity', 'Received Quantity', 'Unit Cost'];
+const PO_CSV_HEADERS = ['PO Number', 'Reference', 'Status', 'Delivery Date', 'Remark', 'Colour', 'Size', 'SKU', 'Quantity', 'Received Quantity', 'Unit Cost'];
 
 /**
  * Round-trippable PO export — one row per line item. Re-importing this file (via the unified
@@ -462,6 +462,7 @@ export function buildPoCsv(purchaseOrders: PurchaseOrderRecord[]): string {
       lines.push(
         [
           formatPoNumber(po.number),
+          po.referenceNumber ?? '',
           po.status,
           po.deliveryDate ? po.deliveryDate.slice(0, 10) : '',
           po.remark ?? '',
@@ -490,20 +491,28 @@ type PoEmailSource = {
   number: number;
   productTitle: string;
   supplierName: string;
+  referenceNumber: string | null;
   deliveryDate: string | null;
   remark: string | null;
-  items: { quantity: number; variantTitle: string; sku: string | null }[];
+  items: { quantity: number; variantTitle: string; sku: string | null; unitCost: number | null }[];
 };
 
 export function buildPoEmail(po: PoEmailSource): { subject: string; body: string } {
   const totalUnits = po.items.reduce((sum, item) => sum + item.quantity, 0);
+  const grandTotal = po.items.reduce((sum, item) => sum + item.quantity * (item.unitCost ?? 0), 0);
   const subject = `Purchase Order ${formatPoNumber(po.number)} — ${po.productTitle}`;
-  const totalLine = `Total: ${totalUnits} units across ${po.items.length} variant${po.items.length === 1 ? '' : 's'}`;
+  const totalLine = `Total: ${totalUnits} units across ${po.items.length} variant${po.items.length === 1 ? '' : 's'} — ${formatCurrencyValue(grandTotal)}`;
 
   const headerLines = [`Hi ${po.supplierName},`, '', 'Please supply the following items for the product below.', '', `Product: ${po.productTitle}`];
+  if (po.referenceNumber) headerLines.push(`Reference: ${po.referenceNumber}`);
   if (po.deliveryDate) headerLines.push(`Delivery required by: ${formatDate(po.deliveryDate)}`);
 
-  const itemLines = po.items.map((item) => `- Qty: ${item.quantity} | Variant: ${item.variantTitle} | SKU: ${item.sku ?? '-'}`);
+  const itemLines = po.items.map(
+    (item) =>
+      `- Qty: ${item.quantity} | Variant: ${item.variantTitle} | SKU: ${item.sku ?? '-'} | Cost: ${item.unitCost !== null ? formatMoney(item.unitCost) : '-'} | Total: ${
+        item.unitCost !== null ? formatCurrencyValue(item.quantity * item.unitCost) : '-'
+      }`
+  );
   const footerLines = [...(po.remark ? ['', `Remark: ${po.remark}`] : []), '', 'Thanks'];
 
   const body = [...headerLines, '', ...itemLines, '', totalLine, ...footerLines].join('\n');

@@ -53,6 +53,7 @@ export class PurchaseOrderController {
     const value = (body ?? {}) as Record<string, unknown>;
     const supplierId = typeof value.supplierId === 'string' ? value.supplierId.trim() : '';
     const supplierProductId = typeof value.supplierProductId === 'string' ? value.supplierProductId.trim() : '';
+    const referenceNumberRaw = typeof value.referenceNumber === 'string' ? value.referenceNumber.trim() : '';
     const remarkRaw = typeof value.remark === 'string' ? value.remark.trim() : '';
     const deliveryDateRaw = typeof value.deliveryDate === 'string' ? value.deliveryDate.trim() : '';
     const rawItems = Array.isArray(value.items) ? value.items : [];
@@ -68,7 +69,7 @@ export class PurchaseOrderController {
       else deliveryDate = parsed;
     }
 
-    const items: Array<{ variantId: string; quantity: number; unitCost?: number }> = [];
+    const items: Array<{ variantId: string; quantity: number; unitCost?: number; sku?: string }> = [];
     for (const raw of rawItems) {
       if (!raw || typeof raw !== 'object') continue;
       const v = raw as Record<string, unknown>;
@@ -88,7 +89,8 @@ export class PurchaseOrderController {
         }
         unitCost = parsed;
       }
-      items.push({ variantId, quantity: Math.trunc(quantity), unitCost });
+      const sku = typeof v.sku === 'string' ? v.sku.trim() : undefined;
+      items.push({ variantId, quantity: Math.trunc(quantity), unitCost, sku: sku || undefined });
     }
     if (items.length === 0 && !errors.some((e) => e.startsWith('items:'))) errors.push('items: Select at least one variant');
 
@@ -117,6 +119,7 @@ export class PurchaseOrderController {
       poEmail: supplier.poEmail,
       supplierProductId: product.id,
       productTitle: product.name,
+      referenceNumber: referenceNumberRaw || null,
       deliveryDate,
       remark: remarkRaw || null,
       createdById: actor.id,
@@ -126,7 +129,7 @@ export class PurchaseOrderController {
         return {
           variantId: variant.id,
           variantTitle: variantTitle(variant.colour, variant.size),
-          sku: variant.sku,
+          sku: i.sku ?? variant.sku,
           quantity: i.quantity,
           unitCost: i.unitCost ?? Number(variant.buyPrice),
         };

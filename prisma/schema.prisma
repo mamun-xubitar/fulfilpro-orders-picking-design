@@ -828,6 +828,8 @@ enum PurchaseOrderStatus {
 model PurchaseOrder {
   id                  String              @id @default(uuid())
   number              Int                 @unique @default(autoincrement())
+  /** Supplier's or internal free-text reference. Optional; not unique. */
+  referenceNumber     String?
   supplierId          String
   supplierName        String
   poEmail             String
