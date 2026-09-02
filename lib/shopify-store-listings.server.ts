@@ -1,3 +1,4 @@
+import { unstable_cache } from 'next/cache';
 import prisma from '@/lib/prisma.server';
 import { StoreModel } from '@/models/store.model.server';
 import { shopifyGraphQL, getLegacyId } from '@/lib/shopify-graphql.server';
@@ -104,10 +105,44 @@ function toVariant(node: ShopifyProductVariantByHandleNode): StoreListingVariant
   };
 }
 
+type StoreListingLookup = Omit<StoreListingResult, 'storeId' | 'storeName' | 'storeDomain' | 'error'>;
+
+/** One store's lookup, uncached — throws on failure so a bad token or a throttled shop is never
+ * written into the cache (the caller degrades it to a per-card error instead). */
+async function fetchOneStoreListing(storeDomain: string, accessToken: string, handle: string): Promise<StoreListingLookup> {
+  const data = await shopifyGraphQL<ShopifyProductByHandleResult>(storeDomain, accessToken, PRODUCT_BY_HANDLE_QUERY, { handle });
+  const product = data.productByIdentifier;
+  if (!product) {
+    return { found: false, productTitle: null, productGid: null, externalId: null, status: null, url: null, currencyCode: null, variants: [] };
+  }
+  const status = VALID_STATUSES.has(product.status) ? (product.status as StoreListingResult['status']) : null;
+  return {
+    found: true,
+    productTitle: product.title,
+    productGid: product.id,
+    externalId: getLegacyId(product.id),
+    status,
+    url: product.onlineStoreUrl ?? product.onlineStorePreviewUrl ?? null,
+    currencyCode: null,
+    variants: product.variants.nodes.map(toVariant),
+  };
+}
+
+/** Cached per (store, handle) until `revalidateTag(storeListingsTag(handle))` fires — no time
+ * expiry, since the app's only writes to Shopify product data (price updates, and Sync) both
+ * invalidate the tag themselves. The access token is deliberately kept out of the cache key
+ * (only `store.id` + `handle` identify the entry) so a token rotation can't orphan it. */
+function getCachedStoreListing(store: { id: string; storeDomain: string; accessToken: string }, handle: string) {
+  return unstable_cache(() => fetchOneStoreListing(store.storeDomain, store.accessToken, handle), ['store-listings', store.id, handle], {
+    tags: [storeListingsTag(handle)],
+    revalidate: false,
+  });
+}
+
 /**
  * Looks up one product by handle against every connected store concurrently. Each store's
  * lookup is isolated in its own try/catch — one dead token or throttled shop must never take
- * down the other stores' cards.
+ * down the other stores' cards, and its failure is never cached.
  */
 export async function fetchStoreListings(handle: string): Promise<StoreListingResult[]> {
   const stores = await model.findConnectedWithTokens();
@@ -116,24 +151,8 @@ export async function fetchStoreListings(handle: string): Promise<StoreListingRe
     stores.map(async (store): Promise<StoreListingResult> => {
       const base = { storeId: store.id, storeName: store.name ?? store.storeDomain, storeDomain: store.storeDomain };
       try {
-        const data = await shopifyGraphQL<ShopifyProductByHandleResult>(store.storeDomain, store.accessToken, PRODUCT_BY_HANDLE_QUERY, { handle });
-        const product = data.productByIdentifier;
-        if (!product) {
-          return { ...base, found: false, productTitle: null, productGid: null, externalId: null, status: null, url: null, currencyCode: null, variants: [], error: null };
-        }
-        const status = VALID_STATUSES.has(product.status) ? (product.status as StoreListingResult['status']) : null;
-        return {
-          ...base,
-          found: true,
-          productTitle: product.title,
-          productGid: product.id,
-          externalId: getLegacyId(product.id),
-          status,
-          url: product.onlineStoreUrl ?? product.onlineStorePreviewUrl ?? null,
-          currencyCode: null,
-          variants: product.variants.nodes.map(toVariant),
-          error: null,
-        };
+        const lookup = await getCachedStoreListing(store, handle)();
+        return { ...base, ...lookup, error: null };
       } catch (error) {
         return {
           ...base,

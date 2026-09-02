@@ -1,4 +1,4 @@
-import { unstable_cache, revalidateTag } from 'next/cache';
+import { revalidateTag } from 'next/cache';
 import { SupplierProductModel } from '@/models/supplier-product.model.server';
 import { fetchStoreListings, updateStoreVariantPrices, storeListingsTag } from '@/lib/shopify-store-listings.server';
 
@@ -11,19 +11,15 @@ function isAdmin(session: Session) {
 }
 
 export class StoreListingController {
-  /** Cached per-handle for 5 minutes — navigating between products within that window never
-   * re-hits Shopify. The Sync action explicitly busts this via revalidateTag(storeListingsTag). */
+  /** Cached per-handle until the data actually changes — a price save or Sync below both call
+   * revalidateTag(storeListingsTag), so navigating between products never re-hits Shopify
+   * unless something changed. See lib/shopify-store-listings.server.ts for the cache itself. */
   async list(productId: string, session: Session) {
     if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
     const handle = await model.findHandle(productId);
     if (!handle) return { error: { message: 'Product not found', status: 404 } };
 
-    const getCachedListings = unstable_cache((h: string) => fetchStoreListings(h), ['store-listings', handle], {
-      revalidate: 300,
-      tags: [storeListingsTag(handle)],
-    });
-    const listings = await getCachedListings(handle);
-
+    const listings = await fetchStoreListings(handle);
     return { data: { listings } };
   }
 
@@ -32,7 +28,7 @@ export class StoreListingController {
     const handle = await model.findHandle(productId);
     if (!handle) return { error: { message: 'Product not found', status: 404 } };
 
-    revalidateTag(storeListingsTag(handle), 'max');
+    revalidateTag(storeListingsTag(handle), { expire: 0 });
     const listings = await fetchStoreListings(handle);
     return { data: { listings }, message: 'Store listings refreshed' };
   }
@@ -67,7 +63,7 @@ export class StoreListingController {
       return { error: { message: error instanceof Error ? error.message : 'Failed to update prices', status: 502 } };
     }
 
-    revalidateTag(storeListingsTag(handle), 'max');
+    revalidateTag(storeListingsTag(handle), { expire: 0 });
     return { data: { variants: updated }, message: 'Price updated' };
   }
 }

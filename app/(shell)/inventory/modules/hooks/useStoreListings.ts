@@ -29,21 +29,23 @@ export function useStoreListings(productId: string | null) {
 
     const controller = new AbortController();
     abortRef.current = controller;
-    setFetching(true);
 
-    fetch(`/api/inventory/catalog/${productId}/store-listings`, { signal: controller.signal })
-      .then((res) => res.json() as Promise<ApiEnvelope<{ listings: StoreListingResult[] }>>)
-      .then((json) => {
-        if (!json.success) throw new Error(json.message || 'Failed to load store listings');
-        setListings(json.data!.listings);
-      })
-      .catch((err: unknown) => {
-        if (err instanceof DOMException && err.name === 'AbortError') return;
-        toast.error(err instanceof Error ? err.message : 'Failed to load store listings');
-      })
-      .finally(() => {
-        if (abortRef.current === controller) setFetching(false);
-      });
+    (function run() {
+      setFetching(true);
+      fetch(`/api/inventory/catalog/${productId}/store-listings`, { signal: controller.signal })
+        .then((res) => res.json() as Promise<ApiEnvelope<{ listings: StoreListingResult[] }>>)
+        .then((json) => {
+          if (!json.success) throw new Error(json.message || 'Failed to load store listings');
+          setListings(json.data!.listings);
+        })
+        .catch((err: unknown) => {
+          if (err instanceof DOMException && err.name === 'AbortError') return;
+          toast.error(err instanceof Error ? err.message : 'Failed to load store listings');
+        })
+        .finally(() => {
+          if (abortRef.current === controller) setFetching(false);
+        });
+    })();
 
     return () => controller.abort();
   }, [productId]);
