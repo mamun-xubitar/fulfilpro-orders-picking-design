@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
 import { ModalShell } from '@/components/ModalShell';
-import { formatNumber } from './utils';
+import { useEffect, useRef, useState } from 'react';
 import type { StoreListingResult } from './types';
+import { formatNumber } from './utils';
 
 type DraftPrices = Record<string, string>;
 
@@ -133,7 +133,7 @@ export default function StorePricesModal({ listing, onClose, onSaveOne, onSaveAl
                   <td className="px-2 py-2 text-right text-[13px] tabular-nums text-gray-700">
                     {variant.inventoryQuantity !== null ? formatNumber(variant.inventoryQuantity) : '—'}
                   </td>
-                  <td className="px-2 py-2">
+                  <td className="px-2 py-2 text-right">
                     <input
                       type="number"
                       step="0.01"
@@ -141,7 +141,7 @@ export default function StorePricesModal({ listing, onClose, onSaveOne, onSaveAl
                       value={drafts[variant.id] ?? ''}
                       onChange={(e) => setDraft(variant.id, e.target.value)}
                       aria-label={`Price for ${variant.title}`}
-                      className={`w-24 rounded-lg border px-2 py-1.5 text-right text-[13px] tabular-nums outline-none focus:ring-2 ${
+                      className={`ml-auto w-24 rounded-lg border px-2 py-1.5 text-right text-[13px] tabular-nums outline-none focus:ring-2 ${
                         invalid ? 'border-red-300 focus:border-red-500 focus:ring-red-100' : 'border-gray-300 focus:border-blue-500 focus:ring-blue-100'
                       }`}
                     />
