@@ -1,4 +1,4 @@
-import { deriveColorFromName, isValidCssColor, FALLBACK_SWATCH, parseColoursInput, formatColoursInput } from '@/lib/inventory/colour';
+import { deriveColorFromName, isValidCssColor, FALLBACK_SWATCH, parseColoursInput, formatColoursInput, formatColourName } from '@/lib/inventory/colour';
 import { NEAR_TRIGGER_RATIO } from './constants';
 import type {
   ColourOption,
@@ -18,12 +18,13 @@ import type {
 
 // — Stock maths —
 
-/** "Black / M", "Black" (colour-only), "M" (size-only), or "—" (neither axis) — a single
- * source of truth for labelling a variant, so a colour-only or size-only product never shows a
- * dangling "Black / " or " / M". */
+/** "Black / M", "Black" (colour-only), "M" (size-only), or "Default Title" (neither axis,
+ * matching Shopify's own label for an option-less variant) — a single source of truth for
+ * labelling a variant, so a colour-only or size-only product never shows a dangling "Black / "
+ * or " / M". The colour half renders Title Case regardless of how it was typed or imported. */
 export function variantTitle(v: { colour: string; size: string }): string {
-  const parts = [v.colour, v.size].filter(Boolean);
-  return parts.length > 0 ? parts.join(' / ') : '—';
+  const parts = [v.colour ? formatColourName(v.colour) : '', v.size].filter(Boolean);
+  return parts.length > 0 ? parts.join(' / ') : 'Default Title';
 }
 
 export function getAvailable(v: VariantRow): number {

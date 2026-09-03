@@ -12,6 +12,7 @@ import ImportProductsModal from './ImportProductsModal';
 import PoModals from './PoModals';
 import StocktakeModal from './StocktakeModal';
 import StorePricesModal from './StorePricesModal';
+import SupplierModal from './SupplierModal';
 import { ChevronLeft, ChevronRight, Close, Lock, Unlock } from './icons';
 import { formatMoney, variantTitle } from './utils';
 import type { InventoryPage } from './hooks/useInventoryPage';
@@ -124,6 +125,7 @@ export default function InventoryModals(p: InventoryPage) {
       <AdjustmentModals adjustments={p.adjustments} variants={variants} />
       <ImportModal importExport={p.importExport} />
       <ImportProductsModal importProducts={p.importProducts} suppliers={p.supplierOptions} />
+      <SupplierModal suppliers={p.suppliers} />
     </>
   );
 }

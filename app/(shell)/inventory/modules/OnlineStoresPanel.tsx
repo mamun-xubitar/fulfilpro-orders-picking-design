@@ -15,18 +15,24 @@ type OnlineStoresPanelProps = {
 
 export default function OnlineStoresPanel({ storeListings, onEditPrice, onAction }: OnlineStoresPanelProps) {
   const { listings, loading, syncing, sync } = storeListings;
+  // Only show stores this product is actually listed on — a lookup failure still surfaces (it's
+  // an unknown state, not "not listed"), but a clean `found: false` result is dropped rather than
+  // rendered as a "Not listed" card for every connected store.
+  const listed = listings.filter((listing) => listing.found || listing.error);
 
   return (
     <section className="flex min-w-0 flex-col rounded-xl border border-gray-200 bg-white shadow-sm">
-      <PanelHeading icon={<Store className="h-4 w-4" />} title="Online stores & prices" meta={`${listings.length}`} />
+      <PanelHeading icon={<Store className="h-4 w-4" />} title="Online stores & prices" meta={`${listed.length}`} />
 
       <div className="flex-1 space-y-2 p-3">
         {loading ? (
           <StoreCardSkeletons />
         ) : listings.length === 0 ? (
           <p className="px-1 py-8 text-center text-xs text-gray-400">No connected stores.</p>
+        ) : listed.length === 0 ? (
+          <p className="px-1 py-8 text-center text-xs text-gray-400">Not listed in any connected store.</p>
         ) : (
-          listings.map((listing) => <StoreCard key={listing.storeId} listing={listing} onEditPrice={onEditPrice} onAction={onAction} />)
+          listed.map((listing) => <StoreCard key={listing.storeId} listing={listing} onEditPrice={onEditPrice} onAction={onAction} />)
         )}
       </div>
 

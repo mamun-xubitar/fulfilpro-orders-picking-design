@@ -13,6 +13,7 @@ import ProductsTable from './ProductsTable';
 import ProductsTableToolbar from './ProductsTableToolbar';
 import ProductsToolbar from './ProductsToolbar';
 import PurchaseOrdersPanel from './PurchaseOrdersPanel';
+import SuppliersTab from './SuppliersTab';
 import VariantsMatrixTable from './VariantsMatrixTable';
 import VariantsMatrixToolbar from './VariantsMatrixToolbar';
 import { MODULE_TABS, PRODUCT_TABS } from './constants';
@@ -28,7 +29,9 @@ export default function InventoryPage() {
     <main className="flex-1 space-y-3 p-4 md:p-6">
       <ModuleTabs active={p.moduleTab} onChange={p.setModuleTab} />
 
-      {p.moduleTab !== 'products' ? (
+      {p.moduleTab === 'suppliers' ? (
+        <SuppliersTab suppliers={p.suppliers} />
+      ) : p.moduleTab !== 'products' ? (
         <ComingSoon label={moduleTab.label} blurb={moduleTab.blurb} />
       ) : (
         <>

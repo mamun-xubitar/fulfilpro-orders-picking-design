@@ -1,0 +1,107 @@
+'use client';
+
+import { formatColourName } from '@/lib/inventory/colour';
+import { ModalActions, ModalShell } from '@/components/ModalShell';
+import { STATUS_BADGES } from './PurchaseOrdersPanel';
+import type { usePurchaseOrder } from './hooks/usePurchaseOrder';
+import { formatDate, formatMoney, formatPoNumber } from './utils';
+
+const GRID_COLS = 'grid-cols-[minmax(0,1fr)_7rem_5.5rem_4.5rem_4.5rem_4.5rem_5rem_5.5rem_6rem]';
+
+export default function ReceivePoModal({ po }: { po: ReturnType<typeof usePurchaseOrder> }) {
+  const target = po.receiveTarget!;
+
+  return (
+    <ModalShell
+      title={`Receive — ${target.productTitle}`}
+      onClose={po.closeReceive}
+      extraWide
+      footer={<ModalActions onCancel={po.closeReceive} onConfirm={po.submitReceive} confirmLabel={po.receiving ? 'Receiving...' : 'Receive'} disabled={po.receiving} />}
+    >
+      <div className="space-y-4">
+        <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-semibold text-gray-900">{formatPoNumber(target.number)}</span>
+            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${STATUS_BADGES[target.status]}`}>
+              {target.status.replace('_', ' ')}
+            </span>
+          </div>
+          <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-600 sm:grid-cols-3">
+            {target.referenceNumber && (
+              <div>
+                <dt className="inline text-gray-400">Reference: </dt>
+                <dd className="inline">{target.referenceNumber}</dd>
+              </div>
+            )}
+            <div>
+              <dt className="inline text-gray-400">Supplier: </dt>
+              <dd className="inline">{target.supplierName}</dd>
+            </div>
+            <div>
+              <dt className="inline text-gray-400">PO email: </dt>
+              <dd className="inline">{target.poEmail}</dd>
+            </div>
+            {target.deliveryDate && (
+              <div>
+                <dt className="inline text-gray-400">Delivery date: </dt>
+                <dd className="inline">{formatDate(target.deliveryDate)}</dd>
+              </div>
+            )}
+            <div>
+              <dt className="inline text-gray-400">Created: </dt>
+              <dd className="inline">{formatDate(target.createdAt)}</dd>
+            </div>
+            {target.remark && (
+              <div className="col-span-2 sm:col-span-3">
+                <dt className="inline text-gray-400">Remark: </dt>
+                <dd className="inline">{target.remark}</dd>
+              </div>
+            )}
+          </dl>
+        </div>
+
+        <p className="text-sm text-gray-600">Enter the quantity received for each item. Leave 0 for items not yet shipped — receive again later for partial deliveries.</p>
+
+        <div className="max-h-80 overflow-y-auto rounded-lg border border-gray-200">
+          <div className={`grid ${GRID_COLS} gap-3 border-b border-gray-100 bg-gray-50 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500`}>
+            <span>Variant</span>
+            <span>Supplier SKU</span>
+            <span>Colour</span>
+            <span>Size</span>
+            <span className="text-right">Ordered</span>
+            <span className="text-right">Received</span>
+            <span className="text-right">Outstanding</span>
+            <span className="text-right">Unit cost</span>
+            <span className="text-right">Receive qty</span>
+          </div>
+          <div className="divide-y divide-gray-100">
+            {target.items.map((item) => {
+              const remaining = Math.max(0, item.quantity - item.receivedQuantity);
+              return (
+                <div key={item.id} className={`grid ${GRID_COLS} items-center gap-3 px-3 py-1.5 text-sm`}>
+                  <span className="min-w-0 truncate text-gray-700">{item.variantTitle}</span>
+                  <span className="truncate text-gray-500">{item.sku ?? '—'}</span>
+                  <span className="truncate text-gray-500">{item.colour ? formatColourName(item.colour) : '—'}</span>
+                  <span className="truncate text-gray-500">{item.size || '—'}</span>
+                  <span className="text-right tabular-nums text-gray-500">{item.quantity}</span>
+                  <span className="text-right tabular-nums text-gray-500">{item.receivedQuantity}</span>
+                  <span className="text-right tabular-nums font-medium text-gray-700">{remaining}</span>
+                  <span className="text-right tabular-nums text-gray-500">{item.unitCost !== null ? formatMoney(item.unitCost) : '—'}</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={remaining}
+                    value={po.receiveQty[item.id] ?? ''}
+                    onChange={(e) => po.setReceiveItemQty(item.id, e.target.value, remaining)}
+                    aria-label={`Receive quantity for ${item.variantTitle}`}
+                    className="w-full rounded-lg border border-gray-300 px-2 py-1 text-right text-sm outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </ModalShell>
+  );
+}

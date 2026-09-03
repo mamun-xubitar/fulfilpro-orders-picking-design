@@ -217,6 +217,7 @@ export class SupplierProductModel {
     brand: string | null;
     marginPercent: number;
     exchangeRate: number;
+    lowStockThreshold: number;
     actor?: { id?: string | null; name: string };
   }): Promise<string> {
     const row = await prisma.supplierProduct.create({
@@ -229,6 +230,10 @@ export class SupplierProductModel {
         sku: data.itemNo,
         status: 'DRAFT',
         pricing: { create: { currencyCode: 'USD', exchangeRate: data.exchangeRate, marginPercent: data.marginPercent } },
+        // Mirrors Shopify: a product declared with no size/colour still gets one variant (its
+        // "Default Title") rather than sitting with an empty matrix — see reconcileVariants,
+        // which later promotes this same sentinel row in place once an axis is added.
+        variants: { create: { colour: '', size: '', trigger: data.lowStockThreshold, position: 0 } },
       },
     });
     await prisma.inventoryActivity.create({

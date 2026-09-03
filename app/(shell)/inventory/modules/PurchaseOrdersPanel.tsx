@@ -5,7 +5,7 @@ import { formatDate, formatPoNumber } from './utils';
 import { Clipboard } from './icons';
 import type { usePurchaseOrder } from './hooks/usePurchaseOrder';
 
-const STATUS_BADGES: Record<string, string> = {
+export const STATUS_BADGES: Record<string, string> = {
   REQUESTED: 'bg-amber-50 text-amber-800 border-amber-200',
   CONFIRMED: 'bg-indigo-50 text-indigo-700 border-indigo-200',
   PARTIALLY_RECEIVED: 'bg-blue-50 text-blue-700 border-blue-200',

@@ -17,6 +17,7 @@ import { useProductPricing } from './useProductPricing';
 import { useProductsTable } from './useProductsTable';
 import { usePurchaseOrder } from './usePurchaseOrder';
 import { useStocktake } from './useStocktake';
+import { useSuppliers } from './useSuppliers';
 import { useStoreListings } from './useStoreListings';
 import { useVariantsMatrix } from './useVariantsMatrix';
 import type { ModuleTabId, ProductRecord, ProductTabId, StoreListingResult } from '../types';
@@ -62,6 +63,7 @@ export function useInventoryPage() {
   const importExport = useImportExport({ product, onSaved: onProductSaved, onPoImported: po.loadPurchaseOrders });
   const productsTable = useProductsTable({ enabled: data.allRecords, verifiedOnly: nav.verifiedOnly, quickFilter: nav.quickFilter, onView: nav.viewProduct });
   const importProducts = useImportProducts({ supplierOptions: po.supplierOptions, onImported: () => { data.refresh(); productsTable.refresh(); } });
+  const suppliers = useSuppliers({ onChanged: po.refreshSuppliers });
 
   /** Stock Summary always reflects the whole product, not the matrix's filtered rows. */
   const summary = useMemo(() => summariseVariants(product?.variants ?? []), [product]);
@@ -112,6 +114,7 @@ export function useInventoryPage() {
     po,
     stocktake,
     adjustments,
+    suppliers,
     importExport,
     importProducts,
     productsTable,
@@ -130,6 +133,7 @@ export function useInventoryPage() {
     createErrors,
     createProduct,
     supplierOptions: po.supplierOptions,
+    refreshSuppliers: po.refreshSuppliers,
     editImagesOpen,
     openEditImages: () => setEditImagesOpen(true),
     closeEditImages: () => setEditImagesOpen(false),

@@ -107,8 +107,10 @@ export class InventoryCsvImportController {
     // `newHandle === null` means the file's handle matched this product's own handle — i.e. this
     // import is about to replace values already on the record, which is exactly what
     // "Overwrite…" gates. Adopting a brand-new handle onto the product isn't a replace in that
-    // sense, so it's unaffected by the flag.
-    if (newHandle === null && !options.overwrite) {
+    // sense, so it's unaffected by the flag. Only refuse on commit — a preview surfaces this via
+    // `handleMatches` instead, so toggling the checkbox never needs to re-upload the file.
+    const handleMatches = newHandle === null;
+    if (commit && handleMatches && !options.overwrite) {
       return {
         error: { message: `handle: This product already exists — tick "Overwrite products with matching handles" to replace its values`, status: 409 },
       };
@@ -139,7 +141,7 @@ export class InventoryCsvImportController {
     const images = parsed.images.map((image) => ({ url: image.url, altText: image.altText })).filter((image) => !existingImageUrls.has(image.url));
 
     if (!commit) {
-      return { data: { type: 'product' as const, rows, product: parsed.product, images }, message: 'Preview ready' };
+      return { data: { type: 'product' as const, rows, product: parsed.product, images, handleMatches }, message: 'Preview ready' };
     }
 
     await productModel.updateDetails(product.id, {

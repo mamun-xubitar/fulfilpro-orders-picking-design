@@ -1,6 +1,7 @@
 'use client';
 
 import { ModalActions, ModalShell } from '@/components/ModalShell';
+import FilePicker from './FilePicker';
 import type { ProductImportPreviewGroup, useImportProducts } from './hooks/useImportProducts';
 import type { SupplierOption } from './types';
 
@@ -9,12 +10,20 @@ type ImportProductsModalProps = {
   suppliers: SupplierOption[];
 };
 
+/** create/update/skip is derived here from `exists` + the live "Overwrite" checkbox, rather than
+ * baked into the preview response, so toggling the checkbox never needs a re-upload. */
+function groupAction(group: ProductImportPreviewGroup, overwrite: boolean): 'create' | 'update' | 'skip' {
+  if (!group.exists) return 'create';
+  return overwrite ? 'update' : 'skip';
+}
+
 /** Bulk product import — creates one product per Handle group in a Shopify product CSV, all
  * under the chosen supplier. Mirrors ImportModal's preview-then-commit flow. */
 export default function ImportProductsModal({ importProducts: ip, suppliers }: ImportProductsModalProps) {
   if (!ip.modalOpen) return null;
 
-  const actionableCount = ip.preview?.filter((g) => g.action !== 'skip').length ?? 0;
+  const actionableCount = ip.preview?.filter((g) => groupAction(g, ip.overwrite) !== 'skip').length ?? 0;
+  const allSkipped = !!ip.preview && ip.preview.length > 0 && actionableCount === 0;
 
   return (
     <ModalShell
@@ -77,26 +86,23 @@ export default function ImportProductsModal({ importProducts: ip, suppliers }: I
           </label>
         </div>
 
-        <input
-          type="file"
-          accept=".csv,text/csv"
-          disabled={!ip.supplierId}
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) void ip.handleFile(file);
-          }}
-          className="block w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-blue-600 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-white hover:file:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-        />
+        <FilePicker onSelect={(file) => void ip.handleFile(file)} disabled={!ip.supplierId} fileName={ip.pendingFile?.name} />
 
         {ip.previewing && <p className="text-sm text-gray-400">Reading file…</p>}
 
-        {ip.preview && <ImportProductsPreviewTable groups={ip.preview} />}
+        {allSkipped && (
+          <p className="text-sm text-red-600">
+            Every product in this file already exists — tick &quot;Overwrite products with matching handles&quot; to replace their values.
+          </p>
+        )}
+
+        {ip.preview && <ImportProductsPreviewTable groups={ip.preview} overwrite={ip.overwrite} />}
       </div>
     </ModalShell>
   );
 }
 
-function ImportProductsPreviewTable({ groups }: { groups: ProductImportPreviewGroup[] }) {
+function ImportProductsPreviewTable({ groups, overwrite }: { groups: ProductImportPreviewGroup[]; overwrite: boolean }) {
   return (
     <div className="max-h-96 overflow-y-auto rounded-lg border border-gray-200">
       <table className="w-full border-collapse text-sm">
@@ -110,29 +116,32 @@ function ImportProductsPreviewTable({ groups }: { groups: ProductImportPreviewGr
           </tr>
         </thead>
         <tbody>
-          {groups.map((g) => (
-            <tr key={g.handle} className={`border-b border-gray-100 last:border-0 ${g.action === 'skip' ? 'opacity-50' : ''}`}>
-              <td className="px-3 py-2 font-mono text-[12px] text-gray-700">{g.handle}</td>
-              <td className="px-3 py-2 text-gray-700">{g.title}</td>
-              <td className="px-3 py-2 text-right tabular-nums text-gray-500">{g.variantCount}</td>
-              <td className="px-3 py-2 text-right tabular-nums text-gray-500">{g.imageCount}</td>
-              <td className="px-3 py-2">
-                {g.action === 'skip' ? (
-                  <span className="inline-flex items-center rounded-full border border-gray-300 bg-gray-50 px-2 py-0.5 text-[11px] font-semibold text-gray-600">
-                    Already exists
-                  </span>
-                ) : g.action === 'update' ? (
-                  <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
-                    Update
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
-                    Create
-                  </span>
-                )}
-              </td>
-            </tr>
-          ))}
+          {groups.map((g) => {
+            const action = groupAction(g, overwrite);
+            return (
+              <tr key={g.handle} className={`border-b border-gray-100 last:border-0 ${action === 'skip' ? 'opacity-50' : ''}`}>
+                <td className="px-3 py-2 font-mono text-[12px] text-gray-700">{g.handle}</td>
+                <td className="px-3 py-2 text-gray-700">{g.title}</td>
+                <td className="px-3 py-2 text-right tabular-nums text-gray-500">{g.variantCount}</td>
+                <td className="px-3 py-2 text-right tabular-nums text-gray-500">{g.imageCount}</td>
+                <td className="px-3 py-2">
+                  {action === 'skip' ? (
+                    <span className="inline-flex items-center rounded-full border border-gray-300 bg-gray-50 px-2 py-0.5 text-[11px] font-semibold text-gray-600">
+                      Already exists
+                    </span>
+                  ) : action === 'update' ? (
+                    <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
+                      Update
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                      Create
+                    </span>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

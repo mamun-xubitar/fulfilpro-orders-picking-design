@@ -1,6 +1,7 @@
 'use client';
 
 import { memo } from 'react';
+import { formatColourName } from '@/lib/inventory/colour';
 import { ColourCell, IncomingCell, Num, NumCell, RowAction, SizeCell, SkuCell } from './VariantsMatrixCells';
 import { STATUS_STYLES } from './constants';
 import { Check, Close, Pencil, Trash } from './icons';
@@ -57,7 +58,7 @@ function VariantsMatrixRow({
           <label className="flex cursor-pointer items-center gap-2">
             <SelectCheckbox name={name} selected={selected} onToggleSelect={() => onToggleSelect(variant.id)} />
             {variant.colour && <span className="h-2.5 w-2.5 shrink-0 rounded-full ring-1 ring-black/10" style={{ backgroundColor: swatch }} />}
-            <span className="whitespace-nowrap text-[13px] font-medium text-gray-900">{variant.colour || '—'}</span>
+            <span className="whitespace-nowrap text-[13px] font-medium text-gray-900">{variant.colour ? formatColourName(variant.colour) : '—'}</span>
           </label>
         )}
       </td>

@@ -21,7 +21,9 @@ export type ProductImportPreviewGroup = {
   title: string;
   variantCount: number;
   imageCount: number;
-  action: 'create' | 'update' | 'skip';
+  /** Whether a product with this handle already exists — the client derives create/update/skip
+   * from this plus the live "Overwrite" checkbox state, so toggling it never needs a re-preview. */
+  exists: boolean;
 };
 
 type ProductImportOptions = { overwrite: boolean; markVerified: boolean };
@@ -65,7 +67,7 @@ export class InventoryProductImportController {
         title: g.product.name || g.handle,
         variantCount: g.rows.length,
         imageCount: g.images.length,
-        action: existingByHandle.has(g.handle) ? (options.overwrite ? 'update' : 'skip') : 'create',
+        exists: existingByHandle.has(g.handle),
       }));
       return { data: { groups: preview }, message: 'Preview ready' };
     }

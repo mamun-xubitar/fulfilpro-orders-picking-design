@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { ModalShell } from '@/components/ModalShell';
+import { formatColourName } from '@/lib/inventory/colour';
 import { STATUS_LEGEND } from './constants';
 import type { InventoryPage } from './hooks/useInventoryPage';
 import { Adjust, Download, Expand, Plus } from './icons';
@@ -51,7 +52,7 @@ export default function VariantsMatrixToolbar({ p }: VariantsMatrixToolbarProps)
         {matrix.colourNames.map((name) => (
           <Pill key={name} active={matrix.isColourActive(name)} onClick={() => matrix.toggleColour(name)}>
             <span className="h-2 w-2 rounded-full ring-1 ring-black/10" style={{ backgroundColor: matrix.swatchOf(name) }} />
-            {name}
+            {formatColourName(name)}
           </Pill>
         ))}
       </div>

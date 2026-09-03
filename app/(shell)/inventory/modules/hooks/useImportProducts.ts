@@ -9,7 +9,7 @@ export type ProductImportPreviewGroup = {
   title: string;
   variantCount: number;
   imageCount: number;
-  action: 'create' | 'update' | 'skip';
+  exists: boolean;
 };
 
 type ApiEnvelope<T> = { success: boolean; message: string; data: T };
@@ -93,11 +93,9 @@ export function useImportProducts({ supplierOptions, onImported }: UseImportProd
 
   const handleFile = (file: File) => previewFile(file, { overwrite, markVerified });
 
-  // Toggling "Overwrite" changes which rows are create vs. skip in the preview table.
-  const setOverwrite = (value: boolean) => {
-    setOverwriteState(value);
-    if (pendingFile) void previewFile(pendingFile, { overwrite: value, markVerified });
-  };
+  // create/update/skip is derived at render time from `exists` + this flag (see
+  // ImportProductsModal), so toggling "Overwrite" is a plain state update — no re-preview.
+  const setOverwrite = (value: boolean) => setOverwriteState(value);
 
   const commitImport = async () => {
     if (!pendingFile || !preview) return;

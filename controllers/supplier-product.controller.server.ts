@@ -149,7 +149,7 @@ export class SupplierProductController {
       where: { id: 'default' },
       update: {},
       create: { id: 'default' },
-      select: { globalMarginPercent: true, globalExchangeRate: true },
+      select: { globalMarginPercent: true, globalExchangeRate: true, lowStockThreshold: true },
     });
     const id = await model.create({
       supplierId,
@@ -159,6 +159,7 @@ export class SupplierProductController {
       brand: brand || null,
       marginPercent: Number(settings.globalMarginPercent),
       exchangeRate: Number(settings.globalExchangeRate),
+      lowStockThreshold: settings.lowStockThreshold ?? 10,
       actor: actorFromSession(session),
     });
     const product = await model.findById(id);
