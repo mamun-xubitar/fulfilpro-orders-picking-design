@@ -96,6 +96,9 @@ export class SupplierController {
     if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
     const existing = await model.findById(id);
     if (!existing) return { error: { message: 'Supplier not found', status: 404 } };
+    if (existing.productCount > 0) {
+      return { error: { message: "Remove or reassign this supplier's products first", status: 409 } };
+    }
     await model.delete(id);
     return { data: null, message: 'Supplier deleted' };
   }

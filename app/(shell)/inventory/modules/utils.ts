@@ -1,4 +1,4 @@
-import { deriveColorFromName, isValidCssColor, FALLBACK_SWATCH, parseColoursInput, formatColoursInput } from '@/lib/inventory/colour';
+import { deriveColorFromName, isValidCssColor, FALLBACK_SWATCH, parseColoursInput, formatColoursInput, formatColourName } from '@/lib/inventory/colour';
 import { NEAR_TRIGGER_RATIO } from './constants';
 import type {
   ColourOption,
@@ -18,12 +18,13 @@ import type {
 
 // — Stock maths —
 
-/** "Black / M", "Black" (colour-only), "M" (size-only), or "—" (neither axis) — a single
- * source of truth for labelling a variant, so a colour-only or size-only product never shows a
- * dangling "Black / " or " / M". */
+/** "Black / M", "Black" (colour-only), "M" (size-only), or "Default Title" (neither axis,
+ * matching Shopify's own label for an option-less variant) — a single source of truth for
+ * labelling a variant, so a colour-only or size-only product never shows a dangling "Black / "
+ * or " / M". The colour half renders Title Case regardless of how it was typed or imported. */
 export function variantTitle(v: { colour: string; size: string }): string {
-  const parts = [v.colour, v.size].filter(Boolean);
-  return parts.length > 0 ? parts.join(' / ') : '—';
+  const parts = [v.colour ? formatColourName(v.colour) : '', v.size].filter(Boolean);
+  return parts.length > 0 ? parts.join(' / ') : 'Default Title';
 }
 
 export function getAvailable(v: VariantRow): number {
@@ -135,6 +136,17 @@ export function formatMoney(n: number): string {
 
 export function formatCurrencyValue(n: number): string {
   return `$${formatMoney(n)}`;
+}
+
+/** A store listing's price, or price range, formatted with a leading `$` on both ends of a
+ * range — e.g. "$12.00 – $15.00", not "$12.00 – 15.00". Used by both the store cards and the
+ * per-store price chips under Pricing & margin. */
+export function priceLabel(variants: { price: number }[]): string {
+  if (variants.length === 0) return '—';
+  const prices = variants.map((v) => v.price);
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+  return min === max ? formatCurrencyValue(min) : `${formatCurrencyValue(min)} – ${formatCurrencyValue(max)}`;
 }
 
 export function formatDate(iso: string | null): string {

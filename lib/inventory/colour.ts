@@ -155,6 +155,43 @@ export const CSS_NAMED_COLOURS: Record<string, string> = {
   yellowgreen: '#9acd32',
 };
 
+/** Trade/apparel colour names not in the CSS Color Module 4 keyword list, keyed the same way
+ * (lowercase, spaces stripped) so they resolve through the same lookup as CSS_NAMED_COLOURS. */
+export const EXTRA_NAMED_COLOURS: Record<string, string> = {
+  sky: '#87ceeb',
+  charcoal: '#36454f',
+  heathergrey: '#9a9a9a',
+  heathergray: '#9a9a9a',
+  offwhite: '#faf9f6',
+  cream: '#fffdd0',
+  bottlegreen: '#00543c',
+  burgundy: '#800020',
+  mustard: '#ffdb58',
+  rust: '#b7410e',
+  blush: '#de5d83',
+  taupe: '#483c32',
+  stone: '#928e85',
+  sand: '#c2b280',
+  ecru: '#c2b280',
+  oatmeal: '#ded4c7',
+  graphite: '#41424c',
+  denim: '#1560bd',
+  camel: '#c19a6b',
+  mocha: '#967969',
+  emerald: '#50c878',
+  petrol: '#005f6a',
+  midnight: '#191970',
+  natural: '#ede8d0',
+  bone: '#e3dac9',
+  ash: '#b2beb5',
+  berry: '#8b0057',
+  mint: '#98ff98',
+  lilac: '#c8a2c8',
+};
+
+/** Merged lookup — extras first so a trade name never shadows a CSS keyword. */
+const ALL_NAMED_COLOURS: Record<string, string> = { ...EXTRA_NAMED_COLOURS, ...CSS_NAMED_COLOURS };
+
 /** Grey dot shown for a colour whose derived CSS value isn't recognized. */
 export const FALLBACK_SWATCH = '#cbd5e1';
 
@@ -162,7 +199,7 @@ const HEX_PATTERN = /^#[0-9a-f]{3}$|^#[0-9a-f]{6}$/i;
 
 export function isValidCssColor(value: string): boolean {
   if (HEX_PATTERN.test(value)) return true;
-  return value.toLowerCase() in CSS_NAMED_COLOURS;
+  return value.toLowerCase().replace(/\s+/g, '') in ALL_NAMED_COLOURS;
 }
 
 /** "Hot Pink" -> "HotPink" (a valid CSS keyword); a literal hex token passes through verbatim. */
@@ -174,7 +211,9 @@ export function deriveColorFromName(name: string): string {
 
 /** What to actually render as `backgroundColor` — never an unrecognized/invalid CSS value. */
 export function resolveSwatch(color: string): string {
-  return isValidCssColor(color) ? color : FALLBACK_SWATCH;
+  const trimmed = color.trim();
+  if (HEX_PATTERN.test(trimmed)) return trimmed;
+  return ALL_NAMED_COLOURS[trimmed.toLowerCase().replace(/\s+/g, '')] ?? FALLBACK_SWATCH;
 }
 
 /** "Red, Blue, Hot Pink" -> [{name:"Red",color:"Red"}, ..., {name:"Hot Pink",color:"HotPink"}] */
@@ -188,4 +227,14 @@ export function parseColoursInput(value: string): { name: string; color: string 
 
 export function formatColoursInput(colours: { name: string }[]): string {
   return colours.map((c) => c.name).join(', ');
+}
+
+/** Display-only casing: "sky" -> "Sky", "dark gray" -> "Dark Gray". A literal hex token passes
+ * through unchanged. Stored values are never touched by this — call it only when rendering. */
+export function formatColourName(name: string): string {
+  if (HEX_PATTERN.test(name.trim())) return name.trim();
+  return name
+    .split(/(\s+|-)/)
+    .map((part) => (/^[a-z]/i.test(part) ? part.charAt(0).toUpperCase() + part.slice(1).toLowerCase() : part))
+    .join('');
 }

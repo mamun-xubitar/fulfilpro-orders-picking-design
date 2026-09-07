@@ -1,5 +1,6 @@
 'use client';
 
+import { formatColourName } from '@/lib/inventory/colour';
 import type { ImportPreview } from './hooks/useImportExport';
 
 type ProductPreview = Extract<ImportPreview, { type: 'product' }>;
@@ -63,7 +64,7 @@ export default function ProductImportPreviewTable({ preview }: { preview: Produc
             <tbody>
               {preview.rows.map((row, i) => (
                 <tr key={i} className="border-b border-gray-100 last:border-0">
-                  <td className="px-3 py-1.5">{row.colour}</td>
+                  <td className="px-3 py-1.5">{row.colour ? formatColourName(row.colour) : row.colour}</td>
                   <td className="px-3 py-1.5">{row.size}</td>
                   <td className="px-3 py-1.5 text-gray-500">{row.sku || '—'}</td>
                   <td className="px-3 py-1.5 text-right tabular-nums">{row.stockOnHand}</td>

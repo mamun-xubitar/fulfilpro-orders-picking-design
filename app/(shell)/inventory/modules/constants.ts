@@ -67,6 +67,14 @@ export const PRODUCT_STATUS_BADGES: Record<string, string> = {
   ARCHIVED: 'bg-gray-50 text-gray-600 border-gray-200',
 };
 
+/** SupplierProductStoreListing.status — our own record of the publish, shown on each store card. */
+export const LISTING_STATUS_BADGES: Record<string, string> = {
+  NOT_LISTED: 'bg-gray-50 text-gray-500 border-gray-200',
+  PUBLISHING: 'bg-blue-50 text-blue-700 border-blue-200',
+  LISTED: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  FAILED: 'bg-red-50 text-red-700 border-red-200',
+};
+
 /** The products table's status filter and bulk "Set status" modal. */
 export const STATUS_OPTIONS: { value: ProductStatusValue; label: string }[] = [
   { value: 'ACTIVE', label: 'Active' },

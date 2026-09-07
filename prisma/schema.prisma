@@ -64,6 +64,9 @@ model Store {
   shipmentTrackings           ShipmentTracking[]
   products                    Product[]
   orderLineItems              OrderLineItem[]
+  supplierProductListings     SupplierProductStoreListing[]
+  webhookEvents               ShopifyWebhookEvent[]
+  inventoryAllocations        InventoryAllocation[]
 
   @@index([status])
   @@index([partnerStoreId])
@@ -109,6 +112,7 @@ model Order {
   decorationEditRequests DecorationEditRequest[]
   shipmentTrackings      ShipmentTracking[]
   orderLineItems         OrderLineItem[]
+  inventoryAllocations   InventoryAllocation[]
   createdAt              DateTime                   @default(now())
   updatedAt              DateTime                   @updatedAt
 
@@ -889,7 +893,7 @@ model SupplierProduct {
   categoryId      String?
   sku             String
   description     String?
-  deliveryRemarks String?
+  remarks         String?
   status          SupplierProductStatus    @default(DRAFT)
   verified        Boolean                  @default(false)
   sizes           String[]                 @default([])
@@ -903,6 +907,7 @@ model SupplierProduct {
   stocktakes      Stocktake[]
   adjustments     StockAdjustment[]
   activity        InventoryActivity[]
+  storeListings   SupplierProductStoreListing[]
   createdAt       DateTime                 @default(now())
   updatedAt       DateTime                 @updatedAt
 
@@ -935,6 +940,8 @@ model SupplierProductVariant {
   purchaseOrderItems PurchaseOrderItem[]
   stocktakeItems     StocktakeItem[]
   adjustments        StockAdjustment[]
+  storeVariants      SupplierProductStoreVariant[]
+  allocations        InventoryAllocation[]
   createdAt          DateTime                @default(now())
   updatedAt          DateTime                @updatedAt
 
@@ -1050,3 +1057,112 @@ model InventoryActivity {
   @@index([supplierProductId, createdAt])
 }
 
+
+// — Connected-store publishing —
+
+enum StoreListingStatus {
+  NOT_LISTED
+  PUBLISHING
+  LISTED
+  FAILED
+}
+
+/** A hub product's presence on one connected store. Created lazily — either the first time an
+ * admin sets a per-store margin, or the first time the product is published — so its existence
+ * alone doesn't imply the product is actually listed; `status` is the source of truth for that. */
+model SupplierProductStoreListing {
+  id                String                       @id @default(uuid())
+  supplierProductId String
+  storeId           String
+  /** Filled once the first successful publish returns Shopify's product id. */
+  productGid        String?
+  externalId        String?
+  handle            String?
+  status            StoreListingStatus           @default(NOT_LISTED)
+  /** ACTIVE / DRAFT / ARCHIVED as last reported by Shopify. */
+  shopifyStatus     String?
+  /** Per-store margin % — pre-fills this store's suggested price in the publish/bulk-update
+   * modals only. Never enters SupplierProductPricing's calculation. */
+  marginPercent     Decimal?                     @db.Decimal(6, 2)
+  lastError         String?
+  lastPublishedAt   DateTime?
+  lastSyncedAt      DateTime?
+  supplierProduct   SupplierProduct              @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
+  store             Store                        @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  variants          SupplierProductStoreVariant[]
+  createdAt         DateTime                     @default(now())
+  updatedAt         DateTime                     @updatedAt
+
+  @@unique([supplierProductId, storeId])
+  @@index([storeId])
+}
+
+/** One hub variant's mapping onto a single store's Shopify variant + inventory item. */
+model SupplierProductStoreVariant {
+  id              String                       @id @default(uuid())
+  listingId       String
+  variantId       String
+  variantGid      String?
+  inventoryItemGid String?
+  /** Last price pushed to (or read back from) this store for this variant. */
+  price           Decimal?                     @db.Decimal(14, 2)
+  listing         SupplierProductStoreListing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  variant         SupplierProductVariant       @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  createdAt       DateTime                     @default(now())
+  updatedAt       DateTime                     @updatedAt
+
+  @@unique([listingId, variantId])
+  @@index([variantId])
+}
+
+/** Idempotency guard for inbound Shopify webhooks — `X-Shopify-Webhook-Id` is stable across
+ * Shopify's own retries of the same delivery, unlike topic+body which can legitimately repeat. */
+model ShopifyWebhookEvent {
+  id          String    @id @default(uuid())
+  storeId     String
+  webhookId   String
+  topic       String
+  status      String    @default("processing")
+  error       String?
+  processedAt DateTime?
+  store       Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+
+  @@unique([storeId, webhookId])
+  @@index([topic, createdAt])
+}
+
+enum InventoryAllocationState {
+  ALLOCATED
+  FULFILLED
+  RELEASED
+}
+
+/** One hub-side commitment for a single Shopify order line item — the ledger that makes order-
+ * driven allocation idempotent and auditable. Joined to a hub variant by SKU string equality,
+ * the same join SupplierProductModel already uses for its allocatedFromOrders hint — there is no
+ * variant-level id on the order line items the app fetches from Shopify. */
+model InventoryAllocation {
+  id                String                   @id @default(uuid())
+  storeId           String
+  orderId           String?
+  shopifyOrderId    String
+  orderNumber       Int?
+  lineItemId        String
+  sku               String?
+  variantId         String?
+  quantity          Int
+  fulfilledQuantity Int                      @default(0)
+  releasedQuantity  Int                      @default(0)
+  state             InventoryAllocationState @default(ALLOCATED)
+  store             Store                    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  order             Order?                   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  variant           SupplierProductVariant?  @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+
+  @@unique([storeId, shopifyOrderId, lineItemId])
+  @@index([variantId])
+  @@index([state])
+  @@index([sku])
+}

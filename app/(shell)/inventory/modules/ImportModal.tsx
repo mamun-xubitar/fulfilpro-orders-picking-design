@@ -1,6 +1,7 @@
 'use client';
 
 import { ModalActions, ModalShell } from '@/components/ModalShell';
+import FilePicker from './FilePicker';
 import PoImportPreviewTable from './PoImportPreviewTable';
 import ProductImportPreviewTable from './ProductImportPreviewTable';
 import type { useImportExport } from './hooks/useImportExport';
@@ -9,6 +10,9 @@ export default function ImportModal({ importExport: ie }: { importExport: Return
   if (!ie.importOpen) return null;
 
   const preview = ie.preview;
+  // Overwrite is unticked and the file's handle matches this product — commit would be refused,
+  // so block it client-side instead of letting the admin hit the 409.
+  const blockedByOverwrite = preview?.type === 'product' && preview.handleMatches && !ie.overwrite;
   const confirmLabel =
     preview?.type === 'product'
       ? `Import ${preview.rows.length} row${preview.rows.length === 1 ? '' : 's'}`
@@ -21,7 +25,16 @@ export default function ImportModal({ importExport: ie }: { importExport: Return
       title="Import"
       onClose={ie.closeImport}
       extraWide
-      footer={preview ? <ModalActions onCancel={ie.closeImport} onConfirm={ie.commitImport} confirmLabel={ie.importing ? 'Importing...' : confirmLabel} disabled={ie.importing} /> : undefined}
+      footer={
+        preview ? (
+          <ModalActions
+            onCancel={ie.closeImport}
+            onConfirm={ie.commitImport}
+            confirmLabel={ie.importing ? 'Importing...' : confirmLabel}
+            disabled={ie.importing || blockedByOverwrite}
+          />
+        ) : undefined
+      }
     >
       <div className="space-y-3">
         <p className="text-sm text-gray-600">
@@ -55,17 +68,15 @@ export default function ImportModal({ importExport: ie }: { importExport: Return
           </label>
         </div>
 
-        <input
-          type="file"
-          accept=".csv,text/csv"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) void ie.handleFile(file);
-          }}
-          className="block w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-blue-600 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-white hover:file:bg-blue-700"
-        />
+        <FilePicker onSelect={(file) => void ie.handleFile(file)} fileName={ie.pendingFile?.name} />
 
         {ie.previewing && <p className="text-sm text-gray-400">Reading file…</p>}
+
+        {blockedByOverwrite && (
+          <p className="text-sm text-red-600">
+            This product already exists — tick &quot;Overwrite this product if the file&apos;s handle matches&quot; to replace its values.
+          </p>
+        )}
 
         {preview?.type === 'product' && <ProductImportPreviewTable preview={preview} />}
         {preview?.type === 'po' && <PoImportPreviewTable preview={preview} />}

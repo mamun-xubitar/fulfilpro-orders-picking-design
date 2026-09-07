@@ -14,7 +14,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const { error } = result as ErrResult;
     return apiError({ message: error.message, errors: error.errors, status: error.status });
   }
-  return apiSuccess({ message: 'Store listings retrieved', data: result.data });
+  return apiSuccess({ message: result.message, data: result.data });
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -25,5 +25,5 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const { error } = result as ErrResult;
     return apiError({ message: error.message, errors: error.errors, status: error.status });
   }
-  return apiSuccess({ message: result.message ?? 'Store listings refreshed', data: result.data });
+  return apiSuccess({ message: result.message, data: result.data });
 }

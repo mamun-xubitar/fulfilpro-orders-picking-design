@@ -2,6 +2,7 @@
 
 import { ModalActions, ModalShell } from '@/components/ModalShell';
 import PoItemsTable from './PoItemsTable';
+import ReceivePoModal from './ReceivePoModal';
 import type { usePurchaseOrder } from './hooks/usePurchaseOrder';
 import type { VariantRow } from './types';
 
@@ -88,39 +89,6 @@ function CreatePoModal({ po, variants }: { po: ReturnType<typeof usePurchaseOrde
         </Field>
 
         {po.createErrors.general && <p className="text-sm text-red-600">{po.createErrors.general}</p>}
-      </div>
-    </ModalShell>
-  );
-}
-
-function ReceivePoModal({ po }: { po: ReturnType<typeof usePurchaseOrder> }) {
-  const target = po.receiveTarget!;
-  return (
-    <ModalShell
-      title={`Receive — ${target.productTitle}`}
-      onClose={po.closeReceive}
-      footer={<ModalActions onCancel={po.closeReceive} onConfirm={po.submitReceive} confirmLabel={po.receiving ? 'Receiving...' : 'Receive'} disabled={po.receiving} />}
-    >
-      <p className="mb-3 text-sm text-gray-600">Enter the quantity received for each item. Leave 0 for items not yet shipped — receive again later for partial deliveries.</p>
-      <div className="max-h-72 space-y-1.5 overflow-y-auto">
-        {target.items.map((item) => {
-          const remaining = Math.max(0, item.quantity - item.receivedQuantity);
-          return (
-            <div key={item.id} className="flex items-center justify-between gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm">
-              <span className="min-w-0 truncate text-gray-700">
-                {item.variantTitle} <span className="text-gray-400">· {remaining} of {item.quantity} outstanding</span>
-              </span>
-              <input
-                type="number"
-                min={0}
-                max={remaining}
-                value={po.receiveQty[item.id] ?? ''}
-                onChange={(e) => po.setReceiveItemQty(item.id, e.target.value, remaining)}
-                className="w-20 rounded-lg border border-gray-300 px-2 py-1 text-right text-sm outline-none focus:ring-2 focus:ring-blue-400"
-              />
-            </div>
-          );
-        })}
       </div>
     </ModalShell>
   );

@@ -79,7 +79,7 @@ export type SupplierProductRow = {
   categoryId: string | null;
   sku: string;
   description: string;
-  deliveryRemarks: string;
+  remarks: string;
   status: SupplierProductStatus;
   verified: boolean;
   createdAt: string;
@@ -217,6 +217,7 @@ export class SupplierProductModel {
     brand: string | null;
     marginPercent: number;
     exchangeRate: number;
+    lowStockThreshold: number;
     actor?: { id?: string | null; name: string };
   }): Promise<string> {
     const row = await prisma.supplierProduct.create({
@@ -229,6 +230,10 @@ export class SupplierProductModel {
         sku: data.itemNo,
         status: 'DRAFT',
         pricing: { create: { currencyCode: 'USD', exchangeRate: data.exchangeRate, marginPercent: data.marginPercent } },
+        // Mirrors Shopify: a product declared with no size/colour still gets one variant (its
+        // "Default Title") rather than sitting with an empty matrix — see reconcileVariants,
+        // which later promotes this same sentinel row in place once an axis is added.
+        variants: { create: { colour: '', size: '', trigger: data.lowStockThreshold, position: 0 } },
       },
     });
     await prisma.inventoryActivity.create({
@@ -254,7 +259,7 @@ export class SupplierProductModel {
       categoryId: string | null;
       sku: string;
       description: string;
-      deliveryRemarks: string;
+      remarks: string;
       status: SupplierProductStatus;
       verified: boolean;
       sizes: string[];
@@ -282,7 +287,7 @@ export class SupplierProductModel {
         ...(data.categoryId !== undefined ? { categoryId: data.categoryId } : {}),
         ...(data.sku !== undefined ? { sku: data.sku } : {}),
         ...(data.description !== undefined ? { description: data.description } : {}),
-        ...(data.deliveryRemarks !== undefined ? { deliveryRemarks: data.deliveryRemarks } : {}),
+        ...(data.remarks !== undefined ? { remarks: data.remarks } : {}),
         ...(data.status !== undefined ? { status: data.status } : {}),
         ...(data.verified !== undefined ? { verified: data.verified } : {}),
         ...(data.sizes !== undefined ? { sizes: data.sizes } : {}),
@@ -653,7 +658,7 @@ export class SupplierProductModel {
       categoryId: row.categoryId,
       sku: row.sku,
       description: row.description ?? '',
-      deliveryRemarks: row.deliveryRemarks ?? '',
+      remarks: row.remarks ?? '',
       status: row.status,
       verified: row.verified,
       createdAt: row.createdAt.toISOString(),

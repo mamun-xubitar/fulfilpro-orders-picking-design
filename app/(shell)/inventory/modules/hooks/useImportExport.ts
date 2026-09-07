@@ -17,7 +17,7 @@ export type PoImportPreviewItem = { variantId: string; variantTitle: string; sku
 export type PoImportPreviewGroup = { poNumber: string; isNew: boolean; status?: string; deliveryDate?: string; remark?: string; items: PoImportPreviewItem[] };
 
 export type ImportPreview =
-  | { type: 'product'; rows: ProductImportPreviewRow[]; product: ProductImportPreviewFields; images: ProductImportPreviewImage[] }
+  | { type: 'product'; rows: ProductImportPreviewRow[]; product: ProductImportPreviewFields; images: ProductImportPreviewImage[]; handleMatches: boolean }
   | { type: 'po'; groups: PoImportPreviewGroup[] };
 
 type ApiEnvelope<T> = { success: boolean; message: string; data: T };
@@ -123,16 +123,11 @@ export function useImportExport({ product, onSaved, onPoImported }: UseImportExp
 
   const handleFile = (file: File) => previewFile(file, { overwrite, markVerified });
 
-  // Toggling either option can change whether the file is even importable (the "Overwrite"
-  // refusal), so re-run the preview against the file already selected.
-  const toggleOverwrite = (value: boolean) => {
-    setOverwrite(value);
-    if (pendingFile) void previewFile(pendingFile, { overwrite: value, markVerified });
-  };
-  const toggleMarkVerified = (value: boolean) => {
-    setMarkVerified(value);
-    if (pendingFile) void previewFile(pendingFile, { overwrite, markVerified: value });
-  };
+  // Neither option changes what the preview itself shows — "Overwrite" only gates whether commit
+  // is allowed (surfaced via `preview.handleMatches`, checked at render time) and "Mark verified"
+  // has no effect until commit — so toggling either is a plain state update with no re-upload.
+  const toggleOverwrite = (value: boolean) => setOverwrite(value);
+  const toggleMarkVerified = (value: boolean) => setMarkVerified(value);
 
   const commitImport = async () => {
     if (!product || !pendingFile || !preview) return;
@@ -158,6 +153,7 @@ export function useImportExport({ product, onSaved, onPoImported }: UseImportExp
     closeImport,
     preview,
     previewing,
+    pendingFile,
     handleFile,
     importing,
     commitImport,

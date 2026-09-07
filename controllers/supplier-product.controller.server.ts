@@ -149,7 +149,7 @@ export class SupplierProductController {
       where: { id: 'default' },
       update: {},
       create: { id: 'default' },
-      select: { globalMarginPercent: true, globalExchangeRate: true },
+      select: { globalMarginPercent: true, globalExchangeRate: true, lowStockThreshold: true },
     });
     const id = await model.create({
       supplierId,
@@ -159,6 +159,7 @@ export class SupplierProductController {
       brand: brand || null,
       marginPercent: Number(settings.globalMarginPercent),
       exchangeRate: Number(settings.globalExchangeRate),
+      lowStockThreshold: settings.lowStockThreshold ?? 10,
       actor: actorFromSession(session),
     });
     const product = await model.findById(id);
@@ -194,7 +195,7 @@ export class SupplierProductController {
       ...('categoryId' in value ? { categoryId: typeof value.categoryId === 'string' ? value.categoryId : null } : {}),
       ...(typeof value.sku === 'string' ? { sku: value.sku.trim() } : {}),
       ...(typeof value.description === 'string' ? { description: sanitizeHtml(value.description) } : {}),
-      ...(typeof value.deliveryRemarks === 'string' ? { deliveryRemarks: value.deliveryRemarks } : {}),
+      ...(typeof value.remarks === 'string' ? { remarks: value.remarks.trim() } : {}),
       ...(typeof value.status === 'string' ? { status: value.status as SupplierProductStatus } : {}),
       ...(typeof value.verified === 'boolean' ? { verified: value.verified } : {}),
       ...(Array.isArray(value.sizes) ? { sizes: (value.sizes as unknown[]).filter((s): s is string => typeof s === 'string') } : {}),
@@ -366,6 +367,17 @@ export class SupplierProductController {
 
     const product = await model.findById(id);
     return { data: product, message: 'Images added' };
+  }
+
+  /** Saves files to disk and returns their public URLs without creating any `SupplierProductImage`
+   * row — used by the Online stores & prices / Bulk update modals, where an added image is only a
+   * temporary part of that store's draft (never the hub gallery) until the admin hits Save. */
+  async stageImages(files: File[], session: Session) {
+    if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
+    if (files.length === 0) return { error: { message: 'No files provided', status: 400 } };
+
+    const uploaded = await Promise.all(files.map((file) => saveUploadedFile(file)));
+    return { data: { files: uploaded.map((file) => ({ url: file.url, name: file.name })) }, message: 'Images staged' };
   }
 
   async removeImage(id: string, imageId: string, session: Session) {

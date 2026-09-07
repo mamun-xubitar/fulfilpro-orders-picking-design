@@ -98,7 +98,44 @@ export function useStoreListings(productId: string | null) {
     }
   };
 
-  return { listings, loading, syncing, savingStoreId, sync, savePrices };
+  /** Persists (or, with `marginPercent: null`, clears) one store's per-store margin. When that
+   * store is already published, saving immediately reprices every mapped variant on Shopify to
+   * match — the server does the push and returns the updated variants, merged in here the same
+   * way `savePrices` does, so the price chip reflects it without a manual Sync. A store that
+   * isn't listed yet (or a Shopify-side repricing failure) still keeps the saved margin — the
+   * toast reflects which happened. */
+  const setMargin = async (storeId: string, marginPercent: number | null): Promise<boolean> => {
+    if (!productId) return false;
+    try {
+      const res = await fetch(`/api/inventory/catalog/${productId}/store-listings/${storeId}/margin`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ marginPercent }),
+      });
+      const json = (await res.json()) as ApiEnvelope<{ marginPercent: number | null; repriced?: boolean; variants?: StoreListingVariant[] }>;
+      if (!res.ok || !json.success) throw new Error(json.message || 'Failed to save store margin');
+
+      const updatedById = json.data!.variants ? new Map(json.data!.variants.map((v) => [v.id, v])) : null;
+      setListings((prev) =>
+        prev.map((listing) =>
+          listing.storeId === storeId
+            ? {
+                ...listing,
+                marginPercent: json.data!.marginPercent,
+                variants: updatedById ? listing.variants.map((v) => updatedById.get(v.id) ?? v) : listing.variants,
+              }
+            : listing
+        )
+      );
+      toast.success(json.message);
+      return true;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to save store margin');
+      return false;
+    }
+  };
+
+  return { listings, loading, syncing, savingStoreId, sync, savePrices, setMargin };
 }
 
 export type StoreListingsState = ReturnType<typeof useStoreListings>;

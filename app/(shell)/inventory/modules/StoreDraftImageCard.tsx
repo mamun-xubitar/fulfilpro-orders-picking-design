@@ -1,0 +1,54 @@
+'use client';
+
+import { Trash } from './icons';
+
+type StoreDraftImageCardProps = {
+  image: { id: string; url: string; altText: string | null };
+  excluded: boolean;
+  altValue: string;
+  onToggleInclude: () => void;
+  onAltChange: (value: string) => void;
+  /** Removes this image from the store's draft — never a hub delete, just like every other field
+   * here. Variant assignment/upload/delete of the hub gallery stays on the "Edit images" modal. */
+  onRemove: () => void;
+};
+
+/** One image in a store's Media grid — this store's own draft copy (Include + alt-text + remove),
+ * temporary until Save. Excluded images are visibly dimmed and ringed so "not going to this store"
+ * reads at a glance. */
+export default function StoreDraftImageCard({ image, excluded, altValue, onToggleInclude, onAltChange, onRemove }: StoreDraftImageCardProps) {
+  return (
+    <figure className={`overflow-hidden rounded-xl border transition-opacity duration-150 ${excluded ? 'border-gray-200 opacity-50' : 'border-gray-300'}`}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={image.url} alt={altValue || image.altText || ''} className="aspect-square w-full object-cover" />
+      <figcaption className="space-y-1.5 bg-gray-50 px-2 py-1.5">
+        <div className="flex items-center justify-end">
+          <button
+            type="button"
+            onClick={onRemove}
+            aria-label="Remove image from this store"
+            title="Remove from this store"
+            className="shrink-0 rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600 cursor-pointer"
+          >
+            <Trash className="h-3.5 w-3.5" />
+          </button>
+        </div>
+
+        <div className="flex items-center gap-1.5 border-t border-gray-200 pt-1.5">
+          <label className="flex shrink-0 cursor-pointer items-center gap-1 text-[11px] font-medium text-gray-600">
+            <input type="checkbox" checked={!excluded} onChange={onToggleInclude} className="rounded border-gray-300 text-blue-600" />
+            Include
+          </label>
+          <input
+            type="text"
+            value={altValue}
+            onChange={(e) => onAltChange(e.target.value)}
+            placeholder="Alt text"
+            aria-label="Alt text for image"
+            className="min-w-0 flex-1 rounded border border-gray-200 px-1.5 py-1 text-[11px] outline-none focus:border-blue-400"
+          />
+        </div>
+      </figcaption>
+    </figure>
+  );
+}

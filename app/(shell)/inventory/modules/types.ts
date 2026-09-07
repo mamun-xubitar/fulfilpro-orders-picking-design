@@ -77,18 +77,32 @@ export type StoreListingVariant = {
   id: string;
   title: string;
   sku: string | null;
+  barcode: string | null;
   price: number;
   optionValues: string[];
   inventoryQuantity: number | null;
+  /** This store's live MediaImage id for the variant, if one is assigned. */
+  imageId: string | null;
+};
+
+/** One product image as it exists on a single connected store, fetched live from Shopify. */
+export type StoreListingImage = {
+  id: string;
+  url: string;
+  altText: string | null;
 };
 
 /** A connected store, and (if this product is published there) its live Shopify listing —
  * looked up by handle. One entry per connected store, whether or not the product is found. */
+export type StoreListingStatusValue = 'NOT_LISTED' | 'PUBLISHING' | 'LISTED' | 'FAILED';
+
 export type StoreListingResult = {
   storeId: string;
   storeName: string;
   storeDomain: string;
   found: boolean;
+  /** How the product was matched on that store — handle lookup, persisted id fallback, or null. */
+  matchedBy: 'handle' | 'id' | null;
   /** Product.title on that store — null when not found there. */
   productTitle: string | null;
   productGid: string | null;
@@ -97,8 +111,34 @@ export type StoreListingResult = {
   url: string | null;
   currencyCode: string | null;
   variants: StoreListingVariant[];
+  /** Shopify's free-text "Type" field on that store — null when not found there. */
+  productType: string | null;
+  /** Collections this listing currently belongs to on that store — used to seed the publish
+   * modal's Collections picker. Automated collections are flagged so they're never offered for
+   * (unsupported) manual membership edits. */
+  collections: { id: string; title: string; handle: string; automated: boolean }[];
+  /** Product.descriptionHtml on that store — null when not found there. */
+  description: string | null;
+  /** Product.vendor on that store — null when not found there. */
+  vendor: string | null;
+  /** Product.tags on that store. */
+  tags: string[];
+  seoTitle: string | null;
+  seoDescription: string | null;
+  /** Shopify's standard taxonomy category on that store — distinct from `productType`. */
+  category: { id: string; name: string } | null;
+  /** Product images on that store, live from Shopify. */
+  images: StoreListingImage[];
   /** Set when this store's lookup failed (e.g. throttled, bad token) — the other stores still resolve. */
   error: string | null;
+  /** From SupplierProductStoreListing — our own record of the publish, merged onto the live
+   * Shopify lookup above. Independent of `status`, which is Shopify's product status. */
+  listingStatus: StoreListingStatusValue;
+  /** Per-store margin % — pre-fills this store's suggested price in the publish/bulk-update
+   * modals. Never affects the product-level Pricing & margin panel's calculation. */
+  marginPercent: number | null;
+  lastError: string | null;
+  lastPublishedAt: string | null;
 };
 
 /** Raw pricing inputs. Mirrors the ProductPricing table one-for-one. */
@@ -164,17 +204,17 @@ export type ProductRecord = {
   /** Sanitized HTML — edited via a rich-text field, imported straight from Shopify's
    * `Body (HTML)` CSV column, and rendered rather than escaped. */
   description: string;
-  /** NOT IN PRISMA YET — free-text supplier delivery note. */
-  deliveryRemarks: string;
+  /** Free-text supplier delivery note. */
+  remarks: string;
   status: ProductStatusValue;
-  /** NOT IN PRISMA YET — whether a human has signed off on the record. */
+  /** Whether a human has signed off on the record. */
   verified: boolean;
   /** ISO 8601 — orders the product list; the page opens on the newest. */
   createdAt: string;
   images: ProductImage[];
-  /** NOT IN PRISMA YET — source of truth for the size chips and the matrix size dropdown. */
+  /** Source of truth for the size chips and the matrix size dropdown. */
   sizes: string[];
-  /** NOT IN PRISMA YET — source of truth for the colour chips, matrix pills and every swatch. */
+  /** Source of truth for the colour chips, matrix pills and every swatch. */
   colours: ColourOption[];
   variants: VariantRow[];
   pricing: PricingInputs;
@@ -265,7 +305,7 @@ export type ProductDetailsForm = {
   categoryId: string | null;
   sku: string;
   description: string;
-  deliveryRemarks: string;
+  remarks: string;
   /** Comma-separated, e.g. "50, 52, 54, 56, 58, 60". */
   sizes: string;
   /** Comma-separated, e.g. "Red, Blue, Hot Pink". */

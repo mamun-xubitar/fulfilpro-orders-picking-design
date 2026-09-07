@@ -1,7 +1,7 @@
 'use client';
 
-import { formatCurrencyValue, variantTitle } from './utils';
 import type { VariantRow } from './types';
+import { formatCurrencyValue, variantTitle } from './utils';
 
 const GRID_COLS = 'grid-cols-[minmax(0,1fr)_4.5rem_9rem_5rem_6rem_6.5rem]';
 
@@ -24,7 +24,7 @@ export default function PoItemsTable({ rows, quantities, skus, costs, onQuantity
       <div className={`grid ${GRID_COLS} gap-3 border-b border-gray-100 bg-gray-50 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500`}>
         <span>Variants</span>
         <span className="text-right">Stock</span>
-        <span>Supplier SKU</span>
+        <span className="text-right">Supplier SKU</span>
         <span className="text-right">Qty</span>
         <span className="text-right">Cost</span>
         <span className="text-right">Total</span>

@@ -45,5 +45,6 @@ next-env.d.ts
 # decoration file uploads (served publicly via /api/uploads)
 /uploads
 /.claude
+skills-lock.json
 
 !.env.example

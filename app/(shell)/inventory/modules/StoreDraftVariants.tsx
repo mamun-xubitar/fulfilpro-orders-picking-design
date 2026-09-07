@@ -1,0 +1,181 @@
+'use client';
+
+import { useEffect, useRef } from 'react';
+import StoreDraftVariantImage from './StoreDraftVariantImage';
+import type { ProductRecord } from './types';
+import type { StoreDraft } from './hooks/useStorePublish';
+
+type StoreDraftVariantsProps = {
+  storeName: string;
+  product: ProductRecord;
+  draft: StoreDraft;
+  /** hubVariantId -> Available default when the admin hasn't typed an override — see
+   * `defaultStock` in storeDraft.ts. */
+  defaultStock: Record<string, number>;
+  showPricing: boolean;
+  showVariants: boolean;
+  /** Only true when both the Images and Variants aspects are shown — Shopify requires a
+   * variant's assigned file to also appear in the product-level files input, so assigning one
+   * without pushing images along would be a silent no-op. */
+  showVariantImages: boolean;
+  toggleVariant: (variantId: string) => void;
+  setExcludedVariants: (variantIds: string[]) => void;
+  setPrice: (variantId: string, value: string) => void;
+  setSku: (variantId: string, value: string) => void;
+  setBarcode: (variantId: string, value: string) => void;
+  setStock: (variantId: string, value: string) => void;
+  setVariantImage: (variantId: string, imageId: string | null) => void;
+};
+
+/** Variants / stock matrix — Include (with a select-all header checkbox), SKU/barcode overrides,
+ * this store's editable available stock (defaulting to its live Shopify quantity or an even split
+ * of hub stock for a new store), and this store's own ex-tax price. Cost always comes from the
+ * hub. */
+export default function StoreDraftVariants({
+  storeName,
+  product,
+  draft,
+  defaultStock,
+  showPricing,
+  showVariants,
+  showVariantImages,
+  toggleVariant,
+  setExcludedVariants,
+  setPrice,
+  setSku,
+  setBarcode,
+  setStock,
+  setVariantImage,
+}: StoreDraftVariantsProps) {
+  const availableImages = draft.images.filter((img) => !draft.excludedImages.includes(img.id));
+  const allIncluded = product.variants.every((v) => !draft.excludedVariants.includes(v.id));
+  const someIncluded = !allIncluded && product.variants.some((v) => !draft.excludedVariants.includes(v.id));
+  const headerCheckboxRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (headerCheckboxRef.current) headerCheckboxRef.current.indeterminate = someIncluded;
+  }, [someIncluded]);
+
+  return (
+    <div className="mb-1">
+      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+        Variants / stock matrix {showPricing ? '(Price AUD ex-tax)' : ''}
+      </p>
+      <div className="overflow-x-auto rounded-lg border border-gray-200">
+        <table className="w-full min-w-[560px] text-sm">
+          <thead>
+            <tr className="border-b border-gray-200 bg-gray-50">
+              {showVariants && (
+                <th className="w-20 px-2 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                  <span className="flex items-center gap-1.5">
+                    <input
+                      ref={headerCheckboxRef}
+                      type="checkbox"
+                      checked={allIncluded}
+                      onChange={() => setExcludedVariants(allIncluded ? product.variants.map((v) => v.id) : [])}
+                      aria-label={`Include all variants for ${storeName}`}
+                      title="Include all variants"
+                      className="rounded border-gray-300 text-blue-600 cursor-pointer"
+                    />
+                    Include
+                  </span>
+                </th>
+              )}
+              <th className="px-2 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">Variant</th>
+              {showVariants && (
+                <>
+                  <th className="px-2 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">SKU</th>
+                  <th className="px-2 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">Barcode</th>
+                  <th className="px-2 py-2 text-right text-[11px] font-semibold uppercase tracking-wide text-gray-500">Available</th>
+                </>
+              )}
+              {showVariantImages && <th className="w-40 px-2 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">Image</th>}
+              {showPricing && <th className="w-28 px-2 py-2 text-right text-[11px] font-semibold uppercase tracking-wide text-gray-500">Price (AUD)</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {product.variants.map((v) => {
+              const excluded = showVariants && draft.excludedVariants.includes(v.id);
+              return (
+                <tr key={v.id} className={`border-b border-gray-100 last:border-0 ${excluded ? 'opacity-50' : ''}`}>
+                  {showVariants && (
+                    <td className="px-2 py-1.5">
+                      <input
+                        type="checkbox"
+                        checked={!draft.excludedVariants.includes(v.id)}
+                        onChange={() => toggleVariant(v.id)}
+                        aria-label={`Include ${v.colour} / ${v.size} for ${storeName}`}
+                        className="rounded border-gray-300 text-blue-600"
+                      />
+                    </td>
+                  )}
+                  <td className="px-2 py-1.5 text-[13px] font-medium text-gray-900">
+                    {v.colour} / {v.size}
+                    <span className="block text-[11px] font-normal text-gray-400">Sizes: {v.size} · Colours: {v.colour}</span>
+                  </td>
+                  {showVariants && (
+                    <>
+                      <td className="px-2 py-1.5">
+                        <input
+                          type="text"
+                          value={draft.variantSku[v.id] ?? v.sku ?? ''}
+                          onChange={(e) => setSku(v.id, e.target.value)}
+                          aria-label={`SKU for ${v.colour} / ${v.size} at ${storeName}`}
+                          className="w-28 rounded-lg border border-gray-300 px-2 py-1 text-[13px] outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                        />
+                      </td>
+                      <td className="px-2 py-1.5">
+                        <input
+                          type="text"
+                          value={draft.variantBarcode[v.id] ?? v.barcode ?? ''}
+                          onChange={(e) => setBarcode(v.id, e.target.value)}
+                          aria-label={`Barcode for ${v.colour} / ${v.size} at ${storeName}`}
+                          className="w-28 rounded-lg border border-gray-300 px-2 py-1 text-[13px] outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                        />
+                      </td>
+                      <td className="px-2 py-1.5 text-right">
+                        <input
+                          type="number"
+                          step="1"
+                          min="0"
+                          value={draft.variantStock[v.id] ?? String(defaultStock[v.id] ?? 0)}
+                          onChange={(e) => setStock(v.id, e.target.value)}
+                          aria-label={`Available stock for ${v.colour} / ${v.size} at ${storeName}`}
+                          className="w-20 rounded-lg border border-gray-300 px-2 py-1 text-right text-[13px] tabular-nums outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                        />
+                        <span className="ml-1 text-[11px] text-gray-400">/ {Math.max(0, v.stockOnHand - v.allocated)}</span>
+                      </td>
+                    </>
+                  )}
+                  {showVariantImages && (
+                    <td className="px-2 py-1.5">
+                      <StoreDraftVariantImage
+                        variantLabel={`${v.colour} / ${v.size}`}
+                        storeName={storeName}
+                        images={availableImages}
+                        selectedImageId={draft.variantImages[v.id] ?? null}
+                        onChange={(imageId) => setVariantImage(v.id, imageId)}
+                      />
+                    </td>
+                  )}
+                  {showPricing && (
+                    <td className="px-2 py-1.5 text-right">
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={draft.variantPrices[v.id] ?? String(v.sellPrice)}
+                        onChange={(e) => setPrice(v.id, e.target.value)}
+                        aria-label={`Price for ${v.colour} / ${v.size} at ${storeName}`}
+                        className="w-24 rounded-lg border border-gray-300 px-2 py-1 text-right text-[13px] tabular-nums outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                      />
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}

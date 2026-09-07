@@ -1,6 +1,6 @@
 'use client';
 
-import { isValidCssColor, parseColoursInput, resolveSwatch } from '@/lib/inventory/colour';
+import { formatColourName, isValidCssColor, parseColoursInput, resolveSwatch } from '@/lib/inventory/colour';
 import { FieldLabel } from './ProductFieldRows';
 import type { ColourOption } from './types';
 
@@ -56,7 +56,7 @@ function ColourChips({ colours }: { colours: ColourOption[] }) {
               style={{ backgroundColor: resolveSwatch(colour.color) }}
               title={recognized ? undefined : `"${colour.color}" isn't a recognized colour — showing a placeholder swatch`}
             />
-            {colour.name}
+            {formatColourName(colour.name)}
           </span>
         );
       })}

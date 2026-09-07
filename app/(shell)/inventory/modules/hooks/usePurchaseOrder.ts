@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import useRequest from '@/hooks/useRequest';
 import { buildMailtoHref, buildPoEmail } from '../utils';
@@ -31,7 +31,7 @@ export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
   const [receiveQty, setReceiveQty] = useState<Record<string, string>>({});
   const { request: requestReceive, loading: receiving } = useRequest<{ purchaseOrder: PurchaseOrderRecord; product: ProductRecord | null }>();
 
-  useEffect(() => {
+  const refreshSuppliers = useCallback(() => {
     fetch('/api/inventory/suppliers?pageSize=200')
       .then((res) => res.json())
       .then((json: { success: boolean; data: { suppliers: { id: string; name: string; poEmail: string }[] } }) => {
@@ -39,6 +39,10 @@ export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
       })
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    refreshSuppliers();
+  }, [refreshSuppliers]);
 
   const loadPurchaseOrders = () => {
     if (!product) return;
@@ -159,6 +163,7 @@ export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
 
   return {
     supplierOptions,
+    refreshSuppliers,
     purchaseOrders,
     loadingList,
     loadPurchaseOrders,
