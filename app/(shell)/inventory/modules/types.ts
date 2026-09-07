@@ -77,9 +77,19 @@ export type StoreListingVariant = {
   id: string;
   title: string;
   sku: string | null;
+  barcode: string | null;
   price: number;
   optionValues: string[];
   inventoryQuantity: number | null;
+  /** This store's live MediaImage id for the variant, if one is assigned. */
+  imageId: string | null;
+};
+
+/** One product image as it exists on a single connected store, fetched live from Shopify. */
+export type StoreListingImage = {
+  id: string;
+  url: string;
+  altText: string | null;
 };
 
 /** A connected store, and (if this product is published there) its live Shopify listing —
@@ -91,6 +101,8 @@ export type StoreListingResult = {
   storeName: string;
   storeDomain: string;
   found: boolean;
+  /** How the product was matched on that store — handle lookup, persisted id fallback, or null. */
+  matchedBy: 'handle' | 'id' | null;
   /** Product.title on that store — null when not found there. */
   productTitle: string | null;
   productGid: string | null;
@@ -99,6 +111,24 @@ export type StoreListingResult = {
   url: string | null;
   currencyCode: string | null;
   variants: StoreListingVariant[];
+  /** Shopify's free-text "Type" field on that store — null when not found there. */
+  productType: string | null;
+  /** Collections this listing currently belongs to on that store — used to seed the publish
+   * modal's Collections picker. Automated collections are flagged so they're never offered for
+   * (unsupported) manual membership edits. */
+  collections: { id: string; title: string; handle: string; automated: boolean }[];
+  /** Product.descriptionHtml on that store — null when not found there. */
+  description: string | null;
+  /** Product.vendor on that store — null when not found there. */
+  vendor: string | null;
+  /** Product.tags on that store. */
+  tags: string[];
+  seoTitle: string | null;
+  seoDescription: string | null;
+  /** Shopify's standard taxonomy category on that store — distinct from `productType`. */
+  category: { id: string; name: string } | null;
+  /** Product images on that store, live from Shopify. */
+  images: StoreListingImage[];
   /** Set when this store's lookup failed (e.g. throttled, bad token) — the other stores still resolve. */
   error: string | null;
   /** From SupplierProductStoreListing — our own record of the publish, merged onto the live

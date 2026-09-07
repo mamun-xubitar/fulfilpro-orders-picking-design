@@ -50,16 +50,34 @@ export class StoreListingModel {
     storeId: string,
     data: { productGid: string; externalId: string; handle: string; shopifyStatus: string }
   ) {
-    await prisma.supplierProductStoreListing.update({
+    await prisma.supplierProductStoreListing.upsert({
       where: { supplierProductId_storeId: { supplierProductId, storeId } },
-      data: { ...data, status: 'LISTED', lastError: null, lastPublishedAt: new Date(), lastSyncedAt: new Date() },
+      create: { supplierProductId, storeId, ...data, status: 'LISTED', lastPublishedAt: new Date(), lastSyncedAt: new Date() },
+      update: { ...data, status: 'LISTED', lastError: null, lastPublishedAt: new Date(), lastSyncedAt: new Date() },
     });
   }
 
   async markFailed(supplierProductId: string, storeId: string, error: string) {
-    await prisma.supplierProductStoreListing.update({
+    await prisma.supplierProductStoreListing.upsert({
       where: { supplierProductId_storeId: { supplierProductId, storeId } },
-      data: { status: 'FAILED', lastError: error },
+      create: { supplierProductId, storeId, status: 'FAILED', lastError: error },
+      update: { status: 'FAILED', lastError: error },
+    });
+  }
+
+  /** Adopts a product found on Shopify but with no local row (externally created / pre-table
+   * listing) as LISTED without clobbering a concurrently publishing row. */
+  async adoptExternal(
+    supplierProductId: string,
+    storeId: string,
+    data: { productGid: string; externalId: string; handle: string; shopifyStatus: string }
+  ) {
+    const existing = await prisma.supplierProductStoreListing.findUnique({
+      where: { supplierProductId_storeId: { supplierProductId, storeId } },
+    });
+    if (existing) return;
+    await prisma.supplierProductStoreListing.create({
+      data: { supplierProductId, storeId, ...data, status: 'LISTED', lastSyncedAt: new Date() },
     });
   }
 
@@ -68,6 +86,33 @@ export class StoreListingModel {
       where: { supplierProductId_storeId: { supplierProductId, storeId } },
       create: { supplierProductId, storeId, marginPercent },
       update: { marginPercent },
+    });
+  }
+
+  async listVariantMappings(supplierProductId: string, storeId: string): Promise<StoreVariantMapRow[]> {
+    const listing = await prisma.supplierProductStoreListing.findUnique({
+      where: { supplierProductId_storeId: { supplierProductId, storeId } },
+      include: { variants: true },
+    });
+    if (!listing) return [];
+    return listing.variants.map((v) => ({
+      hubVariantId: v.variantId,
+      variantGid: v.variantGid ?? '',
+      inventoryItemGid: v.inventoryItemGid,
+      price: v.price !== null ? Number(v.price) : null,
+    }));
+  }
+
+  /** Removes mapping rows for hub variants no longer present in a store's push — keeps the DB in
+   * sync with productSet's full-replacement semantics, which delete any Shopify variant omitted
+   * from the submitted list. Guards against an empty `keepHubVariantIds`: Prisma's `notIn: []`
+   * matches every row, which would otherwise wipe the whole mapping set. */
+  async pruneVariantMappings(supplierProductId: string, storeId: string, keepHubVariantIds: string[]) {
+    if (keepHubVariantIds.length === 0) return;
+    const listing = await prisma.supplierProductStoreListing.findUnique({ where: { supplierProductId_storeId: { supplierProductId, storeId } } });
+    if (!listing) return;
+    await prisma.supplierProductStoreVariant.deleteMany({
+      where: { listingId: listing.id, variantId: { notIn: keepHubVariantIds } },
     });
   }
 

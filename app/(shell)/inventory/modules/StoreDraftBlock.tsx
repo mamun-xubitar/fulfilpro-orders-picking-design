@@ -1,107 +1,157 @@
 'use client';
 
+import StoreDraftDetails from './StoreDraftDetails';
+import StoreDraftMedia from './StoreDraftMedia';
+import StoreDraftVariants from './StoreDraftVariants';
 import type { ProductRecord } from './types';
 import type { StoreDraft } from './hooks/useStorePublish';
 
 type StoreDraftBlockProps = {
+  storeId: string;
   storeName: string;
   storeDomain: string;
+  listingStatus?: string;
+  /** 1-based position among the currently selected stores, for the "Store n of m" header
+   * counter that helps tell several stacked blocks apart. */
+  index: number;
+  total: number;
   product: ProductRecord;
   draft: StoreDraft;
   onChange: (next: StoreDraft) => void;
+  /** hubVariantId -> the Available quantity to show/push when the admin hasn't typed an override
+   * — this store's own live Shopify quantity (published) or an even split of the hub's available
+   * stock across the currently-selected new stores (unpublished). See `defaultStock`. */
+  defaultStock: Record<string, number>;
   /** Which field groups to show — the bulk-update modal only renders the checked aspects. */
+  showImages: boolean;
   showDetails: boolean;
   showPricing: boolean;
   showVariants: boolean;
 };
 
 /**
- * One store's editable slice of a publish/bulk-update — bordered so several of these stacked in
- * the bulk-update modal read as clearly separate store targets. Product master fields (name,
- * description, image, variant structure) are shown read-only from the hub record; only what can
- * legitimately differ per store (tags, SEO, price) is editable here.
+ * One store's editable slice of a publish/bulk-update — bordered, with a sticky "Store n of m"
+ * header, so several of these stacked in the bulk-update modal read as clearly separate store
+ * targets. Every Shopify-mapped field is editable here (title, description, vendor, type,
+ * category, collections, status, tags, SEO, images incl. per-variant assignment, SKU/barcode,
+ * per-store AUD price, per-store available stock); cost stays read-only from the hub.
  */
-export default function StoreDraftBlock({ storeName, storeDomain, product, draft, onChange, showDetails, showPricing, showVariants }: StoreDraftBlockProps) {
-  const setField = (field: 'tags' | 'seoTitle' | 'seoDescription') => (e: React.ChangeEvent<HTMLInputElement>) =>
-    onChange({ ...draft, [field]: e.target.value });
+export default function StoreDraftBlock({
+  storeId,
+  storeName,
+  storeDomain,
+  listingStatus,
+  index,
+  total,
+  product,
+  draft,
+  onChange,
+  defaultStock,
+  showImages,
+  showDetails,
+  showPricing,
+  showVariants,
+}: StoreDraftBlockProps) {
+  const set = (field: Partial<StoreDraft>) => onChange({ ...draft, ...field });
+  const setField = (field: 'seoTitle' | 'seoDescription' | 'title') => (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+  ) => onChange({ ...draft, [field]: e.target.value });
 
-  const setPrice = (variantId: string, value: string) => onChange({ ...draft, variantPrices: { ...draft.variantPrices, [variantId]: value } });
+  const setPrice = (variantId: string, value: string) =>
+    onChange({
+      ...draft,
+      variantPrices: { ...draft.variantPrices, [variantId]: value },
+      variantPricesEdited: draft.variantPricesEdited.includes(variantId)
+        ? draft.variantPricesEdited
+        : [...draft.variantPricesEdited, variantId],
+    });
+  const setSku = (variantId: string, value: string) => onChange({ ...draft, variantSku: { ...draft.variantSku, [variantId]: value } });
+  const setBarcode = (variantId: string, value: string) =>
+    onChange({ ...draft, variantBarcode: { ...draft.variantBarcode, [variantId]: value } });
+  const setStock = (variantId: string, value: string) =>
+    onChange({ ...draft, variantStock: { ...draft.variantStock, [variantId]: value } });
+
+  const toggleVariant = (variantId: string) => {
+    const excluded = draft.excludedVariants.includes(variantId)
+      ? draft.excludedVariants.filter((id) => id !== variantId)
+      : [...draft.excludedVariants, variantId];
+    onChange({ ...draft, excludedVariants: excluded });
+  };
+  const setExcludedVariants = (variantIds: string[]) => onChange({ ...draft, excludedVariants: variantIds });
+
+  // Clears any variant currently pointing at `imageId` — used whenever that image stops being
+  // a valid choice (removed, or excluded from this store's push), so a variant's picker never
+  // holds a stale selection.
+  const clearVariantImage = (imageId: string) =>
+    Object.fromEntries(Object.entries(draft.variantImages).map(([variantId, id]) => [variantId, id === imageId ? null : id]));
+
+  const toggleImage = (imageId: string) => {
+    const nowExcluded = !draft.excludedImages.includes(imageId);
+    const excluded = nowExcluded ? [...draft.excludedImages, imageId] : draft.excludedImages.filter((id) => id !== imageId);
+    onChange({ ...draft, excludedImages: excluded, variantImages: nowExcluded ? clearVariantImage(imageId) : draft.variantImages });
+  };
+  const setAlt = (imageId: string, value: string) => onChange({ ...draft, imageAlts: { ...draft.imageAlts, [imageId]: value } });
+
+  const addImages = (images: { id: string; url: string; altText: string | null }[]) =>
+    onChange({ ...draft, images: [...draft.images, ...images] });
+
+  const removeImage = (imageId: string) =>
+    onChange({
+      ...draft,
+      images: draft.images.filter((img) => img.id !== imageId),
+      excludedImages: draft.excludedImages.filter((id) => id !== imageId),
+      imageAlts: Object.fromEntries(Object.entries(draft.imageAlts).filter(([id]) => id !== imageId)),
+      variantImages: clearVariantImage(imageId),
+    });
+
+  const setVariantImage = (variantId: string, imageId: string | null) =>
+    onChange({ ...draft, variantImages: { ...draft.variantImages, [variantId]: imageId } });
 
   return (
-    <div className="rounded-xl border-2 border-gray-200 p-4">
-      <div className="mb-3 flex items-baseline justify-between">
-        <h4 className="text-sm font-semibold text-gray-900">{storeName}</h4>
-        <span className="text-[11px] text-gray-400">{storeDomain}</span>
+    <div className="overflow-hidden rounded-xl border-2 border-gray-300 bg-white shadow-sm">
+      <div className="sticky top-0 z-10 flex items-baseline justify-between gap-2 border-b border-gray-200 bg-gray-50/95 px-4 py-2.5 backdrop-blur">
+        <span className="flex items-baseline gap-2">
+          <span className="text-[11px] font-semibold text-gray-400">
+            Store {index} of {total}
+          </span>
+          <h4 className="text-sm font-semibold text-gray-900">{storeName}</h4>
+        </span>
+        <span className="flex items-center gap-2 text-[11px] text-gray-400">
+          {listingStatus && <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 font-semibold uppercase">{listingStatus.replace('_', ' ')}</span>}
+          <span className="truncate">{storeDomain}</span>
+        </span>
       </div>
 
-      {showDetails && (
-        <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <TextField label="Tags (comma separated)" value={draft.tags} onChange={setField('tags')} placeholder="new, summer, hat" />
-          <TextField label="SEO title" value={draft.seoTitle} onChange={setField('seoTitle')} placeholder={product.name} />
-          <div className="sm:col-span-2">
-            <TextField label="SEO description" value={draft.seoDescription} onChange={setField('seoDescription')} placeholder="Optional" />
-          </div>
-        </div>
-      )}
+      <div className="p-4">
+        {showDetails && <StoreDraftDetails storeId={storeId} product={product} draft={draft} set={set} setField={setField} />}
 
-      {(showPricing || showVariants) && (
-        <div className="overflow-hidden rounded-lg border border-gray-200">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-200 bg-gray-50">
-                <th className="px-2 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">Variant</th>
-                <th className="px-2 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">SKU</th>
-                {showVariants && <th className="px-2 py-2 text-right text-[11px] font-semibold uppercase tracking-wide text-gray-500">Available</th>}
-                {showPricing && <th className="w-28 px-2 py-2 text-right text-[11px] font-semibold uppercase tracking-wide text-gray-500">Price</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {product.variants.map((v) => (
-                <tr key={v.id} className="border-b border-gray-100 last:border-0">
-                  <td className="px-2 py-1.5 text-[13px] font-medium text-gray-900">
-                    {v.colour} / {v.size}
-                  </td>
-                  <td className="px-2 py-1.5 text-[13px] text-gray-500">{v.sku ?? '—'}</td>
-                  {showVariants && (
-                    <td className="px-2 py-1.5 text-right text-[13px] tabular-nums text-gray-700">{Math.max(0, v.stockOnHand - v.allocated)}</td>
-                  )}
-                  {showPricing && (
-                    <td className="px-2 py-1.5 text-right">
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={draft.variantPrices[v.id] ?? String(v.sellPrice)}
-                        onChange={(e) => setPrice(v.id, e.target.value)}
-                        aria-label={`Price for ${v.colour} / ${v.size} at ${storeName}`}
-                        className="w-24 rounded-lg border border-gray-300 px-2 py-1 text-right text-[13px] tabular-nums outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                      />
-                    </td>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-      {!showDetails && !showPricing && !showVariants && (
-        <p className="text-[13px] text-gray-400">Images will be republished from the product&apos;s current gallery ({product.images.length} file(s)).</p>
-      )}
-    </div>
-  );
-}
+        {showImages && (
+          <StoreDraftMedia productId={product.id} draft={draft} toggleImage={toggleImage} setAlt={setAlt} addImages={addImages} removeImage={removeImage} />
+        )}
 
-function TextField({ label, value, onChange, placeholder }: { label: string; value: string; onChange: React.ChangeEventHandler<HTMLInputElement>; placeholder: string }) {
-  return (
-    <div>
-      <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-gray-500">{label}</label>
-      <input
-        type="text"
-        value={value}
-        onChange={onChange}
-        placeholder={placeholder}
-        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400"
-      />
+        {(showPricing || showVariants) && (
+          <StoreDraftVariants
+            storeName={storeName}
+            product={product}
+            draft={draft}
+            defaultStock={defaultStock}
+            showPricing={showPricing}
+            showVariants={showVariants}
+            showVariantImages={showImages && showVariants}
+            toggleVariant={toggleVariant}
+            setExcludedVariants={setExcludedVariants}
+            setPrice={setPrice}
+            setSku={setSku}
+            setBarcode={setBarcode}
+            setStock={setStock}
+            setVariantImage={setVariantImage}
+          />
+        )}
+
+        {!showDetails && !showPricing && !showVariants && !showImages && (
+          <p className="text-[13px] text-gray-400">Select what to update above — nothing will be touched on {storeName}.</p>
+        )}
+      </div>
     </div>
   );
 }

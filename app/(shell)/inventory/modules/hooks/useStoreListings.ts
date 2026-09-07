@@ -98,9 +98,12 @@ export function useStoreListings(productId: string | null) {
     }
   };
 
-  /** Persists (or, with `marginPercent: null`, clears) one store's per-store margin. This value
-   * only pre-fills that store's suggested price in the publish/bulk-update modals — it never
-   * touches the product-level Pricing & margin panel's own calculation. */
+  /** Persists (or, with `marginPercent: null`, clears) one store's per-store margin. When that
+   * store is already published, saving immediately reprices every mapped variant on Shopify to
+   * match — the server does the push and returns the updated variants, merged in here the same
+   * way `savePrices` does, so the price chip reflects it without a manual Sync. A store that
+   * isn't listed yet (or a Shopify-side repricing failure) still keeps the saved margin — the
+   * toast reflects which happened. */
   const setMargin = async (storeId: string, marginPercent: number | null): Promise<boolean> => {
     if (!productId) return false;
     try {
@@ -109,11 +112,22 @@ export function useStoreListings(productId: string | null) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ marginPercent }),
       });
-      const json = (await res.json()) as ApiEnvelope<{ marginPercent: number | null }>;
+      const json = (await res.json()) as ApiEnvelope<{ marginPercent: number | null; repriced?: boolean; variants?: StoreListingVariant[] }>;
       if (!res.ok || !json.success) throw new Error(json.message || 'Failed to save store margin');
 
-      setListings((prev) => prev.map((listing) => (listing.storeId === storeId ? { ...listing, marginPercent: json.data!.marginPercent } : listing)));
-      toast.success(marginPercent === null ? 'Store margin removed' : 'Store margin saved');
+      const updatedById = json.data!.variants ? new Map(json.data!.variants.map((v) => [v.id, v])) : null;
+      setListings((prev) =>
+        prev.map((listing) =>
+          listing.storeId === storeId
+            ? {
+                ...listing,
+                marginPercent: json.data!.marginPercent,
+                variants: updatedById ? listing.variants.map((v) => updatedById.get(v.id) ?? v) : listing.variants,
+              }
+            : listing
+        )
+      );
+      toast.success(json.message);
       return true;
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to save store margin');

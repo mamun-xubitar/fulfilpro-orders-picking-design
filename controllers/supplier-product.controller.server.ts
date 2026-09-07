@@ -369,6 +369,17 @@ export class SupplierProductController {
     return { data: product, message: 'Images added' };
   }
 
+  /** Saves files to disk and returns their public URLs without creating any `SupplierProductImage`
+   * row — used by the Online stores & prices / Bulk update modals, where an added image is only a
+   * temporary part of that store's draft (never the hub gallery) until the admin hits Save. */
+  async stageImages(files: File[], session: Session) {
+    if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
+    if (files.length === 0) return { error: { message: 'No files provided', status: 400 } };
+
+    const uploaded = await Promise.all(files.map((file) => saveUploadedFile(file)));
+    return { data: { files: uploaded.map((file) => ({ url: file.url, name: file.name })) }, message: 'Images staged' };
+  }
+
   async removeImage(id: string, imageId: string, session: Session) {
     if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
     const removed = await model.removeImage(id, imageId);

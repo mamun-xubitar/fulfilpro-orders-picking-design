@@ -2,52 +2,21 @@
 
 import { useState } from 'react';
 import useRequest from '@/hooks/useRequest';
-import type { PricingInputs, ProductRecord } from '../types';
+import type { ProductRecord } from '../types';
 import type { StoreListingsState } from './useStoreListings';
+import { ALL_ASPECTS, buildPublishTarget, defaultStock, emptyDraft, isPublished, resolveStock } from '../storeDraft';
+import type { PublishAspect, StoreDraft } from '../storeDraft';
 
-export type PublishAspect = 'images' | 'details' | 'pricing' | 'variants';
-
-export const ALL_ASPECTS: PublishAspect[] = ['images', 'details', 'pricing', 'variants'];
+export type { PublishAspect, StoreDraft };
+export { ALL_ASPECTS };
 
 type PublishResult = { storeId: string; status: 'LISTED' | 'FAILED'; error?: string; url?: string | null };
-
-/** Per-store editable overlay for the publish / bulk-update modals — everything that can differ
- * store to store. Product master fields (name, description, images, variant structure) are
- * always taken from the hub record itself, so there is exactly one place that edits them. */
-export type StoreDraft = {
-  tags: string;
-  seoTitle: string;
-  seoDescription: string;
-  /** hubVariantId -> ex-tax price for this store. */
-  variantPrices: Record<string, string>;
-};
-
-function suggestedPrice(pricing: PricingInputs, marginPercent: number | null, fallback: number): number {
-  if (marginPercent === null) return fallback;
-  // Mirrors computePricing's landed-cost formula, but using this store's own margin instead of
-  // the product-level one — never written back into PricingInputs.
-  const totalBuying = pricing.buyingPrice * pricing.exchangeRate + pricing.freight + pricing.misc;
-  const sellingPrice = totalBuying * (1 + marginPercent / 100);
-  return Math.round((sellingPrice + sellingPrice * (pricing.tax / 100)) * 100) / 100;
-}
-
-function emptyDraft(product: ProductRecord | null, storeId: string, storeListings: StoreListingsState): StoreDraft {
-  const listing = storeListings.listings.find((l) => l.storeId === storeId);
-  const margin = listing?.marginPercent ?? null;
-  const variantPrices: Record<string, string> = {};
-  for (const v of product?.variants ?? []) {
-    const existing = listing?.variants.find((sv) => sv.sku && sv.sku === v.sku)?.price;
-    const price = existing ?? (product ? suggestedPrice(product.pricing, margin, v.sellPrice) : 0);
-    variantPrices[v.id] = String(price);
-  }
-  return { tags: '', seoTitle: '', seoDescription: '', variantPrices };
-}
 
 export function useStorePublish({ product, storeListings }: { product: ProductRecord | null; storeListings: StoreListingsState }) {
   const [selectedStoreIds, setSelectedStoreIds] = useState<Set<string>>(new Set());
   const [publishOpen, setPublishOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
-  const [bulkAspects, setBulkAspects] = useState<Set<PublishAspect>>(new Set(['pricing']));
+  const [bulkAspects, setBulkAspects] = useState<Set<PublishAspect>>(new Set());
   const [drafts, setDrafts] = useState<Record<string, StoreDraft>>({});
   const { request, loading: publishing } = useRequest<{ results: PublishResult[] }>();
 
@@ -59,49 +28,64 @@ export function useStorePublish({ product, storeListings }: { product: ProductRe
       return next;
     });
 
-  const toggleAllStores = () => {
-    const listed = storeListings.listings.filter((l) => l.found || l.error).map((l) => l.storeId);
-    const allSelected = listed.length > 0 && listed.every((id) => selectedStoreIds.has(id));
-    setSelectedStoreIds(allSelected ? new Set() : new Set(listed));
+  /** Selects/clears every store in `ids` (default: every connected store) — the Bulk update modal
+   * passes only published stores so "select all" there never picks up an unpublished one. */
+  const toggleAllStores = (ids?: string[]) => {
+    const all = ids ?? storeListings.listings.map((l) => l.storeId);
+    const allSelected = all.length > 0 && all.every((id) => selectedStoreIds.has(id));
+    setSelectedStoreIds(allSelected ? new Set() : new Set(all));
   };
 
-  /** Lazily seeds a store's draft (tags/SEO empty, prices suggested from its margin) the first
-   * time it's touched, so opening a modal doesn't need an effect to pre-populate every store. */
+  /** Lazily seeds a store's draft from the hub product (prices suggested from its margin) the
+   * first time it's touched, so opening a modal doesn't need an effect to pre-populate. */
   const draftFor = (storeId: string): StoreDraft => drafts[storeId] ?? emptyDraft(product, storeId, storeListings);
 
   const setDraft = (storeId: string, next: StoreDraft) => setDrafts((prev) => ({ ...prev, [storeId]: next }));
 
+  // Opposite lifecycle to `draftFor`: recomputed on every call, never stored, because the default
+  // split depends on which stores are currently selected — it would go stale the moment the
+  // selection changes if it were baked into a draft the way variantPrices is.
+  const defaultStockFor = (storeId: string) => defaultStock(product, storeId, selectedStoreIds, storeListings);
+
+  // Rows where the unpublished selected stores' resolved stock for a variant sums past the hub's
+  // own available quantity — informational only, so a deliberate overcommit reads as intentional
+  // rather than a mistake. Scoped to unpublished stores: a published store's live Shopify quantity
+  // routinely exceeds hub availability in normal trading, which would make this fire permanently
+  // if included (this also means it's always empty in the bulk-update modal, where every store is
+  // published).
+  const stockWarnings = (product?.variants ?? []).flatMap((v) => {
+    const peers = storeListings.listings.filter((l) => selectedStoreIds.has(l.storeId) && !isPublished(l));
+    if (peers.length === 0) return [];
+    const total = peers.reduce((sum, l) => sum + resolveStock(draftFor(l.storeId), v.id, defaultStockFor(l.storeId)), 0);
+    const available = Math.max(0, v.stockOnHand - v.allocated);
+    return total > available ? [{ variantId: v.id, colour: v.colour, size: v.size, total, available }] : [];
+  });
+
+  // Publish and bulk-update are mutually exclusive — each open* closes the other so their store
+  // blocks (and any open picker dropdowns inside them) can never render stacked on top of each
+  // other at once.
   const openPublish = (storeId?: string) => {
     if (storeId) setSelectedStoreIds(new Set([storeId]));
     setDrafts({});
+    setBulkOpen(false);
     setPublishOpen(true);
   };
 
+  // Narrows to published stores on open — a selection made in the Publish modal (which can
+  // select an unfound store) must never carry an unpublished store into the bulk-update count.
   const openBulkUpdate = () => {
-    setBulkAspects(new Set(['pricing']));
+    setSelectedStoreIds((prev) => new Set([...prev].filter((id) => isPublished(storeListings.listings.find((l) => l.storeId === id)))));
+    setBulkAspects(new Set());
     setDrafts({});
+    setPublishOpen(false);
     setBulkOpen(true);
   };
 
   const submit = (storeIds: string[], aspects: PublishAspect[], onDone: (results: PublishResult[]) => void) => {
     if (!product || storeIds.length === 0) return;
-    const targets = storeIds.map((storeId) => {
-      const draft = draftFor(storeId);
-      return {
-        storeId,
-        tags: draft.tags
-          .split(',')
-          .map((t) => t.trim())
-          .filter(Boolean),
-        seoTitle: draft.seoTitle || null,
-        seoDescription: draft.seoDescription || null,
-        variantPrices: Object.fromEntries(
-          Object.entries(draft.variantPrices)
-            .map(([id, v]) => [id, Number(v)] as const)
-            .filter(([, v]) => Number.isFinite(v) && v >= 0)
-        ),
-      };
-    });
+    const targets = storeIds.map((storeId) =>
+      buildPublishTarget(product, storeId, draftFor(storeId), aspects, defaultStockFor(storeId))
+    );
 
     request({
       url: `/api/inventory/catalog/${product.id}/store-listings/publish`,
@@ -121,11 +105,15 @@ export function useStorePublish({ product, storeListings }: { product: ProductRe
       setSelectedStoreIds(new Set());
     });
 
-  const bulkUpdateSelected = () =>
-    submit([...selectedStoreIds], bulkAspects.size > 0 ? [...bulkAspects] : ALL_ASPECTS, () => {
+  const bulkUpdateSelected = () => {
+    // Bulk update only ever targets the published product — a store checked on the panel before
+    // it was published has nothing to submit here even if it was left selected.
+    const publishableIds = [...selectedStoreIds].filter((id) => isPublished(storeListings.listings.find((l) => l.storeId === id)));
+    submit(publishableIds, bulkAspects.size > 0 ? [...bulkAspects] : ALL_ASPECTS, () => {
       setBulkOpen(false);
       setSelectedStoreIds(new Set());
     });
+  };
 
   return {
     selectedStoreIds,
@@ -147,6 +135,8 @@ export function useStorePublish({ product, storeListings }: { product: ProductRe
       }),
     draftFor,
     setDraft,
+    defaultStockFor,
+    stockWarnings,
     publishing,
     publishToSelected,
     bulkUpdateSelected,

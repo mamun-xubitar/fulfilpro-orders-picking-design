@@ -91,8 +91,6 @@ export default function PricingMarginPanel({ pricing: p, storeListings, onEditSt
           )}
         </Row>
 
-        <PerStoreMarginRows listings={storeListings.listings} onSetMargin={storeListings.setMargin} />
-
         <Row label="Sell price (ex tax)">
           <Value>
             {formatMoney(p.computed.sellingPrice)} <Unit>{base}</Unit>
@@ -112,7 +110,14 @@ export default function PricingMarginPanel({ pricing: p, storeListings, onEditSt
           )}
         </Row>
 
-        <StorePriceChips listings={storeListings.listings} onEditPrice={onEditStorePrice} />
+        {/* Per-store overrides — kept visually separate from the product-level calculation
+           above, since neither of these ever feeds computePricing. */}
+        {storeListings.listings.length > 0 && (
+          <div className="space-y-3 border-t border-gray-100 pt-3">
+            <PerStoreMarginRows listings={storeListings.listings} onSetMargin={storeListings.setMargin} editing={p.editing} />
+            <StorePriceChips listings={storeListings.listings} onEditPrice={onEditStorePrice} />
+          </div>
+        )}
 
         <div className="mt-auto flex items-center justify-between rounded-xl border border-blue-100 bg-blue-50 px-3 py-3">
           <span className="text-[11px] font-semibold uppercase tracking-wide text-blue-700">Sell price (inc tax)</span>

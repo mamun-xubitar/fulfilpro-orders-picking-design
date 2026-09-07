@@ -1,0 +1,84 @@
+'use client';
+
+import CategoryPicker from './CategoryPicker';
+import CollectionsPicker from './CollectionsPicker';
+import ProductTypePicker from './ProductTypePicker';
+import RichTextField from './RichTextField';
+import TagsPicker from './TagsPicker';
+import VendorPicker from './VendorPicker';
+import { TextField } from './StoreDraftFields';
+import type { ProductRecord, ProductStatusValue } from './types';
+import type { StoreDraft } from './hooks/useStorePublish';
+
+const STATUS_OPTIONS: ProductStatusValue[] = ['ACTIVE', 'DRAFT', 'ARCHIVED'];
+
+type StoreDraftDetailsProps = {
+  storeId: string;
+  product: ProductRecord;
+  draft: StoreDraft;
+  set: (field: Partial<StoreDraft>) => void;
+  setField: (
+    field: 'seoTitle' | 'seoDescription' | 'title'
+  ) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
+};
+
+/** "Product details" + "Settings" — everything Shopify's own product-organization panel covers
+ * (title, vendor, Type, Category, Collections) plus status/handle/tags/SEO. */
+export default function StoreDraftDetails({ storeId, product, draft, set, setField }: StoreDraftDetailsProps) {
+  return (
+    <div className="mb-4 space-y-4">
+      <div className="space-y-3">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Product details</p>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="sm:col-span-2">
+            <TextField label="Title (Product name)" value={draft.title} onChange={setField('title')} placeholder={product.name} />
+          </div>
+          <VendorPicker storeId={storeId} value={draft.vendor} onChange={(vendor) => set({ vendor })} />
+          <ProductTypePicker storeId={storeId} value={draft.productType} onChange={(productType) => set({ productType })} />
+          <div className="sm:col-span-2">
+            <CategoryPicker value={draft.category} onChange={(category) => set({ category })} />
+          </div>
+          <div className="sm:col-span-2">
+            <CollectionsPicker storeId={storeId} value={draft.collections} onChange={(collections) => set({ collections })} />
+          </div>
+        </div>
+        <RichTextField label="Description" value={draft.description} onChange={(html) => set({ description: html })} />
+      </div>
+
+      <div className="space-y-3 border-t border-gray-100 pt-3">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Settings</p>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-gray-500">Status</label>
+            <select
+              value={draft.status}
+              onChange={(e) => set({ status: e.target.value as ProductStatusValue })}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400"
+            >
+              {STATUS_OPTIONS.map((s) => (
+                <option key={s} value={s}>
+                  {s} {s === 'DRAFT' ? '(hidden from storefront)' : s === 'ARCHIVED' ? '(archived)' : '(live)'}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-gray-500">Handle</label>
+            <input
+              type="text"
+              value={product.handle}
+              disabled
+              title="Handle is hub-owned and cannot diverge per store"
+              className="w-full cursor-not-allowed rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500"
+            />
+          </div>
+          <TagsPicker storeId={storeId} value={draft.tags} onChange={(tags) => set({ tags })} />
+          <TextField label="SEO title" value={draft.seoTitle} onChange={setField('seoTitle')} placeholder={draft.title || product.name} />
+          <div className="sm:col-span-2">
+            <TextField label="SEO description" value={draft.seoDescription} onChange={setField('seoDescription')} placeholder="Optional" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

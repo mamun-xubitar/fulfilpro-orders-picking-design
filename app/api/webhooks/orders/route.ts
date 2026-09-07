@@ -1,10 +1,10 @@
-import { NextRequest } from 'next/server';
-import { Prisma } from '@prisma/client';
-import { normalizeShopDomain, verifyWebhookHmac } from '@/lib/shopify-auth.server';
-import { StoreModel } from '@/models/store.model.server';
-import { type ShopifyOrderPayload } from '@/models/order.model.server';
 import { WebhookController, type ShopifyFulfillmentPayload, type ShopifyRefundPayload } from '@/controllers/webhook.controller.server';
 import prisma from '@/lib/prisma.server';
+import { normalizeShopDomain, verifyWebhookHmac } from '@/lib/shopify-auth.server';
+import { type ShopifyOrderPayload } from '@/models/order.model.server';
+import { StoreModel } from '@/models/store.model.server';
+import { Prisma } from '@prisma/client';
+import { NextRequest } from 'next/server';
 
 const storeModel = new StoreModel();
 const webhookController = new WebhookController();
@@ -89,19 +89,19 @@ export async function POST(request: NextRequest) {
           accessToken: store.accessToken,
         });
         break;
-      case 'orders/updated': {
-        if (!store.accessToken) {
-          throw new Error('Store is missing a Shopify access token');
-        }
-        await webhookController.handleOrderUpdated({
-          topic,
-          payload: payload as ShopifyOrderPayload,
-          storeId: store.id,
-          storeDomain: normalizedShop,
-          accessToken: store.accessToken,
-        });
-        break;
-      }
+      // case 'orders/updated': {
+      //   if (!store.accessToken) {
+      //     throw new Error('Store is missing a Shopify access token');
+      //   }
+      //   await webhookController.handleOrderUpdated({
+      //     topic,
+      //     payload: payload as ShopifyOrderPayload,
+      //     storeId: store.id,
+      //     storeDomain: normalizedShop,
+      //     accessToken: store.accessToken,
+      //   });
+      //   break;
+      // }
       case 'orders/cancelled':
         await webhookController.handleOrderCancelled({ payload: payload as ShopifyOrderPayload, storeId: store.id });
         break;

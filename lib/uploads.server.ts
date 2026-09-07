@@ -31,6 +31,16 @@ export async function saveUploadedFile(file: File): Promise<SavedFile> {
   };
 }
 
+/** Shopify fetches image `originalSource` URLs itself, so a site-relative upload path (what
+ * saveUploadedFile stores) has to become an absolute public URL first. Returns null when it can't
+ * be made public, so callers fail loudly instead of silently publishing a product with no media. */
+export function toPublicUrl(url: string): string | null {
+  if (/^https?:\/\//i.test(url)) return url;
+  const base = process.env.APP_URL?.replace(/\/$/, '');
+  if (!base || !url.startsWith('/')) return null;
+  return `${base}${url}`;
+}
+
 /** Resolve a public file path, guarding against directory traversal. Returns null if outside UPLOADS_DIR. */
 export function resolveUploadPath(segments: string[]): string | null {
   const normalized = path.normalize(path.join(UPLOADS_DIR, ...segments));

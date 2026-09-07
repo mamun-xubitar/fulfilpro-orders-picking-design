@@ -12,7 +12,7 @@ type OnlineStoresPanelProps = {
   storeListings: StoreListingsState;
   selectedStoreIds: Set<string>;
   onToggleStore: (storeId: string) => void;
-  onToggleAll: () => void;
+  onToggleAll: (ids?: string[]) => void;
   onOpenPublish: () => void;
   onOpenBulkUpdate: () => void;
 };
@@ -26,12 +26,15 @@ export default function OnlineStoresPanel({
   onOpenBulkUpdate,
 }: OnlineStoresPanelProps) {
   const { listings, loading, syncing, sync } = storeListings;
-  // Only show stores this product is actually listed on — a lookup failure still surfaces (it's
-  // an unknown state, not "not listed"), but a clean `found: false` result is dropped rather than
-  // rendered as a "Not listed" card for every connected store.
-  const listed = listings.filter((listing) => listing.found || listing.error);
-  const allSelected = listed.length > 0 && listed.every((l) => selectedStoreIds.has(l.storeId));
-  const someSelected = listed.some((l) => selectedStoreIds.has(l.storeId)) && !allSelected;
+  // Only show a card for a store where this product's handle actually matches on Shopify (`found`)
+  // — a store it isn't on yet doesn't belong in this "where it's currently listed" list. Publishing
+  // to a brand-new store still goes through the separate "+" button/modal, which lists every
+  // connected store regardless of match.
+  const listed = listings.filter((l) => l.found);
+  const listedIds = listed.map((l) => l.storeId);
+  const selectedListedCount = listed.filter((l) => selectedStoreIds.has(l.storeId)).length;
+  const allSelected = listed.length > 0 && selectedListedCount === listed.length;
+  const someSelected = selectedListedCount > 0 && !allSelected;
   const headerCheckboxRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -64,19 +67,19 @@ export default function OnlineStoresPanel({
               ref={headerCheckboxRef}
               type="checkbox"
               checked={allSelected}
-              onChange={onToggleAll}
+              onChange={() => onToggleAll(listedIds)}
               aria-label="Select all stores"
               className="rounded border-gray-300 text-blue-600 cursor-pointer"
             />
             Select all
           </label>
-          {selectedStoreIds.size > 0 && (
+          {selectedListedCount > 0 && (
             <button
               type="button"
               onClick={onOpenBulkUpdate}
               className="rounded-lg bg-blue-600 px-2.5 py-1 text-[11px] font-semibold text-white transition-colors duration-150 hover:bg-blue-700 cursor-pointer"
             >
-              Bulk Update ({selectedStoreIds.size})
+              Bulk Update ({selectedListedCount})
             </button>
           )}
         </div>
@@ -99,20 +102,14 @@ export default function OnlineStoresPanel({
       <div className="flex gap-2 border-t border-gray-100 p-3">
         <button
           type="button"
-          onClick={onOpenPublish}
-          className="flex-1 rounded-lg bg-blue-600 py-2 text-[13px] font-semibold text-white transition-colors duration-150 hover:bg-blue-700 cursor-pointer"
-        >
-          Publish to a store
-        </button>
-        <button
-          type="button"
           onClick={sync}
           disabled={syncing}
           aria-label="Sync store listings"
           title="Sync store listings"
-          className="flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 px-3 py-2 text-[13px] font-semibold text-gray-700 transition-colors duration-150 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+          className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-gray-300 px-3 py-2 text-[13px] font-semibold text-gray-700 transition-colors duration-150 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
         >
           <Refresh className={`h-3.5 w-3.5 ${syncing ? 'animate-spin' : ''}`} />
+          {syncing ? 'Syncing…' : 'Sync listings'}
         </button>
       </div>
     </section>
@@ -149,6 +146,11 @@ function StoreCard({ listing, selected, onToggle }: { listing: StoreListingResul
         >
           {listing.listingStatus.replace('_', ' ')}
         </span>
+        {!listing.found && !listing.error && listing.listingStatus === 'LISTED' && (
+          <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
+            Missing on Shopify
+          </span>
+        )}
         {listing.error ? (
           <span className="inline-flex items-center rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700">
             Lookup failed
@@ -159,6 +161,12 @@ function StoreCard({ listing, selected, onToggle }: { listing: StoreListingResul
       </div>
 
       {(listing.error || listing.lastError) && <p className="mt-1.5 text-[11px] text-red-600">{listing.error ?? listing.lastError}</p>}
+      {listing.found && listing.productTitle && (
+        <p className="mt-1 truncate text-[11px] text-gray-500" title={listing.productTitle}>
+          {listing.productTitle}
+          {listing.status ? ` · ${listing.status}` : ''}
+        </p>
+      )}
 
       <div className="mt-2.5 flex gap-1.5">
         {listing.url ? (
