@@ -160,6 +160,10 @@ export async function getStoreInfo(shop: string, accessToken: string) {
 const ORDER_WEBHOOK_TOPICS = [
   'orders/create',
   'orders/updated',
+  'orders/cancelled',
+  'fulfillments/create',
+  'fulfillments/update',
+  'refunds/create',
 ] as const;
 
 const PRODUCT_WEBHOOK_TOPICS = [

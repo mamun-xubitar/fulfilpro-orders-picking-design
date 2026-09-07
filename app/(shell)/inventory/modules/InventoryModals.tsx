@@ -4,12 +4,14 @@ import { useState } from 'react';
 import { ModalActions, ModalShell } from '@/components/ModalShell';
 import { slugifyHandle } from '@/lib/inventory/handle';
 import AdjustmentModals from './AdjustmentModals';
+import BulkUpdateStoresModal from './BulkUpdateStoresModal';
 import EditImagesModal from './EditImagesModal';
 import GalleryPreview from './GalleryPreview';
 import GalleryThumbRow from './GalleryThumbRow';
 import ImportModal from './ImportModal';
 import ImportProductsModal from './ImportProductsModal';
 import PoModals from './PoModals';
+import PublishToStoresModal from './PublishToStoresModal';
 import StocktakeModal from './StocktakeModal';
 import StorePricesModal from './StorePricesModal';
 import SupplierModal from './SupplierModal';
@@ -91,6 +93,14 @@ export default function InventoryModals(p: InventoryPage) {
           }
           onSaveAll={(variants) => p.storeListings.savePrices(p.storePriceTarget!.storeId, p.storePriceTarget!.productGid!, variants)}
         />
+      )}
+
+      {p.product && p.storePublish.publishOpen && (
+        <PublishToStoresModal product={p.product} storeOptions={p.storeListings.listings} publish={p.storePublish} />
+      )}
+
+      {p.product && p.storePublish.bulkOpen && (
+        <BulkUpdateStoresModal product={p.product} storeOptions={p.storeListings.listings} publish={p.storePublish} />
       )}
 
       {pricing.confirmUse && (

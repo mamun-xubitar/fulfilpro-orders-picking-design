@@ -98,7 +98,30 @@ export function useStoreListings(productId: string | null) {
     }
   };
 
-  return { listings, loading, syncing, savingStoreId, sync, savePrices };
+  /** Persists (or, with `marginPercent: null`, clears) one store's per-store margin. This value
+   * only pre-fills that store's suggested price in the publish/bulk-update modals — it never
+   * touches the product-level Pricing & margin panel's own calculation. */
+  const setMargin = async (storeId: string, marginPercent: number | null): Promise<boolean> => {
+    if (!productId) return false;
+    try {
+      const res = await fetch(`/api/inventory/catalog/${productId}/store-listings/${storeId}/margin`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ marginPercent }),
+      });
+      const json = (await res.json()) as ApiEnvelope<{ marginPercent: number | null }>;
+      if (!res.ok || !json.success) throw new Error(json.message || 'Failed to save store margin');
+
+      setListings((prev) => prev.map((listing) => (listing.storeId === storeId ? { ...listing, marginPercent: json.data!.marginPercent } : listing)));
+      toast.success(marginPercent === null ? 'Store margin removed' : 'Store margin saved');
+      return true;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to save store margin');
+      return false;
+    }
+  };
+
+  return { listings, loading, syncing, savingStoreId, sync, savePrices, setMargin };
 }
 
 export type StoreListingsState = ReturnType<typeof useStoreListings>;

@@ -84,6 +84,8 @@ export type StoreListingVariant = {
 
 /** A connected store, and (if this product is published there) its live Shopify listing —
  * looked up by handle. One entry per connected store, whether or not the product is found. */
+export type StoreListingStatusValue = 'NOT_LISTED' | 'PUBLISHING' | 'LISTED' | 'FAILED';
+
 export type StoreListingResult = {
   storeId: string;
   storeName: string;
@@ -99,6 +101,14 @@ export type StoreListingResult = {
   variants: StoreListingVariant[];
   /** Set when this store's lookup failed (e.g. throttled, bad token) — the other stores still resolve. */
   error: string | null;
+  /** From SupplierProductStoreListing — our own record of the publish, merged onto the live
+   * Shopify lookup above. Independent of `status`, which is Shopify's product status. */
+  listingStatus: StoreListingStatusValue;
+  /** Per-store margin % — pre-fills this store's suggested price in the publish/bulk-update
+   * modals. Never affects the product-level Pricing & margin panel's calculation. */
+  marginPercent: number | null;
+  lastError: string | null;
+  lastPublishedAt: string | null;
 };
 
 /** Raw pricing inputs. Mirrors the ProductPricing table one-for-one. */
@@ -164,17 +174,17 @@ export type ProductRecord = {
   /** Sanitized HTML — edited via a rich-text field, imported straight from Shopify's
    * `Body (HTML)` CSV column, and rendered rather than escaped. */
   description: string;
-  /** NOT IN PRISMA YET — free-text supplier delivery note. */
-  deliveryRemarks: string;
+  /** Free-text supplier delivery note. */
+  remarks: string;
   status: ProductStatusValue;
-  /** NOT IN PRISMA YET — whether a human has signed off on the record. */
+  /** Whether a human has signed off on the record. */
   verified: boolean;
   /** ISO 8601 — orders the product list; the page opens on the newest. */
   createdAt: string;
   images: ProductImage[];
-  /** NOT IN PRISMA YET — source of truth for the size chips and the matrix size dropdown. */
+  /** Source of truth for the size chips and the matrix size dropdown. */
   sizes: string[];
-  /** NOT IN PRISMA YET — source of truth for the colour chips, matrix pills and every swatch. */
+  /** Source of truth for the colour chips, matrix pills and every swatch. */
   colours: ColourOption[];
   variants: VariantRow[];
   pricing: PricingInputs;
@@ -265,7 +275,7 @@ export type ProductDetailsForm = {
   categoryId: string | null;
   sku: string;
   description: string;
-  deliveryRemarks: string;
+  remarks: string;
   /** Comma-separated, e.g. "50, 52, 54, 56, 58, 60". */
   sizes: string;
   /** Comma-separated, e.g. "Red, Blue, Hot Pink". */

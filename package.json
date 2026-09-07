@@ -13,6 +13,7 @@
     "worker:background": "tsx workers/background.worker.ts",
     "backfill:order-line-items": "tsx scripts/enqueue-backfill-order-line-items.ts",
     "backfill:category-full-names": "tsx scripts/backfill-category-full-names.ts",
+    "register-webhooks": "tsx scripts/register-shopify-webhooks.ts",
     "lint": "eslint",
     "pm2": "pm2",
     "pm2:start": "pm2 start .pm2.config.js",

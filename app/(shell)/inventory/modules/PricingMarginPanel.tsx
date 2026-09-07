@@ -1,12 +1,21 @@
 'use client';
 
 import { PanelHeading } from './MainImagePanel';
+import PerStoreMarginRows from './PerStoreMarginRows';
+import StorePriceChips from './StorePriceChips';
 import { Check, Close, Pencil, Tag } from './icons';
 import { formatMoney } from './utils';
 import type { useProductPricing } from './hooks/useProductPricing';
-import type { PricingForm } from './types';
+import type { StoreListingsState } from './hooks/useStoreListings';
+import type { PricingForm, StoreListingResult } from './types';
 
-type PricingMarginPanelProps = ReturnType<typeof useProductPricing>;
+type PricingMarginPanelInner = ReturnType<typeof useProductPricing>;
+
+type PricingMarginPanelProps = {
+  pricing: PricingMarginPanelInner;
+  storeListings: StoreListingsState;
+  onEditStorePrice: (listing: StoreListingResult) => void;
+};
 
 /** Buying price is in the foreign currency and gets converted by the exchange rate;
  * freight and misc are always AUD, so their unit never follows the currency picker. */
@@ -16,7 +25,7 @@ const COST_FIELDS: { key: Extract<keyof PricingForm, 'buyingPrice' | 'freight' |
   { key: 'misc', label: 'Misc', unit: 'base' },
 ];
 
-export default function PricingMarginPanel(p: PricingMarginPanelProps) {
+export default function PricingMarginPanel({ pricing: p, storeListings, onEditStorePrice }: PricingMarginPanelProps) {
   const foreign = p.form.currencyCode;
   const base = p.baseCurrency;
 
@@ -82,6 +91,8 @@ export default function PricingMarginPanel(p: PricingMarginPanelProps) {
           )}
         </Row>
 
+        <PerStoreMarginRows listings={storeListings.listings} onSetMargin={storeListings.setMargin} />
+
         <Row label="Sell price (ex tax)">
           <Value>
             {formatMoney(p.computed.sellingPrice)} <Unit>{base}</Unit>
@@ -101,6 +112,8 @@ export default function PricingMarginPanel(p: PricingMarginPanelProps) {
           )}
         </Row>
 
+        <StorePriceChips listings={storeListings.listings} onEditPrice={onEditStorePrice} />
+
         <div className="mt-auto flex items-center justify-between rounded-xl border border-blue-100 bg-blue-50 px-3 py-3">
           <span className="text-[11px] font-semibold uppercase tracking-wide text-blue-700">Sell price (inc tax)</span>
           <span className="text-base font-bold text-blue-900 tabular-nums">
@@ -114,7 +127,7 @@ export default function PricingMarginPanel(p: PricingMarginPanelProps) {
   );
 }
 
-function PricingActions({ p }: { p: PricingMarginPanelProps }) {
+function PricingActions({ p }: { p: PricingMarginPanelInner }) {
   if (p.editing) {
     return (
       <div className="flex gap-2">

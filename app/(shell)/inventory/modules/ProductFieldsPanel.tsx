@@ -66,12 +66,12 @@ export default function ProductFieldsPanel({ details: d }: ProductFieldsPanelPro
         {editing ? (
           <>
             <RichTextField label="Description" value={d.form.description} onChange={d.setDescription} />
-            <TextAreaField label="Delivery remarks" value={d.form.deliveryRemarks} onChange={d.set('deliveryRemarks')} />
+            <TextAreaField label="Remarks" value={d.form.remarks} onChange={d.set('remarks')} />
           </>
         ) : (
           <>
             <HtmlField label="Description" value={d.form.description} />
-            <Field label="Delivery remarks" value={d.form.deliveryRemarks} multiline />
+            <Field label="Remarks" value={d.form.remarks} multiline />
           </>
         )}
 

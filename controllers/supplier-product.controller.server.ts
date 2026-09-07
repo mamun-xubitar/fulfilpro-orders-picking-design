@@ -195,7 +195,7 @@ export class SupplierProductController {
       ...('categoryId' in value ? { categoryId: typeof value.categoryId === 'string' ? value.categoryId : null } : {}),
       ...(typeof value.sku === 'string' ? { sku: value.sku.trim() } : {}),
       ...(typeof value.description === 'string' ? { description: sanitizeHtml(value.description) } : {}),
-      ...(typeof value.deliveryRemarks === 'string' ? { deliveryRemarks: value.deliveryRemarks } : {}),
+      ...(typeof value.remarks === 'string' ? { remarks: value.remarks.trim() } : {}),
       ...(typeof value.status === 'string' ? { status: value.status as SupplierProductStatus } : {}),
       ...(typeof value.verified === 'boolean' ? { verified: value.verified } : {}),
       ...(Array.isArray(value.sizes) ? { sizes: (value.sizes as unknown[]).filter((s): s is string => typeof s === 'string') } : {}),

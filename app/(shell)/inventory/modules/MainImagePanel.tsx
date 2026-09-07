@@ -134,10 +134,13 @@ export function PanelHeading({
   icon,
   title,
   meta,
+  action,
 }: {
   icon: React.ReactNode;
   title: string;
   meta?: string;
+  /** An optional trailing control (e.g. a "+" button) rendered after the meta badge. */
+  action?: React.ReactNode;
 }) {
   return (
     <div className="flex items-center justify-between gap-2 border-b border-gray-100 px-4 py-3">
@@ -147,11 +150,12 @@ export function PanelHeading({
           {title}
         </h3>
       </div>
-      {meta && (
-        <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-600">
-          {meta}
-        </span>
-      )}
+      <div className="flex shrink-0 items-center gap-1.5">
+        {meta && (
+          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-600">{meta}</span>
+        )}
+        {action}
+      </div>
     </div>
   );
 }

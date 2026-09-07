@@ -19,6 +19,7 @@ import { usePurchaseOrder } from './usePurchaseOrder';
 import { useStocktake } from './useStocktake';
 import { useSuppliers } from './useSuppliers';
 import { useStoreListings } from './useStoreListings';
+import { useStorePublish } from './useStorePublish';
 import { useVariantsMatrix } from './useVariantsMatrix';
 import type { ModuleTabId, ProductRecord, ProductTabId, StoreListingResult } from '../types';
 
@@ -35,13 +36,16 @@ export function useInventoryPage() {
   const nav = useProductNavigation(data);
   const product = nav.product;
   const storeListings = useStoreListings(product?.id ?? null);
-  // Stepping to another product invalidates any open store-price modal — its variant snapshot
-  // belongs to the product that was on screen when it opened. Adjusted during render (React's
-  // recommended pattern for resetting state on a prop change) rather than in an effect.
+  const storePublish = useStorePublish({ product, storeListings });
+  // Stepping to another product invalidates any open store-price modal, and any in-progress
+  // publish/bulk-update draft — both hold onto ids and prices that belong to the product that was
+  // on screen when they were opened. Adjusted during render (React's recommended pattern for
+  // resetting state on a prop change) rather than in an effect.
   const [renderedProductId, setRenderedProductId] = useState(product?.id);
   if (product?.id !== renderedProductId) {
     setRenderedProductId(product?.id);
     if (storePriceTarget !== null) setStorePriceTarget(null);
+    storePublish.resetForProductChange();
   }
 
   const onProductSaved = (updated: ProductRecord) => data.updateProduct(updated.id, updated);
@@ -140,6 +144,7 @@ export function useInventoryPage() {
     storePriceTarget,
     setStorePriceTarget,
     storeListings,
+    storePublish,
   };
 }
 

@@ -138,6 +138,17 @@ export function formatCurrencyValue(n: number): string {
   return `$${formatMoney(n)}`;
 }
 
+/** A store listing's price, or price range, formatted with a leading `$` on both ends of a
+ * range — e.g. "$12.00 – $15.00", not "$12.00 – 15.00". Used by both the store cards and the
+ * per-store price chips under Pricing & margin. */
+export function priceLabel(variants: { price: number }[]): string {
+  if (variants.length === 0) return '—';
+  const prices = variants.map((v) => v.price);
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+  return min === max ? formatCurrencyValue(min) : `${formatCurrencyValue(min)} – ${formatCurrencyValue(max)}`;
+}
+
 export function formatDate(iso: string | null): string {
   if (!iso) return '—';
   return new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });

@@ -79,7 +79,7 @@ export type SupplierProductRow = {
   categoryId: string | null;
   sku: string;
   description: string;
-  deliveryRemarks: string;
+  remarks: string;
   status: SupplierProductStatus;
   verified: boolean;
   createdAt: string;
@@ -259,7 +259,7 @@ export class SupplierProductModel {
       categoryId: string | null;
       sku: string;
       description: string;
-      deliveryRemarks: string;
+      remarks: string;
       status: SupplierProductStatus;
       verified: boolean;
       sizes: string[];
@@ -287,7 +287,7 @@ export class SupplierProductModel {
         ...(data.categoryId !== undefined ? { categoryId: data.categoryId } : {}),
         ...(data.sku !== undefined ? { sku: data.sku } : {}),
         ...(data.description !== undefined ? { description: data.description } : {}),
-        ...(data.deliveryRemarks !== undefined ? { deliveryRemarks: data.deliveryRemarks } : {}),
+        ...(data.remarks !== undefined ? { remarks: data.remarks } : {}),
         ...(data.status !== undefined ? { status: data.status } : {}),
         ...(data.verified !== undefined ? { verified: data.verified } : {}),
         ...(data.sizes !== undefined ? { sizes: data.sizes } : {}),
@@ -658,7 +658,7 @@ export class SupplierProductModel {
       categoryId: row.categoryId,
       sku: row.sku,
       description: row.description ?? '',
-      deliveryRemarks: row.deliveryRemarks ?? '',
+      remarks: row.remarks ?? '',
       status: row.status,
       verified: row.verified,
       createdAt: row.createdAt.toISOString(),
