@@ -3,7 +3,7 @@
 import ProductSearchBox from './ProductSearchBox';
 import { QUICK_FILTERS } from './constants';
 import type { InventoryPage } from './hooks/useInventoryPage';
-import { ChevronLeft, ChevronRight, First, Last, Plus, Search, Upload } from './icons';
+import { ChevronLeft, ChevronRight, First, Last, Plus, Search, Trash, Upload } from './icons';
 import { formatNumber } from './utils';
 
 export default function ProductsToolbar(p: InventoryPage) {
@@ -51,10 +51,20 @@ export default function ProductsToolbar(p: InventoryPage) {
           <button
             type="button"
             onClick={p.importProducts.openModal}
-            className="ml-auto flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-emerald-300 bg-emerald-50 p-2 text-sm font-semibold text-emerald-700 shadow-sm transition-colors duration-150 hover:bg-emerald-100 cursor-pointer"
+            className="ml-auto flex items-center gap-1 whitespace-nowrap rounded-lg border border-emerald-300 bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 shadow-sm transition-colors duration-150 hover:bg-emerald-100 cursor-pointer"
           >
-            <Upload className="h-4 w-4" />
+            <Upload className="h-3.5 w-3.5" />
             Import Products
+          </button>
+          <button
+            type="button"
+            onClick={p.openDeleteProduct}
+            disabled={!nav.product || nav.allRecords}
+            title="Delete this product"
+            aria-label="Delete this product"
+            className="flex items-center justify-center rounded-lg border border-red-200 bg-red-50 p-1.5 text-red-600 shadow-sm transition-colors duration-150 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+          >
+            <Trash className="h-3.5 w-3.5" />
           </button>
         </div>
 

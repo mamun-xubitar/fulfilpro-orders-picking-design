@@ -137,3 +137,11 @@ export async function shopifyGraphQL<T>(
 export function getLegacyId(gid: string) {
   return gid.split('/').at(-1) ?? gid;
 }
+
+/** Picks the first non-blank URL — `??` alone lets an empty-string `onlineStoreUrl` (seen on
+ * some stores/products) win over a genuinely usable `onlineStorePreviewUrl` fallback, which is
+ * what produced the "sometimes shows the preview URL" symptom in reverse (a dead blank link
+ * instead of a working preview one). */
+export function preferredStoreUrl(...urls: (string | null | undefined)[]): string | null {
+  return urls.find((url) => url?.trim()) ?? null;
+}

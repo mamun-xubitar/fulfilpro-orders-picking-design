@@ -132,6 +132,37 @@ export function useCatalogData() {
     setProduct((prev) => (prev?.id === productId ? patch : prev));
   }, []);
 
+  /** Patches the stepper's own counts from the products table's latest fetch — the table
+   * refetches after every delete/bulk-action/import, so this is how "n / X of Y" stays live while
+   * "All records" is on instead of freezing at whatever it was when the toggle was flipped (its
+   * own fetch effect is skipped entirely while allRecords is true, see below). Never triggers a
+   * fetch; only re-clamps the (also frozen) page so it can't outlive a shrunk total. */
+  const syncCounts = useCallback(({ totalAll: nextTotalAll, filteredCount }: { totalAll: number; filteredCount: number }) => {
+    setTotalAll(nextTotalAll);
+    setPagination((prev) => {
+      const totalPages = Math.max(1, filteredCount);
+      const page = Math.min(prev.page, totalPages);
+      pageRef.current = page;
+      return { ...prev, page, total: filteredCount, totalPages, hasPrev: page > 1, hasNext: page < totalPages };
+    });
+  }, []);
+
+  /** Removes the currently-focused product from the counters immediately (no round trip), then
+   * pulls its replacement — the product now sitting at the same page index, since sort order is
+   * createdAt desc and pageSize is 1 in detail mode. */
+  const removeProduct = useCallback((productId: string) => {
+    setProduct((prev) => (prev?.id === productId ? null : prev));
+    setTotalAll((n) => Math.max(0, n - 1));
+    setPagination((prev) => {
+      const total = Math.max(0, prev.total - 1);
+      const totalPages = Math.max(1, total);
+      const page = Math.min(prev.page, totalPages);
+      pageRef.current = page;
+      return { ...prev, page, total, totalPages, hasPrev: page > 1, hasNext: page < totalPages };
+    });
+    setFetchNonce((n) => n + 1);
+  }, []);
+
   const applyGlobalRate = () => {
     const value = Number(rateInput);
     if (!Number.isFinite(value) || value <= 0) {
@@ -190,6 +221,8 @@ export function useCatalogData() {
     focusProduct,
     refresh,
     updateProduct,
+    removeProduct,
+    syncCounts,
     globals,
     rateInput,
     setRateInput,

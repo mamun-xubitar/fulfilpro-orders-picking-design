@@ -27,6 +27,7 @@ export function useProductImageMutations({ product, onSaved }: UseProductImageMu
   const [uploading, setUploading] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [settingImageForVariantId, setSettingImageForVariantId] = useState<string | null>(null);
+  const [settingColourForImageId, setSettingColourForImageId] = useState<string | null>(null);
 
   /** `variantId` links the first uploaded image straight into that variant's image slot. */
   const uploadImages = async (files: File[], variantId?: string) => {
@@ -86,5 +87,28 @@ export function useProductImageMutations({ product, onSaved }: UseProductImageMu
     }
   };
 
-  return { uploading, removingId, settingImageForVariantId, uploadImages, removeImage, setVariantImage };
+  /** Assigns (or clears, `colour: null`) which colour an image belongs to. The server fans this
+   * out to every variant of that colour — see updateImageColour — so the matrix, gallery and
+   * this modal all pick it up from the single refreshed ProductRecord below. */
+  const setImageColour = async (imageId: string, colour: string | null) => {
+    if (!product) return;
+    setSettingColourForImageId(imageId);
+    try {
+      const res = await fetch(`/api/inventory/catalog/${product.id}/images/${imageId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ colour }),
+      });
+      const json = await parseApiResponse<ProductRecord>(res);
+      if (!res.ok || !json.success) throw new Error(json.message || 'Failed to update image colour');
+      onSaved(json.data);
+      toast.success(json.message);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to update image colour');
+    } finally {
+      setSettingColourForImageId(null);
+    }
+  };
+
+  return { uploading, removingId, settingImageForVariantId, settingColourForImageId, uploadImages, removeImage, setVariantImage, setImageColour };
 }

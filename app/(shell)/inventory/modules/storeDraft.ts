@@ -64,6 +64,13 @@ export type StoreDraft = {
   variantStock: Record<string, string>;
 };
 
+/** Maps a live Shopify product status (which can be 'ARCHIVED', a state the hub's own
+ * three-value vocabulary doesn't have) onto the hub's vocabulary — see the call site's comment. */
+function toHubStatus(status: 'ACTIVE' | 'DRAFT' | 'ARCHIVED' | 'UNLISTED' | null | undefined): ProductStatusValue {
+  if (status === 'ARCHIVED' || status == null) return 'DRAFT';
+  return status;
+}
+
 function suggestedPrice(pricing: PricingInputs, marginPercent: number | null, fallback: number): number {
   if (marginPercent === null) return fallback;
   return storePriceFromMargin(pricing, marginPercent);
@@ -114,6 +121,21 @@ export function emptyDraft(product: ProductRecord | null, storeId: string, store
     // `images`) — both id spaces line up with whichever list `images` ends up holding.
     variantImages[v.id] = published ? matched?.imageId ?? null : v.imageId ?? null;
   }
+  if (published) {
+    // A live Shopify listing's per-variant images can disagree within one colour (e.g. edited
+    // outside this app) — the editor now assigns per colour, not per variant, so normalise here
+    // by taking the first non-null image seen for each colour and applying it across the group.
+    // Otherwise the draft would open showing a state the editor can't actually represent.
+    const firstImageByColour = new Map<string, string>();
+    for (const v of product?.variants ?? []) {
+      const key = v.colour.toLowerCase();
+      const imageId = variantImages[v.id];
+      if (imageId && !firstImageByColour.has(key)) firstImageByColour.set(key, imageId);
+    }
+    for (const v of product?.variants ?? []) {
+      variantImages[v.id] = firstImageByColour.get(v.colour.toLowerCase()) ?? null;
+    }
+  }
   return {
     tags: published ? listing?.tags ?? [] : [],
     seoTitle: published ? listing?.seoTitle ?? '' : '',
@@ -130,7 +152,11 @@ export function emptyDraft(product: ProductRecord | null, storeId: string, store
       ? listing?.category ?? { id: null, name: '' }
       : { id: product?.categoryId ?? null, name: product?.category ?? '' },
     collections: (listing?.collections ?? []).filter((c) => !c.automated).map((c) => ({ id: c.id, title: c.title })),
-    status: published ? listing?.status ?? 'DRAFT' : product?.status ?? 'DRAFT',
+    // listing.status is Shopify's own live status and can be 'ARCHIVED' (e.g. archived directly
+    // in Shopify admin) — a state our hub's three-value vocabulary doesn't have. It's treated as
+    // DRAFT here (both mean "not visible to customers"), same as an admin who re-publishes an
+    // archived product would pick.
+    status: published ? toHubStatus(listing?.status) : product?.status ?? 'DRAFT',
     variantPrices,
     variantPricesEdited: [],
     variantSku,

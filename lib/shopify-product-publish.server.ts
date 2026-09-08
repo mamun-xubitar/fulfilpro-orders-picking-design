@@ -1,5 +1,5 @@
 import prisma from '@/lib/prisma.server';
-import { shopifyGraphQL, getLegacyId } from '@/lib/shopify-graphql.server';
+import { shopifyGraphQL, getLegacyId, preferredStoreUrl } from '@/lib/shopify-graphql.server';
 import { variantOptionKey } from '@/lib/inventory/variant-option-key';
 
 /** Which parts of the hub product a publish/bulk-update call should push. 'variants' covers
@@ -42,7 +42,9 @@ export type PublishPayload = {
    * `images`. `null` = collections aspect not touched (details aspect omitted entirely). */
   collectionIds: string[] | null;
   tags: string[];
-  status: 'ACTIVE' | 'DRAFT' | 'ARCHIVED';
+  /** Our hub's own three-state vocabulary — matches Shopify's own ProductStatus 1:1 as of API
+   * 2025-10 (this app is on 2026-04), sent through verbatim. */
+  status: 'ACTIVE' | 'DRAFT' | 'UNLISTED';
   seoTitle?: string | null;
   seoDescription?: string | null;
   images: PublishImage[];
@@ -365,13 +367,16 @@ export async function publishProductToStore(args: {
     input.handle = payload.handle;
     input.vendor = payload.vendor;
     input.productType = payload.productType;
+    // UNLISTED is a real ProductStatus value since API 2025-10 (this app is on 2026-04) — sent
+    // through as-is, unlike the old coercion to ACTIVE this used to need.
     input.status = payload.status;
     input.tags = payload.tags;
-    if (payload.categoryGid) input.category = payload.categoryGid;
+    // Sent even when null/empty (not just omitted) so a draft that clears a previously-set
+    // category, collection list, or SEO field can actually clear it on Shopify — productSet only
+    // leaves a field untouched when it's absent from the input entirely.
+    input.category = payload.categoryGid ?? null;
     if (payload.collectionIds) input.collections = payload.collectionIds;
-    if (payload.seoTitle || payload.seoDescription) {
-      input.seo = { title: payload.seoTitle || undefined, description: payload.seoDescription || undefined };
-    }
+    input.seo = { title: payload.seoTitle ?? '', description: payload.seoDescription ?? '' };
     // Product options are re-derived from the variant set below whenever variants are pushed —
     // Shopify infers them from productOptions, sent alongside variants.
   }
@@ -384,16 +389,22 @@ export async function publishProductToStore(args: {
     }));
   }
 
-  // Price-only without any known variant ids would be an empty no-op — escalate to a full
-  // variants+pricing push so new/row-less products still get created instead of silently skipping.
-  const hasVariantIds = payload.variants.some((v) => v.variantGid);
-  const effectiveVariants = includes('variants') || (includes('pricing') && !hasVariantIds);
+  // Price-only where EVERY variant is already mapped is safe to send as a bare price patch;
+  // if even one variant is unmapped, productSet's full-replacement `variants` list would delete
+  // it, so escalate to a full variants+pricing push instead (also covers new/row-less products).
+  const hasAllVariantIds = payload.variants.length > 0 && payload.variants.every((v) => v.variantGid);
+  const effectiveVariants = includes('variants') || (includes('pricing') && !hasAllVariantIds);
 
   if (effectiveVariants && payload.variants.length > 0) {
     const colours = [...new Set(payload.variants.map((v) => v.colour?.trim() || 'Default'))];
     const sizes = [...new Set(payload.variants.map((v) => v.size?.trim() || 'Default'))];
-    const useColour = colours.length > 1 || payload.variants.some((v) => v.colour?.trim());
-    const useSize = sizes.length > 1 || payload.variants.some((v) => v.size?.trim());
+    // An axis is "used" when it varies, or when it's set to anything other than the 'Default'
+    // sentinel buildPublishPayload substitutes for a blank colour/size — a single-variant product
+    // with no declared colour/size then correctly falls through to the plain Title/Default option
+    // below, instead of the previous check (dead: buildPublishPayload already guarantees a
+    // non-blank value) always taking this branch.
+    const useColour = colours.length > 1 || colours.some((c) => c !== 'Default');
+    const useSize = sizes.length > 1 || sizes.some((s) => s !== 'Default');
     const productOptions = [
       ...(useColour ? [{ name: 'Colour', values: colours.map((name) => ({ name })) }] : []),
       ...(useSize ? [{ name: 'Size', values: sizes.map((name) => ({ name })) }] : []),
@@ -410,11 +421,15 @@ export async function publishProductToStore(args: {
       ];
       const variant: Record<string, unknown> = {
         ...(v.variantGid ? { id: v.variantGid } : {}),
-        sku: v.sku?.trim() ? v.sku.trim() : undefined,
-        barcode: v.barcode?.trim() ? v.barcode.trim() : undefined,
+        // Sent as '' rather than omitted when blank, so a SKU/barcode the admin cleared actually
+        // clears on Shopify instead of leaving the previous value in place.
+        sku: v.sku?.trim() ?? '',
+        barcode: v.barcode?.trim() ?? '',
         price: includes('pricing') ? v.price.toFixed(2) : undefined,
         ...(optionValues.length > 0 ? { optionValues } : {}),
-        inventoryItem: { tracked: true, cost: v.buyPrice > 0 ? v.buyPrice.toFixed(2) : undefined },
+        // Cost always sent (including 0) — the hub is the source of truth for cost, so an
+        // intentional 0 must reach Shopify rather than being silently dropped.
+        inventoryItem: { tracked: true, cost: Math.max(0, v.buyPrice).toFixed(2) },
         // Requires the same URL to also be present in the product-level `files` input above —
         // only meaningful when the images aspect is included, which is exactly when that holds.
         ...(includes('images') && v.imageUrl ? { file: { originalSource: v.imageUrl, contentType: 'IMAGE' } } : {}),
@@ -442,10 +457,13 @@ export async function publishProductToStore(args: {
   if (userErrors.length > 0) throw new Error(userErrors.map((e) => e.message).join('; '));
   if (!product) throw new Error('Shopify did not return the product after productSet');
 
-  // Publish to every sales channel only for ACTIVE products — DRAFT stays unpublished (visible in
-  // admin, hidden from the storefront), ARCHIVED stays archived. Idempotent no-op for channels
-  // already published there.
-  if (payload.status === 'ACTIVE') {
+  // Publish to every sales channel for ACTIVE and UNLISTED products — both need channel
+  // publication for the storefront route to resolve at all; UNLISTED just stays out of
+  // search/collections/recommendations on Shopify's side once it is. DRAFT stays unpublished.
+  // Only meaningful when this call actually set a status (the details aspect); guarded so a
+  // price/variant-only bulk update never force-publishes a product to every channel behind the
+  // admin's back. Idempotent no-op for channels already published there.
+  if (includes('details') && (payload.status === 'ACTIVE' || payload.status === 'UNLISTED')) {
     const publicationIds = await getAllPublicationIds(store.storeDomain, store.accessToken);
     if (publicationIds.length > 0) {
       await shopifyGraphQL(store.storeDomain, store.accessToken, PUBLISHABLE_PUBLISH_MUTATION, {
@@ -498,7 +516,7 @@ export async function publishProductToStore(args: {
     externalId: getLegacyId(product.id),
     handle: product.handle,
     shopifyStatus: product.status,
-    url: product.onlineStoreUrl ?? product.onlineStorePreviewUrl ?? null,
+    url: preferredStoreUrl(product.onlineStoreUrl, product.onlineStorePreviewUrl),
     variants,
   };
 }

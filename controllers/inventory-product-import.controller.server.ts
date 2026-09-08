@@ -78,7 +78,8 @@ export class InventoryProductImportController {
       create: { id: 'default' },
       select: { globalMarginPercent: true, globalExchangeRate: true },
     });
-    const takenItemNos = new Set((await prisma.supplierProduct.findMany({ where: { supplierId }, select: { itemNo: true } })).map((r) => r.itemNo));
+    // itemNo is globally unique now, not scoped per supplier.
+    const takenItemNos = new Set((await prisma.supplierProduct.findMany({ select: { itemNo: true } })).map((r) => r.itemNo));
 
     const actor = { id: session?.user?.id ?? null, name: session?.user?.name ?? session?.user?.email ?? 'Unknown' };
     const created: SupplierProductRow[] = [];
@@ -224,7 +225,6 @@ export class InventoryProductImportController {
       async (tx) => {
         const row = await tx.supplierProduct.create({
           data: {
-            supplierId,
             itemNo,
             handle: group.handle,
             name: group.product.name || group.handle,
@@ -237,6 +237,10 @@ export class InventoryProductImportController {
             sizes: group.sizes,
             colours: colours as unknown as Prisma.InputJsonValue,
             pricing: { create: { currencyCode: 'USD', exchangeRate: Number(settings.globalExchangeRate), marginPercent: Number(settings.globalMarginPercent) } },
+            // Bug fix: CSV-imported products previously got the supplierId column set but no
+            // SupplierProductSupplier link, making them invisible to Products Count and to the
+            // products-table supplier filter.
+            supplierLinks: { create: { supplierId } },
           },
         });
 

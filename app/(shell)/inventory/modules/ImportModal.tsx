@@ -66,6 +66,21 @@ export default function ImportModal({ importExport: ie }: { importExport: Return
               <span className="font-medium">Mark this product as verified.</span> <span className="text-gray-400">(Product CSV only.)</span>
             </span>
           </label>
+          <div className="flex items-center gap-2 pt-1 text-sm text-gray-700">
+            <span className="font-medium">Attribute new purchase orders to</span>
+            <select
+              value={ie.poSupplierId}
+              onChange={(e) => ie.setPoSupplierId(e.target.value)}
+              className="rounded-lg border border-gray-300 bg-white px-2 py-1 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 cursor-pointer"
+            >
+              {ie.poSupplierOptions.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+            <span className="text-gray-400">(PO CSV only.)</span>
+          </div>
         </div>
 
         <FilePicker onSelect={(file) => void ie.handleFile(file)} fileName={ie.pendingFile?.name} />

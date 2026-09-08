@@ -1,7 +1,7 @@
 import { unstable_cache } from 'next/cache';
 import prisma from '@/lib/prisma.server';
 import { StoreModel } from '@/models/store.model.server';
-import { shopifyGraphQL, getLegacyId } from '@/lib/shopify-graphql.server';
+import { shopifyGraphQL, getLegacyId, preferredStoreUrl } from '@/lib/shopify-graphql.server';
 
 const model = new StoreModel();
 
@@ -32,7 +32,7 @@ export type StoreListingResult = {
   productTitle: string | null;
   productGid: string | null;
   externalId: string | null;
-  status: 'ACTIVE' | 'DRAFT' | 'ARCHIVED' | null;
+  status: 'ACTIVE' | 'DRAFT' | 'ARCHIVED' | 'UNLISTED' | null;
   url: string | null;
   currencyCode: string | null;
   variants: StoreListingVariant[];
@@ -192,7 +192,7 @@ const PRODUCT_VARIANTS_BULK_UPDATE_MUTATION = `
   }
 `;
 
-const VALID_STATUSES = new Set(['ACTIVE', 'DRAFT', 'ARCHIVED']);
+const VALID_STATUSES = new Set(['ACTIVE', 'DRAFT', 'ARCHIVED', 'UNLISTED']);
 
 function toVariant(node: ShopifyProductVariantByHandleNode): StoreListingVariant {
   return {
@@ -247,7 +247,7 @@ function toLookup(product: ShopifyProductByHandleNode | null, matchedBy: 'handle
     productGid: product.id,
     externalId: getLegacyId(product.id),
     status,
-    url: product.onlineStoreUrl ?? product.onlineStorePreviewUrl ?? null,
+    url: preferredStoreUrl(product.onlineStoreUrl, product.onlineStorePreviewUrl),
     currencyCode: null,
     variants: product.variants.nodes.map(toVariant),
     productType: product.productType ?? null,

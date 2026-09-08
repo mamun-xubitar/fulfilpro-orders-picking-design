@@ -31,6 +31,9 @@ type ProductCsvOptions = {
   /** Defaults to today's always-replace behaviour when the flag is omitted by an older caller. */
   overwrite: boolean;
   markVerified: boolean;
+  /** PO CSV only — which supplier a brand-new PO the file creates is attributed to. The admin
+   * picks this explicitly in the import modal now that products can have several suppliers. */
+  poSupplierId?: string;
 };
 
 export class InventoryCsvImportController {
@@ -55,7 +58,7 @@ export class InventoryCsvImportController {
     // The overwrite / markVerified options apply to product CSVs only — a PO CSV never
     // replaces product details, so there's nothing for them to gate.
     if (type === 'product') return this.processProductCsv(product, text, commit, session, options);
-    return this.processPoCsv(product, text, commit, session);
+    return this.processPoCsv(product, text, commit, session, options.poSupplierId);
   }
 
   /** Picks the group in a (possibly multi-product) CSV that belongs to this product: the group
@@ -188,7 +191,7 @@ export class InventoryCsvImportController {
    * label groups its rows into one brand-new PO. Every row must resolve to a real variant (by SKU,
    * falling back to Colour+Size) — PO import never creates a variant. All-or-nothing: any invalid
    * row rejects the whole file. */
-  private async processPoCsv(product: SupplierProductRow, text: string, commit: boolean, session: Session) {
+  private async processPoCsv(product: SupplierProductRow, text: string, commit: boolean, session: Session, poSupplierId?: string) {
     const parsed = parsePoCsv(text);
     if (parsed.rows.length === 0) {
       return { error: { message: 'rows: No valid rows found — expected PO Number, Colour, Size and Quantity columns', status: 400 } };
@@ -296,8 +299,15 @@ export class InventoryCsvImportController {
         poUpdated++;
       } else {
         if (!supplierInfo) {
-          supplierInfo = await prisma.supplier.findUnique({ where: { id: product.supplierId }, select: { id: true, name: true, poEmail: true } });
-          if (!supplierInfo) return { error: { message: 'This product has no supplier configured', status: 400 } };
+          // The admin's explicit choice wins; fall back to the product's own supplier only when
+          // it's unambiguous (exactly one linked) — a multi-supplier product without a choice is
+          // a validation error rather than a silent guess.
+          const resolvedSupplierId = poSupplierId || (product.suppliers.length === 1 ? product.suppliers[0].id : undefined);
+          if (!resolvedSupplierId) {
+            return { error: { message: 'supplierId: This product has multiple suppliers — choose one in the import dialog', status: 400 } };
+          }
+          supplierInfo = await prisma.supplier.findUnique({ where: { id: resolvedSupplierId }, select: { id: true, name: true, poEmail: true } });
+          if (!supplierInfo) return { error: { message: 'supplierId: Selected supplier not found', status: 400 } };
         }
         const created = await poModel.create({
           supplierId: supplierInfo.id,

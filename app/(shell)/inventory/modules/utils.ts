@@ -213,6 +213,26 @@ export function findCaseInsensitiveDuplicate(values: string[]): string | null {
 /** `product.category` stores the full Shopify taxonomy path ("Apparel & Accessories > … >
  * Visors") — this is the compact display form for space-constrained rows (the products table),
  * which show the leaf with the full path as a `title` tooltip instead. */
+/** Grouped by colour (A->Z) so same-colour rows stay together; within a colour, ordered by the
+ * product's own declared size order. A row whose size isn't in that list (e.g. a migrated
+ * "Default Title") falls back to the input order — Array#sort is stable, so returning 0 for an
+ * undefined/undefined tie preserves whatever order the caller passed in. Shared by the product
+ * page's variants matrix and the publish/bulk-update store draft tables, so all three read the
+ * same way. */
+export function sortVariantsForDisplay<T extends { colour: string; size: string }>(variants: T[], sizes: string[]): T[] {
+  const sizeIndex = new Map(sizes.map((s, i) => [s.toLowerCase(), i]));
+  return [...variants].sort((a, b) => {
+    const byColour = a.colour.localeCompare(b.colour, undefined, { sensitivity: 'base' });
+    if (byColour !== 0) return byColour;
+    const aIndex = sizeIndex.get(a.size.toLowerCase());
+    const bIndex = sizeIndex.get(b.size.toLowerCase());
+    if (aIndex !== undefined && bIndex !== undefined) return aIndex - bIndex;
+    if (aIndex !== undefined) return -1;
+    if (bIndex !== undefined) return 1;
+    return 0;
+  });
+}
+
 export function categoryLeaf(category: string): string {
   const parts = category.split('>').map((p) => p.trim());
   return parts[parts.length - 1] ?? '';
@@ -373,7 +393,9 @@ function csvRowToLine(row: Partial<Record<ShopifyCsvHeader, string>>): string {
   return SHOPIFY_CSV_HEADERS.map((header) => escapeCsv(row[header] ?? '')).join(',');
 }
 
-const PRODUCT_STATUS_TO_SHOPIFY: Record<ProductRecord['status'], string> = { ACTIVE: 'active', DRAFT: 'draft', ARCHIVED: 'archived' };
+// UNLISTED has no Shopify equivalent — exported as 'active' (Published stays FALSE below, so
+// re-importing keeps it hidden from channels, matching how the publish path treats it).
+const PRODUCT_STATUS_TO_SHOPIFY: Record<ProductRecord['status'], string> = { ACTIVE: 'active', DRAFT: 'draft', UNLISTED: 'active' };
 
 /** Resolves a stored (possibly relative, `/api/uploads/...`) image URL to an absolute one, so
  * an exported CSV is importable by Shopify — its importer can't fetch a site-relative path. */

@@ -2,6 +2,7 @@
 
 import { truncate } from '@/lib/utils/common';
 import { PRODUCT_STATUS_BADGES } from './constants';
+import { VerifiedBadge } from './ProductFieldsPanel';
 import { Eye, Trash } from './icons';
 import { availableStockOf, stockValueOf, totalStockOf } from './hooks/useProductsTable';
 import { categoryLeaf, formatCurrencyValue, formatDate, formatNumber, getSwatch } from './utils';
@@ -40,6 +41,16 @@ export default function ProductsTableRow({ product, selected, onToggleSelect, on
           </div>
         </div>
       </td>
+      <td className="px-4 py-3 text-sm text-gray-700">
+        {product.suppliers.length === 0 ? (
+          '—'
+        ) : (
+          <>
+            {product.suppliers[0].name}
+            {product.suppliers.length > 1 && <span className="ml-1 text-xs text-gray-400">+{product.suppliers.length - 1}</span>}
+          </>
+        )}
+      </td>
       <td className="px-4 py-3 text-sm text-gray-700">{product.brand || '—'}</td>
       <td className="px-4 py-3 text-sm text-gray-700" title={product.category || undefined}>
         {product.category ? categoryLeaf(product.category) : '—'}
@@ -51,11 +62,7 @@ export default function ProductsTableRow({ product, selected, onToggleSelect, on
         </span>
       </td>
       <td className="px-4 py-3 text-center">
-        {product.verified ? (
-          <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">Verified</span>
-        ) : (
-          <span className="text-xs text-gray-400">—</span>
-        )}
+        <VerifiedBadge verified={product.verified} />
       </td>
       <td className="px-4 py-3 text-right text-sm tabular-nums text-gray-700">{product.variants.length}</td>
       <td className="px-4 py-3 text-right text-sm tabular-nums text-gray-700">{formatNumber(totalStockOf(product))}</td>

@@ -91,7 +91,7 @@ export default function StorePricesModal({ listing, onClose, onSaveOne, onSaveAl
     >
       <p className="mb-3 text-base font-semibold text-gray-900">{listing.productTitle ?? listing.storeName}</p>
 
-      <div className="overflow-hidden rounded-lg border border-gray-200">
+      <div className="overflow-x-auto rounded-lg border border-gray-200">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-200 bg-gray-50">

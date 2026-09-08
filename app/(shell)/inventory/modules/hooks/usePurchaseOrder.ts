@@ -29,7 +29,12 @@ export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
 
   const [receiveTarget, setReceiveTarget] = useState<PurchaseOrderRecord | null>(null);
   const [receiveQty, setReceiveQty] = useState<Record<string, string>>({});
+  const [receiveCost, setReceiveCost] = useState<Record<string, string>>({});
   const { request: requestReceive, loading: receiving } = useRequest<{ purchaseOrder: PurchaseOrderRecord; product: ProductRecord | null }>();
+  // Bumped after a successful receive — a receipt can create a new (non-primary) supplier link,
+  // so the Suppliers tab's Products Count needs to refetch even though this hook has no direct
+  // reference to useSuppliers.
+  const [receivedNonce, setReceivedNonce] = useState(0);
 
   const refreshSuppliers = useCallback(() => {
     fetch('/api/inventory/suppliers?pageSize=200')
@@ -132,18 +137,24 @@ export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
   const openReceive = (po: PurchaseOrderRecord) => {
     setReceiveTarget(po);
     setReceiveQty(Object.fromEntries(po.items.map((item) => [item.id, String(Math.max(0, item.quantity - item.receivedQuantity))])));
+    setReceiveCost(Object.fromEntries(po.items.map((item) => [item.id, item.unitCost !== null ? String(item.unitCost) : ''])));
   };
   const closeReceive = () => setReceiveTarget(null);
   const setReceiveItemQty = (itemId: string, value: string, max?: number) => {
     const clamped = max !== undefined && Number(value) > max ? String(max) : value;
     setReceiveQty((prev) => ({ ...prev, [itemId]: clamped }));
   };
+  const setReceiveItemCost = (itemId: string, value: string) => setReceiveCost((prev) => ({ ...prev, [itemId]: value }));
 
   const submitReceive = () => {
     if (!receiveTarget) return;
     const receipts = Object.entries(receiveQty)
       .filter(([, v]) => Number(v) > 0)
-      .map(([itemId, v]) => ({ itemId, quantity: Number(v) }));
+      .map(([itemId, v]) => {
+        const costInput = receiveCost[itemId];
+        const unitCost = costInput !== undefined && costInput !== '' && Number.isFinite(Number(costInput)) ? Number(costInput) : undefined;
+        return { itemId, quantity: Number(v), unitCost };
+      });
     if (receipts.length === 0) {
       toast.error('Enter a quantity to receive');
       return;
@@ -157,6 +168,7 @@ export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
         setReceiveTarget(null);
         loadPurchaseOrders();
         if (data.product) onSaved(data.product);
+        setReceivedNonce((n) => n + 1);
       },
     });
   };
@@ -192,7 +204,10 @@ export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
     closeReceive,
     receiveQty,
     setReceiveItemQty,
+    receiveCost,
+    setReceiveItemCost,
     receiving,
     submitReceive,
+    receivedNonce,
   };
 }

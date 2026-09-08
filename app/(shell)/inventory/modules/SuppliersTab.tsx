@@ -101,7 +101,8 @@ export default function SuppliersTab({ suppliers: s }: { suppliers: ReturnType<t
             This removes <strong className="font-semibold text-gray-900">{s.deleteTarget.name}</strong>. This can&apos;t be undone.
             {s.deleteTarget.productCount > 0 && (
               <span className="mt-2 block text-amber-700">
-                This supplier has {s.deleteTarget.productCount} linked product{s.deleteTarget.productCount === 1 ? '' : 's'} — remove or reassign them first.
+                This supplier is linked to {s.deleteTarget.productCount} product{s.deleteTarget.productCount === 1 ? '' : 's'} — the link is simply removed, unless
+                it&apos;s the only supplier on one of them, in which case the delete is refused.
               </span>
             )}
           </p>

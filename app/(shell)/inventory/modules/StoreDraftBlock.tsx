@@ -104,8 +104,19 @@ export default function StoreDraftBlock({
       variantImages: clearVariantImage(imageId),
     });
 
-  const setVariantImage = (variantId: string, imageId: string | null) =>
-    onChange({ ...draft, variantImages: { ...draft.variantImages, [variantId]: imageId } });
+  // Shopify-style: an image is assigned per colour, not per variant — changing one row's image
+  // changes it for every variant that shares its colour, mirroring how the hub's own
+  // EditImagesModal (and updateImageColour) fans an assignment out.
+  const setVariantImage = (variantId: string, imageId: string | null) => {
+    const target = product.variants.find((v) => v.id === variantId);
+    if (!target) return;
+    const colourKey = target.colour.toLowerCase();
+    const groupIds = product.variants.filter((v) => v.colour.toLowerCase() === colourKey).map((v) => v.id);
+    onChange({
+      ...draft,
+      variantImages: { ...draft.variantImages, ...Object.fromEntries(groupIds.map((id) => [id, imageId])) },
+    });
+  };
 
   return (
     <div className="overflow-hidden rounded-xl border-2 border-gray-300 bg-white shadow-sm">

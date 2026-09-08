@@ -25,12 +25,15 @@ type UseSuppliersArgs = {
   /** Called after a create/edit/delete so the New Product / Import Products / Create PO
    * dropdowns elsewhere on the page pick up the change immediately. */
   onChanged: () => void;
+  /** Bumped by usePurchaseOrder after a successful Receive — a receipt can create a new
+   * (non-primary) supplier link, which this list's Products Count must reflect immediately. */
+  refreshKey?: number;
 };
 
 /** List + create/edit/delete for the Suppliers module tab. Mirrors the house pattern: debounced
  * search, page state reset to 1 on filter change, an EMPTY_FORM + set(field) form helper, and
  * server errors surfaced inline via useRequest's `errors` map. */
-export function useSuppliers({ onChanged }: UseSuppliersArgs) {
+export function useSuppliers({ onChanged, refreshKey }: UseSuppliersArgs) {
   const [rows, setRows] = useState<SupplierRow[]>([]);
   const [pagination, setPagination] = useState<PaginationState>(EMPTY_PAGINATION);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -61,7 +64,7 @@ export function useSuppliers({ onChanged }: UseSuppliersArgs) {
   };
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(load, [searchInput, page]);
+  useEffect(load, [searchInput, page, refreshKey]);
 
   const pageNumbers = buildPageNumbers(pagination.page, pagination.totalPages);
 

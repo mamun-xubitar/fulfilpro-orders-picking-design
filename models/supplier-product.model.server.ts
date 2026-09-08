@@ -55,7 +55,7 @@ export type CatalogueListParams = {
   search?: string;
   verified?: boolean;
   status?: SupplierProductStatus;
-  supplierName?: string;
+  supplierId?: string;
   quickFilter?: QuickFilterId | null;
   sort?: ProductsSortKey;
   dir?: 'asc' | 'desc';
@@ -66,10 +66,12 @@ export type CatalogueListResult = {
   total: number;
 };
 
+export type SupplierProductSupplierRow = { id: string; name: string; poEmail: string };
+
 export type SupplierProductRow = {
   id: string;
-  supplierId: string;
-  supplierName: string;
+  /** Every linked supplier, alphabetical by name — no default/primary among them. */
+  suppliers: SupplierProductSupplierRow[];
   itemNo: string;
   /** Unique URL-safe slug — Shopify's product Handle equivalent. */
   handle: string;
@@ -106,7 +108,7 @@ const EMPTY_PRICING: SupplierProductPricingRow = {
 const OPEN_PO_STATUSES = ['REQUESTED', 'CONFIRMED', 'PARTIALLY_RECEIVED'] as const;
 
 const catalogueInclude = {
-  supplier: { select: { id: true, name: true } },
+  supplierLinks: { include: { supplier: { select: { id: true, name: true, poEmail: true } } }, orderBy: { supplier: { name: 'asc' as const } } },
   variants: { orderBy: { position: 'asc' as const } },
   images: { orderBy: { position: 'asc' as const } },
   pricing: true,
@@ -176,18 +178,15 @@ export class SupplierProductModel {
     return rows[0] ?? null;
   }
 
-  /** Distinct supplier names among products — for the products table's supplier filter dropdown. */
-  async listSupplierNames(): Promise<string[]> {
-    const rows = await prisma.supplierProduct.findMany({
-      select: { supplier: { select: { name: true } } },
-      distinct: ['supplierId'],
-    });
-    return [...new Set(rows.map((r) => r.supplier.name))].sort();
-  }
-
   /** Whole-catalogue count, ignoring every filter — the "of Y" half of the record stepper. */
   async countAll(): Promise<number> {
     return prisma.supplierProduct.count();
+  }
+
+  /** Count under the Verified filter only (ignoring every other table filter) — the "n / X"
+   * half of the record stepper, kept in sync with the table via useProductsTable's onCounts. */
+  async countForStepper(verified?: boolean): Promise<number> {
+    return prisma.supplierProduct.count({ where: verified === undefined ? {} : { verified } });
   }
 
   async findById(id: string): Promise<SupplierProductRow | null> {
@@ -210,7 +209,8 @@ export class SupplierProductModel {
   }
 
   async create(data: {
-    supplierId: string;
+    /** Every product needs at least one linked supplier. */
+    supplierIds: string[];
     itemNo: string;
     handle: string;
     name: string;
@@ -222,7 +222,6 @@ export class SupplierProductModel {
   }): Promise<string> {
     const row = await prisma.supplierProduct.create({
       data: {
-        supplierId: data.supplierId,
         itemNo: data.itemNo,
         handle: data.handle,
         name: data.name,
@@ -234,6 +233,7 @@ export class SupplierProductModel {
         // "Default Title") rather than sitting with an empty matrix — see reconcileVariants,
         // which later promotes this same sentinel row in place once an axis is added.
         variants: { create: { colour: '', size: '', trigger: data.lowStockThreshold, position: 0 } },
+        supplierLinks: { create: data.supplierIds.map((supplierId) => ({ supplierId })) },
       },
     });
     await prisma.inventoryActivity.create({
@@ -253,6 +253,9 @@ export class SupplierProductModel {
     data: Partial<{
       itemNo: string;
       handle: string;
+      /** Full replacement of the linked supplier set — at least one id. A supplier dropped from
+       * this list has its link removed entirely (a receipt against it later re-creates the link). */
+      supplierIds: string[];
       brand: string;
       name: string;
       category: string;
@@ -266,7 +269,7 @@ export class SupplierProductModel {
       colours: ColourOptionData[];
     }>
   ): Promise<void> {
-    const current = await prisma.supplierProduct.findUnique({ where: { id }, select: { supplierId: true, sizes: true, colours: true } });
+    const current = await prisma.supplierProduct.findUnique({ where: { id }, select: { sizes: true, colours: true } });
     if (!current) throw new Error('Product not found');
 
     if (data.colours !== undefined) {
@@ -276,23 +279,33 @@ export class SupplierProductModel {
       await this.applySizeRenames(id, current.sizes as string[], data.sizes);
     }
 
-    await prisma.supplierProduct.update({
-      where: { id },
-      data: {
-        ...(data.itemNo !== undefined ? { itemNo: data.itemNo } : {}),
-        ...(data.handle !== undefined ? { handle: data.handle } : {}),
-        ...(data.brand !== undefined ? { brand: data.brand } : {}),
-        ...(data.name !== undefined ? { name: data.name } : {}),
-        ...(data.category !== undefined ? { category: data.category } : {}),
-        ...(data.categoryId !== undefined ? { categoryId: data.categoryId } : {}),
-        ...(data.sku !== undefined ? { sku: data.sku } : {}),
-        ...(data.description !== undefined ? { description: data.description } : {}),
-        ...(data.remarks !== undefined ? { remarks: data.remarks } : {}),
-        ...(data.status !== undefined ? { status: data.status } : {}),
-        ...(data.verified !== undefined ? { verified: data.verified } : {}),
-        ...(data.sizes !== undefined ? { sizes: data.sizes } : {}),
-        ...(data.colours !== undefined ? { colours: data.colours as unknown as Prisma.InputJsonValue } : {}),
-      },
+    await prisma.$transaction(async (tx) => {
+      await tx.supplierProduct.update({
+        where: { id },
+        data: {
+          ...(data.itemNo !== undefined ? { itemNo: data.itemNo } : {}),
+          ...(data.handle !== undefined ? { handle: data.handle } : {}),
+          ...(data.brand !== undefined ? { brand: data.brand } : {}),
+          ...(data.name !== undefined ? { name: data.name } : {}),
+          ...(data.category !== undefined ? { category: data.category } : {}),
+          ...(data.categoryId !== undefined ? { categoryId: data.categoryId } : {}),
+          ...(data.sku !== undefined ? { sku: data.sku } : {}),
+          ...(data.description !== undefined ? { description: data.description } : {}),
+          ...(data.remarks !== undefined ? { remarks: data.remarks } : {}),
+          ...(data.status !== undefined ? { status: data.status } : {}),
+          ...(data.verified !== undefined ? { verified: data.verified } : {}),
+          ...(data.sizes !== undefined ? { sizes: data.sizes } : {}),
+          ...(data.colours !== undefined ? { colours: data.colours as unknown as Prisma.InputJsonValue } : {}),
+        },
+      });
+
+      if (data.supplierIds !== undefined) {
+        await tx.supplierProductSupplier.deleteMany({ where: { supplierProductId: id, supplierId: { notIn: data.supplierIds } } });
+        await tx.supplierProductSupplier.createMany({
+          data: data.supplierIds.map((supplierId) => ({ supplierProductId: id, supplierId })),
+          skipDuplicates: true,
+        });
+      }
     });
 
     if (data.sizes !== undefined || data.colours !== undefined) {
@@ -369,6 +382,14 @@ export class SupplierProductModel {
     const existingKeys = new Set(existing.map((v) => `${v.colour.toLowerCase()}::${v.size}`));
     const lowStockThreshold = (await prisma.appSettings.findUnique({ where: { id: 'default' }, select: { lowStockThreshold: true } }))
       ?.lowStockThreshold ?? 10;
+    // A colour that already has an image assigned should hand it straight to a newly
+    // materialised variant of that colour (e.g. adding a size to an already-imaged colour) —
+    // otherwise the new row would sit unlinked until someone reassigns the image by hand.
+    const taggedImages = await prisma.supplierProductImage.findMany({
+      where: { supplierProductId, colour: { not: null } },
+      select: { id: true, colour: true },
+    });
+    const imageIdByColour = new Map(taggedImages.map((img) => [img.colour!.toLowerCase(), img.id]));
 
     const toCreate: Prisma.SupplierProductVariantCreateManyInput[] = [];
     let position = existing.length;
@@ -376,7 +397,14 @@ export class SupplierProductModel {
       for (const size of sizeAxis) {
         const key = `${colour.toLowerCase()}::${size}`;
         if (existingKeys.has(key)) continue;
-        toCreate.push({ supplierProductId, colour, size, trigger: lowStockThreshold, position: position++ });
+        toCreate.push({
+          supplierProductId,
+          colour,
+          size,
+          trigger: lowStockThreshold,
+          position: position++,
+          imageId: imageIdByColour.get(colour.toLowerCase()) ?? null,
+        });
         existingKeys.add(key);
       }
     }
@@ -446,41 +474,64 @@ export class SupplierProductModel {
    * tagged with a pruned colour are untagged (mirrors applyColourRenames' removal branch)
    * rather than left pointing at a colour that no longer exists anywhere on the product.
    */
+  /**
+   * After one or more variants are deleted, prunes any colour/size from the product's declared
+   * lists that no remaining variant uses — otherwise the next Product Details save would
+   * re-create the row(s) just deleted (reconcileVariants treats every declared colour x size as
+   * required). Images tagged with a pruned colour are untagged (mirrors applyColourRenames'
+   * removal branch) rather than left pointing at a colour that no longer exists anywhere on the
+   * product. Shared by deleteVariant and deleteVariants so a bulk delete runs this once, not once
+   * per row.
+   */
+  private async pruneUnusedAxes(tx: Prisma.TransactionClient, supplierProductId: string): Promise<void> {
+    const product = await tx.supplierProduct.findUnique({ where: { id: supplierProductId }, select: { sizes: true, colours: true } });
+    if (!product) return;
+
+    const remaining = await tx.supplierProductVariant.findMany({ where: { supplierProductId }, select: { colour: true, size: true } });
+    const usedColours = new Set(remaining.map((v) => v.colour.toLowerCase()).filter(Boolean));
+    const usedSizes = new Set(remaining.map((v) => v.size.toLowerCase()).filter(Boolean));
+
+    const currentColours = normalizeColours(product.colours);
+    const currentSizes = product.sizes as string[];
+    const nextColours = currentColours.filter((c) => usedColours.has(c.name.toLowerCase()));
+    const nextSizes = currentSizes.filter((s) => usedSizes.has(s.toLowerCase()));
+    const prunedColours = currentColours.filter((c) => !usedColours.has(c.name.toLowerCase()));
+
+    if (nextColours.length !== currentColours.length || nextSizes.length !== currentSizes.length) {
+      await tx.supplierProduct.update({
+        where: { id: supplierProductId },
+        data: {
+          ...(nextColours.length !== currentColours.length ? { colours: nextColours as unknown as Prisma.InputJsonValue } : {}),
+          ...(nextSizes.length !== currentSizes.length ? { sizes: nextSizes } : {}),
+        },
+      });
+    }
+    for (const colour of prunedColours) {
+      await tx.supplierProductImage.updateMany({
+        where: { supplierProductId, colour: { equals: colour.name, mode: 'insensitive' } },
+        data: { colour: null },
+      });
+    }
+  }
+
   async deleteVariant(supplierProductId: string, variantId: string): Promise<boolean> {
     return prisma.$transaction(async (tx) => {
       const result = await tx.supplierProductVariant.deleteMany({ where: { id: variantId, supplierProductId } });
       if (result.count === 0) return false;
-
-      const product = await tx.supplierProduct.findUnique({ where: { id: supplierProductId }, select: { sizes: true, colours: true } });
-      if (!product) return true;
-
-      const remaining = await tx.supplierProductVariant.findMany({ where: { supplierProductId }, select: { colour: true, size: true } });
-      const usedColours = new Set(remaining.map((v) => v.colour.toLowerCase()).filter(Boolean));
-      const usedSizes = new Set(remaining.map((v) => v.size.toLowerCase()).filter(Boolean));
-
-      const currentColours = normalizeColours(product.colours);
-      const currentSizes = product.sizes as string[];
-      const nextColours = currentColours.filter((c) => usedColours.has(c.name.toLowerCase()));
-      const nextSizes = currentSizes.filter((s) => usedSizes.has(s.toLowerCase()));
-      const prunedColours = currentColours.filter((c) => !usedColours.has(c.name.toLowerCase()));
-
-      if (nextColours.length !== currentColours.length || nextSizes.length !== currentSizes.length) {
-        await tx.supplierProduct.update({
-          where: { id: supplierProductId },
-          data: {
-            ...(nextColours.length !== currentColours.length ? { colours: nextColours as unknown as Prisma.InputJsonValue } : {}),
-            ...(nextSizes.length !== currentSizes.length ? { sizes: nextSizes } : {}),
-          },
-        });
-      }
-      for (const colour of prunedColours) {
-        await tx.supplierProductImage.updateMany({
-          where: { supplierProductId, colour: { equals: colour.name, mode: 'insensitive' } },
-          data: { colour: null },
-        });
-      }
-
+      await this.pruneUnusedAxes(tx, supplierProductId);
       return true;
+    });
+  }
+
+  /** Deletes several variants in one transaction, pruning unused colours/sizes once at the end
+   * rather than once per row. Returns the number actually deleted (ids outside this product are
+   * silently ignored, same as deleteVariant). */
+  async deleteVariants(supplierProductId: string, variantIds: string[]): Promise<number> {
+    return prisma.$transaction(async (tx) => {
+      const result = await tx.supplierProductVariant.deleteMany({ where: { id: { in: variantIds }, supplierProductId } });
+      if (result.count === 0) return 0;
+      await this.pruneUnusedAxes(tx, supplierProductId);
+      return result.count;
     });
   }
 
@@ -548,9 +599,41 @@ export class SupplierProductModel {
     return result.count > 0;
   }
 
+  /**
+   * Assigns (or clears) which colour an image belongs to — Shopify-style, one image per colour,
+   * an image may be shared across every variant of that colour. Assigning fans the image out to
+   * every variant of that colour (replacing whatever they previously pointed at) and untags any
+   * other image this product had tagged with that colour, since only one can hold it at a time.
+   * Clearing (colour: null) untags the image and unlinks every variant currently pointing at it.
+   */
   async updateImageColour(supplierProductId: string, imageId: string, colour: string | null): Promise<boolean> {
-    const result = await prisma.supplierProductImage.updateMany({ where: { id: imageId, supplierProductId }, data: { colour } });
-    return result.count > 0;
+    return prisma.$transaction(async (tx) => {
+      const image = await tx.supplierProductImage.findFirst({ where: { id: imageId, supplierProductId }, select: { id: true } });
+      if (!image) return false;
+
+      if (colour === null) {
+        await tx.supplierProductImage.update({ where: { id: imageId }, data: { colour: null } });
+        await tx.supplierProductVariant.updateMany({ where: { supplierProductId, imageId }, data: { imageId: null } });
+        return true;
+      }
+
+      const previousHolders = await tx.supplierProductImage.findMany({
+        where: { supplierProductId, colour: { equals: colour, mode: 'insensitive' }, id: { not: imageId } },
+        select: { id: true },
+      });
+      if (previousHolders.length > 0) {
+        const previousIds = previousHolders.map((img) => img.id);
+        await tx.supplierProductImage.updateMany({ where: { id: { in: previousIds } }, data: { colour: null } });
+        await tx.supplierProductVariant.updateMany({ where: { supplierProductId, imageId: { in: previousIds } }, data: { imageId: null } });
+      }
+
+      await tx.supplierProductImage.update({ where: { id: imageId }, data: { colour } });
+      await tx.supplierProductVariant.updateMany({
+        where: { supplierProductId, colour: { equals: colour, mode: 'insensitive' } },
+        data: { imageId },
+      });
+      return true;
+    });
   }
 
   async logActivity(supplierProductId: string, message: string, type: string, actor: { id?: string | null; name: string }, variantId?: string): Promise<void> {
@@ -646,10 +729,11 @@ export class SupplierProductModel {
       : [];
     const lastAdjustmentByProduct = new Map(lastAdjustmentRows.map((r) => [r.supplierProductId, r.createdAt.toISOString()]));
 
-    return rows.map((row) => ({
+    return rows.map((row) => {
+      // Already alphabetical by supplier name — see catalogueInclude's supplierLinks orderBy.
+      return {
       id: row.id,
-      supplierId: row.supplierId,
-      supplierName: row.supplier?.name ?? '',
+      suppliers: row.supplierLinks.map((l) => ({ id: l.supplierId, name: l.supplier.name, poEmail: l.supplier.poEmail })),
       itemNo: row.itemNo,
       handle: row.handle,
       brand: row.brand ?? '',
@@ -705,7 +789,8 @@ export class SupplierProductModel {
         thisMonth: adjustmentCountByProduct.get(row.id) ?? 0,
       },
       activity: row.activity.map((a) => ({ id: a.id, at: a.createdAt.toISOString(), actor: a.actorName, message: a.message })),
-    }));
+    };
+    });
   }
 }
 
@@ -783,7 +868,7 @@ function buildCatalogueWhereSql(params: {
   search?: string;
   verified?: boolean;
   status?: SupplierProductStatus;
-  supplierName?: string;
+  supplierId?: string;
   quickFilter?: QuickFilterId | null;
 }): Prisma.Sql {
   const whereParts: Prisma.Sql[] = [Prisma.sql`1 = 1`];
@@ -794,8 +879,8 @@ function buildCatalogueWhereSql(params: {
   if (params.status) {
     whereParts.push(Prisma.sql`sp.status = ${params.status}::"SupplierProductStatus"`);
   }
-  if (params.supplierName) {
-    whereParts.push(Prisma.sql`su.name = ${params.supplierName}`);
+  if (params.supplierId) {
+    whereParts.push(Prisma.sql`EXISTS (SELECT 1 FROM "SupplierProductSupplier" sps WHERE sps."supplierProductId" = sp.id AND sps."supplierId" = ${params.supplierId})`);
   }
 
   const term = params.search?.trim();
@@ -840,7 +925,6 @@ function buildCatalogueFilteredSql(whereSql: Prisma.Sql): Prisma.Sql {
       COALESCE(pa.total_stock, 0) AS total_stock,
       COALESCE(pa.stock_value, 0) AS stock_value
     FROM "SupplierProduct" sp
-    JOIN "Supplier" su ON su.id = sp."supplierId"
     LEFT JOIN product_agg pa ON pa.pid = sp.id
     WHERE ${whereSql}
   `;

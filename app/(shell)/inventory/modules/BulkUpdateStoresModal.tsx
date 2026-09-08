@@ -100,7 +100,7 @@ export default function BulkUpdateStoresModal({ product, storeOptions, publish: 
           ))}
         </aside>
 
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           <section className="rounded-xl border border-gray-200 bg-gray-50 p-3">
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">What to update</p>
             <div className="flex flex-wrap items-center gap-4">

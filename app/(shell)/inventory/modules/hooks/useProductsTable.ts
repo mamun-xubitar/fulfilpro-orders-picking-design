@@ -20,6 +20,13 @@ type UseProductsTableArgs = {
   verifiedOnly: boolean;
   quickFilter: QuickFilterId | null;
   onView: (id: string) => void;
+  /** Patches the record stepper's "n / X of Y" counts from this table's own fetch response —
+   * called after every load, so a delete/bulk-action/import here keeps the stepper live even
+   * though its own fetch is skipped while "All records" is on. */
+  onCounts?: (counts: { totalAll: number; filteredCount: number }) => void;
+  /** Fired after a product is actually deleted (single or bulk) — deleting a product drops its
+   * SupplierProductSupplier links, so the Suppliers tab's Products Count needs to refetch. */
+  onDeleted?: () => void;
 };
 
 export function totalStockOf(p: ProductRecord): number {
@@ -34,10 +41,10 @@ export function stockValueOf(p: ProductRecord): number {
   return p.variants.reduce((sum, v) => sum + v.stockOnHand * v.sellPrice, 0);
 }
 
-export function useProductsTable({ enabled, verifiedOnly, quickFilter, onView }: UseProductsTableArgs) {
+export function useProductsTable({ enabled, verifiedOnly, quickFilter, onView, onCounts, onDeleted }: UseProductsTableArgs) {
   const [rows, setRows] = useState<ProductRecord[]>([]);
   const [pagination, setPagination] = useState<CataloguePagination>(EMPTY_PAGINATION);
-  const [supplierOptions, setSupplierOptions] = useState<string[]>([]);
+  const [supplierOptions, setSupplierOptions] = useState<{ id: string; name: string }[]>([]);
   // Named distinctly from the exposed `loading` below — see useCatalogData's `fetching` for why.
   const [fetching, setFetching] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -59,9 +66,9 @@ export function useProductsTable({ enabled, verifiedOnly, quickFilter, onView }:
     setStatusState(value);
     setPage(1);
   };
-  const [supplierName, setSupplierNameState] = useState('');
-  const setSupplierName = (value: string) => {
-    setSupplierNameState(value);
+  const [supplierId, setSupplierIdState] = useState('');
+  const setSupplierId = (value: string) => {
+    setSupplierIdState(value);
     setPage(1);
   };
   const [sort, setSortState] = useState<ProductsSortKey>('name');
@@ -77,11 +84,11 @@ export function useProductsTable({ enabled, verifiedOnly, quickFilter, onView }:
   const [deleteConfirm, setDeleteConfirm] = useState<DeleteTarget | null>(null);
   const [statusModal, setStatusModal] = useState<ProductStatusValue | null>(null);
 
-  const hasActiveFilters = search.trim() !== '' || status !== '' || supplierName !== '';
+  const hasActiveFilters = search.trim() !== '' || status !== '' || supplierId !== '';
   const handleClearFilters = () => {
     setSearch('');
     setStatus('');
-    setSupplierName('');
+    setSupplierId('');
   };
 
   const buildParams = (overrides?: { page?: number; pageSize?: number }) => {
@@ -97,7 +104,7 @@ export function useProductsTable({ enabled, verifiedOnly, quickFilter, onView }:
     if (quickFilter) params.set('quickFilter', quickFilter);
     if (search.trim()) params.set('search', search.trim());
     if (status) params.set('status', status);
-    if (supplierName) params.set('supplier', supplierName);
+    if (supplierId) params.set('supplier', supplierId);
     return params;
   };
 
@@ -116,6 +123,15 @@ export function useProductsTable({ enabled, verifiedOnly, quickFilter, onView }:
         setPagination(json.data.pagination);
         setSupplierOptions(json.data.supplierOptions);
         setLoaded(true);
+        if (json.data.stepperTotal !== undefined) {
+          onCounts?.({ totalAll: json.data.totalAll, filteredCount: json.data.stepperTotal });
+        }
+        // A delete can empty out the last page the client was sitting on — model.list offsets
+        // from this unclamped client page, so snap to the server's own (clamped) page rather than
+        // leaving the table permanently empty.
+        if (json.data.products.length === 0 && json.data.pagination.total > 0 && page !== json.data.pagination.page) {
+          setPage(json.data.pagination.page);
+        }
       })
       .catch((err: unknown) => {
         if (err instanceof DOMException && err.name === 'AbortError') return;
@@ -127,7 +143,7 @@ export function useProductsTable({ enabled, verifiedOnly, quickFilter, onView }:
 
     return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, verifiedOnly, quickFilter, search, status, supplierName, sort, dir, page, pageSize, refreshTick]);
+  }, [enabled, verifiedOnly, quickFilter, search, status, supplierId, sort, dir, page, pageSize, refreshTick]);
 
   const refresh = () => setRefreshTick((n) => n + 1);
   const pageNumbers = buildPageNumbers(pagination.page, pagination.totalPages);
@@ -192,6 +208,7 @@ export function useProductsTable({ enabled, verifiedOnly, quickFilter, onView }:
       if (!res.ok || !json.success) throw new Error(json.message || 'Bulk action failed');
       toast.success(json.message);
       clearSelection();
+      if (body.action === 'delete') onDeleted?.();
       // Re-fetches rather than patching in place — a bulk status/verified change can move rows
       // out of the current filter set entirely (e.g. unverifying while "Verified" is checked).
       refresh();
@@ -209,6 +226,10 @@ export function useProductsTable({ enabled, verifiedOnly, quickFilter, onView }:
       const json = (await res.json()) as { success: boolean; message: string };
       if (!res.ok || !json.success) throw new Error(json.message || 'Failed to delete product');
       toast.success('Product deleted');
+      // Otherwise a deleted row stays "selected" forever — the bar keeps counting it, and the
+      // next bulk action would re-post its (now nonexistent) id.
+      setSelectedIds((prev) => prev.filter((s) => s !== id));
+      onDeleted?.();
       refresh();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to delete product');
@@ -240,8 +261,8 @@ export function useProductsTable({ enabled, verifiedOnly, quickFilter, onView }:
     setSearch,
     status,
     setStatus,
-    supplierName,
-    setSupplierName,
+    supplierId,
+    setSupplierId,
     supplierOptions,
     hasActiveFilters,
     handleClearFilters,

@@ -4,9 +4,9 @@ import { formatColourName } from '@/lib/inventory/colour';
 import { ModalActions, ModalShell } from '@/components/ModalShell';
 import { STATUS_BADGES } from './PurchaseOrdersPanel';
 import type { usePurchaseOrder } from './hooks/usePurchaseOrder';
-import { formatDate, formatMoney, formatPoNumber } from './utils';
+import { formatDate, formatPoNumber } from './utils';
 
-const GRID_COLS = 'grid-cols-[minmax(0,1fr)_7rem_5.5rem_4.5rem_4.5rem_4.5rem_5rem_5.5rem_6rem]';
+const GRID_COLS = 'grid-cols-[minmax(0,1fr)_7rem_5.5rem_4.5rem_4.5rem_4.5rem_5rem_6.5rem_6rem]';
 
 export default function ReceivePoModal({ po }: { po: ReturnType<typeof usePurchaseOrder> }) {
   const target = po.receiveTarget!;
@@ -27,12 +27,10 @@ export default function ReceivePoModal({ po }: { po: ReturnType<typeof usePurcha
             </span>
           </div>
           <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-600 sm:grid-cols-3">
-            {target.referenceNumber && (
-              <div>
-                <dt className="inline text-gray-400">Reference: </dt>
-                <dd className="inline">{target.referenceNumber}</dd>
-              </div>
-            )}
+            <div>
+              <dt className="inline text-gray-400">Reference: </dt>
+              <dd className="inline">{target.referenceNumber || '—'}</dd>
+            </div>
             <div>
               <dt className="inline text-gray-400">Supplier: </dt>
               <dd className="inline">{target.supplierName}</dd>
@@ -41,22 +39,18 @@ export default function ReceivePoModal({ po }: { po: ReturnType<typeof usePurcha
               <dt className="inline text-gray-400">PO email: </dt>
               <dd className="inline">{target.poEmail}</dd>
             </div>
-            {target.deliveryDate && (
-              <div>
-                <dt className="inline text-gray-400">Delivery date: </dt>
-                <dd className="inline">{formatDate(target.deliveryDate)}</dd>
-              </div>
-            )}
+            <div>
+              <dt className="inline text-gray-400">Delivery date: </dt>
+              <dd className="inline">{target.deliveryDate ? formatDate(target.deliveryDate) : '—'}</dd>
+            </div>
             <div>
               <dt className="inline text-gray-400">Created: </dt>
               <dd className="inline">{formatDate(target.createdAt)}</dd>
             </div>
-            {target.remark && (
-              <div className="col-span-2 sm:col-span-3">
-                <dt className="inline text-gray-400">Remark: </dt>
-                <dd className="inline">{target.remark}</dd>
-              </div>
-            )}
+            <div className="col-span-2 sm:col-span-3">
+              <dt className="inline text-gray-400">Remark: </dt>
+              <dd className="inline">{target.remark || '—'}</dd>
+            </div>
           </dl>
         </div>
 
@@ -86,7 +80,15 @@ export default function ReceivePoModal({ po }: { po: ReturnType<typeof usePurcha
                   <span className="text-right tabular-nums text-gray-500">{item.quantity}</span>
                   <span className="text-right tabular-nums text-gray-500">{item.receivedQuantity}</span>
                   <span className="text-right tabular-nums font-medium text-gray-700">{remaining}</span>
-                  <span className="text-right tabular-nums text-gray-500">{item.unitCost !== null ? formatMoney(item.unitCost) : '—'}</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={po.receiveCost[item.id] ?? ''}
+                    onChange={(e) => po.setReceiveItemCost(item.id, e.target.value)}
+                    aria-label={`Unit cost for ${item.variantTitle}`}
+                    className="w-full rounded-lg border border-gray-300 px-2 py-1 text-right text-sm outline-none focus:ring-2 focus:ring-blue-400"
+                  />
                   <input
                     type="number"
                     min={0}
