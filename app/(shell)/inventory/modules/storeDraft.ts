@@ -1,5 +1,6 @@
 import { storePriceFromMargin } from '@/lib/inventory/store-price';
 import { variantOptionKey } from '@/lib/inventory/variant-option-key';
+import { resolveOptionAxes, optionMatchKeys, type OptionAxes } from '@/lib/inventory/variant-options';
 import type { PricingInputs, ProductRecord, ProductStatusValue } from './types';
 import type { StoreListingsState } from './hooks/useStoreListings';
 
@@ -78,18 +79,25 @@ function suggestedPrice(pricing: PricingInputs, marginPercent: number | null, fa
 
 /** Finds the live Shopify variant matching a hub variant — SKU first, then option values — used
  * to source the SKU/barcode/image/stock shown for a published store (never price, see
- * emptyDraft). Mirrors the server's own lookup in shopify-product-publish.server.ts exactly: a
- * blank hub colour/size is published as 'Default', so matching must try that substituted key
- * before the raw one, or every variant with a blank option silently fails to match. */
-function matchListingVariant(listing: StoreListingsState['listings'][number] | undefined, v: { sku: string | null; colour: string; size: string }) {
+ * emptyDraft). Mirrors the server's own lookup in shopify-product-publish.server.ts via the same
+ * shared candidate-key list, so a simple (no colour/size) or single-axis product — published as
+ * Title/"Default Title", or with only one selectedOption — still matches, not just a full
+ * Colour+Size product. */
+function matchListingVariant(
+  listing: StoreListingsState['listings'][number] | undefined,
+  v: { sku: string | null; colour: string; size: string },
+  axes: OptionAxes
+) {
   const sku = v.sku?.trim().toLowerCase();
-  const hubKey = variantOptionKey([v.colour?.trim() || 'Default', v.size?.trim() || 'Default']);
-  const rawKey = variantOptionKey([v.colour ?? '', v.size ?? '']);
-  return (
-    listing?.variants.find((sv) => sku && sv.sku?.trim().toLowerCase() === sku) ??
-    listing?.variants.find((sv) => variantOptionKey(sv.optionValues) === hubKey) ??
-    listing?.variants.find((sv) => variantOptionKey(sv.optionValues) === rawKey)
-  );
+  if (sku) {
+    const bySku = listing?.variants.find((sv) => sv.sku?.trim().toLowerCase() === sku);
+    if (bySku) return bySku;
+  }
+  for (const key of optionMatchKeys(v, axes)) {
+    const match = listing?.variants.find((sv) => variantOptionKey(sv.optionValues) === key);
+    if (match) return match;
+  }
+  return undefined;
 }
 
 /** A store counts as "published" when Shopify already has a matching product there — regardless
@@ -107,8 +115,9 @@ export function emptyDraft(product: ProductRecord | null, storeId: string, store
   const variantSku: Record<string, string> = {};
   const variantBarcode: Record<string, string> = {};
   const variantImages: Record<string, string | null> = {};
+  const axes = resolveOptionAxes(product?.variants ?? []);
   for (const v of product?.variants ?? []) {
-    const matched = published ? matchListingVariant(listing, v) : undefined;
+    const matched = published ? matchListingVariant(listing, v, axes) : undefined;
     // Price always follows the per-store margin (or the product's own default price) — never the
     // store's currently-live Shopify price, published or not.
     variantPrices[v.id] = String(product ? suggestedPrice(product.pricing, margin, v.sellPrice) : 0);
@@ -207,6 +216,7 @@ export function defaultStock(
   const i = Math.max(0, peerIndex);
 
   const result: Record<string, number> = {};
+  const axes = resolveOptionAxes(product.variants);
   for (const v of product.variants) {
     if (published) {
       // Sums stock across every location Shopify has it at for this store, while the write path
@@ -215,7 +225,7 @@ export function defaultStock(
       // by that save. Store publishing already assumes one fulfilment location per store — this
       // is the same assumption, just newly visible here. No effect for the common single-location
       // store.
-      result[v.id] = matchListingVariant(listing, v)?.inventoryQuantity ?? hubAvailable(v);
+      result[v.id] = matchListingVariant(listing, v, axes)?.inventoryQuantity ?? hubAvailable(v);
     } else {
       const available = hubAvailable(v);
       result[v.id] = Math.floor(available / n) + (i < available % n ? 1 : 0);

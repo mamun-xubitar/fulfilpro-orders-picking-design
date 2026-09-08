@@ -493,8 +493,11 @@ function buildPublishPayload(
         const imageUrl = candidateImageUrl && target.images?.some((i) => i.url === candidateImageUrl) ? candidateImageUrl : null;
         return {
           hubVariantId: v.id,
-          colour: v.colour?.trim() ? v.colour : 'Default',
-          size: v.size?.trim() ? v.size : 'Default',
+          // Raw, trimmed value — '' when blank. lib/shopify-product-publish.server.ts derives the
+          // Shopify option structure from these directly; no sentinel substitution here, so a
+          // colour genuinely named "Default" is never mistaken for a blank one.
+          colour: v.colour?.trim() ?? '',
+          size: v.size?.trim() ?? '',
           sku: meta?.sku ?? (v.sku?.trim() ? v.sku.trim() : null),
           barcode: meta?.barcode ?? (v.barcode?.trim() ? v.barcode.trim() : null),
           price: Number.isFinite(Number(override)) && Number(override) >= 0
