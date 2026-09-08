@@ -1219,25 +1219,28 @@ model InventoryAllocation {
 }
 
 /**
- * Per-fulfilment idempotency for fulfillments/create + fulfillments/update.
+ * Per-fulfilment-line idempotency for fulfillments/create + fulfillments/update.
  * Shopify re-delivers the same fulfilment (same `payload.id`) on every status
  * change (pending -> open -> success, tracking updates) with a fresh
  * X-Shopify-Webhook-Id, so the delivery-level ShopifyWebhookEvent guard alone
- * cannot dedupe. One row per Shopify fulfilment id: the first delivery moves
- * stock, later deliveries for the same id are no-ops (or reverse once).
+ * cannot dedupe. One row per (fulfilment, order line): the first delivery moves
+ * stock, later deliveries for the same line are no-ops (or reverse once). The
+ * key MUST stay per-line — a per-fulfilment key would make the second and later
+ * lines of a multi-line fulfilment collide and silently skip their stock moves.
  */
 model ProcessedFulfillmentEvent {
   id             String   @id @default(uuid())
   storeId        String
   shopifyOrderId String
   fulfillmentId  String
+  lineItemId     String
   status         String   @default("applied")
   appliedQty     Int      @default(0)
   store          Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  @@unique([storeId, fulfillmentId])
+  @@unique([storeId, fulfillmentId, lineItemId])
   @@index([storeId, shopifyOrderId])
 }
 

@@ -34,25 +34,32 @@ function normalizeRestockType(raw: string | null | undefined, topLevelRestock?: 
 }
 
 /** Moves a hub variant's `allocated` counter by `delta`, clamped at 0, and logs the movement.
- * Never uses a bare `{ decrement }` — that can't clamp, and a webhook processed out of order
- * (e.g. a refund landing before its fulfillment) must never push the counter negative. */
+ * Single atomic UPDATE (no read-then-write gap): concurrent webhook deliveries touching
+ * the same variant can't clobber each other's moves. A bare `{ decrement }` can't clamp,
+ * and a webhook processed out of order (e.g. a refund landing before its fulfillment)
+ * must never push the counter negative — hence GREATEST(0, ...). Parameters are bound
+ * via Prisma's tagged template, never string-concatenated. */
 async function adjustVariantAllocated(tx: Tx, variantId: string, delta: number, message: string) {
-  const variant = await tx.supplierProductVariant.findUnique({ where: { id: variantId }, select: { allocated: true, supplierProductId: true } });
-  if (!variant) return;
-  const next = Math.max(0, variant.allocated + delta);
-  await tx.supplierProductVariant.update({ where: { id: variantId }, data: { allocated: next } });
+  const rows = await tx.$queryRaw<{ supplierProductId: string }[]>`
+    UPDATE "SupplierProductVariant"
+    SET "allocated" = GREATEST(0, "allocated" + ${delta}), "updatedAt" = NOW()
+    WHERE "id" = ${variantId}
+    RETURNING "supplierProductId"`;
+  if (rows.length === 0) return;
   await tx.inventoryActivity.create({
-    data: { supplierProductId: variant.supplierProductId, variantId, type: 'order_allocation', message, actorId: ACTOR.id, actorName: ACTOR.name },
+    data: { supplierProductId: rows[0].supplierProductId, variantId, type: 'order_allocation', message, actorId: ACTOR.id, actorName: ACTOR.name },
   });
 }
 
 async function adjustVariantStock(tx: Tx, variantId: string, delta: number, message: string) {
-  const variant = await tx.supplierProductVariant.findUnique({ where: { id: variantId }, select: { stockOnHand: true, supplierProductId: true } });
-  if (!variant) return;
-  const next = Math.max(0, variant.stockOnHand + delta);
-  await tx.supplierProductVariant.update({ where: { id: variantId }, data: { stockOnHand: next } });
+  const rows = await tx.$queryRaw<{ supplierProductId: string }[]>`
+    UPDATE "SupplierProductVariant"
+    SET "stockOnHand" = GREATEST(0, "stockOnHand" + ${delta}), "updatedAt" = NOW()
+    WHERE "id" = ${variantId}
+    RETURNING "supplierProductId"`;
+  if (rows.length === 0) return;
   await tx.inventoryActivity.create({
-    data: { supplierProductId: variant.supplierProductId, variantId, type: 'order_stock', message, actorId: ACTOR.id, actorName: ACTOR.name },
+    data: { supplierProductId: rows[0].supplierProductId, variantId, type: 'order_stock', message, actorId: ACTOR.id, actorName: ACTOR.name },
   });
 }
 
@@ -276,7 +283,7 @@ export async function applyFulfillment(args: { storeId: string; shopifyOrderId: 
         if (!row) return;
         if (fulfillmentKey) {
           await tx.processedFulfillmentEvent.create({
-            data: { storeId: args.storeId, shopifyOrderId: args.shopifyOrderId, fulfillmentId: fulfillmentKey, status: 'applied', appliedQty: wanted },
+            data: { storeId: args.storeId, shopifyOrderId: args.shopifyOrderId, fulfillmentId: fulfillmentKey, lineItemId, status: 'applied', appliedQty: wanted },
           });
         }
 
@@ -317,11 +324,15 @@ export async function reverseFulfillment(args: { storeId: string; shopifyOrderId
     await prisma.$transaction(async (tx) => {
       if (fulfillmentKey) {
         const prior = await tx.processedFulfillmentEvent.findUnique({
-          where: { storeId_fulfillmentId: { storeId: args.storeId, fulfillmentId: fulfillmentKey } },
+          where: { storeId_fulfillmentId_lineItemId: { storeId: args.storeId, fulfillmentId: fulfillmentKey, lineItemId } },
         });
-        if (!prior) return;
-        if (prior.status === 'reversed') return;
-        await tx.processedFulfillmentEvent.update({ where: { id: prior.id }, data: { status: 'reversed' } });
+        if (prior?.status === 'reversed') return;
+        if (prior) {
+          await tx.processedFulfillmentEvent.update({ where: { id: prior.id }, data: { status: 'reversed' } });
+        }
+        // No prior row (fulfilment applied before per-line idempotency existed):
+        // still fall through — the fulfilledQuantity cap below makes duplicates
+        // and never-fulfilled lines safe no-ops on its own.
       }
       const row = await tx.inventoryAllocation.findUnique({
         where: { storeId_shopifyOrderId_lineItemId: { storeId: args.storeId, shopifyOrderId: args.shopifyOrderId, lineItemId } },
