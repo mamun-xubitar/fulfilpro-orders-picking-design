@@ -46,10 +46,10 @@ export default function DescriptionField({ details: d }: DescriptionFieldProps) 
         )}
         {d.ai && (
           <div className={AI_GROUP}>
-            <SegmentButton active={d.ai.active === 'original'} onClick={() => d.setAiActive('original')}>
+            <SegmentButton active={d.ai.active === 'original'} disabled={d.aiGenerating} onClick={() => d.setAiActive('original')}>
               Original
             </SegmentButton>
-            <SegmentButton active={d.ai.active === 'generated'} onClick={() => d.setAiActive('generated')}>
+            <SegmentButton active={d.ai.active === 'generated'} disabled={d.aiGenerating} onClick={() => d.setAiActive('generated')}>
               Generated
             </SegmentButton>
             <button
@@ -84,13 +84,24 @@ export default function DescriptionField({ details: d }: DescriptionFieldProps) 
   );
 }
 
-function SegmentButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+function SegmentButton({
+  active,
+  disabled,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       aria-pressed={active}
-      className={`rounded-md px-2 py-1 text-[11px] font-semibold transition-colors duration-150 cursor-pointer ${
+      className={`rounded-md px-2 py-1 text-[11px] font-semibold transition-colors duration-150 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
         active ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-600 hover:bg-white hover:text-gray-900'
       }`}
     >

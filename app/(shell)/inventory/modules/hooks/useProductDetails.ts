@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { toast } from 'react-toastify';
 import useRequest from '@/hooks/useRequest';
 import { deriveColorFromName } from '@/lib/inventory/colour';
@@ -65,13 +65,29 @@ export function useProductDetails({ product, onSaved }: UseProductDetailsArgs) {
   // Original/Generated are two independent drafts of the description, tagged with the product
   // they belong to so a product switch drops them without an effect having to reset anything —
   // same pattern as `draft` above. Switching the active slot stows the other draft's edits rather
-  // than discarding them (see setAiActive).
-  const [ai, setAi] = useState<{ productId: string; active: 'original' | 'generated'; original: string; generated: string } | null>(null);
+  // than discarding them (see setAiActive). `generatedBaseline` is the raw AI output, untouched by
+  // stowing/hand-edits, so regenerate can detect an unsaved edit regardless of which tab is active.
+  const [ai, setAi] = useState<{
+    productId: string;
+    active: 'original' | 'generated';
+    original: string;
+    generated: string;
+    generatedBaseline: string;
+  } | null>(null);
 
   const saved = product ? productToForm(product) : EMPTY_FORM;
   const form = draft && draft.productId === product?.id ? draft.form : saved;
   const editing = editingId !== null && editingId === product?.id;
   const effectiveAi = ai && product && ai.productId === product.id ? ai : null;
+
+  // Latest-value refs for the AI request callbacks below, which are created (and capture `form`/
+  // `product`) at click time but must act on whatever is current when the response lands — not
+  // the stale click-time snapshot — and must bail out entirely if the admin has since switched to
+  // a different product, rather than clobbering that product's currently-visible draft.
+  const productRef = useRef(product);
+  productRef.current = product;
+  const formRef = useRef(form);
+  formRef.current = form;
 
   const write = (next: ProductDetailsForm) => {
     if (!product) return;
@@ -120,6 +136,7 @@ export function useProductDetails({ product, onSaved }: UseProductDetailsArgs) {
    * Regenerate group. Nothing is persisted; Save writes whichever draft is active. */
   const generateDescription = () => {
     if (!product) return;
+    const productId = product.id;
     const original = form.description;
     requestAi({
       url: '/api/inventory/ai/product-description',
@@ -127,8 +144,9 @@ export function useProductDetails({ product, onSaved }: UseProductDetailsArgs) {
       showToast: false,
       data: aiRequestData(original),
       onSuccess: ({ data }) => {
-        setAi({ productId: product.id, active: 'generated', original, generated: data.description });
-        write({ ...form, description: data.description });
+        if (productRef.current?.id !== productId) return; // admin switched products while this was in flight
+        setAi({ productId, active: 'generated', original, generated: data.description, generatedBaseline: data.description });
+        write({ ...formRef.current, description: data.description });
       },
       onError: (err) => toast.error(err.general || 'Failed to generate description'),
     });
@@ -148,8 +166,12 @@ export function useProductDetails({ product, onSaved }: UseProductDetailsArgs) {
    * has hand-edited the Generated draft since it was last produced, since this overwrites it. */
   const regenerateDescription = () => {
     if (!effectiveAi || !product) return;
-    const hasUnsavedEdit = effectiveAi.active === 'generated' && form.description !== effectiveAi.generated;
+    // Compares against the raw last-fetched output rather than checking only the active tab, so
+    // switching to Original right before regenerating can't sneak past an unconfirmed hand-edit.
+    const currentGenerated = effectiveAi.active === 'generated' ? form.description : effectiveAi.generated;
+    const hasUnsavedEdit = currentGenerated !== effectiveAi.generatedBaseline;
     if (hasUnsavedEdit && !window.confirm('Regenerating will discard your edits to the generated description. Continue?')) return;
+    const productId = product.id;
     const original = effectiveAi.active === 'original' ? form.description : effectiveAi.original;
     requestAi({
       url: '/api/inventory/ai/product-description',
@@ -157,8 +179,9 @@ export function useProductDetails({ product, onSaved }: UseProductDetailsArgs) {
       showToast: false,
       data: aiRequestData(original),
       onSuccess: ({ data }) => {
-        setAi({ productId: product.id, active: 'generated', original, generated: data.description });
-        write({ ...form, description: data.description });
+        if (productRef.current?.id !== productId) return; // admin switched products while this was in flight
+        setAi({ productId, active: 'generated', original, generated: data.description, generatedBaseline: data.description });
+        write({ ...formRef.current, description: data.description });
       },
       onError: (err) => toast.error(err.general || 'Failed to regenerate description'),
     });
