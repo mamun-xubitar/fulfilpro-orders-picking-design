@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { toast } from 'react-toastify';
 import useRequest from '@/hooks/useRequest';
 import { deriveColorFromName } from '@/lib/inventory/colour';
@@ -61,10 +61,33 @@ export function useProductDetails({ product, onSaved }: UseProductDetailsArgs) {
   // name on every keystroke; unlocking hands control to the admin.
   const [handleLocked, setHandleLocked] = useState(true);
   const { request, loading: saving, errors, setErrors } = useRequest<ProductRecord>();
+  const { request: requestAi, loading: aiGenerating } = useRequest<{ description: string }>();
+  // Original/Generated are two independent drafts of the description, tagged with the product
+  // they belong to so a product switch drops them without an effect having to reset anything —
+  // same pattern as `draft` above. Switching the active slot stows the other draft's edits rather
+  // than discarding them (see setAiActive). `generatedBaseline` is the raw AI output, untouched by
+  // stowing/hand-edits, so regenerate can detect an unsaved edit regardless of which tab is active.
+  const [ai, setAi] = useState<{
+    productId: string;
+    active: 'original' | 'generated';
+    original: string;
+    generated: string;
+    generatedBaseline: string;
+  } | null>(null);
 
   const saved = product ? productToForm(product) : EMPTY_FORM;
   const form = draft && draft.productId === product?.id ? draft.form : saved;
   const editing = editingId !== null && editingId === product?.id;
+  const effectiveAi = ai && product && ai.productId === product.id ? ai : null;
+
+  // Latest-value refs for the AI request callbacks below, which are created (and capture `form`/
+  // `product`) at click time but must act on whatever is current when the response lands — not
+  // the stale click-time snapshot — and must bail out entirely if the admin has since switched to
+  // a different product, rather than clobbering that product's currently-visible draft.
+  const productRef = useRef(product);
+  productRef.current = product;
+  const formRef = useRef(form);
+  formRef.current = form;
 
   const write = (next: ProductDetailsForm) => {
     if (!product) return;
@@ -95,7 +118,78 @@ export function useProductDetails({ product, onSaved }: UseProductDetailsArgs) {
 
   const setDescription = (description: string) => write({ ...form, description });
 
-  const saveDetails = () => {
+  /** Builds the request body for both generate and regenerate — the admin's in-progress draft,
+   * not the last-saved product, so a generation reflects fields not yet saved. */
+  const aiRequestData = (descriptionOverride: string) => ({
+    productId: product?.id,
+    name: form.name,
+    brand: form.brand,
+    category: form.category,
+    description: descriptionOverride,
+    remarks: form.remarks,
+    sizes: parseSizesInput(form.sizes),
+    colours: parseColoursInput(form.colours),
+  });
+
+  /** First generation — snapshots the description on screen as "Original", writes the AI result
+   * into both "Generated" and the live field, and switches the icon into the Original/Generated/
+   * Regenerate group. Nothing is persisted; Save writes whichever draft is active. */
+  const generateDescription = () => {
+    if (!product) return;
+    const productId = product.id;
+    const original = form.description;
+    requestAi({
+      url: '/api/inventory/ai/product-description',
+      method: 'POST',
+      showToast: false,
+      data: aiRequestData(original),
+      onSuccess: ({ data }) => {
+        if (productRef.current?.id !== productId) return; // admin switched products while this was in flight
+        setAi({ productId, active: 'generated', original, generated: data.description, generatedBaseline: data.description });
+        write({ ...formRef.current, description: data.description });
+      },
+      onError: (err) => toast.error(err.general || 'Failed to generate description'),
+    });
+  };
+
+  /** Switches which draft is live in the field. Stows the outgoing draft's current text (which
+   * may have been hand-edited since generation) before swapping in the other one, so neither
+   * draft loses edits by switching back and forth. */
+  const setAiActive = (next: 'original' | 'generated') => {
+    if (!effectiveAi || effectiveAi.active === next) return;
+    const stowed = { ...effectiveAi, [effectiveAi.active]: form.description, active: next };
+    setAi(stowed);
+    write({ ...form, description: stowed[next] });
+  };
+
+  /** Re-requests a Generated draft from the current Original text. Confirms first if the admin
+   * has hand-edited the Generated draft since it was last produced, since this overwrites it. */
+  const regenerateDescription = () => {
+    if (!effectiveAi || !product) return;
+    // Compares against the raw last-fetched output rather than checking only the active tab, so
+    // switching to Original right before regenerating can't sneak past an unconfirmed hand-edit.
+    const currentGenerated = effectiveAi.active === 'generated' ? form.description : effectiveAi.generated;
+    const hasUnsavedEdit = currentGenerated !== effectiveAi.generatedBaseline;
+    if (hasUnsavedEdit && !window.confirm('Regenerating will discard your edits to the generated description. Continue?')) return;
+    const productId = product.id;
+    const original = effectiveAi.active === 'original' ? form.description : effectiveAi.original;
+    requestAi({
+      url: '/api/inventory/ai/product-description',
+      method: 'POST',
+      showToast: false,
+      data: aiRequestData(original),
+      onSuccess: ({ data }) => {
+        if (productRef.current?.id !== productId) return; // admin switched products while this was in flight
+        setAi({ productId, active: 'generated', original, generated: data.description, generatedBaseline: data.description });
+        write({ ...formRef.current, description: data.description });
+      },
+      onError: (err) => toast.error(err.general || 'Failed to regenerate description'),
+    });
+  };
+
+  /** `after` fires once the save succeeds — used by the New Product wizard to advance to the
+   * next step only on a confirmed save, without duplicating this request. */
+  const saveDetails = (after?: () => void) => {
     if (!product) return;
     request({
       url: `/api/inventory/catalog/${product.id}`,
@@ -132,6 +226,8 @@ export function useProductDetails({ product, onSaved }: UseProductDetailsArgs) {
         setDraft(null);
         setEditingId(null);
         setHandleLocked(true);
+        setAi(null);
+        after?.();
       },
     });
   };
@@ -230,6 +326,9 @@ export function useProductDetails({ product, onSaved }: UseProductDetailsArgs) {
     saving,
     errors,
     form,
+    /** The product this draft belongs to — used by the itemNo availability check to exclude the
+     * product's own current itemNo from the collision check. */
+    productId: product?.id ?? null,
     set,
     setName,
     handleLocked,
@@ -239,6 +338,8 @@ export function useProductDetails({ product, onSaved }: UseProductDetailsArgs) {
     setStatus: (status: ProductStatusValue) => write({ ...form, status }),
     setVerified: (verified: boolean) => write({ ...form, verified }),
     setSupplierIds: (supplierIds: string[]) => write({ ...form, supplierIds }),
+    setSizesValue: (sizes: string) => write({ ...form, sizes }),
+    setColoursValue: (colours: string) => write({ ...form, colours }),
     startEdit: () => {
       if (!product) return;
       setEditingId(product.id);
@@ -250,11 +351,17 @@ export function useProductDetails({ product, onSaved }: UseProductDetailsArgs) {
       setEditingId(null);
       setHandleLocked(true);
       setErrors({});
+      setAi(null);
     },
     saveDetails,
     quickAddSizes,
     quickAddColours,
     syncListsFromProduct,
+    ai: effectiveAi,
+    aiGenerating,
+    generateDescription,
+    setAiActive,
+    regenerateDescription,
     // Effective lists, so the variants matrix reflects an in-progress edit.
     sizes: parseSizesInput(form.sizes),
     colours: parseColoursInput(form.colours),

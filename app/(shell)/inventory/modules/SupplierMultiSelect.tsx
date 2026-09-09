@@ -2,16 +2,19 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { FieldLabel } from './ProductFieldRows';
-import { Close } from './icons';
-
-/** Above this many options the panel grows a search box — below it, searching 3 suppliers is noise. */
-const SEARCH_THRESHOLD = 8;
+import { Close, Plus } from './icons';
 
 type SupplierMultiSelectProps = {
   suppliers: { id: string; name: string }[];
   selectedIds: string[];
   onChange: (ids: string[]) => void;
   error?: string;
+  /** Opens the Add supplier modal pre-filled with `name` — offered as a row in the dropdown when
+   * the search term matches no existing supplier, so a not-found lookup can resolve into a create
+   * without leaving the field. */
+  onCreateSupplier?: (name: string) => void;
+  /** Opens the Add supplier modal with a blank form — rendered as a "+" button beside the trigger. */
+  onAddSupplier?: () => void;
 };
 
 /**
@@ -20,7 +23,7 @@ type SupplierMultiSelectProps = {
  * the supplier list is already loaded page-wide. Every linked supplier is equal: there's no
  * default/primary among them.
  */
-export default function SupplierMultiSelect({ suppliers, selectedIds, onChange, error }: SupplierMultiSelectProps) {
+export default function SupplierMultiSelect({ suppliers, selectedIds, onChange, error, onCreateSupplier, onAddSupplier }: SupplierMultiSelectProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
@@ -29,8 +32,6 @@ export default function SupplierMultiSelect({ suppliers, selectedIds, onChange, 
     const onClickOutside = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false);
     };
-    // Escape is bound at the document, not on the search input the way TagsPicker does it — that
-    // input is conditional here, so a short list would otherwise have no Escape at all.
     const onEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setOpen(false);
     };
@@ -42,7 +43,6 @@ export default function SupplierMultiSelect({ suppliers, selectedIds, onChange, 
     };
   }, []);
 
-  const showSearch = suppliers.length > SEARCH_THRESHOLD;
   const results = useMemo(() => {
     const term = query.trim().toLowerCase();
     if (!term) return suppliers;
@@ -52,11 +52,12 @@ export default function SupplierMultiSelect({ suppliers, selectedIds, onChange, 
   const selected = selectedIds.map((id) => suppliers.find((s) => s.id === id) ?? { id, name: id });
   const toggle = (id: string) => onChange(selectedIds.includes(id) ? selectedIds.filter((s) => s !== id) : [...selectedIds, id]);
   const remove = (id: string) => onChange(selectedIds.filter((s) => s !== id));
+  const trimmedQuery = query.trim();
 
   return (
     <div className="min-w-0" ref={containerRef}>
       <FieldLabel>Suppliers</FieldLabel>
-      <div className="relative">
+      <div className="relative flex items-start gap-1.5">
         <button
           type="button"
           onClick={() => setOpen((prev) => !prev)}
@@ -93,20 +94,29 @@ export default function SupplierMultiSelect({ suppliers, selectedIds, onChange, 
           ))}
         </button>
 
+        {onAddSupplier && (
+          <button
+            type="button"
+            onClick={onAddSupplier}
+            aria-label="Add a new supplier"
+            title="Add a new supplier"
+            className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-500 transition-colors duration-150 hover:bg-gray-50 hover:text-gray-700 cursor-pointer"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+        )}
+
         {open && (
           <div className="absolute z-30 top-full mt-1 left-0 w-full sm:w-[20rem] max-w-[90vw] max-h-72 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
-            {showSearch && (
-              <input
-                autoFocus
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search suppliers…"
-                className="w-full border-b border-gray-100 px-3 py-2 text-sm outline-none"
-              />
-            )}
-            {suppliers.length === 0 && <div className="px-3 py-2 text-xs text-gray-400">No suppliers yet.</div>}
-            {suppliers.length > 0 && results.length === 0 && <div className="px-3 py-2 text-xs text-gray-400">No suppliers match “{query.trim()}”.</div>}
+            <input
+              autoFocus
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search suppliers…"
+              className="w-full border-b border-gray-100 px-3 py-2 text-sm outline-none"
+            />
+            {suppliers.length === 0 && !trimmedQuery && <div className="px-3 py-2 text-xs text-gray-400">No suppliers yet.</div>}
             {results.map((s) => (
               <label key={s.id} className="flex cursor-pointer items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50">
                 <input
@@ -118,6 +128,23 @@ export default function SupplierMultiSelect({ suppliers, selectedIds, onChange, 
                 <span className="truncate text-gray-900">{s.name}</span>
               </label>
             ))}
+            {results.length === 0 && trimmedQuery && (
+              <div className="px-3 py-2 text-xs text-gray-400">No suppliers match “{trimmedQuery}”.</div>
+            )}
+            {trimmedQuery && onCreateSupplier && (
+              <button
+                type="button"
+                onClick={() => {
+                  onCreateSupplier(trimmedQuery);
+                  setOpen(false);
+                  setQuery('');
+                }}
+                className="flex w-full items-center gap-1.5 border-t border-gray-100 px-3 py-2 text-left text-sm font-semibold text-blue-600 hover:bg-blue-50 cursor-pointer"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Create supplier “{trimmedQuery}”
+              </button>
+            )}
           </div>
         )}
       </div>

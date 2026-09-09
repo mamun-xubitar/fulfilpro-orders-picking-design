@@ -195,7 +195,7 @@ const ALL_NAMED_COLOURS: Record<string, string> = { ...EXTRA_NAMED_COLOURS, ...C
 /** Grey dot shown for a colour whose derived CSS value isn't recognized. */
 export const FALLBACK_SWATCH = '#cbd5e1';
 
-const HEX_PATTERN = /^#[0-9a-f]{3}$|^#[0-9a-f]{6}$/i;
+export const HEX_PATTERN = /^#[0-9a-f]{3}$|^#[0-9a-f]{6}$/i;
 
 export function isValidCssColor(value: string): boolean {
   if (HEX_PATTERN.test(value)) return true;

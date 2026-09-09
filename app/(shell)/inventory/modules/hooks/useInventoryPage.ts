@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { toast } from 'react-toastify';
 import useRequest from '@/hooks/useRequest';
 import { isValidHandle } from '@/lib/inventory/handle';
 import { summariseVariants } from '../utils';
@@ -9,6 +8,7 @@ import { useAdjustments } from './useAdjustments';
 import { useCatalogData } from './useCatalogData';
 import { useImportExport } from './useImportExport';
 import { useImportProducts } from './useImportProducts';
+import { useInventoryPresets } from './useInventoryPresets';
 import { useProductDetails } from './useProductDetails';
 import { useProductImageMutations } from './useProductImageMutations';
 import { useProductImages } from './useProductImages';
@@ -31,6 +31,7 @@ export function useInventoryPage() {
   const [newProductOpen, setNewProductOpen] = useState(false);
   const [editImagesOpen, setEditImagesOpen] = useState(false);
   const [deleteProductOpen, setDeleteProductOpen] = useState(false);
+  const [matrixFullView, setMatrixFullView] = useState(false);
   const [storePriceTarget, setStorePriceTarget] = useState<StoreListingResult | null>(null);
   const { request: requestCreate, loading: creatingProduct, errors: createErrors } = useRequest<ProductRecord>();
   const { request: requestDeleteProduct, loading: deletingProduct } = useRequest<null>();
@@ -62,7 +63,7 @@ export function useInventoryPage() {
 
   const gallery = useProductImages(product);
   const imageMutations = useProductImageMutations({ product, onSaved: onProductSaved });
-  const pricing = useProductPricing({ product, globals: data.globals, onSaved: onProductSaved });
+  const pricing = useProductPricing({ product, globals: data.globals, storeListings, onSaved: onProductSaved });
   const details = useProductDetails({ product, onSaved: onProductSaved });
   // A variant delete (or edit) can prune a colour/size the details draft doesn't know about yet
   // — sync the draft's lists from the server's copy so a since-removed value isn't offered back.
@@ -78,14 +79,10 @@ export function useInventoryPage() {
   const productsTable = useProductsTable({ enabled: data.allRecords, verifiedOnly: nav.verifiedOnly, quickFilter: nav.quickFilter, onView: nav.viewProduct, onCounts: data.syncCounts, onDeleted: bumpSupplierRefresh });
   const importProducts = useImportProducts({ supplierOptions: po.supplierOptions, onImported: () => { data.refresh(); productsTable.refresh(); bumpSupplierRefresh(); } });
   const suppliers = useSuppliers({ onChanged: po.refreshSuppliers, refreshKey: po.receivedNonce + supplierRefreshNonce });
+  const presets = useInventoryPresets();
 
   /** Stock Summary always reflects the whole product, not the matrix's filtered rows. */
   const summary = useMemo(() => summariseVariants(product?.variants ?? []), [product]);
-
-  /** Every remaining stub button (design-only surfaces) lands here. */
-  const notImplemented = (action: string) => {
-    toast.info(`${action} isn't available yet.`);
-  };
 
   const confirmDeleteProduct = () => {
     if (!product) return;
@@ -102,7 +99,13 @@ export function useInventoryPage() {
     });
   };
 
-  const createProduct = (form: { supplierIds: string[]; itemNo: string; name: string; brand: string; handle: string }) => {
+  /** `onCreated` fires with the new product's id once creation succeeds — used by the New
+   * Product wizard to advance to step 2. The wizard (not this function) owns closing the modal,
+   * since steps 2-5 keep it open against the same created product. */
+  const createProduct = (
+    form: { supplierIds: string[]; itemNo: string; name: string; brand: string; handle: string },
+    onCreated?: (id: string) => void
+  ) => {
     requestCreate({
       url: '/api/inventory/catalog',
       method: 'POST',
@@ -118,8 +121,8 @@ export function useInventoryPage() {
       },
       onSuccess: ({ data: created }) => {
         nav.selectProduct(created.id);
-        setNewProductOpen(false);
         bumpSupplierRefresh();
+        onCreated?.(created.id);
       },
     });
   };
@@ -155,7 +158,9 @@ export function useInventoryPage() {
     marginInput: data.marginInput,
     setMarginInput: data.setMarginInput,
     applyGlobalMargin: data.applyGlobalMargin,
-    notImplemented,
+    matrixFullView,
+    openMatrixFullView: () => setMatrixFullView(true),
+    closeMatrixFullView: () => setMatrixFullView(false),
     newProductOpen,
     openNewProduct: () => setNewProductOpen(true),
     closeNewProduct: () => setNewProductOpen(false),
@@ -176,6 +181,7 @@ export function useInventoryPage() {
     setStorePriceTarget,
     storeListings,
     storePublish,
+    presets,
   };
 }
 

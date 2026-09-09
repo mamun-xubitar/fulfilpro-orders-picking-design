@@ -1,5 +1,7 @@
 'use client';
 
+import { useEffect } from 'react';
+import { usePageHeading } from '@/components/PageHeadingContext';
 import BottomPanels from './BottomPanels';
 import ComingSoon from './ComingSoon';
 import InventoryModals from './InventoryModals';
@@ -14,8 +16,7 @@ import ProductsTableToolbar from './ProductsTableToolbar';
 import ProductsToolbar from './ProductsToolbar';
 import PurchaseOrdersPanel from './PurchaseOrdersPanel';
 import SuppliersTab from './SuppliersTab';
-import VariantsMatrixTable from './VariantsMatrixTable';
-import VariantsMatrixToolbar from './VariantsMatrixToolbar';
+import VariantsMatrixSection from './VariantsMatrixSection';
 import { MODULE_TABS, PRODUCT_TABS } from './constants';
 import { useInventoryPage } from './hooks/useInventoryPage';
 
@@ -24,6 +25,16 @@ export default function InventoryPage() {
   const moduleTab = MODULE_TABS.find((t) => t.id === p.moduleTab)!;
   const productTab = PRODUCT_TABS.find((t) => t.id === p.productTab)!;
   const hasSelection = p.productsTable.selectAllFilters || p.productsTable.selectedIds.length > 0;
+
+  // Contributes the focused product's name to the shell header ("Inventory / <name>") in
+  // single-product view only — the all-records table view shows the plain "Inventory" title.
+  const { setSuffix } = usePageHeading();
+  const productName = !p.nav.allRecords ? (p.product?.name ?? null) : null;
+  useEffect(() => {
+    setSuffix(productName);
+    return () => setSuffix(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productName]);
 
   return (
     <main className="flex-1 space-y-3 p-4 md:p-6">
@@ -62,10 +73,7 @@ export default function InventoryPage() {
                 <ProductSubTabs active={p.productTab} onChange={p.setProductTab} />
               </div>
 
-              <section className="rounded-xl border border-gray-200 bg-white shadow-sm">
-                <VariantsMatrixToolbar p={p} />
-                <VariantsMatrixTable matrix={p.matrix} />
-              </section>
+              <VariantsMatrixSection p={p} />
 
               {p.productTab === 'details' ? (
                 <ProductDetailsTab p={p} />

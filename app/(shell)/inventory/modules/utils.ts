@@ -11,6 +11,7 @@ import type {
   PurchaseOrderRecord,
   QuickFilterId,
   StockSummary,
+  StoreListingResult,
   VariantComputed,
   VariantRow,
   VariantStatus,
@@ -138,6 +139,19 @@ export function formatCurrencyValue(n: number): string {
   return `$${formatMoney(n)}`;
 }
 
+/** A store's effective per-store margin — the panel's staged draft while it's being edited
+ * (including a value not yet saved, or one just cleared), the live listing's own marginPercent
+ * otherwise. Shared by PerStoreMarginRows (which rows to show) and StoreMarginPriceChips (which
+ * stores get a price badge), so the two can never disagree about which stores have a margin set. */
+export function marginForStore(
+  storeId: string,
+  listings: StoreListingResult[],
+  values: Record<string, number | null>,
+  editing: boolean
+): number | null {
+  return editing ? (values[storeId] ?? null) : (listings.find((l) => l.storeId === storeId)?.marginPercent ?? null);
+}
+
 /** A store listing's price, or price range, formatted with a leading `$` on both ends of a
  * range — e.g. "$12.00 – $15.00", not "$12.00 – 15.00". Used by both the store cards and the
  * per-store price chips under Pricing & margin. */
@@ -208,6 +222,30 @@ export function findCaseInsensitiveDuplicate(values: string[]): string | null {
     seen.add(lower);
   }
   return null;
+}
+
+/** Splits a comma-separated input into trimmed, non-empty values — the generic form of
+ * parseSizesInput, for callers (preset add forms, quick-add modals) that aren't parsing a
+ * product's own sizes/colours field. */
+export function splitCommaList(value: string): string[] {
+  return value
+    .split(',')
+    .map((v) => v.trim())
+    .filter(Boolean);
+}
+
+/** Case-insensitive, whitespace-stripped uniqueness key for a preset/colour/size name — mirrors
+ * the server's `presetKeyOf` (models/inventory-preset.model.server.ts). */
+export function keyOf(name: string): string {
+  return name.trim().toLowerCase().replace(/\s+/g, '');
+}
+
+/** Display-only: capitalises the first character, leaving the rest exactly as typed — "xl" reads
+ * as "Xl" but "XL" stays "XL". Mirrors the server's storage-time capitalisation in
+ * InventoryPresetController.create, applied here purely for chips rendered from a live draft
+ * (not yet a saved preset), which the server hasn't touched yet. */
+export function capitaliseFirst(name: string): string {
+  return name.length === 0 ? name : name.charAt(0).toUpperCase() + name.slice(1);
 }
 
 /** `product.category` stores the full Shopify taxonomy path ("Apparel & Accessories > … >

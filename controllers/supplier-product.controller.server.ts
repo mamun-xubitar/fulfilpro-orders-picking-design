@@ -14,6 +14,7 @@ const currencyModel = new CurrencyRateModel();
 const supplierModel = new SupplierModel();
 
 const STATUS_VALUES = new Set<string>(Object.values(SupplierProductStatus));
+const MAX_IMAGES = 250;
 const QUICK_FILTER_IDS = new Set<string>(['buying-lt-1', 'profit-lt-5', 'selling-lt-1', 'selling-lt-5']);
 const SORT_KEYS = new Set<string>(['name', 'brand', 'category', 'sku', 'status', 'variants', 'stock', 'stockValue', 'createdAt']);
 const CATALOGUE_MODES = new Set(['detail', 'table', 'search', 'ids']);
@@ -126,6 +127,20 @@ export class SupplierProductController {
         supplierOptions: [] as { id: string; name: string }[],
       },
     };
+  }
+
+  /** Instant inline availability check for the itemNo field — New Product wizard's Basics step
+   * and Product details both debounce a call here so a collision is flagged before submit rather
+   * than only surfacing as the create/save 409. */
+  async checkItemNo(searchParams: URLSearchParams, session: Session) {
+    if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
+
+    const itemNo = searchParams.get('itemNo')?.trim() ?? '';
+    const excludeId = searchParams.get('excludeId')?.trim() || undefined;
+    if (!itemNo) return { data: { available: true } };
+
+    const taken = await model.existsByItemNo(itemNo, excludeId);
+    return { data: { available: !taken } };
   }
 
   async create(body: unknown, session: Session) {
@@ -391,6 +406,11 @@ export class SupplierProductController {
     const url = typeof value.url === 'string' ? value.url.trim() : '';
     if (!url) return { error: { message: 'url is required', status: 400 } };
 
+    const existingCount = await model.countImages(id);
+    if (existingCount >= MAX_IMAGES) {
+      return { error: { message: `This product can hold at most ${MAX_IMAGES} images (${existingCount} already uploaded)`, status: 400 } };
+    }
+
     await model.addImage(id, {
       url,
       altText: typeof value.altText === 'string' ? value.altText : null,
@@ -407,6 +427,16 @@ export class SupplierProductController {
     if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
     if (!(await model.exists(id))) return { error: { message: 'Product not found', status: 404 } };
     if (files.length === 0) return { error: { message: 'No files provided', status: 400 } };
+
+    const existingCount = await model.countImages(id);
+    if (existingCount + files.length > MAX_IMAGES) {
+      return {
+        error: {
+          message: `This product can hold at most ${MAX_IMAGES} images (${existingCount} already uploaded, ${files.length} more requested)`,
+          status: 400,
+        },
+      };
+    }
 
     const uploaded = await Promise.all(files.map((file) => saveUploadedFile(file)));
     const created = await model.addImages(

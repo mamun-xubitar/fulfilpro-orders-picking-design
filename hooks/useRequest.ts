@@ -46,6 +46,11 @@ export default function useRequest<TData = unknown>() {
       toastId = toast.loading('Loading...');
     }
 
+    // Flipped just before invoking a consumer's onSuccess — lets the catch block below tell a
+    // real network/parse failure apart from a bug thrown by that callback, which would otherwise
+    // be relabelled as "Network error. Please try again." even though the request itself succeeded.
+    let successHandled = false;
+
     try {
       let finalUrl = url;
       let body: string | undefined;
@@ -118,9 +123,17 @@ export default function useRequest<TData = unknown>() {
           }
         }
 
+        successHandled = true;
         onSuccess?.({ data: json.data as TData, message: json.message });
       }
-    } catch {
+    } catch (error) {
+      if (successHandled) {
+        // The request succeeded — this came from the consumer's onSuccess callback, not the
+        // network. Surfacing it as a network error would hide a real bug and confuse the user
+        // with a false failure toast on a request that already succeeded.
+        console.error(error);
+        return;
+      }
       const errMsg = 'Network error. Please try again.';
       setErrors({ general: errMsg });
       if (showToast && toastId !== undefined) {

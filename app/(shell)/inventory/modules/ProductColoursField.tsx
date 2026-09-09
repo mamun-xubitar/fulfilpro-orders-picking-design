@@ -1,8 +1,9 @@
 'use client';
 
-import { formatColourName, isValidCssColor, parseColoursInput, resolveSwatch } from '@/lib/inventory/colour';
-import { FieldLabel } from './ProductFieldRows';
+import { formatColourName, isValidCssColor, parseColoursInput, formatColoursInput, resolveSwatch } from '@/lib/inventory/colour';
+import PresetComboField from './PresetComboField';
 import type { ColourOption } from './types';
+import type { InventoryPresetsState } from './hooks/useInventoryPresets';
 
 type ProductColoursFieldProps = {
   /** Comma-separated while editing, e.g. "Red, Blue, Hot Pink". */
@@ -10,41 +11,41 @@ type ProductColoursFieldProps = {
   colours: ColourOption[];
   editing: boolean;
   onChange: React.ChangeEventHandler<HTMLInputElement>;
+  /** Sets the comma-separated value directly — used when a preset is toggled from the picker. */
+  onValueChange: (next: string) => void;
   error?: string;
+  presets: InventoryPresetsState;
 };
 
-export default function ProductColoursField({ value, colours, editing, onChange, error }: ProductColoursFieldProps) {
+export default function ProductColoursField({ value, colours, editing, onChange, onValueChange, error, presets }: ProductColoursFieldProps) {
   return (
-    <div>
-      <FieldLabel>Colours</FieldLabel>
-      {editing ? (
-        <div className="space-y-1.5">
-          <input
-            type="text"
-            value={value}
-            onChange={onChange}
-            placeholder="Red, Blue, Hot Pink"
-            aria-label="Colours"
-            className="w-full rounded-lg border border-gray-300 px-2.5 py-2 text-[13px] text-gray-900 outline-none placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-          />
-          {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
-          <div className="flex flex-wrap gap-1.5">
-            <ColourChips colours={parseColoursInput(value)} />
-          </div>
-        </div>
-      ) : (
+    <PresetComboField
+      label="Colours"
+      kind="colour"
+      value={value}
+      editing={editing}
+      onChange={onChange}
+      onValueChange={onValueChange}
+      error={error}
+      presets={presets}
+      placeholder="Red, Blue, Hot Pink"
+      parse={parseColoursInput}
+      format={formatColoursInput}
+      renderReadOnly={() => (
         <div className="flex flex-wrap gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-2">
           {colours.length === 0 ? <span className="text-[13px] text-gray-400">—</span> : <ColourChips colours={colours} />}
         </div>
       )}
-    </div>
+      renderChips={(entries) => <ColourChips colours={entries.map((e) => ({ name: e.name, color: e.color ?? '' }))} />}
+    />
   );
 }
 
 function ColourChips({ colours }: { colours: ColourOption[] }) {
+  const sorted = [...colours].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
   return (
     <>
-      {colours.map((colour, index) => {
+      {sorted.map((colour, index) => {
         const recognized = isValidCssColor(colour.color);
         return (
           <span

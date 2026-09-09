@@ -16,6 +16,7 @@ export default function SupplierModal({ suppliers: s }: SupplierModalProps) {
     <ModalShell
       title={s.editingId ? 'Edit supplier' : 'Add supplier'}
       onClose={s.closeModal}
+      elevated
       footer={<ModalActions onCancel={s.closeModal} onConfirm={s.save} confirmLabel={s.saving ? 'Saving...' : 'Save'} disabled={disabled || s.saving} />}
     >
       <div className="space-y-3">

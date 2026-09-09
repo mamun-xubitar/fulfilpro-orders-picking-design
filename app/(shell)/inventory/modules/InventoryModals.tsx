@@ -1,8 +1,6 @@
 'use client';
 
-import { useState } from 'react';
 import { ModalActions, ModalShell } from '@/components/ModalShell';
-import { slugifyHandle } from '@/lib/inventory/handle';
 import AdjustmentModals from './AdjustmentModals';
 import BulkUpdateStoresModal from './BulkUpdateStoresModal';
 import EditImagesModal from './EditImagesModal';
@@ -15,8 +13,9 @@ import PublishToStoresModal from './PublishToStoresModal';
 import StocktakeModal from './StocktakeModal';
 import StorePricesModal from './StorePricesModal';
 import SupplierModal from './SupplierModal';
-import SupplierMultiSelect from './SupplierMultiSelect';
-import { ChevronLeft, ChevronRight, Close, Lock, Unlock } from './icons';
+import VariantsMatrixSection from './VariantsMatrixSection';
+import NewProductWizard from './newProduct/NewProductWizard';
+import { ChevronLeft, ChevronRight, Close } from './icons';
 import { formatMoney, variantTitle } from './utils';
 import type { InventoryPage } from './hooks/useInventoryPage';
 
@@ -26,14 +25,12 @@ export default function InventoryModals(p: InventoryPage) {
 
   return (
     <>
-      {p.newProductOpen && (
-        <NewProductModal
-          suppliers={p.supplierOptions}
-          onClose={p.closeNewProduct}
-          onCreate={p.createProduct}
-          saving={p.creatingProduct}
-          errors={p.createErrors}
-        />
+      {p.newProductOpen && <NewProductWizard p={p} />}
+
+      {p.matrixFullView && p.product && (
+        <ModalShell title="Variants / stock matrix" onClose={p.closeMatrixFullView} fullScreen>
+          <VariantsMatrixSection p={p} fullView />
+        </ModalShell>
       )}
 
       {p.editImagesOpen && (
@@ -192,118 +189,3 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function NewProductModal({
-  suppliers,
-  onClose,
-  onCreate,
-  saving,
-  errors,
-}: {
-  suppliers: { id: string; name: string }[];
-  onClose: () => void;
-  onCreate: (form: { supplierIds: string[]; itemNo: string; name: string; brand: string; handle: string }) => void;
-  saving: boolean;
-  errors: Record<string, string>;
-}) {
-  const [form, setForm] = useState({
-    supplierIds: suppliers[0] ? [suppliers[0].id] : ([] as string[]),
-    itemNo: '',
-    name: '',
-    brand: '',
-    handle: '',
-  });
-  // Locked (the default): the handle field is disabled and re-derives from the product name on
-  // every keystroke. Unlocking hands control to the user; re-locking re-derives immediately.
-  const [handleLocked, setHandleLocked] = useState(true);
-
-  const set = (field: 'itemNo' | 'brand') => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-    setForm((prev) => ({ ...prev, [field]: e.target.value }));
-  const setName = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const name = e.target.value;
-    setForm((prev) => ({ ...prev, name, ...(handleLocked ? { handle: slugifyHandle(name) } : {}) }));
-  };
-  const setHandle = (e: React.ChangeEvent<HTMLInputElement>) => setForm((prev) => ({ ...prev, handle: e.target.value }));
-  const setSupplierIds = (supplierIds: string[]) => setForm((prev) => ({ ...prev, supplierIds }));
-  const toggleHandleLock = () => {
-    setHandleLocked((prev) => {
-      const next = !prev;
-      if (next) setForm((f) => ({ ...f, handle: slugifyHandle(f.name) }));
-      return next;
-    });
-  };
-
-  const disabled = form.itemNo.trim() === '' || form.name.trim() === '' || form.supplierIds.length === 0 || form.handle.trim() === '';
-
-  return (
-    <ModalShell
-      title="New product"
-      onClose={onClose}
-      footer={
-        <ModalActions
-          onCancel={onClose}
-          onConfirm={() => onCreate({ supplierIds: form.supplierIds, itemNo: form.itemNo, name: form.name, brand: form.brand, handle: form.handle })}
-          confirmLabel={saving ? 'Creating...' : 'Create product'}
-          disabled={disabled || saving}
-        />
-      }
-    >
-      <div className="space-y-3">
-        <SupplierMultiSelect suppliers={suppliers} selectedIds={form.supplierIds} onChange={setSupplierIds} error={errors.supplierId} />
-        <TextField label="Item no." value={form.itemNo} onChange={set('itemNo')} placeholder="09419" error={errors.itemNo} />
-        <TextField label="Product name" value={form.name} onChange={setName} placeholder="FLEX KINDY WIDE BRIM HAT" error={errors.name} />
-        <div>
-          <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-gray-500">Handle</label>
-          <div className="flex items-center gap-2">
-            <input
-              type="text"
-              value={form.handle}
-              onChange={setHandle}
-              disabled={handleLocked}
-              placeholder="flex-kindy-wide-brim-hat"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500"
-            />
-            <button
-              type="button"
-              onClick={toggleHandleLock}
-              aria-label={handleLocked ? 'Edit handle' : 'Auto-generate handle'}
-              title={handleLocked ? 'Edit handle' : 'Auto-generate handle'}
-              className="shrink-0 rounded-lg border border-gray-300 bg-white p-2.5 text-gray-500 transition-colors duration-150 hover:bg-gray-50 hover:text-gray-700 cursor-pointer"
-            >
-              {handleLocked ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
-            </button>
-          </div>
-          {errors.handle && <p className="mt-1 text-xs text-red-600">{errors.handle}</p>}
-        </div>
-        <TextField label="Brand" value={form.brand} onChange={set('brand')} placeholder="FLEX KINDY" />
-      </div>
-    </ModalShell>
-  );
-}
-
-function TextField({
-  label,
-  value,
-  onChange,
-  placeholder,
-  error,
-}: {
-  label: string;
-  value: string;
-  onChange: React.ChangeEventHandler<HTMLInputElement>;
-  placeholder: string;
-  error?: string;
-}) {
-  return (
-    <div>
-      <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-gray-500">{label}</label>
-      <input
-        type="text"
-        value={value}
-        onChange={onChange}
-        placeholder={placeholder}
-        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400"
-      />
-      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
-    </div>
-  );
-}

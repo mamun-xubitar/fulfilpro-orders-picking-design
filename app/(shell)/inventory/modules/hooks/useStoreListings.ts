@@ -98,13 +98,16 @@ export function useStoreListings(productId: string | null) {
     }
   };
 
-  /** Persists (or, with `marginPercent: null`, clears) one store's per-store margin. When that
-   * store is already published, saving immediately reprices every mapped variant on Shopify to
-   * match — the server does the push and returns the updated variants, merged in here the same
-   * way `savePrices` does, so the price chip reflects it without a manual Sync. A store that
-   * isn't listed yet (or a Shopify-side repricing failure) still keeps the saved margin — the
-   * toast reflects which happened. */
-  const setMargin = async (storeId: string, marginPercent: number | null): Promise<boolean> => {
+  /** Persists (or, with `marginPercent: null`, clears) one store's per-store margin — called
+   * only from the Pricing & margin panel's own Save (see useProductPricing.savePricing), never on
+   * blur/change, so a store is never repriced until the admin explicitly saves. When that store is
+   * already published, saving immediately reprices every mapped variant on Shopify to match — the
+   * server does the push and returns the updated variants, merged in here the same way
+   * `savePrices` does, so the price chip reflects it without a manual Sync. A store that isn't
+   * listed yet (or a Shopify-side repricing failure) still keeps the saved margin. `silent`
+   * suppresses this call's own toast — used when several stores are saved together, so the panel
+   * shows one combined summary instead of one toast per store. */
+  const setMargin = async (storeId: string, marginPercent: number | null, options?: { silent?: boolean }): Promise<boolean> => {
     if (!productId) return false;
     try {
       const res = await fetch(`/api/inventory/catalog/${productId}/store-listings/${storeId}/margin`, {
@@ -127,10 +130,10 @@ export function useStoreListings(productId: string | null) {
             : listing
         )
       );
-      toast.success(json.message);
+      if (!options?.silent) toast.success(json.message);
       return true;
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to save store margin');
+      if (!options?.silent) toast.error(err instanceof Error ? err.message : 'Failed to save store margin');
       return false;
     }
   };
