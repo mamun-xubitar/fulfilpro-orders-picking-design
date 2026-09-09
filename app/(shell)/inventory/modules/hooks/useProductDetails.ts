@@ -1,14 +1,17 @@
 'use client';
 
 import { useState } from 'react';
+import { toast } from 'react-toastify';
 import useRequest from '@/hooks/useRequest';
 import { deriveColorFromName } from '@/lib/inventory/colour';
+import { isValidHandle, slugifyHandle } from '@/lib/inventory/handle';
 import { findCaseInsensitiveDuplicate, formatColoursInput, formatSizesInput, parseColoursInput, parseSizesInput } from '../utils';
 import type { ProductDetailsForm, ProductRecord, ProductStatusValue } from '../types';
 
 const EMPTY_FORM: ProductDetailsForm = {
   itemNo: '',
   handle: '',
+  supplierIds: [],
   brand: '',
   name: '',
   category: '',
@@ -26,6 +29,7 @@ function productToForm(product: ProductRecord): ProductDetailsForm {
   return {
     itemNo: product.itemNo,
     handle: product.handle,
+    supplierIds: product.suppliers.map((s) => s.id),
     brand: product.brand,
     name: product.name,
     category: product.category,
@@ -41,7 +45,7 @@ function productToForm(product: ProductRecord): ProductDetailsForm {
 }
 
 /** Plain string fields the curried `set` helper drives — the rest have their own setters. */
-type TextField = Exclude<keyof ProductDetailsForm, 'verified' | 'status' | 'categoryId'>;
+type TextField = Exclude<keyof ProductDetailsForm, 'verified' | 'status' | 'categoryId' | 'supplierIds'>;
 
 type UseProductDetailsArgs = {
   product: ProductRecord | null;
@@ -53,6 +57,9 @@ export function useProductDetails({ product, onSaved }: UseProductDetailsArgs) {
   // product discards them without an effect having to reset anything.
   const [draft, setDraft] = useState<{ productId: string; form: ProductDetailsForm } | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  // Mirrors the New Product modal: locked (the default) re-derives the handle from the product
+  // name on every keystroke; unlocking hands control to the admin.
+  const [handleLocked, setHandleLocked] = useState(true);
   const { request, loading: saving, errors, setErrors } = useRequest<ProductRecord>();
 
   const saved = product ? productToForm(product) : EMPTY_FORM;
@@ -69,6 +76,19 @@ export function useProductDetails({ product, onSaved }: UseProductDetailsArgs) {
     write({ ...form, [field]: e.target.value });
   };
 
+  const setName = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const name = e.target.value;
+    write({ ...form, name, ...(handleLocked ? { handle: slugifyHandle(name) } : {}) });
+  };
+
+  const toggleHandleLock = () => {
+    setHandleLocked((prev) => {
+      const next = !prev;
+      if (next) write({ ...form, handle: slugifyHandle(form.name) });
+      return next;
+    });
+  };
+
   const setCategory = (category: { id: string | null; name: string }) => {
     write({ ...form, category: category.name, categoryId: category.id });
   };
@@ -83,6 +103,7 @@ export function useProductDetails({ product, onSaved }: UseProductDetailsArgs) {
       data: {
         itemNo: form.itemNo,
         handle: form.handle,
+        supplierIds: form.supplierIds,
         brand: form.brand,
         name: form.name,
         category: form.category,
@@ -97,6 +118,8 @@ export function useProductDetails({ product, onSaved }: UseProductDetailsArgs) {
       },
       validation: async () => {
         const validationErrors: Record<string, string> = {};
+        if (!isValidHandle(form.handle.trim())) validationErrors.handle = 'Enter a valid handle (lowercase letters, numbers and dashes)';
+        if (form.supplierIds.length === 0) validationErrors.supplierId = 'At least one supplier is required';
         const dupColour = findCaseInsensitiveDuplicate(parseColoursInput(form.colours).map((c) => c.name));
         if (dupColour) validationErrors.colours = `"${dupColour}" is listed more than once`;
         const dupSize = findCaseInsensitiveDuplicate(parseSizesInput(form.sizes));
@@ -108,6 +131,7 @@ export function useProductDetails({ product, onSaved }: UseProductDetailsArgs) {
         onSaved(data);
         setDraft(null);
         setEditingId(null);
+        setHandleLocked(true);
       },
     });
   };
@@ -125,22 +149,38 @@ export function useProductDetails({ product, onSaved }: UseProductDetailsArgs) {
     });
   };
 
-  /** Appends one size and saves immediately — for the matrix toolbar's "Add size" button,
-   * which shouldn't require opening the Product Details edit form. Returns an error message
-   * on a duplicate (case-insensitive) instead of adding it, or null on success. */
-  const quickAddSize = (value: string): string | null => {
+  /** Appends one or more comma-separated sizes and saves in one PATCH — for the matrix
+   * toolbar's "Add size" modal, which shouldn't require opening the Product Details edit form.
+   * Dedupes case-insensitively against both the current list and the input itself: a duplicate
+   * is toasted and skipped rather than blocking the rest, unless every value in the input turns
+   * out to be a duplicate, in which case nothing is saved and the first one is returned as an
+   * inline error (so the modal doesn't close having silently done nothing). */
+  const quickAddSizes = (values: string[]): string | null => {
     if (!product) return null;
-    const trimmed = value.trim();
-    if (!trimmed) return null;
     const currentSizes = parseSizesInput(form.sizes);
-    if (currentSizes.some((s) => s.toLowerCase() === trimmed.toLowerCase())) return `"${trimmed}" already exists`;
-    const nextSizes = [...currentSizes, trimmed];
+    const seen = new Set(currentSizes.map((s) => s.toLowerCase()));
+    const toAdd: string[] = [];
+    const duplicates: string[] = [];
+    for (const raw of values) {
+      const trimmed = raw.trim();
+      if (!trimmed) continue;
+      const key = trimmed.toLowerCase();
+      if (seen.has(key)) {
+        duplicates.push(trimmed);
+        continue;
+      }
+      seen.add(key);
+      toAdd.push(trimmed);
+    }
+    if (toAdd.length === 0) return duplicates.length > 0 ? `"${duplicates[0]}" already exists` : null;
+    if (duplicates.length > 0) toast.warning(`Skipped ${duplicates.length} duplicate size${duplicates.length === 1 ? '' : 's'}: ${duplicates.join(', ')}`);
+    const nextSizes = [...currentSizes, ...toAdd];
     write({ ...form, sizes: formatSizesInput(nextSizes) });
     request({
       url: `/api/inventory/catalog/${product.id}`,
       method: 'PATCH',
       data: { sizes: nextSizes },
-      successMessage: 'Size added',
+      successMessage: toAdd.length === 1 ? 'Size added' : `${toAdd.length} sizes added`,
       onSuccess: ({ data }) => {
         onSaved(data);
         syncListsFromProduct(data);
@@ -149,21 +189,34 @@ export function useProductDetails({ product, onSaved }: UseProductDetailsArgs) {
     return null;
   };
 
-  /** Appends one colour and saves immediately — mirrors quickAddSize. Returns an error message
-   * on a duplicate name (case-insensitive) instead of adding it, or null on success. */
-  const quickAddColour = (name: string): string | null => {
+  /** Appends one or more comma-separated colours and saves in one PATCH — mirrors
+   * quickAddSizes. */
+  const quickAddColours = (names: string[]): string | null => {
     if (!product) return null;
-    const trimmed = name.trim();
-    if (!trimmed) return null;
     const currentColours = parseColoursInput(form.colours);
-    if (currentColours.some((c) => c.name.toLowerCase() === trimmed.toLowerCase())) return `"${trimmed}" already exists`;
-    const nextColours = [...currentColours, { name: trimmed, color: deriveColorFromName(trimmed) }];
+    const seen = new Set(currentColours.map((c) => c.name.toLowerCase()));
+    const toAdd: { name: string; color: string }[] = [];
+    const duplicates: string[] = [];
+    for (const raw of names) {
+      const trimmed = raw.trim();
+      if (!trimmed) continue;
+      const key = trimmed.toLowerCase();
+      if (seen.has(key)) {
+        duplicates.push(trimmed);
+        continue;
+      }
+      seen.add(key);
+      toAdd.push({ name: trimmed, color: deriveColorFromName(trimmed) });
+    }
+    if (toAdd.length === 0) return duplicates.length > 0 ? `"${duplicates[0]}" already exists` : null;
+    if (duplicates.length > 0) toast.warning(`Skipped ${duplicates.length} duplicate colour${duplicates.length === 1 ? '' : 's'}: ${duplicates.join(', ')}`);
+    const nextColours = [...currentColours, ...toAdd];
     write({ ...form, colours: formatColoursInput(nextColours) });
     request({
       url: `/api/inventory/catalog/${product.id}`,
       method: 'PATCH',
       data: { colours: nextColours },
-      successMessage: 'Colour added',
+      successMessage: toAdd.length === 1 ? 'Colour added' : `${toAdd.length} colours added`,
       onSuccess: ({ data }) => {
         onSaved(data);
         syncListsFromProduct(data);
@@ -178,23 +231,29 @@ export function useProductDetails({ product, onSaved }: UseProductDetailsArgs) {
     errors,
     form,
     set,
+    setName,
+    handleLocked,
+    toggleHandleLock,
     setCategory,
     setDescription,
     setStatus: (status: ProductStatusValue) => write({ ...form, status }),
     setVerified: (verified: boolean) => write({ ...form, verified }),
+    setSupplierIds: (supplierIds: string[]) => write({ ...form, supplierIds }),
     startEdit: () => {
       if (!product) return;
       setEditingId(product.id);
+      setHandleLocked(true);
       setErrors({});
     },
     cancelEdit: () => {
       setDraft(null);
       setEditingId(null);
+      setHandleLocked(true);
       setErrors({});
     },
     saveDetails,
-    quickAddSize,
-    quickAddColour,
+    quickAddSizes,
+    quickAddColours,
     syncListsFromProduct,
     // Effective lists, so the variants matrix reflects an in-progress edit.
     sizes: parseSizesInput(form.sizes),

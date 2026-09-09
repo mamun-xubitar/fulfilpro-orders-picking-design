@@ -136,7 +136,7 @@ export class PurchaseOrderModel {
    */
   async receive(
     id: string,
-    receipts: Array<{ itemId?: string; variantId?: string; colour?: string; size?: string; sku?: string | null; quantity: number }>,
+    receipts: Array<{ itemId?: string; variantId?: string; colour?: string; size?: string; sku?: string | null; quantity: number; unitCost?: number | null }>,
     actor: { id: string; name: string }
   ) {
     return prisma.$transaction(async (tx) => {
@@ -151,7 +151,9 @@ export class PurchaseOrderModel {
           const item = itemById.get(receipt.itemId);
           if (!item) continue;
           variantId = item.variantId;
-          unitCost = item.unitCost;
+          // An edited unit cost on the receive form overrides the PO line's own cost; otherwise
+          // fall back to what was ordered at.
+          unitCost = receipt.unitCost != null ? new Prisma.Decimal(receipt.unitCost) : item.unitCost;
 
           if (!variantId && receipt.colour && receipt.size) {
             const created = await tx.supplierProductVariant.create({
@@ -161,7 +163,10 @@ export class PurchaseOrderModel {
             await tx.purchaseOrderItem.update({ where: { id: item.id }, data: { variantId } });
           }
 
-          await tx.purchaseOrderItem.update({ where: { id: item.id }, data: { receivedQuantity: { increment: receipt.quantity } } });
+          await tx.purchaseOrderItem.update({
+            where: { id: item.id },
+            data: { receivedQuantity: { increment: receipt.quantity }, ...(receipt.unitCost != null && { unitCost: receipt.unitCost }) },
+          });
         } else if (receipt.colour && receipt.size) {
           const existing = await tx.supplierProductVariant.findUnique({
             where: { supplierProductId_colour_size: { supplierProductId: po.supplierProductId, colour: receipt.colour, size: receipt.size } },
@@ -178,6 +183,16 @@ export class PurchaseOrderModel {
           });
         }
       }
+
+      // A product may have multiple suppliers over time — receiving against this PO's supplier
+      // means they've now actually supplied this product, so it counts toward their Products
+      // Count on the Suppliers tab even if they weren't linked to it before.
+      // Idempotent: a repeat receipt against the same (product, supplier) pair is a no-op here.
+      await tx.supplierProductSupplier.upsert({
+        where: { supplierProductId_supplierId: { supplierProductId: po.supplierProductId, supplierId: po.supplierId } },
+        create: { supplierProductId: po.supplierProductId, supplierId: po.supplierId },
+        update: {},
+      });
 
       const items = await tx.purchaseOrderItem.findMany({ where: { purchaseOrderId: id } });
       const status: PurchaseOrderStatus = items.every((item) => item.receivedQuantity >= item.quantity) ? 'RECEIVED' : 'PARTIALLY_RECEIVED';

@@ -23,9 +23,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // Overwrite defaults to today's always-replace behaviour when the client omits it.
     const overwrite = formData.get('overwrite') !== 'false';
     const markVerified = formData.get('markVerified') === 'true';
+    const rawSupplierId = formData.get('supplierId');
+    const poSupplierId = typeof rawSupplierId === 'string' && rawSupplierId ? rawSupplierId : undefined;
     const result = commit
-      ? await controller.commit(id, file, session, { overwrite, markVerified })
-      : await controller.preview(id, file, session, { overwrite, markVerified });
+      ? await controller.commit(id, file, session, { overwrite, markVerified, poSupplierId })
+      : await controller.preview(id, file, session, { overwrite, markVerified, poSupplierId });
     if ('error' in result) {
       const { error } = result as ErrResult;
       return apiError({ message: error.message, errors: error.errors, status: error.status });

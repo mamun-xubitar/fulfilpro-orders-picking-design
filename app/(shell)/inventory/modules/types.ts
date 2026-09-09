@@ -1,6 +1,6 @@
 /** The shape the `/api/inventory/catalog` endpoints return, backed by the `SupplierProduct` tables. */
 
-export type ProductStatusValue = 'ACTIVE' | 'DRAFT' | 'ARCHIVED';
+export type ProductStatusValue = 'ACTIVE' | 'DRAFT' | 'UNLISTED';
 
 /** A colourway on the product. `color` is a CSS-compatible value (named keyword or hex),
  * derived from `name` — see lib/inventory/colour.ts. */
@@ -107,7 +107,7 @@ export type StoreListingResult = {
   productTitle: string | null;
   productGid: string | null;
   externalId: string | null;
-  status: 'ACTIVE' | 'DRAFT' | 'ARCHIVED' | null;
+  status: 'ACTIVE' | 'DRAFT' | 'ARCHIVED' | 'UNLISTED' | null;
   url: string | null;
   currencyCode: string | null;
   variants: StoreListingVariant[];
@@ -182,11 +182,14 @@ export type AdjustmentsInfo = {
   thisMonth: number;
 };
 
+export type ProductSupplierLink = { id: string; name: string; poEmail: string };
+
 /** Everything the Products tab renders for one product. */
 export type ProductRecord = {
   id: string;
-  supplierId: string;
-  supplierName: string;
+  /** Every linked supplier, alphabetical by name — a product can have several, none of them a
+   * "default". */
+  suppliers: ProductSupplierLink[];
   /** The hub's own style code — distinct from `handle`. */
   itemNo: string;
   /** Unique, URL-safe slug — Shopify's product Handle equivalent. */
@@ -246,8 +249,11 @@ export type ProductsResponse = {
   pagination: CataloguePagination;
   /** Whole-catalogue count, ignoring every filter — the "of Y" half of the record stepper. */
   totalAll: number;
+  /** Table mode only: count under the Verified filter only — the "n / X" half of the record
+   * stepper, kept in sync with the table's own mutations (delete, bulk actions, import). */
+  stepperTotal?: number;
   globals: InventoryGlobals;
-  supplierOptions: string[];
+  supplierOptions: { id: string; name: string }[];
 };
 
 // — UI-only types —
@@ -299,6 +305,9 @@ export type PricingForm = {
 export type ProductDetailsForm = {
   itemNo: string;
   handle: string;
+  /** Every linked supplier for this product — at least one. Saving replaces the full set (an id
+   * dropped from here has its link removed). */
+  supplierIds: string[];
   brand: string;
   name: string;
   category: string;

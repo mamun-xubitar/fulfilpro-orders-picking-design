@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { ModalShell } from '@/components/ModalShell';
 import StoreBlockSeparator from './StoreBlockSeparator';
 import StoreDraftBlock from './StoreDraftBlock';
+import NoVariantsWarningBanner from './NoVariantsWarningBanner';
 import type { ProductRecord, StoreListingResult } from './types';
 import type { PublishAspect, StorePublishState } from './hooks/useStorePublish';
 
@@ -32,6 +33,8 @@ export default function BulkUpdateStoresModal({ product, storeOptions, publish: 
   const publishableStores = storeOptions.filter((s) => s.found);
   const selectedStores = publishableStores.filter((s) => p.selectedStoreIds.has(s.storeId));
   const allChecked = p.bulkAspects.size === ASPECT_OPTIONS.length;
+  // Only relevant while the Variants aspect is actually being pushed — see NoVariantsWarningBanner.
+  const noVariantsStores = p.bulkAspects.has('variants') ? selectedStores.filter((s) => p.hasNoVariantsIncluded(s.storeId)) : [];
 
   const allSelected = publishableStores.length > 0 && publishableStores.every((s) => p.selectedStoreIds.has(s.storeId));
   const someSelected = p.selectedStoreIds.size > 0 && !allSelected;
@@ -57,7 +60,7 @@ export default function BulkUpdateStoresModal({ product, storeOptions, publish: 
           <button
             type="button"
             onClick={p.bulkUpdateSelected}
-            disabled={p.publishing || selectedStores.length === 0 || p.bulkAspects.size === 0}
+            disabled={p.publishing || selectedStores.length === 0 || p.bulkAspects.size === 0 || noVariantsStores.length > 0}
             className="ml-auto rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors duration-150 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
           >
             {p.publishing ? 'Updating…' : 'Save'}
@@ -100,7 +103,7 @@ export default function BulkUpdateStoresModal({ product, storeOptions, publish: 
           ))}
         </aside>
 
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           <section className="rounded-xl border border-gray-200 bg-gray-50 p-3">
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">What to update</p>
             <div className="flex flex-wrap items-center gap-4">
@@ -134,6 +137,8 @@ export default function BulkUpdateStoresModal({ product, storeOptions, publish: 
               </label>
             </div>
           </section>
+
+          <NoVariantsWarningBanner storeNames={noVariantsStores.map((s) => s.storeName)} />
 
           {selectedStores.length === 0 ? (
             <p className="rounded-xl border border-dashed border-gray-200 p-8 text-center text-[13px] text-gray-400">No stores selected.</p>

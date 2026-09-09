@@ -10,6 +10,7 @@ type ProductsTableProps = {
 
 const COLUMNS: { key: ProductsSortKey | null; label: string; align: 'left' | 'right' | 'center' }[] = [
   { key: 'name', label: 'Product', align: 'left' },
+  { key: null, label: 'Supplier', align: 'left' },
   { key: 'brand', label: 'Brand', align: 'left' },
   { key: 'category', label: 'Category', align: 'left' },
   { key: 'sku', label: 'SKU', align: 'left' },
@@ -27,7 +28,7 @@ export default function ProductsTable({ table, loading }: ProductsTableProps) {
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[1100px] text-sm">
+      <table className="w-full min-w-[1220px] text-sm">
         <thead>
           <tr className="border-b border-gray-200 bg-gray-50">
             <th className="w-10 px-4 py-3">

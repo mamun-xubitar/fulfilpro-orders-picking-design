@@ -85,6 +85,7 @@ export function useProductNavigation(data: CatalogData) {
     goPrev: data.goPrev,
     goNext: data.goNext,
     goLast: data.goLast,
+    removeProduct: data.removeProduct,
     searchInput,
     setSearchInput,
     searchOpen,

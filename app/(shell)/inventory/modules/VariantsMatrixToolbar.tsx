@@ -5,7 +5,7 @@ import { ModalShell } from '@/components/ModalShell';
 import { formatColourName } from '@/lib/inventory/colour';
 import { STATUS_LEGEND } from './constants';
 import type { InventoryPage } from './hooks/useInventoryPage';
-import { Adjust, Download, Expand, Plus } from './icons';
+import { Adjust, Download, Expand, Plus, Trash } from './icons';
 
 type VariantsMatrixToolbarProps = { p: InventoryPage };
 
@@ -130,6 +130,16 @@ export default function VariantsMatrixToolbar({ p }: VariantsMatrixToolbarProps)
         </button>
         <button
           type="button"
+          onClick={matrix.requestBulkDelete}
+          disabled={matrix.selectedIds.size === 0}
+          title="Deletes the selected variants"
+          className="flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-600 transition-colors duration-150 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+        >
+          <Trash className="h-3.5 w-3.5" />
+          Delete selected{matrix.selectedIds.size > 0 ? ` (${matrix.selectedIds.size})` : ''}
+        </button>
+        <button
+          type="button"
           onClick={createPo}
           disabled={matrix.selectedIds.size === 0 && matrix.rows.length === 0}
           title={matrix.rows.length === 0 ? 'This product has no variants yet' : undefined}
@@ -151,19 +161,20 @@ export default function VariantsMatrixToolbar({ p }: VariantsMatrixToolbarProps)
         </SecondaryButton>
       </div>
 
-      {addColourOpen && <AddColourModal onClose={() => setAddColourOpen(false)} onAdd={p.details.quickAddColour} />}
-      {addSizeOpen && <AddSizeModal onClose={() => setAddSizeOpen(false)} onAdd={p.details.quickAddSize} />}
+      {addColourOpen && <AddColourModal onClose={() => setAddColourOpen(false)} onAdd={p.details.quickAddColours} />}
+      {addSizeOpen && <AddSizeModal onClose={() => setAddSizeOpen(false)} onAdd={p.details.quickAddSizes} />}
     </div>
   );
 }
 
-function AddColourModal({ onClose, onAdd }: { onClose: () => void; onAdd: (name: string) => string | null }) {
+function AddColourModal({ onClose, onAdd }: { onClose: () => void; onAdd: (names: string[]) => string | null }) {
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const handleAdd = () => {
-    if (!name.trim()) return;
-    const err = onAdd(name.trim());
+    const names = splitCommaList(name);
+    if (names.length === 0) return;
+    const err = onAdd(names);
     if (err) setError(err);
     else onClose();
   };
@@ -183,7 +194,7 @@ function AddColourModal({ onClose, onAdd }: { onClose: () => void; onAdd: (name:
             disabled={!name.trim()}
             className="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
           >
-            Add colour
+            Add colour{splitCommaList(name).length > 1 ? 's' : ''}
           </button>
         </div>
       }
@@ -197,7 +208,7 @@ function AddColourModal({ onClose, onAdd }: { onClose: () => void; onAdd: (name:
             setName(e.target.value);
             setError(null);
           }}
-          placeholder="e.g. Black or Hot Pink"
+          placeholder="e.g. Black, Hot Pink, Navy"
           className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400"
         />
         {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
@@ -206,13 +217,14 @@ function AddColourModal({ onClose, onAdd }: { onClose: () => void; onAdd: (name:
   );
 }
 
-function AddSizeModal({ onClose, onAdd }: { onClose: () => void; onAdd: (size: string) => string | null }) {
+function AddSizeModal({ onClose, onAdd }: { onClose: () => void; onAdd: (sizes: string[]) => string | null }) {
   const [size, setSize] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const handleAdd = () => {
-    if (!size.trim()) return;
-    const err = onAdd(size.trim());
+    const sizes = splitCommaList(size);
+    if (sizes.length === 0) return;
+    const err = onAdd(sizes);
     if (err) setError(err);
     else onClose();
   };
@@ -232,7 +244,7 @@ function AddSizeModal({ onClose, onAdd }: { onClose: () => void; onAdd: (size: s
             disabled={!size.trim()}
             className="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
           >
-            Add size
+            Add size{splitCommaList(size).length > 1 ? 's' : ''}
           </button>
         </div>
       }
@@ -246,13 +258,21 @@ function AddSizeModal({ onClose, onAdd }: { onClose: () => void; onAdd: (size: s
             setSize(e.target.value);
             setError(null);
           }}
-          placeholder="e.g. XL or 54"
+          placeholder="e.g. XL, XXL, 54"
           className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400"
         />
         {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
       </div>
     </ModalShell>
   );
+}
+
+/** Splits a comma-separated input into trimmed, non-empty values. */
+function splitCommaList(value: string): string[] {
+  return value
+    .split(',')
+    .map((v) => v.trim())
+    .filter(Boolean);
 }
 
 function Pill({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {

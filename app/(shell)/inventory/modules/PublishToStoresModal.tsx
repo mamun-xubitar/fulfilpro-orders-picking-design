@@ -3,10 +3,12 @@
 import { ModalShell } from "@/components/ModalShell";
 import { sanitizeHtml } from "@/lib/sanitize-html";
 import { useEffect, useRef } from "react";
+import { productStatusLabel } from "./constants";
 import type { StorePublishState } from "./hooks/useStorePublish";
 import StoreBlockSeparator from "./StoreBlockSeparator";
 import StoreDraftBlock from "./StoreDraftBlock";
 import StockWarningBanner from "./StockWarningBanner";
+import NoVariantsWarningBanner from "./NoVariantsWarningBanner";
 import type { ProductRecord, StoreListingResult } from "./types";
 
 type PublishToStoresModalProps = {
@@ -31,6 +33,9 @@ export default function PublishToStoresModal({
   const selectedStores = storeOptions.filter((s) =>
     p.selectedStoreIds.has(s.storeId),
   );
+  // Publish always pushes every aspect (see ALL_ASPECTS in publishToSelected), so the variants
+  // guard applies to every selected store, not just some — see NoVariantsWarningBanner.
+  const noVariantsStores = selectedStores.filter((s) => p.hasNoVariantsIncluded(s.storeId));
   const allSelected =
     storeOptions.length > 0 &&
     storeOptions.every((s) => p.selectedStoreIds.has(s.storeId));
@@ -58,7 +63,7 @@ export default function PublishToStoresModal({
           <button
             type="button"
             onClick={p.publishToSelected}
-            disabled={p.publishing || p.selectedStoreIds.size === 0}
+            disabled={p.publishing || p.selectedStoreIds.size === 0 || noVariantsStores.length > 0}
             className="ml-auto rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors duration-150 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
           >
             {p.publishing
@@ -112,7 +117,7 @@ export default function PublishToStoresModal({
           ))}
         </aside>
 
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           <section className="rounded-xl border border-gray-200 p-4">
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
               Current product (hub source)
@@ -133,9 +138,12 @@ export default function PublishToStoresModal({
                 <p className="text-[12px] text-gray-500">
                   {product.brand} · {product.category} ·{" "}
                   {product.variants.length} variant
-                  {product.variants.length === 1 ? "" : "s"} · {product.status}
-                  {product.status !== "ACTIVE"
+                  {product.variants.length === 1 ? "" : "s"} ·{" "}
+                  {productStatusLabel(product.status)}
+                  {product.status === "DRAFT"
                     ? " (will publish as draft — hidden from storefront)"
+                    : product.status === "UNLISTED"
+                    ? " (will publish, accessible only by direct link)"
                     : ""}
                 </p>
                 <p className="text-[12px] text-gray-400">
@@ -163,6 +171,7 @@ export default function PublishToStoresModal({
             </p>
           </section>
 
+          <NoVariantsWarningBanner storeNames={noVariantsStores.map((s) => s.storeName)} />
           {p.stockWarnings.length > 0 && <StockWarningBanner warnings={p.stockWarnings} />}
 
           {selectedStores.length === 0 ? (

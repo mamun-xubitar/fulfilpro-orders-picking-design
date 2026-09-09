@@ -47,6 +47,17 @@ export function useStorePublish({ product, storeListings }: { product: ProductRe
   // selection changes if it were baked into a draft the way variantPrices is.
   const defaultStockFor = (storeId: string) => defaultStock(product, storeId, selectedStoreIds, storeListings);
 
+  // A store whose draft excludes every hub variant has nothing for `productSet` to push — Shopify
+  // would otherwise fabricate its own zero-price, untracked default variant (the same case is
+  // rejected server-side in lib/shopify-product-publish.server.ts). A hub product with zero
+  // variants isn't this guard's concern — there's nothing to have excluded.
+  const hasNoVariantsIncluded = (storeId: string) => {
+    const variantIds = product?.variants.map((v) => v.id) ?? [];
+    if (variantIds.length === 0) return false;
+    const excluded = draftFor(storeId).excludedVariants;
+    return variantIds.every((id) => excluded.includes(id));
+  };
+
   // Rows where the unpublished selected stores' resolved stock for a variant sums past the hub's
   // own available quantity — informational only, so a deliberate overcommit reads as intentional
   // rather than a mistake. Scoped to unpublished stores: a published store's live Shopify quantity
@@ -137,6 +148,7 @@ export function useStorePublish({ product, storeListings }: { product: ProductRe
     setDraft,
     defaultStockFor,
     stockWarnings,
+    hasNoVariantsIncluded,
     publishing,
     publishToSelected,
     bulkUpdateSelected,

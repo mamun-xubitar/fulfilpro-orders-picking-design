@@ -30,8 +30,15 @@ export function useInventoryPage() {
   const [productTab, setProductTab] = useState<ProductTabId>('details');
   const [newProductOpen, setNewProductOpen] = useState(false);
   const [editImagesOpen, setEditImagesOpen] = useState(false);
+  const [deleteProductOpen, setDeleteProductOpen] = useState(false);
   const [storePriceTarget, setStorePriceTarget] = useState<StoreListingResult | null>(null);
   const { request: requestCreate, loading: creatingProduct, errors: createErrors } = useRequest<ProductRecord>();
+  const { request: requestDeleteProduct, loading: deletingProduct } = useRequest<null>();
+  // Bumped whenever a product's supplier links could have changed (create, details save,
+  // delete, CSV import) so the Suppliers tab's Products Count updates immediately rather than
+  // waiting for the next Receive PO.
+  const [supplierRefreshNonce, setSupplierRefreshNonce] = useState(0);
+  const bumpSupplierRefresh = () => setSupplierRefreshNonce((n) => n + 1);
 
   const nav = useProductNavigation(data);
   const product = nav.product;
@@ -48,7 +55,10 @@ export function useInventoryPage() {
     storePublish.resetForProductChange();
   }
 
-  const onProductSaved = (updated: ProductRecord) => data.updateProduct(updated.id, updated);
+  const onProductSaved = (updated: ProductRecord) => {
+    data.updateProduct(updated.id, updated);
+    bumpSupplierRefresh();
+  };
 
   const gallery = useProductImages(product);
   const imageMutations = useProductImageMutations({ product, onSaved: onProductSaved });
@@ -64,10 +74,10 @@ export function useInventoryPage() {
   const po = usePurchaseOrder({ product, onSaved: onProductSaved });
   const stocktake = useStocktake({ product, onSaved: onProductSaved });
   const adjustments = useAdjustments({ product, onSaved: onProductSaved });
-  const importExport = useImportExport({ product, onSaved: onProductSaved, onPoImported: po.loadPurchaseOrders });
-  const productsTable = useProductsTable({ enabled: data.allRecords, verifiedOnly: nav.verifiedOnly, quickFilter: nav.quickFilter, onView: nav.viewProduct });
-  const importProducts = useImportProducts({ supplierOptions: po.supplierOptions, onImported: () => { data.refresh(); productsTable.refresh(); } });
-  const suppliers = useSuppliers({ onChanged: po.refreshSuppliers });
+  const importExport = useImportExport({ product, onSaved: onProductSaved, onPoImported: po.loadPurchaseOrders, supplierOptions: po.supplierOptions });
+  const productsTable = useProductsTable({ enabled: data.allRecords, verifiedOnly: nav.verifiedOnly, quickFilter: nav.quickFilter, onView: nav.viewProduct, onCounts: data.syncCounts, onDeleted: bumpSupplierRefresh });
+  const importProducts = useImportProducts({ supplierOptions: po.supplierOptions, onImported: () => { data.refresh(); productsTable.refresh(); bumpSupplierRefresh(); } });
+  const suppliers = useSuppliers({ onChanged: po.refreshSuppliers, refreshKey: po.receivedNonce + supplierRefreshNonce });
 
   /** Stock Summary always reflects the whole product, not the matrix's filtered rows. */
   const summary = useMemo(() => summariseVariants(product?.variants ?? []), [product]);
@@ -77,7 +87,22 @@ export function useInventoryPage() {
     toast.info(`${action} isn't available yet.`);
   };
 
-  const createProduct = (form: { supplierId: string; itemNo: string; name: string; brand: string; handle: string }) => {
+  const confirmDeleteProduct = () => {
+    if (!product) return;
+    requestDeleteProduct({
+      url: `/api/inventory/catalog/${product.id}`,
+      method: 'DELETE',
+      successMessage: 'Product deleted',
+      onSuccess: () => {
+        nav.removeProduct(product.id);
+        productsTable.refresh();
+        bumpSupplierRefresh();
+        setDeleteProductOpen(false);
+      },
+    });
+  };
+
+  const createProduct = (form: { supplierIds: string[]; itemNo: string; name: string; brand: string; handle: string }) => {
     requestCreate({
       url: '/api/inventory/catalog',
       method: 'POST',
@@ -85,7 +110,7 @@ export function useInventoryPage() {
       successMessage: 'Product created',
       validation: async () => {
         const errors: Record<string, string> = {};
-        if (!form.supplierId) errors.supplierId = 'Supplier is required';
+        if (form.supplierIds.length === 0) errors.supplierId = 'At least one supplier is required';
         if (!form.itemNo.trim()) errors.itemNo = 'Item number is required';
         if (!form.name.trim()) errors.name = 'Product name is required';
         if (!isValidHandle(form.handle.trim())) errors.handle = 'Enter a valid handle (lowercase letters, numbers and dashes)';
@@ -94,6 +119,7 @@ export function useInventoryPage() {
       onSuccess: ({ data: created }) => {
         nav.selectProduct(created.id);
         setNewProductOpen(false);
+        bumpSupplierRefresh();
       },
     });
   };
@@ -136,6 +162,11 @@ export function useInventoryPage() {
     creatingProduct,
     createErrors,
     createProduct,
+    deleteProductOpen,
+    openDeleteProduct: () => setDeleteProductOpen(true),
+    closeDeleteProduct: () => setDeleteProductOpen(false),
+    deletingProduct,
+    confirmDeleteProduct,
     supplierOptions: po.supplierOptions,
     refreshSuppliers: po.refreshSuppliers,
     editImagesOpen,

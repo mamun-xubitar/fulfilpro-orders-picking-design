@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { toast } from 'react-toastify';
 import { buildPoCsv, buildShopifyProductCsv, downloadCsv } from '../utils';
-import type { ProductRecord, ProductStatusValue, PurchaseOrderRecord, VariantRow } from '../types';
+import type { ProductRecord, ProductStatusValue, PurchaseOrderRecord, SupplierOption, VariantRow } from '../types';
 
 export type ProductImportPreviewRow = { colour: string; size: string; sku: string; barcode: string; stockOnHand: number; buyPrice?: number; sellPrice: number };
 
@@ -36,18 +36,20 @@ async function parseApiResponse<T>(res: Response): Promise<ApiEnvelope<T>> {
 /** File uploads use raw `fetch` with `FormData` — `useRequest` only speaks JSON. Auto-detects
  * Shopify product CSV vs. our own PO CSV server-side; `commit` distinguishes preview from apply.
  * `overwrite` / `markVerified` only affect a product CSV — a PO CSV ignores them — and are sent
- * on the preview call too, so a refused overwrite surfaces before the user commits. */
+ * on the preview call too, so a refused overwrite surfaces before the user commits. `poSupplierId`
+ * only affects a PO CSV — it's the supplier a brand-new PO the file creates gets attributed to. */
 async function postImportFile<T>(
   productId: string,
   file: File,
   commit: boolean,
-  options: { overwrite: boolean; markVerified: boolean }
+  options: { overwrite: boolean; markVerified: boolean; poSupplierId: string }
 ): Promise<ApiEnvelope<T>> {
   const formData = new FormData();
   formData.append('file', file);
   formData.append('commit', String(commit));
   formData.append('overwrite', String(options.overwrite));
   formData.append('markVerified', String(options.markVerified));
+  formData.append('supplierId', options.poSupplierId);
   const res = await fetch(`/api/inventory/catalog/${productId}/import`, { method: 'POST', body: formData });
   const json = await parseApiResponse<T>(res);
   if (!res.ok || !json.success) throw new Error(json.message || 'Import failed');
@@ -60,9 +62,12 @@ type UseImportExportArgs = {
   onSaved: (product: ProductRecord) => void;
   /** Called after a PO-type import commits, so the Purchase Orders panel's own list refreshes too. */
   onPoImported: () => void;
+  /** Every supplier in the system — for the PO-CSV import's supplier dropdown, same list the
+   * Create PO modal offers. */
+  supplierOptions: SupplierOption[];
 };
 
-export function useImportExport({ product, onSaved, onPoImported }: UseImportExportArgs) {
+export function useImportExport({ product, onSaved, onPoImported, supplierOptions }: UseImportExportArgs) {
   const [importOpen, setImportOpen] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<ImportPreview | null>(null);
@@ -71,6 +76,9 @@ export function useImportExport({ product, onSaved, onPoImported }: UseImportExp
   // Overwrite defaults checked — matches today's always-replace behaviour.
   const [overwrite, setOverwrite] = useState(true);
   const [markVerified, setMarkVerified] = useState(false);
+  // PO-CSV only: which supplier a brand-new PO the file creates gets attributed to. Defaults to
+  // the product's own first linked supplier, falling back to the first supplier in the system.
+  const [poSupplierId, setPoSupplierId] = useState('');
 
   const exportVariants = (rows: VariantRow[]) => {
     if (!product) return;
@@ -101,11 +109,12 @@ export function useImportExport({ product, onSaved, onPoImported }: UseImportExp
     setPreview(null);
     setOverwrite(true);
     setMarkVerified(false);
+    setPoSupplierId(product?.suppliers[0]?.id ?? supplierOptions[0]?.id ?? '');
     setImportOpen(true);
   };
   const closeImport = () => setImportOpen(false);
 
-  const previewFile = async (file: File, opts: { overwrite: boolean; markVerified: boolean }) => {
+  const previewFile = async (file: File, opts: { overwrite: boolean; markVerified: boolean; poSupplierId: string }) => {
     if (!product) return;
     setPendingFile(file);
     setPreview(null);
@@ -121,7 +130,7 @@ export function useImportExport({ product, onSaved, onPoImported }: UseImportExp
     }
   };
 
-  const handleFile = (file: File) => previewFile(file, { overwrite, markVerified });
+  const handleFile = (file: File) => previewFile(file, { overwrite, markVerified, poSupplierId });
 
   // Neither option changes what the preview itself shows — "Overwrite" only gates whether commit
   // is allowed (surfaced via `preview.handleMatches`, checked at render time) and "Mark verified"
@@ -133,7 +142,7 @@ export function useImportExport({ product, onSaved, onPoImported }: UseImportExp
     if (!product || !pendingFile || !preview) return;
     setImporting(true);
     try {
-      const json = await postImportFile<{ product: ProductRecord }>(product.id, pendingFile, true, { overwrite, markVerified });
+      const json = await postImportFile<{ product: ProductRecord }>(product.id, pendingFile, true, { overwrite, markVerified, poSupplierId });
       toast.success(json.message);
       setImportOpen(false);
       setPendingFile(null);
@@ -163,5 +172,8 @@ export function useImportExport({ product, onSaved, onPoImported }: UseImportExp
     setOverwrite: toggleOverwrite,
     markVerified,
     setMarkVerified: toggleMarkVerified,
+    poSupplierId,
+    setPoSupplierId,
+    poSupplierOptions: supplierOptions,
   };
 }

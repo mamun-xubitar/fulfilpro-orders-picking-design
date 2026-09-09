@@ -52,7 +52,7 @@ type PublishTarget = {
      * (mirrors how `images` fully replaces the store's media set). Absent = not sent (aspect
      * off); an empty array explicitly clears every collection. */
     collectionIds?: string[];
-    status?: 'ACTIVE' | 'DRAFT' | 'ARCHIVED';
+    status?: 'ACTIVE' | 'DRAFT' | 'UNLISTED';
   };
   /** Per-store image selection (gallery minus excluded, with alt overrides). Absent unless the
    * `images` aspect was selected — then it fully replaces the store's media set. */
@@ -127,7 +127,10 @@ export class StoreListingController {
             productGid: l.productGid!,
             externalId: l.externalId ?? '',
             handle,
-            shopifyStatus: l.status ?? 'ACTIVE',
+            // Was fabricating 'ACTIVE' whenever Shopify's status came back unresolved — DRAFT is
+            // the safe/neutral default (matches toHubStatus's own ARCHIVED fallback) instead of
+            // asserting a status this call never actually observed.
+            shopifyStatus: l.status ?? 'DRAFT',
           })
         )
     );
@@ -282,7 +285,7 @@ export class StoreListingController {
     const rawTargets = Array.isArray(value.targets) ? (value.targets as unknown[]) : [];
     if (rawTargets.length === 0) return { error: { message: 'Validation failed', errors: ['targets: Select at least one store'], status: 400 } };
 
-    const VALID_DETAIL_STATUS = new Set(['ACTIVE', 'DRAFT', 'ARCHIVED']);
+    const VALID_DETAIL_STATUS = new Set(['ACTIVE', 'DRAFT', 'UNLISTED']);
     // Tracks how many images a target sent vs. how many survived toPublicUrl, so the publish loop
     // below can tell "this store genuinely has no images" apart from "every image URL was
     // unresolvable" and fail loudly in the latter case instead of silently wiping Shopify's media.
@@ -298,7 +301,7 @@ export class StoreListingController {
       const rawVariantImages = t.variantImages && typeof t.variantImages === 'object' ? Object.entries(t.variantImages as Record<string, unknown>) : [];
       const detailStatus =
         typeof d?.status === 'string' && VALID_DETAIL_STATUS.has(d.status)
-          ? (d.status as 'ACTIVE' | 'DRAFT' | 'ARCHIVED')
+          ? (d.status as 'ACTIVE' | 'DRAFT' | 'UNLISTED')
           : undefined;
       const storeId = String(t.storeId ?? '');
       const images = rawImages
@@ -490,8 +493,11 @@ function buildPublishPayload(
         const imageUrl = candidateImageUrl && target.images?.some((i) => i.url === candidateImageUrl) ? candidateImageUrl : null;
         return {
           hubVariantId: v.id,
-          colour: v.colour?.trim() ? v.colour : 'Default',
-          size: v.size?.trim() ? v.size : 'Default',
+          // Raw, trimmed value — '' when blank. lib/shopify-product-publish.server.ts derives the
+          // Shopify option structure from these directly; no sentinel substitution here, so a
+          // colour genuinely named "Default" is never mistaken for a blank one.
+          colour: v.colour?.trim() ?? '',
+          size: v.size?.trim() ?? '',
           sku: meta?.sku ?? (v.sku?.trim() ? v.sku.trim() : null),
           barcode: meta?.barcode ?? (v.barcode?.trim() ? v.barcode.trim() : null),
           price: Number.isFinite(Number(override)) && Number(override) >= 0

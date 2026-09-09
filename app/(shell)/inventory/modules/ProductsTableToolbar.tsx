@@ -38,14 +38,14 @@ export default function ProductsTableToolbar({ table, onRefresh, loading }: Prod
       </select>
 
       <select
-        value={table.supplierName}
-        onChange={(e) => table.setSupplierName(e.target.value)}
+        value={table.supplierId}
+        onChange={(e) => table.setSupplierId(e.target.value)}
         className="rounded-lg border border-gray-300 bg-white px-2.5 py-2 text-sm text-gray-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 cursor-pointer"
       >
         <option value="">All suppliers</option>
-        {table.supplierOptions.map((name) => (
-          <option key={name} value={name}>
-            {name}
+        {table.supplierOptions.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.name}
           </option>
         ))}
       </select>

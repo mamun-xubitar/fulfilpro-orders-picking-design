@@ -1,6 +1,6 @@
 'use client';
 
-import { sanitizeHtml } from '@/lib/sanitize-html';
+import ClampedHtml from './ClampedHtml';
 
 /** Shared label / read-only / input rows for the Product details panel. */
 
@@ -9,16 +9,14 @@ export function FieldLabel({ children }: { children: React.ReactNode }) {
 }
 
 /** Read-mode row for `RichTextField` — the Description value is sanitized HTML (imported
- * straight from Shopify's `Body (HTML)` CSV column), so it's rendered rather than escaped. */
+ * straight from Shopify's `Body (HTML)` CSV column), so it's rendered rather than escaped.
+ * Clamped to 10 lines with a "See more" button that only appears when it actually overflows. */
 export function HtmlField({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
       <FieldLabel>{label}</FieldLabel>
       {value ? (
-        <div
-          className="min-h-16 rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-2 text-[13px] text-gray-900 [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-4 [&_ol]:pl-4 [&_a]:text-blue-600 [&_a]:underline"
-          dangerouslySetInnerHTML={{ __html: sanitizeHtml(value) }}
-        />
+        <ClampedHtml html={value} title={label} />
       ) : (
         <p className="min-h-16 rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-2 text-[13px] text-gray-900">—</p>
       )}

@@ -15,6 +15,7 @@ import PublishToStoresModal from './PublishToStoresModal';
 import StocktakeModal from './StocktakeModal';
 import StorePricesModal from './StorePricesModal';
 import SupplierModal from './SupplierModal';
+import SupplierMultiSelect from './SupplierMultiSelect';
 import { ChevronLeft, ChevronRight, Close, Lock, Unlock } from './icons';
 import { formatMoney, variantTitle } from './utils';
 import type { InventoryPage } from './hooks/useInventoryPage';
@@ -36,7 +37,7 @@ export default function InventoryModals(p: InventoryPage) {
       )}
 
       {p.editImagesOpen && (
-        <EditImagesModal images={gallery.images} variants={variants} imageMutations={imageMutations} onClose={p.closeEditImages} />
+        <EditImagesModal images={gallery.images} colours={p.details.colours} imageMutations={imageMutations} onClose={p.closeEditImages} />
       )}
 
       {gallery.lightboxOpen && gallery.lightboxActive && (
@@ -130,6 +131,48 @@ export default function InventoryModals(p: InventoryPage) {
         </ModalShell>
       )}
 
+      {matrix.bulkDeleteOpen && (
+        <ModalShell
+          title="Delete selected variants?"
+          onClose={matrix.cancelBulkDelete}
+          footer={
+            <ModalActions
+              onCancel={matrix.cancelBulkDelete}
+              onConfirm={matrix.confirmBulkDelete}
+              confirmLabel={matrix.bulkDeleting ? 'Deleting...' : 'Delete variants'}
+              disabled={matrix.bulkDeleting}
+              danger
+            />
+          }
+        >
+          <p className="text-sm text-gray-600">
+            This removes <strong className="font-semibold text-gray-900">{matrix.selectedIds.size}</strong> selected variant
+            {matrix.selectedIds.size === 1 ? '' : 's'} and their stock history. This can&apos;t be undone.
+          </p>
+        </ModalShell>
+      )}
+
+      {p.deleteProductOpen && p.product && (
+        <ModalShell
+          title="Delete this product?"
+          onClose={p.closeDeleteProduct}
+          footer={
+            <ModalActions
+              onCancel={p.closeDeleteProduct}
+              onConfirm={p.confirmDeleteProduct}
+              confirmLabel={p.deletingProduct ? 'Deleting...' : 'Delete product'}
+              disabled={p.deletingProduct}
+              danger
+            />
+          }
+        >
+          <p className="text-sm text-gray-600">
+            This permanently removes <strong className="font-semibold text-gray-900">{p.product.name}</strong>, every variant, image and
+            history entry attached to it. This can&apos;t be undone.
+          </p>
+        </ModalShell>
+      )}
+
       <PoModals po={p.po} variants={variants} />
       <StocktakeModal stocktake={p.stocktake} />
       <AdjustmentModals adjustments={p.adjustments} variants={variants} />
@@ -158,22 +201,29 @@ function NewProductModal({
 }: {
   suppliers: { id: string; name: string }[];
   onClose: () => void;
-  onCreate: (form: { supplierId: string; itemNo: string; name: string; brand: string; handle: string }) => void;
+  onCreate: (form: { supplierIds: string[]; itemNo: string; name: string; brand: string; handle: string }) => void;
   saving: boolean;
   errors: Record<string, string>;
 }) {
-  const [form, setForm] = useState({ supplierId: suppliers[0]?.id ?? '', itemNo: '', name: '', brand: '', handle: '' });
+  const [form, setForm] = useState({
+    supplierIds: suppliers[0] ? [suppliers[0].id] : ([] as string[]),
+    itemNo: '',
+    name: '',
+    brand: '',
+    handle: '',
+  });
   // Locked (the default): the handle field is disabled and re-derives from the product name on
   // every keystroke. Unlocking hands control to the user; re-locking re-derives immediately.
   const [handleLocked, setHandleLocked] = useState(true);
 
-  const set = (field: 'supplierId' | 'itemNo' | 'brand') => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+  const set = (field: 'itemNo' | 'brand') => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
   const setName = (e: React.ChangeEvent<HTMLInputElement>) => {
     const name = e.target.value;
     setForm((prev) => ({ ...prev, name, ...(handleLocked ? { handle: slugifyHandle(name) } : {}) }));
   };
   const setHandle = (e: React.ChangeEvent<HTMLInputElement>) => setForm((prev) => ({ ...prev, handle: e.target.value }));
+  const setSupplierIds = (supplierIds: string[]) => setForm((prev) => ({ ...prev, supplierIds }));
   const toggleHandleLock = () => {
     setHandleLocked((prev) => {
       const next = !prev;
@@ -182,31 +232,23 @@ function NewProductModal({
     });
   };
 
-  const disabled = form.itemNo.trim() === '' || form.name.trim() === '' || form.supplierId === '' || form.handle.trim() === '';
+  const disabled = form.itemNo.trim() === '' || form.name.trim() === '' || form.supplierIds.length === 0 || form.handle.trim() === '';
 
   return (
     <ModalShell
       title="New product"
       onClose={onClose}
-      footer={<ModalActions onCancel={onClose} onConfirm={() => onCreate(form)} confirmLabel={saving ? 'Creating...' : 'Create product'} disabled={disabled || saving} />}
+      footer={
+        <ModalActions
+          onCancel={onClose}
+          onConfirm={() => onCreate({ supplierIds: form.supplierIds, itemNo: form.itemNo, name: form.name, brand: form.brand, handle: form.handle })}
+          confirmLabel={saving ? 'Creating...' : 'Create product'}
+          disabled={disabled || saving}
+        />
+      }
     >
       <div className="space-y-3">
-        <div>
-          <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-gray-500">Supplier</label>
-          <select
-            value={form.supplierId}
-            onChange={set('supplierId')}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400"
-          >
-            <option value="">Select a supplier</option>
-            {suppliers.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-          {errors.supplierId && <p className="mt-1 text-xs text-red-600">{errors.supplierId}</p>}
-        </div>
+        <SupplierMultiSelect suppliers={suppliers} selectedIds={form.supplierIds} onChange={setSupplierIds} error={errors.supplierId} />
         <TextField label="Item no." value={form.itemNo} onChange={set('itemNo')} placeholder="09419" error={errors.itemNo} />
         <TextField label="Product name" value={form.name} onChange={setName} placeholder="FLEX KINDY WIDE BRIM HAT" error={errors.name} />
         <div>

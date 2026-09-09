@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import StoreDraftVariantImage from './StoreDraftVariantImage';
 import type { ProductRecord } from './types';
 import type { StoreDraft } from './hooks/useStorePublish';
+import { sortVariantsForDisplay } from './utils';
 
 type StoreDraftVariantsProps = {
   storeName: string;
@@ -48,6 +49,9 @@ export default function StoreDraftVariants({
   setVariantImage,
 }: StoreDraftVariantsProps) {
   const availableImages = draft.images.filter((img) => !draft.excludedImages.includes(img.id));
+  // Colour A->Z, then the product's own declared size order — matches the product page's own
+  // variants matrix (see sortVariantsForDisplay) instead of raw creation-order.
+  const sortedVariants = useMemo(() => sortVariantsForDisplay(product.variants, product.sizes), [product.variants, product.sizes]);
   const allIncluded = product.variants.every((v) => !draft.excludedVariants.includes(v.id));
   const someIncluded = !allIncluded && product.variants.some((v) => !draft.excludedVariants.includes(v.id));
   const headerCheckboxRef = useRef<HTMLInputElement>(null);
@@ -93,7 +97,7 @@ export default function StoreDraftVariants({
             </tr>
           </thead>
           <tbody>
-            {product.variants.map((v) => {
+            {sortedVariants.map((v) => {
               const excluded = showVariants && draft.excludedVariants.includes(v.id);
               return (
                 <tr key={v.id} className={`border-b border-gray-100 last:border-0 ${excluded ? 'opacity-50' : ''}`}>

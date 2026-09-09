@@ -71,10 +71,29 @@ export async function POST(request: NextRequest) {
       const event = await prisma.shopifyWebhookEvent.create({ data: { storeId: store.id, webhookId, topic, status: 'processing' } });
       eventId = event.id;
     } catch (error) {
-      if (isUniqueConstraintError(error)) {
+      if (!isUniqueConstraintError(error)) throw error;
+      // Same delivery seen before. 'done'/'processing' rows short-circuit as before,
+      // but a 'failed' row means the handler never completed (Shopify retries failed
+      // deliveries with the same webhook id) — reset it and run the handler so the
+      // inventory movement isn't stranded. Line-level ledgers (InventoryAllocation,
+      // ProcessedFulfillmentEvent, ProcessedRefundEvent) still prevent double-counting.
+      const existing = await prisma.shopifyWebhookEvent.findUnique({
+        where: { storeId_webhookId: { storeId: store.id, webhookId } },
+        select: { id: true, status: true },
+      });
+      if (existing?.status === 'failed') {
+        await prisma.shopifyWebhookEvent.update({
+          where: { id: existing.id },
+          data: { status: 'processing', error: null, processedAt: null },
+        });
+        eventId = existing.id;
+      } else if (existing) {
         return Response.json({ success: true, message: 'Already processed' }, { status: 200 });
+      } else {
+        // Guard row vanished between the conflict and the lookup — proceed; the
+        // line-level ledgers below still keep every movement idempotent.
+        eventId = null;
       }
-      throw error;
     }
   }
 

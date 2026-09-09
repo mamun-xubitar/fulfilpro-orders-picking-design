@@ -2,15 +2,14 @@
 
 import CategoryPicker from './CategoryPicker';
 import CollectionsPicker from './CollectionsPicker';
+import ProductStatusSelect from './ProductStatusSelect';
 import ProductTypePicker from './ProductTypePicker';
 import RichTextField from './RichTextField';
 import TagsPicker from './TagsPicker';
 import VendorPicker from './VendorPicker';
 import { TextField } from './StoreDraftFields';
-import type { ProductRecord, ProductStatusValue } from './types';
+import type { ProductRecord } from './types';
 import type { StoreDraft } from './hooks/useStorePublish';
-
-const STATUS_OPTIONS: ProductStatusValue[] = ['ACTIVE', 'DRAFT', 'ARCHIVED'];
 
 type StoreDraftDetailsProps = {
   storeId: string;
@@ -50,17 +49,11 @@ export default function StoreDraftDetails({ storeId, product, draft, set, setFie
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-gray-500">Status</label>
-            <select
+            <ProductStatusSelect
               value={draft.status}
-              onChange={(e) => set({ status: e.target.value as ProductStatusValue })}
+              onChange={(status) => set({ status })}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400"
-            >
-              {STATUS_OPTIONS.map((s) => (
-                <option key={s} value={s}>
-                  {s} {s === 'DRAFT' ? '(hidden from storefront)' : s === 'ARCHIVED' ? '(archived)' : '(live)'}
-                </option>
-              ))}
-            </select>
+            />
           </div>
           <div>
             <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-gray-500">Handle</label>

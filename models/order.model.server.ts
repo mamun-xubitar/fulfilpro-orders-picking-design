@@ -181,8 +181,9 @@ export class OrderModel {
       select: { id: true },
     });
 
+    const cancelled = Boolean(payload.cancelled_at ?? payload.canceled_at);
     if (exists) {
-      return { created: false, id: exists.id };
+      return { created: false, id: exists.id, cancelled };
     }
 
     const created = await prisma.order.create({
@@ -191,7 +192,42 @@ export class OrderModel {
     });
     await this.syncLineItemDecorations(created.id);
 
-    return { created: true, id: created.id };
+    return { created: true, id: created.id, cancelled };
+  }
+
+  /**
+   * Marks the local order cancelled from an orders/cancelled webhook so the
+   * Order table, the OrderLineItem net quantities (via linkOrderLineItems) and
+   * the allocatedFromOrders hint stop counting its lines. No-op when the order
+   * was never synced locally. Returns the local order id when found.
+   */
+  async markCancelledFromWebhook(params: {
+    payload: ShopifyOrderPayload;
+    storeId: string;
+  }) {
+    const number = params.payload.order_number;
+    if (!number) return { marked: false as const, id: null as string | null };
+    const existing = await prisma.order.findUnique({
+      where: { storeId_number: { storeId: params.storeId, number } },
+      select: { id: true, canceled: true },
+    });
+    if (!existing) return { marked: false as const, id: null as string | null };
+    const rawCancelledAt =
+      params.payload.cancelled_at ?? params.payload.canceled_at ?? null;
+    const parsed = rawCancelledAt ? new Date(rawCancelledAt) : new Date();
+    const canceledAt = Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+    if (!existing.canceled) {
+      await prisma.order.update({
+        where: { id: existing.id },
+        data: { canceled: true, canceledAt },
+      });
+    }
+    try {
+      await linkOrderLineItems(existing.id);
+    } catch (error) {
+      console.error('Failed to relink order line items after cancel', { orderId: existing.id, error });
+    }
+    return { marked: true as const, id: existing.id };
   }
 
   async upsertFromShopifyOrder(params: {

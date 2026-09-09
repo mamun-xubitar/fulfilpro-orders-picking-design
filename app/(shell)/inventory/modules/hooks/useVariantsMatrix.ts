@@ -1,8 +1,9 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { toast } from 'react-toastify';
 import useRequest from '@/hooks/useRequest';
-import { getStatus, makeSwatchResolver, quickFilterMatches, summariseVariants } from '../utils';
+import { getStatus, makeSwatchResolver, quickFilterMatches, sortVariantsForDisplay, summariseVariants } from '../utils';
 import type { ColourOption, ProductRecord, QuickFilterId, VariantRow, VariantStatus } from '../types';
 
 type MatrixFilters = {
@@ -46,6 +47,11 @@ export function useVariantsMatrix({ product, sizes, colours, quickFilter, onVari
   const deleteTarget = storedDeleteTarget && storedDeleteTarget.productId === product?.id ? storedDeleteTarget.variant : null;
   const { request: requestDelete, loading: deleting } = useRequest<ProductRecord>();
 
+  // Bulk delete confirmation, tagged with its product like the single-row one above.
+  const [storedBulkDeleteOpen, setStoredBulkDeleteOpen] = useState<string | null>(null);
+  const bulkDeleteOpen = storedBulkDeleteOpen !== null && storedBulkDeleteOpen === product?.id;
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
   const patch = (next: Partial<MatrixFilters>) => {
     if (!product) return;
     setStored({ productId: product.id, filters: { ...filters, ...next } });
@@ -80,7 +86,7 @@ export function useVariantsMatrix({ product, sizes, colours, quickFilter, onVari
   const sizeFilter = sizes.includes(filters.size) ? filters.size : '';
 
   const rows = useMemo(() => {
-    return variants.filter((v) => {
+    const filtered = variants.filter((v) => {
       if (quickFilter && !quickFilterMatches(quickFilter, v)) return false;
       if (!allColoursSelected && !activeColours.some((c) => c.toLowerCase() === v.colour.toLowerCase())) return false;
       if (sizeFilter && v.size !== sizeFilter) return false;
@@ -89,7 +95,11 @@ export function useVariantsMatrix({ product, sizes, colours, quickFilter, onVari
       if (filters.showZeroStock && v.stockOnHand > 0) return false;
       return true;
     });
-  }, [variants, quickFilter, allColoursSelected, activeColours, sizeFilter, filters.status, filters.showZeroStock]);
+    // Grouped by colour (A->Z) so same-colour rows stay together; within a colour, ordered by
+    // the product's own declared size order — see sortVariantsForDisplay, shared with the
+    // publish/bulk-update store draft tables so all three read the same way.
+    return sortVariantsForDisplay(filtered, sizes);
+  }, [variants, sizes, quickFilter, allColoursSelected, activeColours, sizeFilter, filters.status, filters.showZeroStock]);
 
   // Selection is narrowed to the visible rows here rather than pruned in an effect.
   const selectedIds = useMemo(() => {
@@ -168,6 +178,37 @@ export function useVariantsMatrix({ product, sizes, colours, quickFilter, onVari
     });
   };
 
+  const requestBulkDelete = () => {
+    if (!product || selectedIds.size === 0) return;
+    setStoredBulkDeleteOpen(product.id);
+  };
+
+  const cancelBulkDelete = () => setStoredBulkDeleteOpen(null);
+
+  /** Raw fetch (not useRequest) — mirrors useProductsTable's bulk actions, since the success
+   * message's variant count is only known once the server responds. */
+  const confirmBulkDelete = async () => {
+    if (!product || selectedIds.size === 0) return;
+    setBulkDeleting(true);
+    try {
+      const res = await fetch(`/api/inventory/catalog/${product.id}/variants/bulk`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ variantIds: [...selectedIds] }),
+      });
+      const json = (await res.json()) as { success: boolean; message: string; data: ProductRecord };
+      if (!res.ok || !json.success) throw new Error(json.message || 'Failed to delete variants');
+      toast.success(json.message);
+      onVariantSaved(json.data);
+      patch({ selected: [] });
+      setStoredBulkDeleteOpen(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete variants');
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
   return {
     colours,
     colourNames,
@@ -186,6 +227,11 @@ export function useVariantsMatrix({ product, sizes, colours, quickFilter, onVari
     requestDeleteRow,
     cancelDeleteRow,
     confirmDeleteRow,
+    bulkDeleteOpen,
+    bulkDeleting,
+    requestBulkDelete,
+    cancelBulkDelete,
+    confirmBulkDelete,
     swatchOf: makeSwatchResolver(colours),
     hiddenCount: variants.length - rows.length,
     allColoursSelected,

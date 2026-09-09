@@ -1,6 +1,8 @@
 import prisma from '@/lib/prisma.server';
-import { shopifyGraphQL, getLegacyId } from '@/lib/shopify-graphql.server';
+import { shopifyGraphQL, getLegacyId, preferredStoreUrl } from '@/lib/shopify-graphql.server';
+import { updateStoreVariantPrices } from '@/lib/shopify-store-listings.server';
 import { variantOptionKey } from '@/lib/inventory/variant-option-key';
+import { resolveOptionAxes, productOptionsInput, variantOptionValues, optionMatchKeys } from '@/lib/inventory/variant-options';
 
 /** Which parts of the hub product a publish/bulk-update call should push. 'variants' covers
  * SKU, barcode, price, option values and inventory together — Shopify has no finer split, since
@@ -12,6 +14,10 @@ export type PublishImage = { url: string; altText: string | null };
 export type PublishVariant = {
   /** SupplierProductVariant.id — carried through so the caller can persist the mapping. */
   hubVariantId: string;
+  /** Raw, trimmed hub value — '' when this axis is blank. Never the 'Default' sentinel; the
+   * Colour/Size-vs-Title option shape is derived from these at publish time via
+   * lib/inventory/variant-options.ts, so a colour genuinely named "Default" isn't mistaken for a
+   * blank one. */
   colour: string;
   size: string;
   sku: string | null;
@@ -42,7 +48,9 @@ export type PublishPayload = {
    * `images`. `null` = collections aspect not touched (details aspect omitted entirely). */
   collectionIds: string[] | null;
   tags: string[];
-  status: 'ACTIVE' | 'DRAFT' | 'ARCHIVED';
+  /** Our hub's own three-state vocabulary — matches Shopify's own ProductStatus 1:1 as of API
+   * 2025-10 (this app is on 2026-04), sent through verbatim. */
+  status: 'ACTIVE' | 'DRAFT' | 'UNLISTED';
   seoTitle?: string | null;
   seoDescription?: string | null;
   images: PublishImage[];
@@ -59,45 +67,62 @@ type ShopifyVariantNode = {
   inventoryItem: { id: string };
 };
 
+type ShopifyPublishProduct = {
+  id: string;
+  title: string;
+  handle: string;
+  status: string;
+  onlineStoreUrl: string | null;
+  onlineStorePreviewUrl: string | null;
+  variants: { nodes: ShopifyVariantNode[] };
+};
+
 type ProductSetResult = {
   productSet: {
-    product: {
-      id: string;
-      title: string;
-      handle: string;
-      status: string;
-      onlineStoreUrl: string | null;
-      onlineStorePreviewUrl: string | null;
-      variants: { nodes: ShopifyVariantNode[] };
-    } | null;
+    product: ShopifyPublishProduct | null;
     userErrors: { field: string[] | null; message: string }[];
   };
 };
 
+/** Shared between `productSet`'s response and the plain read below it, so a price-only push (which
+ * skips `productSet` entirely — see `wantsPricingOnly`) still returns the same shape for the
+ * response re-match and the caller's return value. */
+const PRODUCT_FIELDS = `
+  id
+  title
+  handle
+  status
+  onlineStoreUrl
+  onlineStorePreviewUrl
+  variants(first: 100) {
+    nodes {
+      id
+      title
+      sku
+      barcode
+      price
+      selectedOptions { name value }
+      inventoryItem { id }
+    }
+  }
+`;
+
 const PRODUCT_SET_MUTATION = `
   mutation PublishProductSet($input: ProductSetInput!, $identifier: ProductSetIdentifiers) {
     productSet(input: $input, identifier: $identifier, synchronous: true) {
-      product {
-        id
-        title
-        handle
-        status
-        onlineStoreUrl
-        onlineStorePreviewUrl
-        variants(first: 100) {
-          nodes {
-            id
-            title
-            sku
-            barcode
-            price
-            selectedOptions { name value }
-            inventoryItem { id }
-          }
-        }
-      }
+      product { ${PRODUCT_FIELDS} }
       userErrors { field message }
     }
+  }
+`;
+
+/** Reads the product back without touching anything — used for a pure price-only push, where
+ * prices go through `productVariantsBulkUpdate` instead of `productSet` (see `wantsPricingOnly`),
+ * so there is otherwise no `productSet` response to build the return value and variant mapping
+ * from. */
+const PRODUCT_BY_ID_QUERY = `
+  query ProductById($id: ID!) {
+    node(id: $id) { ... on Product { ${PRODUCT_FIELDS} } }
   }
 `;
 
@@ -365,13 +390,16 @@ export async function publishProductToStore(args: {
     input.handle = payload.handle;
     input.vendor = payload.vendor;
     input.productType = payload.productType;
+    // UNLISTED is a real ProductStatus value since API 2025-10 (this app is on 2026-04) — sent
+    // through as-is, unlike the old coercion to ACTIVE this used to need.
     input.status = payload.status;
     input.tags = payload.tags;
-    if (payload.categoryGid) input.category = payload.categoryGid;
+    // Sent even when null/empty (not just omitted) so a draft that clears a previously-set
+    // category, collection list, or SEO field can actually clear it on Shopify — productSet only
+    // leaves a field untouched when it's absent from the input entirely.
+    input.category = payload.categoryGid ?? null;
     if (payload.collectionIds) input.collections = payload.collectionIds;
-    if (payload.seoTitle || payload.seoDescription) {
-      input.seo = { title: payload.seoTitle || undefined, description: payload.seoDescription || undefined };
-    }
+    input.seo = { title: payload.seoTitle ?? '', description: payload.seoDescription ?? '' };
     // Product options are re-derived from the variant set below whenever variants are pushed —
     // Shopify infers them from productOptions, sent alongside variants.
   }
@@ -384,37 +412,50 @@ export async function publishProductToStore(args: {
     }));
   }
 
-  // Price-only without any known variant ids would be an empty no-op — escalate to a full
-  // variants+pricing push so new/row-less products still get created instead of silently skipping.
-  const hasVariantIds = payload.variants.some((v) => v.variantGid);
-  const effectiveVariants = includes('variants') || (includes('pricing') && !hasVariantIds);
+  // Price-only where EVERY variant is already mapped is safe to push through
+  // `productVariantsBulkUpdate` instead (see `wantsPricingOnly` below) — it takes just {id, price},
+  // so unlike `productSet` it can never reshape or delete a variant. If even one variant is
+  // unmapped, `productSet`'s full-replacement `variants` list would delete it, so escalate to a
+  // full variants+pricing push instead (also covers new/row-less products). A first publish
+  // (`!existingProductGid`) always gets the full push too — otherwise, when neither 'variants' nor
+  // a bare price patch is in play, `productSet` would receive no `variants`/`productOptions` at
+  // all and Shopify would fabricate its own zero-price, untracked default variant.
+  const hasAllVariantIds = payload.variants.length > 0 && payload.variants.every((v) => v.variantGid);
+  const effectiveVariants = includes('variants') || !existingProductGid || (includes('pricing') && !hasAllVariantIds);
+  const wantsPricingOnly = !effectiveVariants && includes('pricing') && payload.variants.length > 0;
+
+  if (effectiveVariants && payload.variants.length === 0) {
+    throw new Error('Select at least one variant to publish');
+  }
+
+  const axes = resolveOptionAxes(payload.variants);
 
   if (effectiveVariants && payload.variants.length > 0) {
-    const colours = [...new Set(payload.variants.map((v) => v.colour?.trim() || 'Default'))];
-    const sizes = [...new Set(payload.variants.map((v) => v.size?.trim() || 'Default'))];
-    const useColour = colours.length > 1 || payload.variants.some((v) => v.colour?.trim());
-    const useSize = sizes.length > 1 || payload.variants.some((v) => v.size?.trim());
-    const productOptions = [
-      ...(useColour ? [{ name: 'Colour', values: colours.map((name) => ({ name })) }] : []),
-      ...(useSize ? [{ name: 'Size', values: sizes.map((name) => ({ name })) }] : []),
-    ];
-    input.productOptions = productOptions.length > 0 ? productOptions : [{ name: 'Title', values: [{ name: 'Default' }] }];
+    // Always present — Shopify infers the option structure from this, sent alongside variants.
+    // Falls back to the built-in Title/"Default Title" option when neither colour nor size is in
+    // use, which productSet requires explicitly even for a "no options" product.
+    input.productOptions = productOptionsInput(payload.variants, axes);
 
     locationId = await getPrimaryLocationId(store.storeDomain, store.accessToken);
     if (!locationId) throw new Error("No active fulfilment location on this store — stock can't be published");
 
     input.variants = payload.variants.map((v) => {
-      const optionValues = [
-        ...(useColour ? [{ optionName: 'Colour', name: v.colour?.trim() || 'Default' }] : []),
-        ...(useSize ? [{ optionName: 'Size', name: v.size?.trim() || 'Default' }] : []),
-      ];
       const variant: Record<string, unknown> = {
         ...(v.variantGid ? { id: v.variantGid } : {}),
-        sku: v.sku?.trim() ? v.sku.trim() : undefined,
-        barcode: v.barcode?.trim() ? v.barcode.trim() : undefined,
-        price: includes('pricing') ? v.price.toFixed(2) : undefined,
-        ...(optionValues.length > 0 ? { optionValues } : {}),
-        inventoryItem: { tracked: true, cost: v.buyPrice > 0 ? v.buyPrice.toFixed(2) : undefined },
+        // Sent as '' rather than omitted when blank, so a SKU/barcode the admin cleared actually
+        // clears on Shopify instead of leaving the previous value in place.
+        sku: v.sku?.trim() ?? '',
+        barcode: v.barcode?.trim() ?? '',
+        // Omitting price only leaves Shopify's existing price alone for a variant that already
+        // exists there — a brand-new variant (no variantGid yet) always needs one, or it's created
+        // at 0.00 regardless of whether the pricing aspect was ticked.
+        price: includes('pricing') || !v.variantGid ? v.price.toFixed(2) : undefined,
+        // REQUIRED and non-null on ProductVariantSetInput — never omitted, even for the built-in
+        // Title option (see lib/inventory/variant-options.ts).
+        optionValues: variantOptionValues(v, axes),
+        // Cost always sent (including 0) — the hub is the source of truth for cost, so an
+        // intentional 0 must reach Shopify rather than being silently dropped.
+        inventoryItem: { tracked: true, cost: Math.max(0, v.buyPrice).toFixed(2) },
         // Requires the same URL to also be present in the product-level `files` input above —
         // only meaningful when the images aspect is included, which is exactly when that holds.
         ...(includes('images') && v.imageUrl ? { file: { originalSource: v.imageUrl, contentType: 'IMAGE' } } : {}),
@@ -424,28 +465,45 @@ export async function publishProductToStore(args: {
       }
       return variant;
     });
-  } else if (includes('pricing') && payload.variants.length > 0) {
-    // Price-only update without touching variant structure — still keyed by existing variant id.
-    const priceOnly = payload.variants
-      .filter((v) => v.variantGid)
-      .map((v) => ({ id: v.variantGid, price: v.price.toFixed(2) }));
-    if (priceOnly.length === 0) {
-      throw new Error('No variant mappings for this store yet — republish with Variants included to create them first');
-    }
-    input.variants = priceOnly;
   }
 
   const identifier = existingProductGid ? { id: existingProductGid } : { handle: payload.handle };
 
-  const data = await shopifyGraphQL<ProductSetResult>(store.storeDomain, store.accessToken, PRODUCT_SET_MUTATION, { input, identifier });
-  const { product, userErrors } = data.productSet;
-  if (userErrors.length > 0) throw new Error(userErrors.map((e) => e.message).join('; '));
-  if (!product) throw new Error('Shopify did not return the product after productSet');
+  let product: ShopifyPublishProduct;
+  if (Object.keys(input).length > 0) {
+    const data = await shopifyGraphQL<ProductSetResult>(store.storeDomain, store.accessToken, PRODUCT_SET_MUTATION, { input, identifier });
+    const { product: setProduct, userErrors } = data.productSet;
+    if (userErrors.length > 0) throw new Error(userErrors.map((e) => e.message).join('; '));
+    if (!setProduct) throw new Error('Shopify did not return the product after productSet');
+    product = setProduct;
+  } else {
+    // Nothing to set — a pure price-only push (see wantsPricingOnly below) with no other aspect
+    // selected. Read the product back instead of calling productSet with an empty input.
+    // `existingProductGid` is guaranteed here: an empty `input` means `effectiveVariants` was
+    // false, and `effectiveVariants` is unconditionally true whenever `existingProductGid` is
+    // unset (see above), so this branch is only reachable on a re-publish.
+    const data = await shopifyGraphQL<{ node: ShopifyPublishProduct | null }>(store.storeDomain, store.accessToken, PRODUCT_BY_ID_QUERY, {
+      id: existingProductGid,
+    });
+    if (!data.node) throw new Error('Shopify could not find this product');
+    product = data.node;
+  }
 
-  // Publish to every sales channel only for ACTIVE products — DRAFT stays unpublished (visible in
-  // admin, hidden from the storefront), ARCHIVED stays archived. Idempotent no-op for channels
-  // already published there.
-  if (payload.status === 'ACTIVE') {
+  if (wantsPricingOnly) {
+    const priceOnly = payload.variants.filter((v) => v.variantGid).map((v) => ({ id: v.variantGid!, price: v.price }));
+    if (priceOnly.length === 0) {
+      throw new Error('No variant mappings for this store yet — republish with Variants included to create them first');
+    }
+    await updateStoreVariantPrices({ storeId, productGid: product.id, variants: priceOnly });
+  }
+
+  // Publish to every sales channel for ACTIVE and UNLISTED products — both need channel
+  // publication for the storefront route to resolve at all; UNLISTED just stays out of
+  // search/collections/recommendations on Shopify's side once it is. DRAFT stays unpublished.
+  // Only meaningful when this call actually set a status (the details aspect); guarded so a
+  // price/variant-only bulk update never force-publishes a product to every channel behind the
+  // admin's back. Idempotent no-op for channels already published there.
+  if (includes('details') && (payload.status === 'ACTIVE' || payload.status === 'UNLISTED')) {
     const publicationIds = await getAllPublicationIds(store.storeDomain, store.accessToken);
     if (publicationIds.length > 0) {
       await shopifyGraphQL(store.storeDomain, store.accessToken, PUBLISHABLE_PUBLISH_MUTATION, {
@@ -460,15 +518,33 @@ export async function publishProductToStore(args: {
   }
 
   const nodes = product.variants.nodes.map(toVariant);
-  const bySku = new Map(nodes.filter((n) => n.sku?.trim()).map((n) => [n.sku!.trim().toLowerCase(), n]));
-  const byOptionKey = new Map(nodes.map((n) => [n.optionKey, n]));
+  // A hub variant we already have a Shopify id for is matched directly by id first — the most
+  // reliable match there is, and the only one available for wantsPricingOnly (`productSet` wasn't
+  // even called, so there's no fresh SKU/option-value echo to match on). Everything else falls
+  // through to a SKU, then option-value, match against the remaining pool. `pool` is consumed as
+  // matches are claimed so two hub variants can never both claim the same Shopify node — e.g. two
+  // variants sharing a SKU, or (variantOptionKey being order-insensitive) a Colour/Size pair whose
+  // values happen to be one another's swapped.
+  const byId = new Map(nodes.map((n) => [n.variantGid, n]));
+  const claimedByIdSet = new Set(payload.variants.map((v) => v.variantGid).filter((id): id is string => !!id && byId.has(id)));
+  const pool = nodes.filter((n) => !claimedByIdSet.has(n.variantGid));
+  function claimFromPool(predicate: (n: (typeof nodes)[number]) => boolean) {
+    const idx = pool.findIndex(predicate);
+    return idx === -1 ? undefined : pool.splice(idx, 1)[0];
+  }
+
   const variants = payload.variants
     .map((v) => {
+      const direct = v.variantGid ? byId.get(v.variantGid) : undefined;
       const skuKey = v.sku?.trim().toLowerCase();
-      const match =
-        (skuKey ? bySku.get(skuKey) : undefined) ??
-        byOptionKey.get(variantOptionKey([v.colour?.trim() || 'Default', v.size?.trim() || 'Default'])) ??
-        byOptionKey.get(variantOptionKey([v.colour ?? '', v.size ?? '']));
+      const bySku = !direct && skuKey ? claimFromPool((n) => n.sku?.trim().toLowerCase() === skuKey) : undefined;
+      const byOptionValue =
+        !direct && !bySku ? optionMatchKeys(v, axes).reduce<(typeof nodes)[number] | undefined>((found, key) => found ?? claimFromPool((n) => n.optionKey === key), undefined) : undefined;
+      // Last resort: a single hub variant and a single (still unclaimed) Shopify variant can only
+      // be each other, however the option values ended up named — rescues a simple product whose
+      // live listing predates every naming scheme above.
+      const onlyOne = !direct && !bySku && !byOptionValue && payload.variants.length === 1 ? claimFromPool(() => true) : undefined;
+      const match = direct ?? bySku ?? byOptionValue ?? onlyOne;
       if (!match) return null;
       return {
         hubVariantId: v.hubVariantId,
@@ -476,7 +552,9 @@ export async function publishProductToStore(args: {
         inventoryItemGid: match.inventoryItemGid,
         sku: match.sku,
         barcode: match.barcode,
-        price: match.price,
+        // What we just told Shopify to set it to, whenever pricing was pushed — the fetched node
+        // can be stale here (wantsPricingOnly reads product state from before its own price push).
+        price: includes('pricing') ? v.price : match.price,
       };
     })
     .filter((v): v is NonNullable<typeof v> => v !== null);
@@ -498,7 +576,7 @@ export async function publishProductToStore(args: {
     externalId: getLegacyId(product.id),
     handle: product.handle,
     shopifyStatus: product.status,
-    url: product.onlineStoreUrl ?? product.onlineStorePreviewUrl ?? null,
+    url: preferredStoreUrl(product.onlineStoreUrl, product.onlineStorePreviewUrl),
     variants,
   };
 }

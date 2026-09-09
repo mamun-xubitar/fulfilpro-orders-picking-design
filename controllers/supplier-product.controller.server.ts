@@ -1,5 +1,6 @@
 import prisma from '@/lib/prisma.server';
 import { SupplierProductModel } from '@/models/supplier-product.model.server';
+import { SupplierModel } from '@/models/supplier.model.server';
 import { CurrencyRateModel } from '@/models/currency-rate.model.server';
 import { saveUploadedFile } from '@/lib/uploads.server';
 import { deriveColorFromName } from '@/lib/inventory/colour';
@@ -10,6 +11,7 @@ import type { CatalogueListParams, ProductsSortKey, QuickFilterId } from '@/mode
 
 const model = new SupplierProductModel();
 const currencyModel = new CurrencyRateModel();
+const supplierModel = new SupplierModel();
 
 const STATUS_VALUES = new Set<string>(Object.values(SupplierProductStatus));
 const QUICK_FILTER_IDS = new Set<string>(['buying-lt-1', 'profit-lt-5', 'selling-lt-1', 'selling-lt-5']);
@@ -64,13 +66,13 @@ export class SupplierProductController {
     const quickFilter = quickFilterParam && QUICK_FILTER_IDS.has(quickFilterParam) ? (quickFilterParam as QuickFilterId) : null;
     const statusParam = searchParams.get('status');
     const status = statusParam && STATUS_VALUES.has(statusParam) ? (statusParam as SupplierProductStatus) : undefined;
-    const supplierName = searchParams.get('supplier')?.trim() || undefined;
+    const supplierId = searchParams.get('supplier')?.trim() || undefined;
     const sortParam = searchParams.get('sort');
     const sort = sortParam && SORT_KEYS.has(sortParam) ? (sortParam as ProductsSortKey) : 'createdAt';
     const dir = searchParams.get('dir') === 'desc' ? 'desc' : searchParams.get('dir') === 'asc' ? 'asc' : sort === 'createdAt' ? 'desc' : 'asc';
 
     if (mode === 'ids') {
-      const ids = await model.listIds({ search: searchParams.get('search')?.trim() || undefined, verified, status, supplierName, quickFilter, sort, dir });
+      const ids = await model.listIds({ search: searchParams.get('search')?.trim() || undefined, verified, status, supplierId, quickFilter, sort, dir });
       return { data: { ids } };
     }
 
@@ -87,9 +89,17 @@ export class SupplierProductController {
       const page = Math.max(1, Number(searchParams.get('page')) || 1);
       const pageSize = [20, 50, 100].includes(Number(searchParams.get('pageSize'))) ? Number(searchParams.get('pageSize')) : 20;
       const search = searchParams.get('search')?.trim() || undefined;
-      const params: CatalogueListParams = { page, pageSize, search, verified, status, supplierName, quickFilter, sort, dir };
-      const [{ products, total }, supplierOptions, totalAll] = await Promise.all([model.list(params), model.listSupplierNames(), model.countAll()]);
-      return { data: { products, pagination: paginationOf(page, pageSize, total), totalAll, globals, supplierOptions } };
+      const params: CatalogueListParams = { page, pageSize, search, verified, status, supplierId, quickFilter, sort, dir };
+      // Every supplier in the system, not just ones with linked products — a supplier with zero
+      // products should still be pickable in the filter dropdown.
+      const [{ products, total }, supplierOptionRows, totalAll, stepperTotal] = await Promise.all([
+        model.list(params),
+        supplierModel.listOptions(),
+        model.countAll(),
+        model.countForStepper(verified),
+      ]);
+      const supplierOptions = supplierOptionRows.map((s) => ({ id: s.id, name: s.name }));
+      return { data: { products, pagination: paginationOf(page, pageSize, total), totalAll, stepperTotal, globals, supplierOptions } };
     }
 
     // detail mode — the quick filter deliberately never reaches here: it only narrows the
@@ -113,7 +123,7 @@ export class SupplierProductController {
         pagination: paginationOf(page, 1, total),
         totalAll,
         globals,
-        supplierOptions: [] as string[],
+        supplierOptions: [] as { id: string; name: string }[],
       },
     };
   }
@@ -122,7 +132,12 @@ export class SupplierProductController {
     if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
 
     const value = (body ?? {}) as Record<string, unknown>;
-    const supplierId = typeof value.supplierId === 'string' ? value.supplierId.trim() : '';
+    const rawSupplierIds = Array.isArray(value.supplierIds)
+      ? (value.supplierIds as unknown[]).filter((s): s is string => typeof s === 'string' && s.trim().length > 0)
+      : typeof value.supplierId === 'string' && value.supplierId.trim()
+        ? [value.supplierId.trim()]
+        : [];
+    const supplierIds = [...new Set(rawSupplierIds)];
     const itemNo = typeof value.itemNo === 'string' ? value.itemNo.trim() : '';
     const name = typeof value.name === 'string' ? value.name.trim() : '';
     const brand = typeof value.brand === 'string' ? value.brand.trim() : '';
@@ -130,17 +145,17 @@ export class SupplierProductController {
     const handle = handleInput || slugifyHandle(name) || slugifyHandle(itemNo);
 
     const errors: string[] = [];
-    if (!supplierId) errors.push('supplierId: Supplier is required');
+    if (supplierIds.length === 0) errors.push('supplierId: At least one supplier is required');
     if (!itemNo) errors.push('itemNo: Item number is required');
     if (!name) errors.push('name: Product name is required');
     if (!handle || !isValidHandle(handle)) errors.push('handle: Enter a valid handle (lowercase letters, numbers and dashes)');
     if (errors.length) return { error: { message: 'Validation failed', errors, status: 400 } };
 
-    const supplier = await prisma.supplier.findUnique({ where: { id: supplierId }, select: { id: true } });
-    if (!supplier) return { error: { message: 'Supplier not found', status: 404 } };
+    const suppliers = await prisma.supplier.findMany({ where: { id: { in: supplierIds } }, select: { id: true } });
+    if (suppliers.length !== supplierIds.length) return { error: { message: 'One or more suppliers were not found', status: 404 } };
 
-    const existing = await prisma.supplierProduct.findUnique({ where: { supplierId_itemNo: { supplierId, itemNo } } });
-    if (existing) return { error: { message: 'Validation failed', errors: ['itemNo: This supplier already has a product with this item number'], status: 409 } };
+    const existing = await prisma.supplierProduct.findUnique({ where: { itemNo } });
+    if (existing) return { error: { message: 'Validation failed', errors: ['itemNo: A product with this item number already exists'], status: 409 } };
 
     const handleTaken = await prisma.supplierProduct.findUnique({ where: { handle }, select: { id: true } });
     if (handleTaken) return { error: { message: 'Validation failed', errors: ['handle: A product with this handle already exists'], status: 409 } };
@@ -152,7 +167,7 @@ export class SupplierProductController {
       select: { globalMarginPercent: true, globalExchangeRate: true, lowStockThreshold: true },
     });
     const id = await model.create({
-      supplierId,
+      supplierIds,
       itemNo,
       handle,
       name,
@@ -168,7 +183,8 @@ export class SupplierProductController {
 
   async updateDetails(id: string, body: unknown, session: Session) {
     if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
-    if (!(await model.exists(id))) return { error: { message: 'Product not found', status: 404 } };
+    const current = await prisma.supplierProduct.findUnique({ where: { id }, select: { itemNo: true } });
+    if (!current) return { error: { message: 'Product not found', status: 404 } };
 
     const value = (body ?? {}) as Record<string, unknown>;
     const errors: string[] = [];
@@ -184,11 +200,32 @@ export class SupplierProductController {
         if (handleTaken && handleTaken.id !== id) errors.push('handle: A product with this handle already exists');
       }
     }
+
+    let supplierIds: string[] | undefined;
+    if (Array.isArray(value.supplierIds)) {
+      supplierIds = [...new Set((value.supplierIds as unknown[]).filter((s): s is string => typeof s === 'string' && s.trim().length > 0))];
+      if (supplierIds.length === 0) {
+        errors.push('supplierId: At least one supplier is required');
+      } else {
+        const found = await prisma.supplier.findMany({ where: { id: { in: supplierIds } }, select: { id: true } });
+        if (found.length !== supplierIds.length) errors.push('supplierId: One or more suppliers were not found');
+      }
+    }
     if (errors.length) return { error: { message: 'Validation failed', errors, status: 400 } };
+
+    // itemNo is globally unique — re-check whenever it's about to change, mirroring create.
+    const effectiveItemNo = typeof value.itemNo === 'string' ? value.itemNo.trim() : current.itemNo;
+    if (effectiveItemNo !== current.itemNo) {
+      const conflict = await prisma.supplierProduct.findUnique({ where: { itemNo: effectiveItemNo }, select: { id: true } });
+      if (conflict && conflict.id !== id) {
+        return { error: { message: 'Validation failed', errors: ['itemNo: A product with this item number already exists'], status: 409 } };
+      }
+    }
 
     await model.updateDetails(id, {
       ...(typeof value.itemNo === 'string' ? { itemNo: value.itemNo.trim() } : {}),
       ...(handle !== undefined ? { handle } : {}),
+      ...(supplierIds !== undefined ? { supplierIds } : {}),
       ...(typeof value.brand === 'string' ? { brand: value.brand.trim() } : {}),
       ...(typeof value.name === 'string' ? { name: value.name.trim() } : {}),
       ...(typeof value.category === 'string' ? { category: value.category.trim() } : {}),
@@ -330,6 +367,22 @@ export class SupplierProductController {
     return { data: product, message: 'Variant deleted' };
   }
 
+  async deleteVariants(id: string, body: unknown, session: Session) {
+    if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
+    if (!(await model.exists(id))) return { error: { message: 'Product not found', status: 404 } };
+
+    const value = (body ?? {}) as Record<string, unknown>;
+    const variantIds = Array.isArray(value.variantIds) ? (value.variantIds as unknown[]).filter((v): v is string => typeof v === 'string') : [];
+    if (variantIds.length === 0) return { error: { message: 'Validation failed', errors: ['variantIds: Select at least one variant'], status: 400 } };
+
+    const count = await model.deleteVariants(id, variantIds);
+    if (count === 0) return { error: { message: 'No matching variants found', status: 404 } };
+
+    await model.logActivity(id, `${count} variant${count === 1 ? '' : 's'} deleted`, 'variant_deleted', actorFromSession(session));
+    const product = await model.findById(id);
+    return { data: product, message: `${count} variant${count === 1 ? '' : 's'} deleted` };
+  }
+
   async addImage(id: string, body: unknown, session: Session) {
     if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
     if (!(await model.exists(id))) return { error: { message: 'Product not found', status: 404 } };
@@ -391,15 +444,20 @@ export class SupplierProductController {
 
   async updateImageColour(id: string, imageId: string, body: unknown, session: Session) {
     if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
+    const product = await model.findById(id);
+    if (!product) return { error: { message: 'Product not found', status: 404 } };
 
     const value = (body ?? {}) as Record<string, unknown>;
     const colour = typeof value.colour === 'string' && value.colour.trim() ? value.colour.trim() : null;
+    if (colour !== null && !product.colours.some((c) => c.name.toLowerCase() === colour.toLowerCase())) {
+      return { error: { message: 'Validation failed', errors: ['colour: Not one of this product’s declared colours'], status: 400 } };
+    }
 
     const updated = await model.updateImageColour(id, imageId, colour);
     if (!updated) return { error: { message: 'Image not found', status: 404 } };
 
-    const product = await model.findById(id);
-    return { data: product, message: 'Image colour updated' };
+    const updatedProduct = await model.findById(id);
+    return { data: updatedProduct, message: colour ? `Image assigned to ${colour}` : 'Image unassigned' };
   }
 
   async remove(id: string, session: Session) {

@@ -64,7 +64,7 @@ export const STATUS_LEGEND: { id: VariantStatus; label: string; className: strin
 export const PRODUCT_STATUS_BADGES: Record<string, string> = {
   ACTIVE: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   DRAFT: 'bg-amber-50 text-amber-700 border-amber-200',
-  ARCHIVED: 'bg-gray-50 text-gray-600 border-gray-200',
+  UNLISTED: 'bg-gray-50 text-gray-600 border-gray-200',
 };
 
 /** SupplierProductStoreListing.status — our own record of the publish, shown on each store card. */
@@ -75,12 +75,19 @@ export const LISTING_STATUS_BADGES: Record<string, string> = {
   FAILED: 'bg-red-50 text-red-700 border-red-200',
 };
 
-/** The products table's status filter and bulk "Set status" modal. */
-export const STATUS_OPTIONS: { value: ProductStatusValue; label: string }[] = [
-  { value: 'ACTIVE', label: 'Active' },
-  { value: 'DRAFT', label: 'Draft' },
-  { value: 'ARCHIVED', label: 'Archived' },
+/** Shopify-style product status — used by the products table's status filter, the bulk "Set
+ * status" modal, the Product Details status select, and the store publish/bulk-update status
+ * select. `hint` mirrors Shopify's own explanatory copy for each state. */
+export const STATUS_OPTIONS: { value: ProductStatusValue; label: string; hint: string }[] = [
+  { value: 'ACTIVE', label: 'Active', hint: 'Sell via selected sales channels and markets' },
+  { value: 'DRAFT', label: 'Draft', hint: 'Not visible on selected sales channels or markets' },
+  { value: 'UNLISTED', label: 'Unlisted', hint: 'Accessible only by direct link' },
 ];
+
+/** Display label for a status badge — falls back to the raw value for anything unexpected. */
+export function productStatusLabel(status: string): string {
+  return STATUS_OPTIONS.find((o) => o.value === status)?.label ?? status;
+}
 
 /** Preset quantity dropdown on each row of the stock adjustment modal, so an admin rarely has to
  * type: every whole number 1-10, then even steps up to 20 — mirrored to negative and positive. */

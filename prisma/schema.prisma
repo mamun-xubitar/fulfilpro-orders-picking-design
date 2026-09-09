@@ -40,14 +40,14 @@ model User {
 }
 
 model Store {
-  id                          String               @id @default(uuid())
-  storeDomain                 String               @unique
+  id                          String                        @id @default(uuid())
+  storeDomain                 String                        @unique
   name                        String?
   accessToken                 String?
   url                         String?
   email                       String?
   logoPath                    String?
-  status                      String               @default("pending")
+  status                      String                        @default("pending")
   clientId                    String
   appId                       String?
   clientSecret                String
@@ -56,10 +56,10 @@ model Store {
   partnerStoreId              String?
   lastSyncedAt                DateTime?
   lastProductSyncedAt         DateTime?
-  partnerStore                Store?               @relation("PartnerStores", fields: [partnerStoreId], references: [id], onDelete: SetNull)
-  childStores                 Store[]              @relation("PartnerStores")
-  createdAt                   DateTime             @default(now())
-  updatedAt                   DateTime             @updatedAt
+  partnerStore                Store?                        @relation("PartnerStores", fields: [partnerStoreId], references: [id], onDelete: SetNull)
+  childStores                 Store[]                       @relation("PartnerStores")
+  createdAt                   DateTime                      @default(now())
+  updatedAt                   DateTime                      @updatedAt
   orders                      Order[]
   shipmentTrackings           ShipmentTracking[]
   products                    Product[]
@@ -67,6 +67,8 @@ model Store {
   supplierProductListings     SupplierProductStoreListing[]
   webhookEvents               ShopifyWebhookEvent[]
   inventoryAllocations        InventoryAllocation[]
+  processedFulfillments       ProcessedFulfillmentEvent[]
+  processedRefunds            ProcessedRefundEvent[]
 
   @@index([status])
   @@index([partnerStoreId])
@@ -422,7 +424,7 @@ enum ProductStatus {
 }
 
 model Product {
-  id               String            @id @default(uuid())
+  id               String           @id @default(uuid())
   storeId          String
   shopifyId        String
   title            String
@@ -431,24 +433,24 @@ model Product {
   productType      String?
   category         String?
   categoryId       String?
-  status           ProductStatus     @default(ACTIVE)
-  tags             String[]          @default([])
+  status           ProductStatus    @default(ACTIVE)
+  tags             String[]         @default([])
   imageUrl         String?
   descriptionHtml  String?
   images           Json?
   onlineStoreUrl   String?
   salesChannels    Json?
-  totalInventory   Int               @default(0)
-  soldQuantity     Int               @default(0)
-  soldAmount       Decimal           @default(0) @db.Decimal(14, 2)
+  totalInventory   Int              @default(0)
+  soldQuantity     Int              @default(0)
+  soldAmount       Decimal          @default(0) @db.Decimal(14, 2)
   shopifyCreatedAt DateTime?
   shopifyUpdatedAt DateTime?
   deletedAt        DateTime?
-  store            Store             @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  store            Store            @relation(fields: [storeId], references: [id], onDelete: Cascade)
   variants         ProductVariant[]
   lineItems        OrderLineItem[]
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 
   @@unique([storeId, shopifyId])
   @@index([storeId, status])
@@ -460,27 +462,27 @@ model Product {
 }
 
 model ProductVariant {
-  id                 String              @id @default(uuid())
-  productId          String
-  storeId            String
-  shopifyId          String
-  title              String?
-  sku                String?
-  price              Decimal             @default(0) @db.Decimal(14, 2)
-  cost               Decimal?            @db.Decimal(14, 2)
-  inventoryItemId    String?
-  inventoryQuantity  Int                 @default(0)
-  inventoryTracked   Boolean             @default(true)
-  inventoryPolicy    String              @default("DENY")
-  imageUrl           String?
-  optionValues       Json?
-  position           Int                 @default(0)
-  soldQuantity       Int                 @default(0)
-  soldAmount         Decimal             @default(0) @db.Decimal(14, 2)
-  product            Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
-  lineItems          OrderLineItem[]
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
+  id                String          @id @default(uuid())
+  productId         String
+  storeId           String
+  shopifyId         String
+  title             String?
+  sku               String?
+  price             Decimal         @default(0) @db.Decimal(14, 2)
+  cost              Decimal?        @db.Decimal(14, 2)
+  inventoryItemId   String?
+  inventoryQuantity Int             @default(0)
+  inventoryTracked  Boolean         @default(true)
+  inventoryPolicy   String          @default("DENY")
+  imageUrl          String?
+  optionValues      Json?
+  position          Int             @default(0)
+  soldQuantity      Int             @default(0)
+  soldAmount        Decimal         @default(0) @db.Decimal(14, 2)
+  product           Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  lineItems         OrderLineItem[]
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
 
   @@unique([storeId, shopifyId])
   @@index([productId])
@@ -713,14 +715,14 @@ model BackgroundJob {
 }
 
 model Task {
-  id                   String        @id @default(uuid())
+  id                   String              @id @default(uuid())
   title                String
   description          String
-  status               TaskStatus    @default(PENDING)
+  status               TaskStatus          @default(PENDING)
   dueDate              DateTime
-  dueType              TaskDueType   @default(CUSTOM)
+  dueType              TaskDueType         @default(CUSTOM)
   completedAt          DateTime?
-  proofFiles           Json          @default("[]")
+  proofFiles           Json                @default("[]")
   assignerId           String
   assignerName         String
   assignerEmail        String
@@ -735,10 +737,10 @@ model Task {
   recurrenceStoppedAt  DateTime?
   nextOccurrenceAt     DateTime?
   parentTaskId         String?
-  parent               Task?         @relation("TaskRecurrence", fields: [parentTaskId], references: [id], onDelete: SetNull)
-  children             Task[]        @relation("TaskRecurrence")
-  createdAt            DateTime      @default(now())
-  updatedAt            DateTime      @updatedAt
+  parent               Task?               @relation("TaskRecurrence", fields: [parentTaskId], references: [id], onDelete: SetNull)
+  children             Task[]              @relation("TaskRecurrence")
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
   messages             TaskMessage[]
 
   @@index([assigneeId, status])
@@ -807,15 +809,15 @@ model CurrencyRate {
 }
 
 model Supplier {
-  id             String               @id @default(uuid())
+  id             String                    @id @default(uuid())
   name           String
   contactEmail   String?
   poEmail        String
   description    String?
-  products       SupplierProduct[]
+  productLinks   SupplierProductSupplier[]
   purchaseOrders PurchaseOrder[]
-  createdAt      DateTime             @default(now())
-  updatedAt      DateTime             @updatedAt
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
 
   @@index([name])
 }
@@ -832,7 +834,9 @@ enum PurchaseOrderStatus {
 model PurchaseOrder {
   id                  String              @id @default(uuid())
   number              Int                 @unique @default(autoincrement())
-  /** Supplier's or internal free-text reference. Optional; not unique. */
+  /**
+   * Supplier's or internal free-text reference. Optional; not unique.
+   */
   referenceNumber     String?
   supplierId          String
   supplierName        String
@@ -877,16 +881,20 @@ model PurchaseOrderItem {
 enum SupplierProductStatus {
   ACTIVE
   DRAFT
-  ARCHIVED
+  UNLISTED
 }
 
-/** The hub catalogue master record — a supplier's product, sold at its own price by any connected store. */
+/**
+ * The hub catalogue master record — a supplier's product, sold at its own price by any connected store.
+ */
 model SupplierProduct {
-  id              String                   @id @default(uuid())
-  supplierId      String
-  itemNo          String
-  /** Unique, URL-safe slug — Shopify's product Handle equivalent. */
-  handle          String                   @unique
+  id              String                        @id @default(uuid())
+  /** Globally unique — one product = one item no. across every supplier (see SupplierProductSupplier for the many-to-many supplier relation). */
+  itemNo          String                        @unique
+  /**
+   * Unique, URL-safe slug — Shopify's product Handle equivalent.
+   */
+  handle          String                        @unique
   name            String
   brand           String?
   category        String?
@@ -894,12 +902,12 @@ model SupplierProduct {
   sku             String
   description     String?
   remarks         String?
-  status          SupplierProductStatus    @default(DRAFT)
-  verified        Boolean                  @default(false)
-  sizes           String[]                 @default([])
-  colours         Json                     @default("[]")
+  status          SupplierProductStatus         @default(DRAFT)
+  verified        Boolean                       @default(false)
+  sizes           String[]                      @default([])
+  colours         Json                          @default("[]")
   nextStocktakeAt DateTime?
-  supplier        Supplier                 @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  supplierLinks   SupplierProductSupplier[]
   variants        SupplierProductVariant[]
   images          SupplierProductImage[]
   pricing         SupplierProductPricing?
@@ -908,42 +916,65 @@ model SupplierProduct {
   adjustments     StockAdjustment[]
   activity        InventoryActivity[]
   storeListings   SupplierProductStoreListing[]
-  createdAt       DateTime                 @default(now())
-  updatedAt       DateTime                 @updatedAt
+  createdAt       DateTime                      @default(now())
+  updatedAt       DateTime                      @updatedAt
 
-  @@unique([supplierId, itemNo])
   @@index([createdAt])
   @@index([name])
   @@index([sku])
 }
 
+/**
+ * The product<->supplier many-to-many relation — a product's only link to its supplier(s), no
+ * separate FK and no default/primary among them. Receiving a PO from a supplier upserts a link
+ * here so the Suppliers tab's Products Count reflects every supplier that has actually fulfilled
+ * this product.
+ */
+model SupplierProductSupplier {
+  id                String          @id @default(uuid())
+  supplierProductId String
+  supplierId        String
+  createdAt         DateTime        @default(now())
+  supplierProduct   SupplierProduct @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
+  supplier          Supplier        @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@unique([supplierProductId, supplierId])
+  @@index([supplierId])
+}
+
 model SupplierProductVariant {
-  id                 String                  @id @default(uuid())
+  id                 String                        @id @default(uuid())
   supplierProductId  String
   sku                String?
   barcode            String?
   colour             String
   size               String
-  stockOnHand        Int                     @default(0)
-  /** Committed to unfulfilled orders. Manually editable; wins over the order-derived figure shown as a hint. */
-  allocated          Int                     @default(0)
-  buyPrice           Decimal                 @default(0) @db.Decimal(14, 2)
-  sellPrice          Decimal                 @default(0) @db.Decimal(14, 2)
-  trigger            Int                     @default(10)
-  /** Unused by the UI — kept for backward compatibility with existing rows. */
-  forwardOrders      Int                     @default(0)
-  position           Int                     @default(0)
-  /** One image from the product's pool, Shopify-style — several variants may point at the same image. */
+  stockOnHand        Int                           @default(0)
+  /**
+   * Committed to unfulfilled orders. Manually editable; wins over the order-derived figure shown as a hint.
+   */
+  allocated          Int                           @default(0)
+  buyPrice           Decimal                       @default(0) @db.Decimal(14, 2)
+  sellPrice          Decimal                       @default(0) @db.Decimal(14, 2)
+  trigger            Int                           @default(10)
+  /**
+   * Unused by the UI — kept for backward compatibility with existing rows.
+   */
+  forwardOrders      Int                           @default(0)
+  position           Int                           @default(0)
+  /**
+   * One image from the product's pool, Shopify-style — several variants may point at the same image.
+   */
   imageId            String?
-  image              SupplierProductImage?   @relation(fields: [imageId], references: [id], onDelete: SetNull)
-  supplierProduct    SupplierProduct         @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
+  image              SupplierProductImage?         @relation(fields: [imageId], references: [id], onDelete: SetNull)
+  supplierProduct    SupplierProduct               @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
   purchaseOrderItems PurchaseOrderItem[]
   stocktakeItems     StocktakeItem[]
   adjustments        StockAdjustment[]
   storeVariants      SupplierProductStoreVariant[]
   allocations        InventoryAllocation[]
-  createdAt          DateTime                @default(now())
-  updatedAt          DateTime                @updatedAt
+  createdAt          DateTime                      @default(now())
+  updatedAt          DateTime                      @updatedAt
 
   @@unique([supplierProductId, colour, size])
   @@index([supplierProductId])
@@ -966,7 +997,9 @@ model SupplierProductImage {
   @@index([supplierProductId])
 }
 
-/** Mirrors the old ProductPricing table 1:1 so `computePricing` in the client stays unchanged. */
+/**
+ * Mirrors the old ProductPricing table 1:1 so `computePricing` in the client stays unchanged.
+ */
 model SupplierProductPricing {
   id                String          @id @default(uuid())
   supplierProductId String          @unique
@@ -976,7 +1009,9 @@ model SupplierProductPricing {
   freight           Decimal         @default(0) @db.Decimal(14, 2)
   misc              Decimal         @default(0) @db.Decimal(14, 2)
   marginPercent     Decimal         @default(0) @db.Decimal(6, 2)
-  /** A percent (0-100), not a flat amount — e.g. 10 means 10% of the ex-tax sell price. */
+  /**
+   * A percent (0-100), not a flat amount — e.g. 10 means 10% of the ex-tax sell price.
+   */
   tax               Decimal         @default(10) @db.Decimal(6, 2)
   supplierProduct   SupplierProduct @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
   createdAt         DateTime        @default(now())
@@ -1057,7 +1092,6 @@ model InventoryActivity {
   @@index([supplierProductId, createdAt])
 }
 
-
 // — Connected-store publishing —
 
 enum StoreListingStatus {
@@ -1067,56 +1101,70 @@ enum StoreListingStatus {
   FAILED
 }
 
-/** A hub product's presence on one connected store. Created lazily — either the first time an
+/**
+ * A hub product's presence on one connected store. Created lazily — either the first time an
  * admin sets a per-store margin, or the first time the product is published — so its existence
- * alone doesn't imply the product is actually listed; `status` is the source of truth for that. */
+ * alone doesn't imply the product is actually listed; `status` is the source of truth for that.
+ */
 model SupplierProductStoreListing {
-  id                String                       @id @default(uuid())
+  id                String                        @id @default(uuid())
   supplierProductId String
   storeId           String
-  /** Filled once the first successful publish returns Shopify's product id. */
+  /**
+   * Filled once the first successful publish returns Shopify's product id.
+   */
   productGid        String?
   externalId        String?
   handle            String?
-  status            StoreListingStatus           @default(NOT_LISTED)
-  /** ACTIVE / DRAFT / ARCHIVED as last reported by Shopify. */
+  status            StoreListingStatus            @default(NOT_LISTED)
+  /**
+   * ACTIVE / DRAFT / ARCHIVED as last reported by Shopify.
+   */
   shopifyStatus     String?
-  /** Per-store margin % — pre-fills this store's suggested price in the publish/bulk-update
-   * modals only. Never enters SupplierProductPricing's calculation. */
-  marginPercent     Decimal?                     @db.Decimal(6, 2)
+  /**
+   * Per-store margin % — pre-fills this store's suggested price in the publish/bulk-update
+   * modals only. Never enters SupplierProductPricing's calculation.
+   */
+  marginPercent     Decimal?                      @db.Decimal(6, 2)
   lastError         String?
   lastPublishedAt   DateTime?
   lastSyncedAt      DateTime?
-  supplierProduct   SupplierProduct              @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
-  store             Store                        @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  supplierProduct   SupplierProduct               @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
+  store             Store                         @relation(fields: [storeId], references: [id], onDelete: Cascade)
   variants          SupplierProductStoreVariant[]
-  createdAt         DateTime                     @default(now())
-  updatedAt         DateTime                     @updatedAt
+  createdAt         DateTime                      @default(now())
+  updatedAt         DateTime                      @updatedAt
 
   @@unique([supplierProductId, storeId])
   @@index([storeId])
 }
 
-/** One hub variant's mapping onto a single store's Shopify variant + inventory item. */
+/**
+ * One hub variant's mapping onto a single store's Shopify variant + inventory item.
+ */
 model SupplierProductStoreVariant {
-  id              String                       @id @default(uuid())
-  listingId       String
-  variantId       String
-  variantGid      String?
+  id               String                      @id @default(uuid())
+  listingId        String
+  variantId        String
+  variantGid       String?
   inventoryItemGid String?
-  /** Last price pushed to (or read back from) this store for this variant. */
-  price           Decimal?                     @db.Decimal(14, 2)
-  listing         SupplierProductStoreListing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  variant         SupplierProductVariant       @relation(fields: [variantId], references: [id], onDelete: Cascade)
-  createdAt       DateTime                     @default(now())
-  updatedAt       DateTime                     @updatedAt
+  /**
+   * Last price pushed to (or read back from) this store for this variant.
+   */
+  price            Decimal?                    @db.Decimal(14, 2)
+  listing          SupplierProductStoreListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  variant          SupplierProductVariant      @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  createdAt        DateTime                    @default(now())
+  updatedAt        DateTime                    @updatedAt
 
   @@unique([listingId, variantId])
   @@index([variantId])
 }
 
-/** Idempotency guard for inbound Shopify webhooks — `X-Shopify-Webhook-Id` is stable across
- * Shopify's own retries of the same delivery, unlike topic+body which can legitimately repeat. */
+/**
+ * Idempotency guard for inbound Shopify webhooks — `X-Shopify-Webhook-Id` is stable across
+ * Shopify's own retries of the same delivery, unlike topic+body which can legitimately repeat.
+ */
 model ShopifyWebhookEvent {
   id          String    @id @default(uuid())
   storeId     String
@@ -1138,10 +1186,12 @@ enum InventoryAllocationState {
   RELEASED
 }
 
-/** One hub-side commitment for a single Shopify order line item — the ledger that makes order-
+/**
+ * One hub-side commitment for a single Shopify order line item — the ledger that makes order-
  * driven allocation idempotent and auditable. Joined to a hub variant by SKU string equality,
  * the same join SupplierProductModel already uses for its allocatedFromOrders hint — there is no
- * variant-level id on the order line items the app fetches from Shopify. */
+ * variant-level id on the order line items the app fetches from Shopify.
+ */
 model InventoryAllocation {
   id                String                   @id @default(uuid())
   storeId           String
@@ -1154,6 +1204,7 @@ model InventoryAllocation {
   quantity          Int
   fulfilledQuantity Int                      @default(0)
   releasedQuantity  Int                      @default(0)
+  refundedQuantity  Int                      @default(0)
   state             InventoryAllocationState @default(ALLOCATED)
   store             Store                    @relation(fields: [storeId], references: [id], onDelete: Cascade)
   order             Order?                   @relation(fields: [orderId], references: [id], onDelete: SetNull)
@@ -1165,4 +1216,50 @@ model InventoryAllocation {
   @@index([variantId])
   @@index([state])
   @@index([sku])
+}
+
+/**
+ * Per-fulfilment-line idempotency for fulfillments/create + fulfillments/update.
+ * Shopify re-delivers the same fulfilment (same `payload.id`) on every status
+ * change (pending -> open -> success, tracking updates) with a fresh
+ * X-Shopify-Webhook-Id, so the delivery-level ShopifyWebhookEvent guard alone
+ * cannot dedupe. One row per (fulfilment, order line): the first delivery moves
+ * stock, later deliveries for the same line are no-ops (or reverse once). The
+ * key MUST stay per-line — a per-fulfilment key would make the second and later
+ * lines of a multi-line fulfilment collide and silently skip their stock moves.
+ */
+model ProcessedFulfillmentEvent {
+  id             String   @id @default(uuid())
+  storeId        String
+  shopifyOrderId String
+  fulfillmentId  String
+  lineItemId     String
+  status         String   @default("applied")
+  appliedQty     Int      @default(0)
+  store          Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([storeId, fulfillmentId, lineItemId])
+  @@index([storeId, shopifyOrderId])
+}
+
+/**
+ * Per-refund-line idempotency for refunds/create. A refund (same `payload.id`
+ * + `line_item_id`) must never restock twice, even across Shopify retries or
+ * an orders/cancelled + refunds/create pair for the same units.
+ */
+model ProcessedRefundEvent {
+  id             String   @id @default(uuid())
+  storeId        String
+  shopifyOrderId String
+  refundId       String
+  lineItemId     String
+  quantity       Int      @default(0)
+  restockType    String?
+  store          Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+
+  @@unique([storeId, refundId, lineItemId])
+  @@index([storeId, shopifyOrderId])
 }
