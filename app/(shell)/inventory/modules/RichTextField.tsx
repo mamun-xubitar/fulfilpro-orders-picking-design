@@ -10,6 +10,9 @@ type RichTextFieldProps = {
   label: string;
   value: string;
   onChange: (html: string) => void;
+  /** Suppresses the field's own label row — for a caller (e.g. DescriptionField) that renders its
+   * own header alongside extra controls in the same row. */
+  hideLabel?: boolean;
 };
 
 type ActiveState = { bold: boolean; italic: boolean; underline: boolean; ul: boolean; ol: boolean };
@@ -31,7 +34,7 @@ const TEXT_COLORS = ['#111827', '#6b7280', '#dc2626', '#ea580c', '#ca8a04', '#16
  * it immediately before applying the command, so "insert link" / "apply colour" affects whatever
  * was selected when the toolbar button was pressed, not wherever focus happens to land after.
  */
-export default function RichTextField({ label, value, onChange }: RichTextFieldProps) {
+export default function RichTextField({ label, value, onChange, hideLabel }: RichTextFieldProps) {
   const ref = useRef<HTMLDivElement>(null);
   const focused = useRef(false);
   const savedRange = useRef<Range | null>(null);
@@ -214,7 +217,7 @@ export default function RichTextField({ label, value, onChange }: RichTextFieldP
 
   return (
     <div className="min-w-0">
-      <FieldLabel>{label}</FieldLabel>
+      {!hideLabel && <FieldLabel>{label}</FieldLabel>}
       <div className="rounded-lg border border-gray-300 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100">
         <div className="flex flex-wrap items-center gap-0.5 border-b border-gray-200 px-1.5 py-1">
           <LetterButton letter="B" title="Bold" bold active={active.bold} onClick={() => runCommand('bold')} />

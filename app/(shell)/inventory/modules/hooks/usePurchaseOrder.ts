@@ -65,7 +65,10 @@ export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [product?.id]);
 
-  const openCreate = (variantIds: string[]) => {
+  /** Resets every create-PO field for `variantIds` (or, given none, every variant on the
+   * product) — split out from `openCreate` so the New Product wizard's Purchase order step can
+   * seed the same form fields without also flipping on the standalone Create PO modal. */
+  const seedForm = (variantIds: string[]) => {
     if (!product) return;
     setSupplierId(supplierOptions[0]?.id ?? '');
     setDeliveryDate('');
@@ -76,6 +79,11 @@ export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
     setQuantities(Object.fromEntries(ids.map((id) => [id, '1'])));
     setSkus(Object.fromEntries(ids.map((id) => [id, variantById.get(id)?.sku ?? ''])));
     setCosts(Object.fromEntries(ids.map((id) => [id, (variantById.get(id)?.buyPrice ?? 0).toFixed(2)])));
+  };
+
+  const openCreate = (variantIds: string[]) => {
+    if (!product) return;
+    seedForm(variantIds);
     setCreateOpen(true);
   };
 
@@ -84,7 +92,9 @@ export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
   const setSku = (variantId: string, value: string) => setSkus((prev) => ({ ...prev, [variantId]: value }));
   const setCost = (variantId: string, value: string) => setCosts((prev) => ({ ...prev, [variantId]: value }));
 
-  const saveAndSend = () => {
+  /** `after` fires once the PO is created — used by the New Product wizard to close itself only
+   * on a confirmed save. */
+  const saveAndSend = (after?: () => void) => {
     if (!product) return;
     const supplier = supplierOptions.find((s) => s.id === supplierId);
     const items = Object.entries(quantities)
@@ -130,6 +140,7 @@ export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
         setCreateOpen(false);
         loadPurchaseOrders();
         if (data.product) onSaved(data.product);
+        after?.();
       },
     });
   };
@@ -181,6 +192,7 @@ export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
     loadPurchaseOrders,
     createOpen,
     openCreate,
+    seedForm,
     closeCreate,
     supplierId,
     setSupplierId,

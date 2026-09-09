@@ -27,44 +27,46 @@ export default function MainImagePanel({
 
       <div className="flex flex-1 gap-2 p-3">
         {tiles.length > 0 && (
-          <div className="max-h-72 w-14 shrink-0 space-y-2 overflow-y-auto pr-1">
-            {tiles.map((tile) => {
-              const isActive = tile.key === activeKey;
-              return (
-                <button
-                  key={tile.key}
-                  type="button"
-                  onClick={() => setActiveKey(tile.key)}
-                  title={tile.label}
-                  aria-label={`Show ${tile.label}`}
-                  aria-pressed={isActive}
-                  className={`block w-full overflow-hidden rounded-lg border-2 transition-colors duration-150 cursor-pointer ${
-                    isActive
-                      ? "border-blue-600"
-                      : "border-transparent hover:border-gray-300"
-                  }`}
-                >
-                  {tile.kind === "photo" ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={tile.image.url}
-                      alt={tile.image.altText ?? ""}
-                      className="aspect-square w-full object-cover"
-                    />
-                  ) : (
-                    <div
-                      className="flex aspect-square w-full items-center justify-center text-[9px] font-semibold text-white"
-                      style={{
-                        backgroundColor: resolveSwatch(tile.color),
-                        textShadow: "0 1px 2px rgba(0,0,0,0.35)",
-                      }}
-                    >
-                      {tile.colourName.slice(0, 3).toUpperCase()}
-                    </div>
-                  )}
-                </button>
-              );
-            })}
+          <div className="relative w-14 shrink-0 max-h-75">
+            <div className="thin-scroll absolute inset-0 space-y-2 overflow-y-auto pr-1">
+              {tiles.map((tile) => {
+                const isActive = tile.key === activeKey;
+                return (
+                  <button
+                    key={tile.key}
+                    type="button"
+                    onClick={() => setActiveKey(tile.key)}
+                    title={tile.label}
+                    aria-label={`Show ${tile.label}`}
+                    aria-pressed={isActive}
+                    className={`block w-full overflow-hidden rounded-lg border-2 transition-colors duration-150 cursor-pointer ${
+                      isActive
+                        ? "border-blue-600"
+                        : "border-transparent hover:border-gray-300"
+                    }`}
+                  >
+                    {tile.kind === "photo" ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={tile.image.url}
+                        alt={tile.image.altText ?? ""}
+                        className="aspect-square w-full object-cover"
+                      />
+                    ) : (
+                      <div
+                        className="flex aspect-square w-full items-center justify-center text-[9px] font-semibold text-white"
+                        style={{
+                          backgroundColor: resolveSwatch(tile.color),
+                          textShadow: "0 1px 2px rgba(0,0,0,0.35)",
+                        }}
+                      >
+                        {tile.colourName.slice(0, 3).toUpperCase()}
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
 

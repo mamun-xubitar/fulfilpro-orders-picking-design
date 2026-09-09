@@ -22,7 +22,7 @@ export default function SuppliersTab({ suppliers: s }: { suppliers: ReturnType<t
         </div>
         <button
           type="button"
-          onClick={s.openCreate}
+          onClick={() => s.openCreate()}
           className="flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition-colors duration-150 hover:bg-emerald-700 cursor-pointer"
         >
           <Plus className="h-4 w-4" />

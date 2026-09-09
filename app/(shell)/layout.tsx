@@ -6,6 +6,7 @@ import MessagesChatButton from "@/app/(shell)/MessagesChatButton";
 import NotificationBell from "@/app/(shell)/NotificationBell";
 import TasksButton from "@/app/(shell)/TasksButton";
 import useLoginManager from "@/app/(shell)/useLoginManager";
+import { PageHeadingProvider, usePageHeading } from "@/components/PageHeadingContext";
 import { isDecoratorRole, isOrderPickerRole, isRestrictedSessionRole } from "@/lib/roles";
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
@@ -388,6 +389,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
   }
 
   return (
+    <PageHeadingProvider>
     <div className={blockOrdersCopy ? "protected-orders-page" : undefined}>
       {blockOrdersCopy && blockedActionMessage && (
         <div
@@ -630,7 +632,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16"/>
               </svg>
             </button>
-            <h1 className="truncate text-lg font-semibold text-gray-900">{activeChild?.label ?? pageTitles[activeId] ?? ""}</h1>
+            <PageHeadingText base={activeChild?.label ?? pageTitles[activeId] ?? ""} />
           </div>
           <div className="flex items-center gap-3 relative">
 
@@ -667,6 +669,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
         {children}
       </div>
     </div>
+    </PageHeadingProvider>
   );
 }
 
@@ -677,6 +680,24 @@ async function getJson<T>(url: string) {
     throw new Error(json.message || "Request failed");
   }
   return json.data;
+}
+
+/** Reads the suffix a page contributes (e.g. the focused product's name in single-product
+ * Inventory view) and appends it to the shell's own title — a separate component so it can
+ * consume PageHeadingContext, which wraps this whole layout including the page below it. */
+function PageHeadingText({ base }: { base: string }) {
+  const { suffix } = usePageHeading();
+  return (
+    <h1 className="truncate text-lg font-semibold text-gray-900">
+      {base}
+      {suffix && (
+        <>
+          <span className="mx-1.5 font-normal text-gray-300">/</span>
+          <span className="font-medium text-gray-600">{suffix}</span>
+        </>
+      )}
+    </h1>
+  );
 }
 
 function getInitials(value: string) {

@@ -31,7 +31,14 @@ export function useProductImageMutations({ product, onSaved }: UseProductImageMu
 
   /** `variantId` links the first uploaded image straight into that variant's image slot. */
   const uploadImages = async (files: File[], variantId?: string) => {
-    if (!product || files.length === 0) return;
+    if (files.length === 0) return;
+    if (!product) {
+      // The only silent-failure path left in this chain — without this, a click landing just
+      // before the focused product finishes loading (e.g. right after the New Product wizard's
+      // create step) drops the selection with no feedback, which reads as "nothing happened".
+      toast.error('No product selected — try again once the product has loaded');
+      return;
+    }
     setUploading(true);
     try {
       const formData = new FormData();

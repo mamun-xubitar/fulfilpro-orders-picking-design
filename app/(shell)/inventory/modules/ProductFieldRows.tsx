@@ -40,7 +40,17 @@ export function Field({ label, value, multiline }: { label: string; value: strin
   );
 }
 
-export function TextField({ label, value, onChange }: { label: string; value: string; onChange: React.ChangeEventHandler<HTMLInputElement> }) {
+export function TextField({
+  label,
+  value,
+  onChange,
+  error,
+}: {
+  label: string;
+  value: string;
+  onChange: React.ChangeEventHandler<HTMLInputElement>;
+  error?: string;
+}) {
   return (
     <div className="min-w-0">
       <FieldLabel>{label}</FieldLabel>
@@ -51,6 +61,7 @@ export function TextField({ label, value, onChange }: { label: string; value: st
         aria-label={label}
         className="w-full rounded-lg border border-gray-300 px-2.5 py-2 text-[13px] text-gray-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
       />
+      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
     </div>
   );
 }

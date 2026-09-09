@@ -75,7 +75,9 @@ export function useVariantsMatrix({ product, sizes, colours, quickFilter, onVari
       seen.add(v.colour.toLowerCase());
       names.push(v.colour);
     }
-    return names;
+    // Sorted A->Z (case-insensitive) so the colour filter pills read the same way as the
+    // matrix rows, which are grouped by colour via sortVariantsForDisplay.
+    return names.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
   }, [colours, product]);
 
   const activeColours = filters.colours ?? colourNames;

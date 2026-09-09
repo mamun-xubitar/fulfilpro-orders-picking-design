@@ -208,6 +208,15 @@ export class SupplierProductModel {
     return row?.handle ?? null;
   }
 
+  /** Case-sensitive itemNo uniqueness check for the New Product wizard / Product details inline
+   * validator — `excludeId` lets an in-place edit check against every other product without
+   * tripping on its own current itemNo. */
+  async existsByItemNo(itemNo: string, excludeId?: string): Promise<boolean> {
+    const row = await prisma.supplierProduct.findUnique({ where: { itemNo }, select: { id: true } });
+    if (!row) return false;
+    return row.id !== excludeId;
+  }
+
   async create(data: {
     /** Every product needs at least one linked supplier. */
     supplierIds: string[];
@@ -563,6 +572,10 @@ export class SupplierProductModel {
       data: { sellPrice, buyPrice },
     });
     return result.count;
+  }
+
+  async countImages(supplierProductId: string): Promise<number> {
+    return prisma.supplierProductImage.count({ where: { supplierProductId } });
   }
 
   async addImage(supplierProductId: string, data: { url: string; altText: string | null; colour: string | null }): Promise<void> {

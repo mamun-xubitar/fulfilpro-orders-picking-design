@@ -119,3 +119,9 @@ export const Palette = (i: IconProps) => (
     <circle cx="16.5" cy="10.5" r="1.1" fill="currentColor" stroke="none" />
   </Icon>
 );
+export const Sparkles = (i: IconProps) => (
+  <Icon {...i}>
+    {p('M9.5 3v3M9.5 12v3M3 9.5h3M12 9.5h3M6.2 6.2l1.1 1.1M11.7 11.7l1.1 1.1M6.2 12.8l1.1-1.1M11.7 7.3l1.1-1.1')}
+    <path d="M17 14l1 2.5L20.5 17.5 18 18.5 17 21l-1-2.5L13.5 17.5 16 16.5z" fill="currentColor" stroke="none" />
+  </Icon>
+);

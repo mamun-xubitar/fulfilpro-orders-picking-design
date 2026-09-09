@@ -7,30 +7,45 @@ import ProductColoursField from './ProductColoursField';
 import { Field, FieldLabel, HtmlField, TextAreaField, TextField } from './ProductFieldRows';
 import ProductStatusSelect from './ProductStatusSelect';
 import ProductSizesField from './ProductSizesField';
-import RichTextField from './RichTextField';
+import DescriptionField from './DescriptionField';
 import SupplierMultiSelect from './SupplierMultiSelect';
 import { productStatusLabel, PRODUCT_STATUS_BADGES } from './constants';
 import { Check, Close, Document, Lock, Pencil, Unlock } from './icons';
 import type { useProductDetails } from './hooks/useProductDetails';
+import type { useSuppliers } from './hooks/useSuppliers';
+import type { InventoryPresetsState } from './hooks/useInventoryPresets';
+import { useItemNoAvailability } from './hooks/useItemNoAvailability';
 import type { SupplierOption } from './types';
 
 type ProductFieldsPanelProps = {
   details: ReturnType<typeof useProductDetails>;
   supplierOptions: SupplierOption[];
+  presets: InventoryPresetsState;
+  suppliers: ReturnType<typeof useSuppliers>;
+  /** For the New Product wizard's Details step — hides the panel chrome (heading, Cancel/Save
+   * row) since the wizard's own footer drives saving and advancing. The panel is expected to
+   * already be in edit mode when embedded. */
+  embedded?: boolean;
 };
 
-export default function ProductFieldsPanel({ details: d, supplierOptions }: ProductFieldsPanelProps) {
+export default function ProductFieldsPanel({ details: d, supplierOptions, presets, suppliers, embedded }: ProductFieldsPanelProps) {
   const editing = d.editing;
+  const itemNoAvailability = useItemNoAvailability(editing ? d.form.itemNo : '', d.productId ?? undefined);
 
   return (
-    <section className="flex min-w-0 flex-col rounded-xl border border-gray-200 bg-white shadow-sm">
-      <PanelHeading icon={<Document className="h-4 w-4" />} title="Product details" />
+    <section className={embedded ? 'flex min-w-0 flex-col' : 'flex min-w-0 flex-col rounded-xl border border-gray-200 bg-white shadow-sm'}>
+      {!embedded && <PanelHeading icon={<Document className="h-4 w-4" />} title="Product details" />}
 
-      <div className="flex flex-1 flex-col gap-3 p-4">
+      <div className={embedded ? 'flex flex-1 flex-col gap-3' : 'flex flex-1 flex-col gap-3 p-4'}>
         <div className="grid grid-cols-2 gap-3">
           {editing ? (
             <>
-              <TextField label="Item no." value={d.form.itemNo} onChange={d.set('itemNo')} />
+              <TextField
+                label="Item no."
+                value={d.form.itemNo}
+                onChange={d.set('itemNo')}
+                error={d.errors?.itemNo ?? (itemNoAvailability.taken ? 'A product with this item number already exists' : undefined)}
+              />
               <div className="min-w-0">
                 <FieldLabel>Handle</FieldLabel>
                 <div className="flex items-center gap-1.5">
@@ -77,6 +92,12 @@ export default function ProductFieldsPanel({ details: d, supplierOptions }: Prod
             selectedIds={d.form.supplierIds}
             onChange={d.setSupplierIds}
             error={d.errors?.supplierId}
+            onCreateSupplier={(name) =>
+              suppliers.openCreate({ name, onCreated: (s) => d.setSupplierIds([...d.form.supplierIds, s.id]) })
+            }
+            onAddSupplier={() =>
+              suppliers.openCreate({ onCreated: (s) => d.setSupplierIds([...d.form.supplierIds, s.id]) })
+            }
           />
         ) : (
           <div>
@@ -117,7 +138,7 @@ export default function ProductFieldsPanel({ details: d, supplierOptions }: Prod
 
         {editing ? (
           <>
-            <RichTextField label="Description" value={d.form.description} onChange={d.setDescription} />
+            <DescriptionField details={d} />
             <TextAreaField label="Remarks" value={d.form.remarks} onChange={d.set('remarks')} />
           </>
         ) : (
@@ -127,22 +148,40 @@ export default function ProductFieldsPanel({ details: d, supplierOptions }: Prod
           </>
         )}
 
-        <ProductSizesField value={d.form.sizes} sizes={d.sizes} editing={editing} onChange={d.set('sizes')} error={d.errors?.sizes} />
+        <ProductSizesField
+          value={d.form.sizes}
+          sizes={d.sizes}
+          editing={editing}
+          onChange={d.set('sizes')}
+          onValueChange={d.setSizesValue}
+          error={d.errors?.sizes}
+          presets={presets}
+        />
 
-        <ProductColoursField value={d.form.colours} colours={d.colours} editing={editing} onChange={d.set('colours')} error={d.errors?.colours} />
+        <ProductColoursField
+          value={d.form.colours}
+          colours={d.colours}
+          editing={editing}
+          onChange={d.set('colours')}
+          onValueChange={d.setColoursValue}
+          error={d.errors?.colours}
+          presets={presets}
+        />
 
         <StatusRow details={d} editing={editing} />
 
-        <div className="mt-auto flex gap-2 pt-1">
-          {editing ? (
-            <>
-              <ActionButton onClick={d.cancelEdit} icon={<Close />} label="Cancel" />
-              <ActionButton onClick={d.saveDetails} icon={<Check />} label="Save" primary />
-            </>
-          ) : (
-            <ActionButton onClick={d.startEdit} icon={<Pencil />} label="Edit" />
-          )}
-        </div>
+        {!embedded && (
+          <div className="mt-auto flex gap-2 pt-1">
+            {editing ? (
+              <>
+                <ActionButton onClick={d.cancelEdit} icon={<Close />} label="Cancel" />
+                <ActionButton onClick={() => d.saveDetails()} icon={<Check />} label="Save" primary />
+              </>
+            ) : (
+              <ActionButton onClick={d.startEdit} icon={<Pencil />} label="Edit" />
+            )}
+          </div>
+        )}
       </div>
     </section>
   );

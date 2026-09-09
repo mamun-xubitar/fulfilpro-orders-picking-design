@@ -1,8 +1,12 @@
 'use client';
 
+import { toast } from 'react-toastify';
 import { PanelHeading } from './MainImagePanel';
 import PerStoreMarginRows from './PerStoreMarginRows';
-import StorePriceChips from './StorePriceChips';
+import StoreMarginPriceChips from './StoreMarginPriceChips';
+// Re-enable: StorePriceChips showed each store's *live* Shopify price — swap back in for
+// StoreMarginPriceChips (below) to restore that instead of the margin-derived price badge.
+// import StorePriceChips from './StorePriceChips';
 import { Check, Close, Pencil, Tag } from './icons';
 import { formatMoney } from './utils';
 import type { useProductPricing } from './hooks/useProductPricing';
@@ -15,6 +19,11 @@ type PricingMarginPanelProps = {
   pricing: PricingMarginPanelInner;
   storeListings: StoreListingsState;
   onEditStorePrice: (listing: StoreListingResult) => void;
+  /** For the New Product wizard's Pricing step — hides the panel heading and the Edit/Cancel/Save
+   * row (the wizard's own footer drives saving and advancing; the panel is expected to already be
+   * in edit mode when embedded), but keeps "Use price" — applying the computed price to every
+   * variant is a one-off action independent of Save/Next. */
+  embedded?: boolean;
 };
 
 /** Buying price is in the foreign currency and gets converted by the exchange rate;
@@ -25,15 +34,15 @@ const COST_FIELDS: { key: Extract<keyof PricingForm, 'buyingPrice' | 'freight' |
   { key: 'misc', label: 'Misc', unit: 'base' },
 ];
 
-export default function PricingMarginPanel({ pricing: p, storeListings, onEditStorePrice }: PricingMarginPanelProps) {
+export default function PricingMarginPanel({ pricing: p, storeListings, onEditStorePrice, embedded }: PricingMarginPanelProps) {
   const foreign = p.form.currencyCode;
   const base = p.baseCurrency;
 
   return (
-    <section className="flex min-w-0 flex-col rounded-xl border border-gray-200 bg-white shadow-sm">
-      <PanelHeading icon={<Tag className="h-4 w-4" />} title={`Pricing & margin (${base})`} meta={foreign} />
+    <section className={embedded ? 'flex min-w-0 flex-col' : 'flex min-w-0 flex-col rounded-xl border border-gray-200 bg-white shadow-sm'}>
+      {!embedded && <PanelHeading icon={<Tag className="h-4 w-4" />} title={`Pricing & margin (${base})`} meta={foreign} />}
 
-      <div className="flex flex-1 flex-col gap-3 p-4">
+      <div className={embedded ? 'flex flex-1 flex-col gap-3' : 'flex flex-1 flex-col gap-3 p-4'}>
         <Row label="Currency">
           {p.editing ? (
             <select
@@ -114,8 +123,18 @@ export default function PricingMarginPanel({ pricing: p, storeListings, onEditSt
            above, since neither of these ever feeds computePricing. */}
         {storeListings.listings.length > 0 && (
           <div className="space-y-3 border-t border-gray-100 pt-3">
-            <PerStoreMarginRows listings={storeListings.listings} onSetMargin={storeListings.setMargin} editing={p.editing} />
+            <PerStoreMarginRows listings={storeListings.listings} values={p.marginDraft} onChange={p.setPendingMargin} editing={p.editing} />
+            {/* Re-enable: uncomment to restore the live-Shopify-price chips (see the parked import above).
             <StorePriceChips listings={storeListings.listings} onEditPrice={onEditStorePrice} />
+            */}
+            <StoreMarginPriceChips
+              listings={storeListings.listings}
+              form={p.form}
+              marginDraft={p.marginDraft}
+              editing={p.editing}
+              onEditPrice={onEditStorePrice}
+              onUnpublished={(storeName) => toast.info(`Publish this product to ${storeName} before editing its price`)}
+            />
           </div>
         )}
 
@@ -126,18 +145,28 @@ export default function PricingMarginPanel({ pricing: p, storeListings, onEditSt
           </span>
         </div>
 
-        <PricingActions p={p} />
+        <PricingActions p={p} embedded={embedded} />
       </div>
     </section>
   );
 }
 
-function PricingActions({ p }: { p: PricingMarginPanelInner }) {
+function PricingActions({ p, embedded }: { p: PricingMarginPanelInner; embedded?: boolean }) {
+  // Embedded (the New Product wizard's Pricing step): the wizard's own footer already drives
+  // Save/Next, so only "Use price" belongs here — applying the computed price to every variant
+  // is a distinct, one-off action neither Save nor Next performs.
+  if (embedded) {
+    return (
+      <div className="flex gap-2">
+        <ActionButton onClick={p.requestUsePrice} icon={<Tag />} label="Use price" primary />
+      </div>
+    );
+  }
   if (p.editing) {
     return (
       <div className="flex gap-2">
         <ActionButton onClick={p.cancelEdit} icon={<Close />} label="Cancel" />
-        <ActionButton onClick={p.savePricing} icon={<Check />} label="Save" primary />
+        <ActionButton onClick={() => p.savePricing()} icon={<Check />} label="Save" primary />
       </div>
     );
   }

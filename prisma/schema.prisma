@@ -808,6 +808,28 @@ model CurrencyRate {
   updatedAt DateTime @updatedAt
 }
 
+/**
+ * Global colour name presets for the inventory hub, shared across every product. `key` is the
+ * lowercased/whitespace-stripped form of `name`, carrying the case-insensitive uniqueness that
+ * Postgres' plain `@unique` on `name` wouldn't give us (so "Navy" and "navy" collide). Name-only,
+ * exactly like SizePreset — a swatch is derived from the name at render time (resolveSwatch), and
+ * the product's own colours carry their own `color` on SupplierProduct.colours.
+ */
+model ColourPreset {
+  id        String   @id @default(uuid())
+  name      String
+  key       String   @unique
+  createdAt DateTime @default(now())
+}
+
+/** Global size presets for the inventory hub, shared across every product. Mirrors ColourPreset. */
+model SizePreset {
+  id        String   @id @default(uuid())
+  name      String
+  key       String   @unique
+  createdAt DateTime @default(now())
+}
+
 model Supplier {
   id             String                    @id @default(uuid())
   name           String

@@ -74,12 +74,16 @@ export function useSuppliers({ onChanged, refreshKey }: UseSuppliersArgs) {
   const set = (field: keyof SupplierForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setFormState((prev) => ({ ...prev, [field]: e.target.value }));
 
-  const { request: requestSave, loading: saving, errors: saveErrors } = useRequest<{ supplier: SupplierRow }>();
+  const { request: requestSave, loading: saving, errors: saveErrors } = useRequest<SupplierRow>();
   const { request: requestDelete, loading: deleting } = useRequest<null>();
 
-  const openCreate = () => {
+  /** `onCreated` fires once, after a successful create, with the new supplier row — used by
+   * SupplierMultiSelect's create-on-not-found flow to auto-select the supplier it just made. */
+  const onCreatedRef = useRef<((supplier: SupplierRow) => void) | null>(null);
+  const openCreate = (options?: { name?: string; onCreated?: (supplier: SupplierRow) => void }) => {
     setEditingId(null);
-    setFormState(EMPTY_FORM);
+    setFormState({ ...EMPTY_FORM, name: options?.name ?? '' });
+    onCreatedRef.current = options?.onCreated ?? null;
     setModalOpen(true);
   };
   const openEdit = (row: SupplierRow) => {
@@ -95,10 +99,12 @@ export function useSuppliers({ onChanged, refreshKey }: UseSuppliersArgs) {
       method: editingId ? 'PATCH' : 'POST',
       data: form,
       successMessage: editingId ? 'Supplier updated' : 'Supplier created',
-      onSuccess: () => {
+      onSuccess: ({ data }) => {
         setModalOpen(false);
         load();
         onChanged();
+        if (!editingId) onCreatedRef.current?.(data);
+        onCreatedRef.current = null;
       },
     });
   };

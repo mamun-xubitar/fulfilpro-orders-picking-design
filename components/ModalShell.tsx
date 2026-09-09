@@ -9,6 +9,9 @@ export function ModalShell({
   wide,
   extraWide,
   fullScreen,
+  elevated,
+  bodyClassName,
+  disableBackdropClose,
 }: {
   title: string;
   onClose: () => void;
@@ -21,13 +24,24 @@ export function ModalShell({
   /** Near-viewport-filling — for editable, full-product-detail forms like the store publish and
    * bulk-update modals, which need more room than even `extraWide`. */
   fullScreen?: boolean;
+  /** For a modal that can be opened from inside another ModalShell (e.g. "Add supplier" launched
+   * from a supplier picker) — bumps the backdrop above the standard z-50 layer so it stacks on
+   * top instead of behind. Stays under the shell's z-[65] blocking overlay. */
+  elevated?: boolean;
+  /** Extra classes appended to the scrolling body div — e.g. `thin-scroll` for a modal with a
+   * long, densely-scrolled body (a large image gallery). */
+  bodyClassName?: string;
+  /** Suppresses the backdrop-click close — for multi-step flows holding unsaved work (e.g. the
+   * New Product wizard), where an accidental click outside shouldn't discard progress. The header
+   * close button and any explicit Cancel action still close normally. */
+  disableBackdropClose?: boolean;
 }) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-gray-900/50 px-4 pb-4 sm:items-center sm:pb-0"
+      className={`fixed inset-0 ${elevated ? 'z-[60]' : 'z-50'} flex items-end justify-center bg-gray-900/50 px-4 pb-4 sm:items-center sm:pb-0`}
       role="dialog"
       aria-modal="true"
-      onClick={onClose}
+      onClick={disableBackdropClose ? undefined : onClose}
     >
       <div
         className={`w-full ${fullScreen ? 'max-w-[95vw]' : extraWide ? 'max-w-5xl' : wide ? 'max-w-2xl' : 'max-w-md'} rounded-lg border border-gray-200 bg-white shadow-xl ${allowOverflow ? 'overflow-visible' : `overflow-hidden flex flex-col ${fullScreen ? 'h-[92dvh]' : 'max-h-[calc(100dvh-2rem)]'}`}`}
@@ -41,7 +55,7 @@ export function ModalShell({
             </svg>
           </button>
         </div>
-        <div className={allowOverflow ? 'px-5 py-4' : 'flex-1 overflow-y-auto px-5 py-4'}>{children}</div>
+        <div className={`${allowOverflow ? 'px-5 py-4' : 'flex-1 overflow-y-auto px-5 py-4'} ${bodyClassName ?? ''}`}>{children}</div>
         {footer && <div className="shrink-0 border-t border-gray-200 px-5 py-4">{footer}</div>}
       </div>
     </div>
