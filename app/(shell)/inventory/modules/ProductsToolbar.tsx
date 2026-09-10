@@ -1,13 +1,18 @@
 'use client';
 
+import { useState } from 'react';
 import ProductSearchBox from './ProductSearchBox';
 import { QUICK_FILTERS } from './constants';
+import { useGlobalStoreMargins } from './hooks/useGlobalStoreMargins';
+import type { GlobalStoreMarginsState } from './hooks/useGlobalStoreMargins';
 import type { InventoryPage } from './hooks/useInventoryPage';
-import { ChevronLeft, ChevronRight, First, Last, Plus, Search, Trash, Upload } from './icons';
+import { ChevronDown, ChevronLeft, ChevronRight, First, Last, Plus, Search, Trash, Upload } from './icons';
 import { formatNumber } from './utils';
 
 export default function ProductsToolbar(p: InventoryPage) {
   const { nav } = p;
+  const storeMargins = useGlobalStoreMargins();
+  const [storeMarginsOpen, setStoreMarginsOpen] = useState(false);
 
   return (
     <div className="flex flex-wrap items-stretch gap-3">
@@ -22,6 +27,17 @@ export default function ProductsToolbar(p: InventoryPage) {
           suffix={p.globals.baseCurrency}
         />
         <GlobalField label="System wide margin" value={p.marginInput} onChange={p.setMarginInput} onApply={p.applyGlobalMargin} step="1" suffix="%" />
+
+        <button
+          type="button"
+          onClick={() => setStoreMarginsOpen((v) => !v)}
+          aria-expanded={storeMarginsOpen}
+          className="flex w-fit items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500 hover:text-gray-700 cursor-pointer"
+        >
+          <ChevronDown className={`h-3 w-3 transition-transform duration-150 ${storeMarginsOpen ? 'rotate-180' : ''}`} />
+          Per store margin
+        </button>
+        {storeMarginsOpen && <GlobalStoreMarginList state={storeMargins} />}
       </div>
 
       {/* Record navigation + search — always two rows: view controls (+ Import) on top, find/create below. */}
@@ -109,6 +125,47 @@ export default function ProductsToolbar(p: InventoryPage) {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+/** Compact rows inside the expandable "Per store margin" section — one connected store per
+ * row, each with its own inline % input + Apply, mirroring GlobalField's layout but stacked
+ * rather than one-per-card since there can be several stores. */
+function GlobalStoreMarginList({ state }: { state: GlobalStoreMarginsState }) {
+  if (state.loading) return <p className="px-1 py-1 text-[11px] text-gray-400">Loading…</p>;
+  if (state.stores.length === 0) return <p className="px-1 py-1 text-[11px] text-gray-400">No connected stores.</p>;
+
+  return (
+    <div className="space-y-1.5 border-t border-gray-100 pt-2">
+      {state.stores.map((store) => (
+        <div key={store.storeId} className="flex items-center gap-2">
+          <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-gray-700" title={store.storeName}>
+            {store.storeName}
+          </span>
+          <div className="relative">
+            <input
+              type="number"
+              step="1"
+              min="0"
+              value={state.inputs[store.storeId] ?? ''}
+              onChange={(e) => state.setInput(store.storeId, e.target.value)}
+              aria-label={`Global default margin for ${store.storeName}`}
+              placeholder="—"
+              className="w-28 rounded-lg border border-gray-300 py-1 pl-2 pr-5 text-right text-[12px] tabular-nums outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            />
+            <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400">%</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => state.apply(store.storeId)}
+            disabled={state.saving}
+            className="rounded-lg bg-blue-600 px-2 py-1 text-[11px] font-semibold text-white transition-colors duration-150 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+          >
+            Apply
+          </button>
+        </div>
+      ))}
     </div>
   );
 }

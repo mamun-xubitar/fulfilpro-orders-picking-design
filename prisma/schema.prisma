@@ -56,6 +56,10 @@ model Store {
   partnerStoreId              String?
   lastSyncedAt                DateTime?
   lastProductSyncedAt         DateTime?
+  /// Global fallback margin for this store's inventory pricing — used when a product has no
+  /// product-specific per-store margin of its own (SupplierProductStoreListing.marginPercent).
+  /// Null means unset, in which case pricing falls back further to the product's own sell price.
+  defaultMarginPercent        Decimal?                      @db.Decimal(6, 2)
   partnerStore                Store?                        @relation("PartnerStores", fields: [partnerStoreId], references: [id], onDelete: SetNull)
   childStores                 Store[]                       @relation("PartnerStores")
   createdAt                   DateTime                      @default(now())
@@ -809,23 +813,26 @@ model CurrencyRate {
 }
 
 /**
- * Global colour name presets for the inventory hub, shared across every product. `key` is the
- * lowercased/whitespace-stripped form of `name`, carrying the case-insensitive uniqueness that
- * Postgres' plain `@unique` on `name` wouldn't give us (so "Navy" and "navy" collide). Name-only,
- * exactly like SizePreset — a swatch is derived from the name at render time (resolveSwatch), and
- * the product's own colours carry their own `color` on SupplierProduct.colours.
+ * Global colour preset *groups* for the inventory hub, shared across every product — e.g.
+ * (Red, Green, Blue). Clicking a group in the picker inserts every member at once. `items` keeps
+ * the members in the order they were typed (what the badge renders); `key` is the group's
+ * order-insensitive identity — each member normalised (lowercased, whitespace-stripped),
+ * de-duplicated, sorted, and joined with "|" — so (Red, Blue) and (Blue, Red) collide as the same
+ * group. Name-only, exactly like SizePresetGroup — a swatch is derived from each member's name at
+ * render time (resolveSwatch), and the product's own colours carry their own `color` on
+ * SupplierProduct.colours.
  */
-model ColourPreset {
+model ColourPresetGroup {
   id        String   @id @default(uuid())
-  name      String
+  items     String[] @default([])
   key       String   @unique
   createdAt DateTime @default(now())
 }
 
-/** Global size presets for the inventory hub, shared across every product. Mirrors ColourPreset. */
-model SizePreset {
+/** Global size preset groups for the inventory hub, shared across every product. Mirrors ColourPresetGroup. */
+model SizePresetGroup {
   id        String   @id @default(uuid())
-  name      String
+  items     String[] @default([])
   key       String   @unique
   createdAt DateTime @default(now())
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { resolveSwatch } from "@/lib/inventory/colour";
+import GalleryThumbRow from "./GalleryThumbRow";
 import type { useProductImages } from "./hooks/useProductImages";
 import { Expand, Image as ImageIcon, Pencil } from "./icons";
 
@@ -25,52 +26,8 @@ export default function MainImagePanel({
         meta={`${images.length} image${images.length === 1 ? "" : "s"}`}
       />
 
-      <div className="flex flex-1 gap-2 p-3">
-        {tiles.length > 0 && (
-          <div className="relative w-14 shrink-0 max-h-75">
-            <div className="thin-scroll absolute inset-0 space-y-2 overflow-y-auto pr-1">
-              {tiles.map((tile) => {
-                const isActive = tile.key === activeKey;
-                return (
-                  <button
-                    key={tile.key}
-                    type="button"
-                    onClick={() => setActiveKey(tile.key)}
-                    title={tile.label}
-                    aria-label={`Show ${tile.label}`}
-                    aria-pressed={isActive}
-                    className={`block w-full overflow-hidden rounded-lg border-2 transition-colors duration-150 cursor-pointer ${
-                      isActive
-                        ? "border-blue-600"
-                        : "border-transparent hover:border-gray-300"
-                    }`}
-                  >
-                    {tile.kind === "photo" ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={tile.image.url}
-                        alt={tile.image.altText ?? ""}
-                        className="aspect-square w-full object-cover"
-                      />
-                    ) : (
-                      <div
-                        className="flex aspect-square w-full items-center justify-center text-[9px] font-semibold text-white"
-                        style={{
-                          backgroundColor: resolveSwatch(tile.color),
-                          textShadow: "0 1px 2px rgba(0,0,0,0.35)",
-                        }}
-                      >
-                        {tile.colourName.slice(0, 3).toUpperCase()}
-                      </div>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        <div className="min-w-0 flex-1">
+      <div className="flex flex-col gap-2 p-3">
+        <div className="min-w-0">
           <button
             type="button"
             onClick={gallery.openLightbox}
@@ -107,9 +64,13 @@ export default function MainImagePanel({
             )}
           </button>
         </div>
+
+        {tiles.length > 0 && (
+          <GalleryThumbRow tiles={tiles} activeKey={activeKey} onSelect={setActiveKey} />
+        )}
       </div>
 
-      <div className="flex gap-2 border-t border-gray-100 p-3">
+      <div className="flex flex-col gap-2 border-t border-gray-100 p-3">
         <button
           type="button"
           onClick={gallery.openLightbox}

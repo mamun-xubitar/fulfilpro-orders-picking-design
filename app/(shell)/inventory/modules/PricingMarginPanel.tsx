@@ -7,7 +7,7 @@ import StoreMarginPriceChips from './StoreMarginPriceChips';
 // Re-enable: StorePriceChips showed each store's *live* Shopify price — swap back in for
 // StoreMarginPriceChips (below) to restore that instead of the margin-derived price badge.
 // import StorePriceChips from './StorePriceChips';
-import { Check, Close, Pencil, Tag } from './icons';
+import { Check, Tag } from './icons';
 import { formatMoney } from './utils';
 import type { useProductPricing } from './hooks/useProductPricing';
 import type { StoreListingsState } from './hooks/useStoreListings';
@@ -44,43 +44,29 @@ export default function PricingMarginPanel({ pricing: p, storeListings, onEditSt
 
       <div className={embedded ? 'flex flex-1 flex-col gap-3' : 'flex flex-1 flex-col gap-3 p-4'}>
         <Row label="Currency">
-          {p.editing ? (
-            <select
-              value={p.form.currencyCode}
-              onChange={p.set('currencyCode')}
-              aria-label="Currency"
-              className="w-28 rounded-lg border border-gray-300 px-2 py-1 text-right text-[13px] outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 cursor-pointer"
-            >
-              {p.currencies.map((c) => (
-                <option key={c.code} value={c.code}>
-                  {c.code}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <Value>{foreign}</Value>
-          )}
+          <select
+            value={p.form.currencyCode}
+            onChange={p.set('currencyCode')}
+            aria-label="Currency"
+            className="w-28 rounded-lg border border-gray-300 px-2 py-1 text-right text-[13px] outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 cursor-pointer"
+          >
+            {p.currencies.map((c) => (
+              <option key={c.code} value={c.code}>
+                {c.code}
+              </option>
+            ))}
+          </select>
         </Row>
 
         <Row label="Exchange rate">
-          {p.editing ? (
-            <NumberInput value={p.form.exchangeRate} onChange={p.set('exchangeRate')} step="0.01" suffix="rate" />
-          ) : (
-            <Value>{Number(p.form.exchangeRate).toFixed(2)}</Value>
-          )}
+          <NumberInput value={p.form.exchangeRate} onChange={p.set('exchangeRate')} step="0.01" suffix="rate" />
         </Row>
 
         {COST_FIELDS.map(({ key, label, unit }) => {
           const currency = unit === 'foreign' ? foreign : base;
           return (
             <Row key={key} label={label}>
-              {p.editing ? (
-                <NumberInput value={p.form[key]} onChange={p.set(key)} step="0.01" suffix={currency} />
-              ) : (
-                <Value>
-                  {formatMoney(Number(p.form[key]) || 0)} <Unit>{currency}</Unit>
-                </Value>
-              )}
+              <NumberInput value={p.form[key]} onChange={p.set(key)} step="0.01" suffix={currency} />
             </Row>
           );
         })}
@@ -93,11 +79,7 @@ export default function PricingMarginPanel({ pricing: p, storeListings, onEditSt
         </div>
 
         <Row label="Margin %">
-          {p.editing ? (
-            <NumberInput value={p.form.marginPercent} onChange={p.set('marginPercent')} step="0.1" suffix="%" />
-          ) : (
-            <span className="text-[13px] font-bold text-blue-700 tabular-nums">{Number(p.form.marginPercent).toFixed(1)} %</span>
-          )}
+          <NumberInput value={p.form.marginPercent} onChange={p.set('marginPercent')} step="0.1" suffix="%" />
         </Row>
 
         <Row label="Sell price (ex tax)">
@@ -107,23 +89,14 @@ export default function PricingMarginPanel({ pricing: p, storeListings, onEditSt
         </Row>
 
         <Row label="Tax">
-          {p.editing ? (
-            <NumberInput value={p.form.tax} onChange={p.set('tax')} step="0.1" suffix="%" />
-          ) : (
-            <Value>
-              {Number(p.form.tax).toFixed(1)}%
-              <span className="ml-1.5 text-[11px] font-normal text-gray-400">
-                ({formatMoney(p.computed.taxAmount)} {base})
-              </span>
-            </Value>
-          )}
+          <NumberInput value={p.form.tax} onChange={p.set('tax')} step="0.1" suffix="%" />
         </Row>
 
         {/* Per-store overrides — kept visually separate from the product-level calculation
            above, since neither of these ever feeds computePricing. */}
         {storeListings.listings.length > 0 && (
           <div className="space-y-3 border-t border-gray-100 pt-3">
-            <PerStoreMarginRows listings={storeListings.listings} values={p.marginDraft} onChange={p.setPendingMargin} editing={p.editing} />
+            <PerStoreMarginRows listings={storeListings.listings} values={p.marginDraft} onChange={p.setPendingMargin} />
             {/* Re-enable: uncomment to restore the live-Shopify-price chips (see the parked import above).
             <StorePriceChips listings={storeListings.listings} onEditPrice={onEditStorePrice} />
             */}
@@ -131,7 +104,6 @@ export default function PricingMarginPanel({ pricing: p, storeListings, onEditSt
               listings={storeListings.listings}
               form={p.form}
               marginDraft={p.marginDraft}
-              editing={p.editing}
               onEditPrice={onEditStorePrice}
               onUnpublished={(storeName) => toast.info(`Publish this product to ${storeName} before editing its price`)}
             />
@@ -162,28 +134,33 @@ function PricingActions({ p, embedded }: { p: PricingMarginPanelInner; embedded?
       </div>
     );
   }
-  if (p.editing) {
-    return (
-      <div className="flex gap-2">
-        <ActionButton onClick={p.cancelEdit} icon={<Close />} label="Cancel" />
-        <ActionButton onClick={() => p.savePricing()} icon={<Check />} label="Save" primary />
-      </div>
-    );
-  }
   return (
     <div className="flex gap-2">
-      <ActionButton onClick={p.startEdit} icon={<Pencil />} label="Edit price" />
-      <ActionButton onClick={p.requestUsePrice} icon={<Tag />} label="Use price" primary />
+      <ActionButton onClick={() => p.savePricing()} icon={<Check />} label="Save" primary disabled={!p.dirty} />
+      <ActionButton onClick={p.requestUsePrice} icon={<Tag />} label="Use price" />
     </div>
   );
 }
 
-export function ActionButton({ onClick, icon, label, primary }: { onClick: () => void; icon: React.ReactNode; label: string; primary?: boolean }) {
+export function ActionButton({
+  onClick,
+  icon,
+  label,
+  primary,
+  disabled,
+}: {
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+  primary?: boolean;
+  disabled?: boolean;
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-1.5 text-[13px] font-semibold transition-colors duration-150 cursor-pointer ${
+      disabled={disabled}
+      className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-1.5 text-[13px] font-semibold transition-colors duration-150 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
         primary ? 'bg-blue-600 text-white hover:bg-blue-700' : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
       }`}
     >

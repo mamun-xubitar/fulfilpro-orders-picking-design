@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { toast } from 'react-toastify';
 import useRequest from '@/hooks/useRequest';
 import { deriveColorFromName } from '@/lib/inventory/colour';
@@ -44,50 +44,63 @@ function productToForm(product: ProductRecord): ProductDetailsForm {
   };
 }
 
+/** Value equality for the dirty check below — `form` and `saved` are independently computed
+ * objects (the latter freshly derived from `product` on every render), so reference equality
+ * would never do. `supplierIds` is the only array field; every other field is a primitive. */
+function formsEqual(a: ProductDetailsForm, b: ProductDetailsForm): boolean {
+  return (
+    a.itemNo === b.itemNo &&
+    a.handle === b.handle &&
+    a.brand === b.brand &&
+    a.name === b.name &&
+    a.category === b.category &&
+    a.categoryId === b.categoryId &&
+    a.sku === b.sku &&
+    a.description === b.description &&
+    a.remarks === b.remarks &&
+    a.sizes === b.sizes &&
+    a.colours === b.colours &&
+    a.status === b.status &&
+    a.verified === b.verified &&
+    a.supplierIds.length === b.supplierIds.length &&
+    a.supplierIds.every((id, i) => id === b.supplierIds[i])
+  );
+}
+
 /** Plain string fields the curried `set` helper drives — the rest have their own setters. */
 type TextField = Exclude<keyof ProductDetailsForm, 'verified' | 'status' | 'categoryId' | 'supplierIds'>;
 
 type UseProductDetailsArgs = {
   product: ProductRecord | null;
   onSaved: (product: ProductRecord) => void;
+  /** Persists the typed colour/size lists as global preset groups — called once per *successful*
+   * save (Save, wizard Next, Add colour, Add sizes), never on a rejected one. Non-blocking: a
+   * preset write that fails never fails the product save that triggered it, and is never surfaced
+   * inline — see useInventoryPresets.ensureGroup. Optional so this hook still composes on its own
+   * (e.g. in tests) without a presets hook wired up. */
+  ensureGroup?: (kind: 'colour' | 'size', items: string[]) => Promise<{ ok: boolean; error: string | null }>;
 };
 
-export function useProductDetails({ product, onSaved }: UseProductDetailsArgs) {
-  // Draft and edit mode are tagged with the product they belong to, so changing
-  // product discards them without an effect having to reset anything.
+export function useProductDetails({ product, onSaved, ensureGroup }: UseProductDetailsArgs) {
+  // Draft is tagged with the product it belongs to, so changing product discards it without an
+  // effect having to reset anything.
   const [draft, setDraft] = useState<{ productId: string; form: ProductDetailsForm } | null>(null);
-  const [editingId, setEditingId] = useState<string | null>(null);
   // Mirrors the New Product modal: locked (the default) re-derives the handle from the product
-  // name on every keystroke; unlocking hands control to the admin.
-  const [handleLocked, setHandleLocked] = useState(true);
+  // name on every keystroke; unlocking hands control to the admin. Tagged with the product it
+  // belongs to (same pattern as `draft`) so an unlock made on one product doesn't carry over to
+  // the next — there's no explicit "start edit" moment anymore (the panel is always editable) to
+  // reset it at.
+  const [storedHandleLocked, setStoredHandleLocked] = useState<{ productId: string; locked: boolean } | null>(null);
+  const handleLocked = storedHandleLocked && storedHandleLocked.productId === product?.id ? storedHandleLocked.locked : true;
   const { request, loading: saving, errors, setErrors } = useRequest<ProductRecord>();
-  const { request: requestAi, loading: aiGenerating } = useRequest<{ description: string }>();
-  // Original/Generated are two independent drafts of the description, tagged with the product
-  // they belong to so a product switch drops them without an effect having to reset anything —
-  // same pattern as `draft` above. Switching the active slot stows the other draft's edits rather
-  // than discarding them (see setAiActive). `generatedBaseline` is the raw AI output, untouched by
-  // stowing/hand-edits, so regenerate can detect an unsaved edit regardless of which tab is active.
-  const [ai, setAi] = useState<{
-    productId: string;
-    active: 'original' | 'generated';
-    original: string;
-    generated: string;
-    generatedBaseline: string;
-  } | null>(null);
 
   const saved = product ? productToForm(product) : EMPTY_FORM;
   const form = draft && draft.productId === product?.id ? draft.form : saved;
-  const editing = editingId !== null && editingId === product?.id;
-  const effectiveAi = ai && product && ai.productId === product.id ? ai : null;
-
-  // Latest-value refs for the AI request callbacks below, which are created (and capture `form`/
-  // `product`) at click time but must act on whatever is current when the response lands — not
-  // the stale click-time snapshot — and must bail out entirely if the admin has since switched to
-  // a different product, rather than clobbering that product's currently-visible draft.
-  const productRef = useRef(product);
-  productRef.current = product;
-  const formRef = useRef(form);
-  formRef.current = form;
+  // The panel is always editable — `editing` now just means "there's a product loaded to edit".
+  const editing = product !== null;
+  // Collapses to false whenever there's no applicable draft, since `form` itself collapses to
+  // `saved` in that case — a value typed then typed back to the original also disarms this.
+  const dirty = !formsEqual(form, saved);
 
   const write = (next: ProductDetailsForm) => {
     if (!product) return;
@@ -105,11 +118,10 @@ export function useProductDetails({ product, onSaved }: UseProductDetailsArgs) {
   };
 
   const toggleHandleLock = () => {
-    setHandleLocked((prev) => {
-      const next = !prev;
-      if (next) write({ ...form, handle: slugifyHandle(form.name) });
-      return next;
-    });
+    if (!product) return;
+    const next = !handleLocked;
+    if (next) write({ ...form, handle: slugifyHandle(form.name) });
+    setStoredHandleLocked({ productId: product.id, locked: next });
   };
 
   const setCategory = (category: { id: string | null; name: string }) => {
@@ -117,75 +129,6 @@ export function useProductDetails({ product, onSaved }: UseProductDetailsArgs) {
   };
 
   const setDescription = (description: string) => write({ ...form, description });
-
-  /** Builds the request body for both generate and regenerate — the admin's in-progress draft,
-   * not the last-saved product, so a generation reflects fields not yet saved. */
-  const aiRequestData = (descriptionOverride: string) => ({
-    productId: product?.id,
-    name: form.name,
-    brand: form.brand,
-    category: form.category,
-    description: descriptionOverride,
-    remarks: form.remarks,
-    sizes: parseSizesInput(form.sizes),
-    colours: parseColoursInput(form.colours),
-  });
-
-  /** First generation — snapshots the description on screen as "Original", writes the AI result
-   * into both "Generated" and the live field, and switches the icon into the Original/Generated/
-   * Regenerate group. Nothing is persisted; Save writes whichever draft is active. */
-  const generateDescription = () => {
-    if (!product) return;
-    const productId = product.id;
-    const original = form.description;
-    requestAi({
-      url: '/api/inventory/ai/product-description',
-      method: 'POST',
-      showToast: false,
-      data: aiRequestData(original),
-      onSuccess: ({ data }) => {
-        if (productRef.current?.id !== productId) return; // admin switched products while this was in flight
-        setAi({ productId, active: 'generated', original, generated: data.description, generatedBaseline: data.description });
-        write({ ...formRef.current, description: data.description });
-      },
-      onError: (err) => toast.error(err.general || 'Failed to generate description'),
-    });
-  };
-
-  /** Switches which draft is live in the field. Stows the outgoing draft's current text (which
-   * may have been hand-edited since generation) before swapping in the other one, so neither
-   * draft loses edits by switching back and forth. */
-  const setAiActive = (next: 'original' | 'generated') => {
-    if (!effectiveAi || effectiveAi.active === next) return;
-    const stowed = { ...effectiveAi, [effectiveAi.active]: form.description, active: next };
-    setAi(stowed);
-    write({ ...form, description: stowed[next] });
-  };
-
-  /** Re-requests a Generated draft from the current Original text. Confirms first if the admin
-   * has hand-edited the Generated draft since it was last produced, since this overwrites it. */
-  const regenerateDescription = () => {
-    if (!effectiveAi || !product) return;
-    // Compares against the raw last-fetched output rather than checking only the active tab, so
-    // switching to Original right before regenerating can't sneak past an unconfirmed hand-edit.
-    const currentGenerated = effectiveAi.active === 'generated' ? form.description : effectiveAi.generated;
-    const hasUnsavedEdit = currentGenerated !== effectiveAi.generatedBaseline;
-    if (hasUnsavedEdit && !window.confirm('Regenerating will discard your edits to the generated description. Continue?')) return;
-    const productId = product.id;
-    const original = effectiveAi.active === 'original' ? form.description : effectiveAi.original;
-    requestAi({
-      url: '/api/inventory/ai/product-description',
-      method: 'POST',
-      showToast: false,
-      data: aiRequestData(original),
-      onSuccess: ({ data }) => {
-        if (productRef.current?.id !== productId) return; // admin switched products while this was in flight
-        setAi({ productId, active: 'generated', original, generated: data.description, generatedBaseline: data.description });
-        write({ ...formRef.current, description: data.description });
-      },
-      onError: (err) => toast.error(err.general || 'Failed to regenerate description'),
-    });
-  };
 
   /** `after` fires once the save succeeds — used by the New Product wizard to advance to the
    * next step only on a confirmed save, without duplicating this request. */
@@ -222,11 +165,11 @@ export function useProductDetails({ product, onSaved }: UseProductDetailsArgs) {
       },
       successMessage: 'Product details saved',
       onSuccess: ({ data }) => {
+        void ensureGroup?.('colour', parseColoursInput(form.colours).map((c) => c.name));
+        void ensureGroup?.('size', parseSizesInput(form.sizes));
         onSaved(data);
         setDraft(null);
-        setEditingId(null);
-        setHandleLocked(true);
-        setAi(null);
+        setStoredHandleLocked({ productId: data.id, locked: true });
         after?.();
       },
     });
@@ -278,6 +221,9 @@ export function useProductDetails({ product, onSaved }: UseProductDetailsArgs) {
       data: { sizes: nextSizes },
       successMessage: toAdd.length === 1 ? 'Size added' : `${toAdd.length} sizes added`,
       onSuccess: ({ data }) => {
+        // The group the admin meant is the full typed list, not just the survivors of the
+        // dedupe above — captured from `values` (this function's own argument), not `toAdd`.
+        void ensureGroup?.('size', values);
         onSaved(data);
         syncListsFromProduct(data);
       },
@@ -314,6 +260,9 @@ export function useProductDetails({ product, onSaved }: UseProductDetailsArgs) {
       data: { colours: nextColours },
       successMessage: toAdd.length === 1 ? 'Colour added' : `${toAdd.length} colours added`,
       onSuccess: ({ data }) => {
+        // The group the admin meant is the full typed list, not just the survivors of the
+        // dedupe above — captured from `names` (this function's own argument), not `toAdd`.
+        void ensureGroup?.('colour', names);
         onSaved(data);
         syncListsFromProduct(data);
       },
@@ -323,6 +272,7 @@ export function useProductDetails({ product, onSaved }: UseProductDetailsArgs) {
 
   return {
     editing,
+    dirty,
     saving,
     errors,
     form,
@@ -340,28 +290,18 @@ export function useProductDetails({ product, onSaved }: UseProductDetailsArgs) {
     setSupplierIds: (supplierIds: string[]) => write({ ...form, supplierIds }),
     setSizesValue: (sizes: string) => write({ ...form, sizes }),
     setColoursValue: (colours: string) => write({ ...form, colours }),
-    startEdit: () => {
-      if (!product) return;
-      setEditingId(product.id);
-      setHandleLocked(true);
-      setErrors({});
-    },
+    /** Discards the in-progress draft — the panel itself no longer has a Cancel button (always
+     * editable, Save-only), but the New Product wizard's "Skip" still uses this to back out of
+     * step 2 without saving. */
     cancelEdit: () => {
       setDraft(null);
-      setEditingId(null);
-      setHandleLocked(true);
+      if (product) setStoredHandleLocked({ productId: product.id, locked: true });
       setErrors({});
-      setAi(null);
     },
     saveDetails,
     quickAddSizes,
     quickAddColours,
     syncListsFromProduct,
-    ai: effectiveAi,
-    aiGenerating,
-    generateDescription,
-    setAiActive,
-    regenerateDescription,
     // Effective lists, so the variants matrix reflects an in-progress edit.
     sizes: parseSizesInput(form.sizes),
     colours: parseColoursInput(form.colours),

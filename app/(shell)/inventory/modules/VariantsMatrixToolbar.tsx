@@ -45,14 +45,18 @@ export default function VariantsMatrixToolbar({ p, fullView }: VariantsMatrixToo
         {totalVariants} variant{totalVariants === 1 ? '' : 's'}
       </span>
 
-      <button
-        type="button"
-        onClick={fullView ? p.closeMatrixFullView : p.openMatrixFullView}
-        className="flex items-center gap-1.5 rounded-lg border border-gray-300 px-2.5 py-1.5 text-xs font-semibold text-gray-700 transition-colors duration-150 hover:bg-gray-50 cursor-pointer"
-      >
-        <Expand className="h-3.5 w-3.5" />
-        {fullView ? 'Exit full view' : 'Full view'}
-      </button>
+      {/* Full view has its own exit via the modal's own close (×) — no separate "exit" action
+          needed here once inside it. */}
+      {!fullView && (
+        <button
+          type="button"
+          onClick={p.openMatrixFullView}
+          className="flex items-center gap-1.5 rounded-lg border border-gray-300 px-2.5 py-1.5 text-xs font-semibold text-gray-700 transition-colors duration-150 hover:bg-gray-50 cursor-pointer"
+        >
+          <Expand className="h-3.5 w-3.5" />
+          Full view
+        </button>
+      )}
 
       <span className="mx-1 h-5 w-px bg-gray-200" aria-hidden="true" />
 

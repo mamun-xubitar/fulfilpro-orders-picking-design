@@ -18,7 +18,7 @@ export default function VariantsMatrixSection({ p, fullView }: VariantsMatrixSec
     <section className={fullView ? 'flex h-full min-h-0 flex-col' : 'rounded-xl border border-gray-200 bg-white shadow-sm'}>
       <VariantsMatrixToolbar p={p} fullView={fullView} />
       <div className={fullView ? 'min-h-0 flex-1' : undefined}>
-        <VariantsMatrixTable matrix={p.matrix} fillHeight={fullView} />
+        <VariantsMatrixTable matrix={p.matrix} fillHeight={fullView} showAllColumns={!!fullView} />
       </div>
     </section>
   );

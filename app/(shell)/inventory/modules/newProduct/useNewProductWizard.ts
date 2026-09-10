@@ -27,17 +27,9 @@ export function useNewProductWizard(p: InventoryPage) {
   // 2-5 show a loading state instead of the panel until this clears.
   const awaitingProduct = createdProductId !== null && p.product?.id !== createdProductId;
 
-  // Enter edit mode automatically on arrival at steps 2 and 4 — the wizard's own footer drives
-  // Save/Next, so the panel should already be editable rather than showing its own Edit button.
-  useEffect(() => {
-    if (step === 2 && !awaitingProduct && p.product && !p.details.editing) p.details.startEdit();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, awaitingProduct, p.product?.id]);
-
-  useEffect(() => {
-    if (step === 4 && !awaitingProduct && p.product && !p.pricing.editing) p.pricing.startEdit();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, awaitingProduct, p.product?.id]);
+  // Steps 2 and 4 (Product details / Pricing & margin) no longer need an explicit "enter edit
+  // mode" effect — both panels are always editable now (see useProductDetails/useProductPricing
+  // `editing`), so there's nothing left to trigger on arrival.
 
   // Seeds the PO form from the product's variants on arrival at step 5 — without opening the
   // standalone Create PO modal (see usePurchaseOrder.seedForm).

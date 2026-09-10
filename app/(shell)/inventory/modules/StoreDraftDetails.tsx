@@ -1,10 +1,10 @@
 'use client';
 
+import AiDescriptionField from './AiDescriptionField';
 import CategoryPicker from './CategoryPicker';
 import CollectionsPicker from './CollectionsPicker';
 import ProductStatusSelect from './ProductStatusSelect';
 import ProductTypePicker from './ProductTypePicker';
-import RichTextField from './RichTextField';
 import TagsPicker from './TagsPicker';
 import VendorPicker from './VendorPicker';
 import { TextField } from './StoreDraftFields';
@@ -41,7 +41,20 @@ export default function StoreDraftDetails({ storeId, product, draft, set, setFie
             <CollectionsPicker storeId={storeId} value={draft.collections} onChange={(collections) => set({ collections })} />
           </div>
         </div>
-        <RichTextField label="Description" value={draft.description} onChange={(html) => set({ description: html })} />
+        <AiDescriptionField
+          value={draft.description}
+          onChange={(html) => set({ description: html })}
+          subjectKey={storeId}
+          buildRequestData={() => ({
+            productId: product.id,
+            name: draft.title || product.name,
+            brand: draft.vendor || product.brand,
+            category: draft.category.name || product.category,
+            remarks: product.remarks,
+            sizes: product.sizes,
+            colours: product.colours,
+          })}
+        />
       </div>
 
       <div className="space-y-3 border-t border-gray-100 pt-3">

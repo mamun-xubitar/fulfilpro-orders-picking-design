@@ -11,7 +11,6 @@ import type {
   PurchaseOrderRecord,
   QuickFilterId,
   StockSummary,
-  StoreListingResult,
   VariantComputed,
   VariantRow,
   VariantStatus,
@@ -66,6 +65,30 @@ export function computeVariant(v: VariantRow): VariantComputed {
     stockValue: getStockValue(v),
     status: getStatus(v),
   };
+}
+
+/** The variant fields the matrix lets an admin edit directly. Computed cells (available,
+ * stockValue, status, incoming) and read-only ones (buyPrice, allocatedFromOrders) are
+ * deliberately absent — they're never part of a draft. */
+const VARIANT_DRAFT_FIELDS = ['sku', 'barcode', 'colour', 'size', 'stockOnHand', 'allocated', 'trigger', 'sellPrice'] as const;
+
+/** The minimal diff between a draft and the server's row — the exact PATCH body to send, and
+ * empty when the row is clean (a value typed then typed back to the original disarms Save,
+ * rather than staying dirty because the field was merely touched). `''` and `null` are treated as
+ * equal for sku/barcode: the text input writes `''` for a cleared field and the server normalises
+ * that back to `null` (see SupplierProductController.updateVariant), so clearing an
+ * already-null SKU isn't a change. */
+export function variantDraftChanges(server: VariantRow, draft: Partial<VariantRow> | undefined): Partial<VariantRow> {
+  if (!draft) return {};
+  const changed: Partial<VariantRow> = {};
+  for (const field of VARIANT_DRAFT_FIELDS) {
+    if (!(field in draft)) continue;
+    const next = draft[field];
+    if (next === undefined) continue;
+    if ((server[field] ?? '') === (next ?? '')) continue;
+    (changed as Record<string, unknown>)[field] = next;
+  }
+  return changed;
 }
 
 /** Folds the visible rows into the Stock Summary panel and the table totals row. */
@@ -139,17 +162,13 @@ export function formatCurrencyValue(n: number): string {
   return `$${formatMoney(n)}`;
 }
 
-/** A store's effective per-store margin — the panel's staged draft while it's being edited
- * (including a value not yet saved, or one just cleared), the live listing's own marginPercent
- * otherwise. Shared by PerStoreMarginRows (which rows to show) and StoreMarginPriceChips (which
- * stores get a price badge), so the two can never disagree about which stores have a margin set. */
-export function marginForStore(
-  storeId: string,
-  listings: StoreListingResult[],
-  values: Record<string, number | null>,
-  editing: boolean
-): number | null {
-  return editing ? (values[storeId] ?? null) : (listings.find((l) => l.storeId === storeId)?.marginPercent ?? null);
+/** A store's effective per-store margin — `values` (useProductPricing's `marginDraft`) already
+ * merges the panel's staged edits over each store's live marginPercent, so this is a lookup, not
+ * a live/draft fork. Shared by PerStoreMarginRows (which rows to show) and StoreMarginPriceChips
+ * (which stores get a price badge), so the two can never disagree about which stores have a
+ * margin set. */
+export function marginForStore(storeId: string, values: Record<string, number | null>): number | null {
+  return values[storeId] ?? null;
 }
 
 /** A store listing's price, or price range, formatted with a leading `$` on both ends of a
@@ -238,6 +257,20 @@ export function splitCommaList(value: string): string[] {
  * the server's `presetKeyOf` (models/inventory-preset.model.server.ts). */
 export function keyOf(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, '');
+}
+
+/** Order-insensitive identity of a whole preset *group* — de-duped, sorted, "|"-joined member
+ * keys, so typing "Blue, Red" still matches an existing "(Red, Blue)" group. Mirrors the server's
+ * `groupKeyOf` (models/inventory-preset.model.server.ts) so the client can tell whether a typed
+ * list already matches a loaded group without a round trip. */
+export function groupKeyOf(items: string[]): string {
+  return [...new Set(items.map(keyOf).filter(Boolean))].sort().join('|');
+}
+
+/** A group's display label — members in the order they were typed, never re-sorted, so
+ * "(S, M, L, XL)" doesn't read as "(L, M, S, XL)". Used for the A→Z sort among groups below. */
+export function groupLabel(items: string[]): string {
+  return items.join(', ');
 }
 
 /** Display-only: capitalises the first character, leaving the rest exactly as typed — "xl" reads

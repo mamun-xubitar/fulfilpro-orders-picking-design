@@ -1,19 +1,20 @@
 'use client';
 
 import { useLayoutEffect, useRef, useState } from 'react';
-import { deriveColorFromName, resolveSwatch } from '@/lib/inventory/colour';
+import { deriveColorFromName, formatColourName, resolveSwatch } from '@/lib/inventory/colour';
 import { Check, Close, Pencil, Plus } from './icons';
-import { findCaseInsensitiveDuplicate, keyOf, splitCommaList } from './utils';
+import { capitaliseFirst, findCaseInsensitiveDuplicate, groupKeyOf, keyOf, splitCommaList } from './utils';
 
-type PresetOption = { id: string; name: string; key: string };
+export type PresetGroupOption = { id: string; items: string[]; key: string };
 
 type PresetPickerProps = {
   kind: 'colour' | 'size';
-  options: PresetOption[];
+  groups: PresetGroupOption[];
   /** Lowercased, whitespace-stripped names currently in the field's comma-separated value. */
   selectedKeys: Set<string>;
-  onToggle: (name: string) => void;
-  onCreate: (name: string) => Promise<string | null>;
+  /** Clicking a group replaces the field's whole value with that group's members. */
+  onApplyGroup: (items: string[]) => void;
+  onCreateGroup: (items: string[]) => Promise<string | null>;
   onDelete: (ids: string[]) => Promise<boolean>;
   saving: boolean;
 };
@@ -21,11 +22,12 @@ type PresetPickerProps = {
 /** The dropdown-style preset panel shared by ProductColoursField and ProductSizesField (via
  * PresetComboField) and by the Variants matrix toolbar's Add colour / Add size modals — opens on
  * focus/click of the paired input (the parent owns the container ref + outside-click/escape
- * handling), and lets the admin toggle presets onto the product, add new ones (comma-separated,
- * one DB insert per name), or — via the header's "Update presets" mode — permanently delete one.
- * Colours and sizes are name-only and behave identically here; a colour badge additionally shows
- * a swatch dot, derived from the name at render time (nothing is stored). */
-export default function PresetPicker({ kind, options, selectedKeys, onToggle, onCreate, onDelete, saving }: PresetPickerProps) {
+ * handling), and lets the admin replace the field's value with a preset *group* (every member
+ * at once), add a new group (comma-separated members, one DB insert), or — via the header's
+ * "Update presets" mode — permanently delete one. Colours and sizes behave identically here; a
+ * colour group additionally shows one swatch dot per member, derived from each name at render
+ * time (nothing is stored). */
+export default function PresetPicker({ kind, groups, selectedKeys, onApplyGroup, onCreateGroup, onDelete, saving }: PresetPickerProps) {
   const pickerRef = useRef<HTMLDivElement>(null);
   const [openUp, setOpenUp] = useState(false);
 
@@ -53,56 +55,53 @@ export default function PresetPicker({ kind, options, selectedKeys, onToggle, on
   }, []);
 
   // Off by default — badges only toggle selection. "Update presets" reveals each badge's ×;
-  // clicking it (now "OK") leaves the mode again. Left automatically once the last preset here
+  // clicking it (now "OK") leaves the mode again. Left automatically once the last group here
   // is deleted, so the header never strands the admin in update mode with nothing left to manage.
   const [updating, setUpdating] = useState(false);
 
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
-  const requestDelete = async (option: PresetOption) => {
-    setDeletingIds((prev) => new Set(prev).add(option.id));
-    const ok = await onDelete([option.id]);
+  const requestDelete = async (group: PresetGroupOption) => {
+    setDeletingIds((prev) => new Set(prev).add(group.id));
+    const ok = await onDelete([group.id]);
     setDeletingIds((prev) => {
       const next = new Set(prev);
-      next.delete(option.id);
+      next.delete(group.id);
       return next;
     });
-    if (ok && options.length <= 1) setUpdating(false);
+    if (ok && groups.length <= 1) setUpdating(false);
   };
 
   const [adding, setAdding] = useState(false);
-  const [newName, setNewName] = useState('');
+  const [newValue, setNewValue] = useState('');
   const [createError, setCreateError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const resetAddForm = () => {
     setAdding(false);
-    setNewName('');
+    setNewValue('');
     setCreateError(null);
   };
 
-  const parsedNames = splitCommaList(newName);
-  const inputDuplicate = findCaseInsensitiveDuplicate(parsedNames);
-  const collision = parsedNames.find((name) => options.some((o) => keyOf(o.name) === keyOf(name)));
-  const validationError = inputDuplicate
-    ? `"${inputDuplicate}" is listed more than once`
-    : collision
-      ? `"${collision}" already exists`
-      : null;
+  const parsedNames = splitCommaList(newValue);
+  const memberDuplicate = findCaseInsensitiveDuplicate(parsedNames);
+  const barred = parsedNames.find((n) => n.includes('|'));
+  const alreadyExists = parsedNames.length > 0 ? groups.some((g) => g.key === groupKeyOf(parsedNames)) : false;
+  const validationError = memberDuplicate
+    ? `"${memberDuplicate}" is listed more than once`
+    : barred
+      ? `A name can't contain the "|" character`
+      : alreadyExists
+        ? 'This group already exists'
+        : null;
   const displayError = createError ?? validationError;
 
   const submitCreate = async () => {
     if (parsedNames.length === 0 || validationError) return;
     setSubmitting(true);
-    for (const name of parsedNames) {
-      const err = await onCreate(name);
-      if (err) {
-        setCreateError(err);
-        setSubmitting(false);
-        return;
-      }
-    }
+    const err = await onCreateGroup(parsedNames);
     setSubmitting(false);
-    resetAddForm();
+    if (err) setCreateError(err);
+    else resetAddForm();
   };
 
   return (
@@ -113,7 +112,7 @@ export default function PresetPicker({ kind, options, selectedKeys, onToggle, on
     >
       <div className="flex items-center justify-between gap-2 px-3 pb-1.5">
         <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{kind === 'colour' ? 'Colour presets' : 'Size presets'}</span>
-        {options.length > 0 && (
+        {groups.length > 0 && (
           <button
             type="button"
             onClick={() => setUpdating((v) => !v)}
@@ -132,43 +131,47 @@ export default function PresetPicker({ kind, options, selectedKeys, onToggle, on
         )}
       </div>
 
-      {options.length === 0 ? (
+      {groups.length === 0 ? (
         <div className="px-3 py-2 text-xs text-gray-400">No presets yet.</div>
       ) : (
         <div className="flex flex-wrap gap-1.5 px-3 pb-2">
-          {options.map((option) => {
-            const selected = selectedKeys.has(keyOf(option.name));
-            const deleting = deletingIds.has(option.id);
+          {groups.map((group) => {
+            const present = group.items.filter((n) => selectedKeys.has(keyOf(n))).length;
+            const state = present === 0 ? 'none' : present === group.items.length ? 'all' : 'some';
+            const deleting = deletingIds.has(group.id);
             return (
               <span
-                key={option.id}
-                className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[12px] font-semibold transition-colors duration-150 ${
-                  selected ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-700'
+                key={group.id}
+                className={`inline-flex items-center gap-1 whitespace-normal rounded-full border px-2 py-1 text-[12px] font-semibold transition-colors duration-150 ${
+                  state === 'all'
+                    ? 'border-blue-600 bg-blue-50 text-blue-700'
+                    : state === 'some'
+                      ? 'border-blue-300 bg-white text-blue-700'
+                      : 'border-gray-200 bg-white text-gray-700'
                 } ${deleting ? 'opacity-40' : ''}`}
               >
                 <button
                   type="button"
                   onClick={() => {
-                    if (!updating) onToggle(option.name);
+                    if (!updating) onApplyGroup(group.items);
                   }}
                   disabled={deleting}
                   className={`flex items-center gap-1 disabled:cursor-not-allowed ${updating ? 'cursor-default' : 'cursor-pointer'}`}
                 >
-                  {kind === 'colour' && (
-                    <span
-                      className="h-2 w-2 shrink-0 rounded-full ring-1 ring-black/10"
-                      style={{ backgroundColor: resolveSwatch(deriveColorFromName(option.name)) }}
-                    />
+                  <GroupBadgeContent kind={kind} items={group.items} />
+                  {state === 'some' && (
+                    <span className="text-[10px] text-blue-500">
+                      {present}/{group.items.length}
+                    </span>
                   )}
-                  {option.name}
                 </button>
                 {updating && (
                   <button
                     type="button"
-                    onClick={() => void requestDelete(option)}
+                    onClick={() => void requestDelete(group)}
                     disabled={deleting}
-                    aria-label={`Delete ${option.name} preset`}
-                    title="Delete preset"
+                    aria-label={`Delete preset group ${group.items.join(', ')}`}
+                    title="Delete preset group"
                     className="flex h-3.5 w-3.5 items-center justify-center rounded-full text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed cursor-pointer"
                   >
                     <Close className="h-2.5 w-2.5" />
@@ -183,17 +186,25 @@ export default function PresetPicker({ kind, options, selectedKeys, onToggle, on
       <div className="border-t border-gray-100 px-3 pt-1.5">
         {adding ? (
           <div className="space-y-1.5">
+            <label className="block text-[11px] font-semibold text-gray-500">New group members (comma separated)</label>
             <input
               autoFocus
               type="text"
-              value={newName}
+              value={newValue}
               onChange={(e) => {
-                setNewName(e.target.value);
+                setNewValue(e.target.value);
                 setCreateError(null);
               }}
-              placeholder={kind === 'colour' ? 'e.g. Hot Pink, Navy' : 'e.g. S, M, L'}
+              placeholder={kind === 'colour' ? 'e.g. Red, Green, Blue' : 'e.g. S, M, L, XL'}
               className="w-full rounded-md border border-gray-300 px-2 py-1 text-[13px] outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
             />
+            {parsedNames.length > 0 && !displayError && (
+              <div className="flex flex-wrap gap-1.5">
+                <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-2 py-1 text-[12px] font-semibold text-gray-700">
+                  <GroupBadgeContent kind={kind} items={parsedNames} />
+                </span>
+              </div>
+            )}
             {displayError && <p className="text-xs text-red-600">{displayError}</p>}
             <div className="flex gap-1.5">
               <button
@@ -209,7 +220,7 @@ export default function PresetPicker({ kind, options, selectedKeys, onToggle, on
                 disabled={parsedNames.length === 0 || !!validationError || saving || submitting}
                 className="flex-1 rounded-md bg-blue-600 px-2 py-1 text-[12px] font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
               >
-                {saving || submitting ? 'Adding…' : `Add ${parsedNames.length > 1 ? `${parsedNames.length} presets` : 'preset'}`}
+                {saving || submitting ? 'Adding…' : `Add group${parsedNames.length > 1 ? ` (${parsedNames.length})` : ''}`}
               </button>
             </div>
           </div>
@@ -220,10 +231,36 @@ export default function PresetPicker({ kind, options, selectedKeys, onToggle, on
             className="flex w-full items-center gap-1.5 rounded-md px-1 py-1 text-[13px] font-semibold text-blue-600 hover:bg-blue-50 cursor-pointer"
           >
             <Plus className="h-3.5 w-3.5" />
-            Add preset
+            Add group
           </button>
         )}
       </div>
     </div>
+  );
+}
+
+/** Shared badge content — a run of overlapping swatch dots (colours only, capped at 4 + "+N")
+ * followed by the member list, formatted per-kind. Used both by the group list above and the
+ * add-form's live preview, so what the admin previews matches what the badge will look like. */
+function GroupBadgeContent({ kind, items }: { kind: 'colour' | 'size'; items: string[] }) {
+  const shown = items.slice(0, 4);
+  const extra = items.length - shown.length;
+  const label = items.map((name) => (kind === 'colour' ? formatColourName(name) : capitaliseFirst(name))).join(', ');
+  return (
+    <>
+      {kind === 'colour' && (
+        <span className="flex items-center">
+          {shown.map((name, i) => (
+            <span
+              key={`${name}-${i}`}
+              className={`h-2 w-2 shrink-0 rounded-full ring-1 ring-black/10 ${i > 0 ? '-ml-1' : ''}`}
+              style={{ backgroundColor: resolveSwatch(deriveColorFromName(name)) }}
+            />
+          ))}
+          {extra > 0 && <span className="ml-1 text-[10px] text-gray-400">+{extra}</span>}
+        </span>
+      )}
+      {label}
+    </>
   );
 }

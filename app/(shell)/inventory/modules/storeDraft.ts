@@ -1,4 +1,4 @@
-import { storePriceFromMargin } from '@/lib/inventory/store-price';
+import { resolveStoreMargin, storePriceFromMargin } from '@/lib/inventory/store-price';
 import { variantOptionKey } from '@/lib/inventory/variant-option-key';
 import { resolveOptionAxes, optionMatchKeys, type OptionAxes } from '@/lib/inventory/variant-options';
 import type { PricingInputs, ProductRecord, ProductStatusValue } from './types';
@@ -109,7 +109,10 @@ export function isPublished(listing: StoreListingsState['listings'][number] | un
 
 export function emptyDraft(product: ProductRecord | null, storeId: string, storeListings: StoreListingsState): StoreDraft {
   const listing = storeListings.listings.find((l) => l.storeId === storeId);
-  const margin = listing?.marginPercent ?? null;
+  // Product-specific per-store margin wins; falling back to this store's own global default
+  // when the product has none. See lib/inventory/store-price.ts for the full resolution chain,
+  // shared with the server-side publish path.
+  const margin = resolveStoreMargin(listing?.marginPercent ?? null, listing?.storeDefaultMarginPercent ?? null);
   const published = isPublished(listing);
   const variantPrices: Record<string, string> = {};
   const variantSku: Record<string, string> = {};

@@ -73,13 +73,13 @@ export default function InventoryPage() {
                 <ProductSubTabs active={p.productTab} onChange={p.setProductTab} />
               </div>
 
-              <VariantsMatrixSection p={p} />
-
               {p.productTab === 'details' ? (
                 <ProductDetailsTab p={p} />
               ) : (
                 <ComingSoon label={productTab.label} blurb={productTab.blurb} />
               )}
+
+              <VariantsMatrixSection p={p} />
 
               <PurchaseOrdersPanel po={p.po} />
 

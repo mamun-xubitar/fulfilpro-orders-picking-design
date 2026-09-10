@@ -150,20 +150,22 @@ export function SkuCell({
   );
 }
 
-export function RowAction({ label, onClick, danger, primary, children }: {
+export function RowAction({ label, onClick, danger, primary, disabled, children }: {
   label: string;
   onClick: () => void;
   danger?: boolean;
   primary?: boolean;
+  disabled?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       aria-label={label}
       title={label}
-      className={`rounded-lg border p-1.5 transition-colors duration-150 cursor-pointer ${
+      className={`rounded-lg border p-1.5 transition-colors duration-150 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 ${
         primary
           ? 'border-blue-600 bg-blue-600 text-white hover:bg-blue-700'
           : danger

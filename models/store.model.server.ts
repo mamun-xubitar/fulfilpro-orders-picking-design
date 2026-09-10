@@ -81,6 +81,22 @@ export class StoreModel {
     return stores as { id: string; storeDomain: string; name: string | null; accessToken: string }[];
   }
 
+  /** Every connected store's global default margin — the "Per store margin" section on the
+   * inventory toolbar's Store-wide defaults card. Null entries are stores with no default set
+   * yet, which fall back further to the product's own sell price. */
+  async findConnectedWithDefaultMargins(): Promise<{ id: string; storeDomain: string; name: string | null; defaultMarginPercent: number | null }[]> {
+    const stores = await prisma.store.findMany({
+      where: { status: 'connected' },
+      select: { id: true, storeDomain: true, name: true, defaultMarginPercent: true },
+      orderBy: [{ name: 'asc' }, { storeDomain: 'asc' }],
+    });
+    return stores.map((s) => ({ ...s, defaultMarginPercent: s.defaultMarginPercent !== null ? Number(s.defaultMarginPercent) : null }));
+  }
+
+  async setDefaultMargin(id: string, marginPercent: number | null) {
+    await prisma.store.update({ where: { id }, data: { defaultMarginPercent: marginPercent } });
+  }
+
   async create(data: CreateStoreData) {
     return prisma.store.create({
       data: {

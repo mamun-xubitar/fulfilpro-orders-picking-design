@@ -10,9 +10,9 @@ type StoreMarginPriceChipsProps = {
   /** The panel's live pricing draft — an unsaved cost/margin/tax edit is reflected immediately,
    * consistent with the panel's own "Sell price (inc tax)" figure. */
   form: PricingForm;
-  /** The panel's staged per-store margin edits — see useProductPricing.marginDraft. */
+  /** The panel's staged per-store margin edits, already merged over each store's live margin —
+   * see useProductPricing.marginDraft. */
   marginDraft: Record<string, number | null>;
-  editing: boolean;
   onEditPrice: (listing: StoreListingResult) => void;
   onUnpublished: (storeName: string) => void;
 };
@@ -26,10 +26,10 @@ type StoreMarginPriceChipsProps = {
  * modal with nothing to edit. Replaces StorePriceChips (parked in PricingMarginPanel), which
  * showed each store's *live* Shopify price rather than what its own margin computes.
  */
-export default function StoreMarginPriceChips({ listings, form, marginDraft, editing, onEditPrice, onUnpublished }: StoreMarginPriceChipsProps) {
+export default function StoreMarginPriceChips({ listings, form, marginDraft, onEditPrice, onUnpublished }: StoreMarginPriceChipsProps) {
   const pricing = pricingFormToInputs(form);
   const margined = listings
-    .map((listing) => ({ listing, margin: marginForStore(listing.storeId, listings, marginDraft, editing) }))
+    .map((listing) => ({ listing, margin: marginForStore(listing.storeId, marginDraft) }))
     .filter((entry): entry is { listing: StoreListingResult; margin: number } => entry.margin !== null);
 
   if (margined.length === 0) return null;
