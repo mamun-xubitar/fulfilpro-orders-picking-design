@@ -13,6 +13,9 @@ type RichTextFieldProps = {
   /** Suppresses the field's own label row — for a caller (e.g. DescriptionField) that renders its
    * own header alongside extra controls in the same row. */
   hideLabel?: boolean;
+  /** Extra control pinned to the right end of the formatting toolbar — e.g. the AI
+   * generate/Original/Generated group, which lives in the toolbar rather than a header row. */
+  toolbarEnd?: React.ReactNode;
 };
 
 type ActiveState = { bold: boolean; italic: boolean; underline: boolean; ul: boolean; ol: boolean };
@@ -34,7 +37,7 @@ const TEXT_COLORS = ['#111827', '#6b7280', '#dc2626', '#ea580c', '#ca8a04', '#16
  * it immediately before applying the command, so "insert link" / "apply colour" affects whatever
  * was selected when the toolbar button was pressed, not wherever focus happens to land after.
  */
-export default function RichTextField({ label, value, onChange, hideLabel }: RichTextFieldProps) {
+export default function RichTextField({ label, value, onChange, hideLabel, toolbarEnd }: RichTextFieldProps) {
   const ref = useRef<HTMLDivElement>(null);
   const focused = useRef(false);
   const savedRange = useRef<Range | null>(null);
@@ -219,7 +222,7 @@ export default function RichTextField({ label, value, onChange, hideLabel }: Ric
     <div className="min-w-0">
       {!hideLabel && <FieldLabel>{label}</FieldLabel>}
       <div className="rounded-lg border border-gray-300 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100">
-        <div className="flex flex-wrap items-center gap-0.5 border-b border-gray-200 px-1.5 py-1">
+        <div className="flex flex-wrap items-center gap-1 rounded-t-lg border-b border-gray-200 bg-gray-50 px-1.5 py-0.5">
           <LetterButton letter="B" title="Bold" bold active={active.bold} onClick={() => runCommand('bold')} />
           <LetterButton letter="I" title="Italic" italic active={active.italic} onClick={() => runCommand('italic')} />
           <LetterButton letter="U" title="Underline" underline active={active.underline} onClick={() => runCommand('underline')} />
@@ -227,16 +230,16 @@ export default function RichTextField({ label, value, onChange, hideLabel }: Ric
           <Divider />
 
           <IconButton title="Bulleted list" active={active.ul} onClick={() => runCommand('insertUnorderedList')}>
-            <BulletList className="h-4 w-4" />
+            <BulletList className="h-3 w-3" />
           </IconButton>
           <IconButton title="Numbered list" active={active.ol} onClick={() => runCommand('insertOrderedList')}>
-            <NumberedList className="h-4 w-4" />
+            <NumberedList className="h-3 w-3" />
           </IconButton>
 
           <Divider />
 
           <IconButton title="Insert link" onMouseDown={openLinkModal} onClick={() => {}}>
-            <LinkIcon className="h-4 w-4" />
+            <LinkIcon className="h-3 w-3" />
           </IconButton>
 
           <div className="relative" ref={colorPopoverRef}>
@@ -246,7 +249,7 @@ export default function RichTextField({ label, value, onChange, hideLabel }: Ric
               onMouseDown={saveSelection}
               onClick={() => setColorOpen((v) => !v)}
             >
-              <Palette className="h-4 w-4" />
+              <Palette className="h-3 w-3" />
             </IconButton>
             {colorOpen && (
               <div className="absolute z-20 top-full mt-1 left-0 flex w-36 flex-wrap gap-1.5 rounded-lg border border-gray-200 bg-white p-2 shadow-lg">
@@ -278,6 +281,7 @@ export default function RichTextField({ label, value, onChange, hideLabel }: Ric
               </div>
             )}
           </div>
+          {toolbarEnd && <span className="ml-auto flex shrink-0 items-center">{toolbarEnd}</span>}
         </div>
         <div
           ref={ref}
@@ -301,7 +305,7 @@ export default function RichTextField({ label, value, onChange, hideLabel }: Ric
             }
           }}
           aria-label={label}
-          className="min-h-24 w-full px-2.5 py-2 text-[13px] text-gray-900 outline-none [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-4 [&_ol]:pl-4 [&_a]:text-blue-600 [&_a]:underline"
+          className="min-h-16 w-full px-2.5 py-2 text-[13px] text-gray-900 outline-none [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-4 [&_ol]:pl-4 [&_a]:text-blue-600 [&_a]:underline"
         />
       </div>
 

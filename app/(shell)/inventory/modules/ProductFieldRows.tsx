@@ -2,10 +2,16 @@
 
 import ClampedHtml from './ClampedHtml';
 
-/** Shared label / read-only / input rows for the Product details panel. */
+/** Shared label / read-only / input rows for the Product details panel. Sizing matches the
+ * prototype's `.lbl` (label) and `.inp` (24px-tall input) tokens literally — fixed heights +
+ * `leading-none` rather than padding/line-height approximations. */
+
+const LABEL_CLASS = 'mb-[2px] block text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-gray-500';
+const INPUT_CLASS =
+  'h-[24px] w-full rounded-[7px] border border-gray-300 px-[6px] text-[11px] leading-none text-gray-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100';
 
 export function FieldLabel({ children }: { children: React.ReactNode }) {
-  return <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-gray-500">{children}</span>;
+  return <span className={LABEL_CLASS}>{children}</span>;
 }
 
 /** Read-mode row for `RichTextField` — the Description value is sanitized HTML (imported
@@ -18,7 +24,7 @@ export function HtmlField({ label, value }: { label: string; value: string }) {
       {value ? (
         <ClampedHtml html={value} title={label} />
       ) : (
-        <p className="min-h-16 rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-2 text-[13px] text-gray-900">—</p>
+        <p className="min-h-12 rounded-[7px] border border-gray-200 bg-gray-50 px-[6px] py-1.5 text-[11px] text-gray-900">—</p>
       )}
     </div>
   );
@@ -29,8 +35,8 @@ export function Field({ label, value, multiline }: { label: string; value: strin
     <div className="min-w-0">
       <FieldLabel>{label}</FieldLabel>
       <p
-        className={`rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-2 text-[13px] text-gray-900 ${
-          multiline ? 'min-h-16 whitespace-pre-line' : 'truncate font-medium'
+        className={`rounded-[7px] border border-gray-200 bg-gray-50 px-[6px] text-[11px] text-gray-900 ${
+          multiline ? 'min-h-12 whitespace-pre-line py-1.5' : 'h-[24px] flex items-center truncate font-medium leading-none'
         }`}
         title={multiline ? undefined : value}
       >
@@ -45,23 +51,19 @@ export function TextField({
   value,
   onChange,
   error,
+  placeholder,
 }: {
   label: string;
   value: string;
   onChange: React.ChangeEventHandler<HTMLInputElement>;
   error?: string;
+  placeholder?: string;
 }) {
   return (
     <div className="min-w-0">
       <FieldLabel>{label}</FieldLabel>
-      <input
-        type="text"
-        value={value}
-        onChange={onChange}
-        aria-label={label}
-        className="w-full rounded-lg border border-gray-300 px-2.5 py-2 text-[13px] text-gray-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-      />
-      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+      <input type="text" value={value} onChange={onChange} aria-label={label} placeholder={placeholder} className={`${INPUT_CLASS} placeholder:text-gray-400`} />
+      {error && <p className="mt-1 text-[10px] leading-tight text-red-600">{error}</p>}
     </div>
   );
 }
@@ -80,12 +82,7 @@ export function SelectField({
   return (
     <div className="min-w-0">
       <FieldLabel>{label}</FieldLabel>
-      <select
-        value={value}
-        onChange={onChange}
-        aria-label={label}
-        className="w-full truncate rounded-lg border border-gray-300 px-2 py-2 text-[13px] text-gray-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 cursor-pointer"
-      >
+      <select value={value} onChange={onChange} aria-label={label} className={`${INPUT_CLASS} truncate cursor-pointer`}>
         {options.map((option) => (
           <option key={option} value={option}>
             {option}
@@ -103,9 +100,9 @@ export function TextAreaField({ label, value, onChange }: { label: string; value
       <textarea
         value={value}
         onChange={onChange}
-        rows={3}
+        rows={2}
         aria-label={label}
-        className="min-h-16 w-full rounded-lg border border-gray-300 px-2.5 py-2 text-[13px] text-gray-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+        className="min-h-[40px] w-full rounded-[7px] border border-gray-300 px-[6px] py-[4px] text-[11px] leading-tight text-gray-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
       />
     </div>
   );

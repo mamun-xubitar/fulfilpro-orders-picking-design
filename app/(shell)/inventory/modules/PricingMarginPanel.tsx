@@ -11,7 +11,7 @@ import { Check, Tag } from './icons';
 import { formatMoney } from './utils';
 import type { useProductPricing } from './hooks/useProductPricing';
 import type { StoreListingsState } from './hooks/useStoreListings';
-import type { PricingForm, StoreListingResult } from './types';
+import type { StoreListingResult } from './types';
 
 type PricingMarginPanelInner = ReturnType<typeof useProductPricing>;
 
@@ -26,60 +26,56 @@ type PricingMarginPanelProps = {
   embedded?: boolean;
 };
 
-/** Buying price is in the foreign currency and gets converted by the exchange rate;
- * freight and misc are always AUD, so their unit never follows the currency picker. */
-const COST_FIELDS: { key: Extract<keyof PricingForm, 'buyingPrice' | 'freight' | 'misc'>; label: string; unit: 'foreign' | 'base' }[] = [
-  { key: 'buyingPrice', label: 'Buying price', unit: 'foreign' },
-  { key: 'freight', label: 'Freight', unit: 'base' },
-  { key: 'misc', label: 'Misc', unit: 'base' },
-];
-
 export default function PricingMarginPanel({ pricing: p, storeListings, onEditStorePrice, embedded }: PricingMarginPanelProps) {
   const foreign = p.form.currencyCode;
   const base = p.baseCurrency;
 
   return (
-    <section className={embedded ? 'flex min-w-0 flex-col' : 'flex min-w-0 flex-col rounded-xl border border-gray-200 bg-white shadow-sm'}>
-      {!embedded && <PanelHeading icon={<Tag className="h-4 w-4" />} title={`Pricing & margin (${base})`} meta={foreign} />}
+    <section className={embedded ? 'flex min-w-0 flex-col' : 'flex min-w-0 flex-col rounded-[10px] border border-gray-200 bg-white shadow-[0_1px_2px_0_rgb(0_0_0/0.05)] xl:min-h-0'}>
+      {!embedded && <PanelHeading icon={<Tag className="h-3 w-3" />} title={`Pricing & margin (${base})`} meta={foreign} />}
 
-      <div className={embedded ? 'flex flex-1 flex-col gap-3' : 'flex flex-1 flex-col gap-3 p-4'}>
+      <div className={embedded ? 'flex flex-1 flex-col gap-[3px]' : 'flex flex-1 flex-col gap-[3px] p-[6px] xl:min-h-0 xl:overflow-y-auto'}>
         <Row label="Currency">
-          <select
-            value={p.form.currencyCode}
-            onChange={p.set('currencyCode')}
-            aria-label="Currency"
-            className="w-28 rounded-lg border border-gray-300 px-2 py-1 text-right text-[13px] outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 cursor-pointer"
-          >
-            {p.currencies.map((c) => (
-              <option key={c.code} value={c.code}>
-                {c.code}
-              </option>
-            ))}
-          </select>
+          <div className="flex gap-[4px]">
+            <select
+              value={p.form.currencyCode}
+              onChange={p.set('currencyCode')}
+              aria-label="Currency"
+              className="h-[22px] w-[58px] rounded-[7px] border border-gray-300 px-[4px] text-right text-[10.5px] leading-none outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 cursor-pointer"
+            >
+              {p.currencies.map((c) => (
+                <option key={c.code} value={c.code}>
+                  {c.code}
+                </option>
+              ))}
+            </select>
+            <NumberInput value={p.form.exchangeRate} onChange={p.set('exchangeRate')} step="0.01" suffix="rate" width="w-[68px]" />
+          </div>
         </Row>
 
-        <Row label="Exchange rate">
-          <NumberInput value={p.form.exchangeRate} onChange={p.set('exchangeRate')} step="0.01" suffix="rate" />
+        <Row label="Buying price">
+          <NumberInput value={p.form.buyingPrice} onChange={p.set('buyingPrice')} step="0.01" suffix={foreign} width="w-[74px]" />
         </Row>
 
-        {COST_FIELDS.map(({ key, label, unit }) => {
-          const currency = unit === 'foreign' ? foreign : base;
-          return (
-            <Row key={key} label={label}>
-              <NumberInput value={p.form[key]} onChange={p.set(key)} step="0.01" suffix={currency} />
-            </Row>
-          );
-        })}
+        <Row label="Freight / Misc">
+          <div className="flex gap-[4px]">
+            <NumberInput value={p.form.freight} onChange={p.set('freight')} step="0.01" suffix={base} width="w-[68px]" />
+            <NumberInput value={p.form.misc} onChange={p.set('misc')} step="0.01" suffix={base} width="w-[68px]" />
+          </div>
+        </Row>
 
-        <div className="flex items-center justify-between rounded-lg bg-gray-100 px-3 py-2">
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-red-600">Total buying (landed)</span>
-          <span className="text-[13px] font-bold text-red-700 tabular-nums">
+        <div className="flex items-center justify-between rounded-[9px] bg-gray-100 px-[9px] py-[6px]">
+          <span className="text-[9.5px] font-bold uppercase leading-none tracking-[0.4px] text-red-600">Total buying (landed)</span>
+          <span className="text-[11.5px] font-bold leading-none text-red-700 tabular-nums">
             {formatMoney(p.computed.totalBuying)} <Unit>{base}</Unit>
           </span>
         </div>
 
-        <Row label="Margin %">
-          <NumberInput value={p.form.marginPercent} onChange={p.set('marginPercent')} step="0.1" suffix="%" />
+        <Row label="Margin / Tax">
+          <div className="flex gap-[4px]">
+            <NumberInput value={p.form.marginPercent} onChange={p.set('marginPercent')} step="0.1" suffix="%" width="w-[62px]" />
+            <NumberInput value={p.form.tax} onChange={p.set('tax')} step="0.1" suffix="%" width="w-[62px]" />
+          </div>
         </Row>
 
         <Row label="Sell price (ex tax)">
@@ -88,14 +84,10 @@ export default function PricingMarginPanel({ pricing: p, storeListings, onEditSt
           </Value>
         </Row>
 
-        <Row label="Tax">
-          <NumberInput value={p.form.tax} onChange={p.set('tax')} step="0.1" suffix="%" />
-        </Row>
-
         {/* Per-store overrides — kept visually separate from the product-level calculation
            above, since neither of these ever feeds computePricing. */}
         {storeListings.listings.length > 0 && (
-          <div className="space-y-3 border-t border-gray-100 pt-3">
+          <div className="space-y-[6px] border-t border-gray-100 pt-[6px]">
             <PerStoreMarginRows listings={storeListings.listings} values={p.marginDraft} onChange={p.setPendingMargin} />
             {/* Re-enable: uncomment to restore the live-Shopify-price chips (see the parked import above).
             <StorePriceChips listings={storeListings.listings} onEditPrice={onEditStorePrice} />
@@ -103,16 +95,16 @@ export default function PricingMarginPanel({ pricing: p, storeListings, onEditSt
             <StoreMarginPriceChips
               listings={storeListings.listings}
               form={p.form}
-              marginDraft={p.marginDraft}
+              marginDraft={p.resolvedMarginDraft}
               onEditPrice={onEditStorePrice}
               onUnpublished={(storeName) => toast.info(`Publish this product to ${storeName} before editing its price`)}
             />
           </div>
         )}
 
-        <div className="mt-auto flex items-center justify-between rounded-xl border border-blue-100 bg-blue-50 px-3 py-3">
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-blue-700">Sell price (inc tax)</span>
-          <span className="text-base font-bold text-blue-900 tabular-nums">
+        <div className="mt-auto flex items-center justify-between rounded-[9px] border border-blue-100 bg-blue-50 px-[9px] py-[6px]">
+          <span className="text-[9.5px] font-bold uppercase leading-none tracking-[0.4px] text-blue-700">Sell price (inc tax)</span>
+          <span className="text-[14px] font-bold leading-none text-blue-900 tabular-nums">
             {formatMoney(p.computed.sellingIncTax)} <Unit>{base}</Unit>
           </span>
         </div>
@@ -129,38 +121,44 @@ function PricingActions({ p, embedded }: { p: PricingMarginPanelInner; embedded?
   // is a distinct, one-off action neither Save nor Next performs.
   if (embedded) {
     return (
-      <div className="flex gap-2">
-        <ActionButton onClick={p.requestUsePrice} icon={<Tag />} label="Use price" primary />
+      <div className="flex gap-[6px]">
+        <ActionButton onClick={p.requestUsePrice} icon={<Tag className="h-3 w-3" />} label="Use price" primary />
       </div>
     );
   }
   return (
-    <div className="flex gap-2">
-      <ActionButton onClick={() => p.savePricing()} icon={<Check />} label="Save" primary disabled={!p.dirty} />
-      <ActionButton onClick={p.requestUsePrice} icon={<Tag />} label="Use price" />
+    <div className="flex gap-[6px]">
+      <ActionButton onClick={() => p.savePricing()} icon={<Check className="h-3 w-3" />} label="Save" primary disabled={!p.dirty} />
+      <ActionButton onClick={p.requestUsePrice} icon={<Tag className="h-3 w-3" />} label="Use price" />
     </div>
   );
 }
 
+/** `.btn.xs` — 22px-tall action button, shared by this panel's footer and the Product details
+ * heading's Save action. `compact` shrinks it for tight header slots (no stretch, less padding). */
 export function ActionButton({
   onClick,
   icon,
   label,
   primary,
   disabled,
+  compact,
 }: {
   onClick: () => void;
   icon: React.ReactNode;
   label: string;
   primary?: boolean;
   disabled?: boolean;
+  compact?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-1.5 text-[13px] font-semibold transition-colors duration-150 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
+      className={`flex items-center justify-center gap-1 rounded-[6px] text-[10px] font-bold leading-none transition-colors duration-150 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
+        compact ? 'h-[20px] flex-none px-2' : 'h-[22px] flex-1 px-[6px]'
+      } ${
         primary ? 'bg-blue-600 text-white hover:bg-blue-700' : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
       }`}
     >
@@ -173,18 +171,18 @@ export function ActionButton({
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-2">
-      <span className="text-[13px] font-medium text-gray-600">{label}</span>
+      <span className="text-[11.5px] font-medium leading-none text-gray-700">{label}</span>
       {children}
     </div>
   );
 }
 
 function Value({ children }: { children: React.ReactNode }) {
-  return <span className="text-[13px] font-semibold text-gray-900 tabular-nums">{children}</span>;
+  return <span className="text-[11.5px] font-bold leading-none text-gray-900 tabular-nums">{children}</span>;
 }
 
 function Unit({ children }: { children: React.ReactNode }) {
-  return <span className="text-[11px] font-medium text-gray-400">{children}</span>;
+  return <span className="text-[10px] font-medium leading-none text-gray-400">{children}</span>;
 }
 
 function NumberInput({
@@ -192,12 +190,18 @@ function NumberInput({
   onChange,
   step,
   suffix,
+  width,
 }: {
   value: string;
   onChange: React.ChangeEventHandler<HTMLInputElement>;
   step: string;
   suffix: string;
+  width?: string;
 }) {
+  // A 1-char suffix ("%") needs far less reserved gutter than a 3-4 letter currency code
+  // ("AUD"/"USD"/"rate") — a uniform gutter clipped 3-digit values (e.g. a 150% margin) against
+  // a short suffix, so it's sized per suffix instead of one fixed value for every field.
+  const gutter = suffix.length <= 1 ? 'pr-[16px]' : 'pr-[22px]';
   return (
     <div className="relative">
       <input
@@ -206,9 +210,9 @@ function NumberInput({
         value={value}
         onChange={onChange}
         aria-label={suffix}
-        className="w-28 rounded-lg border border-gray-300 py-1 pl-2 pr-9 text-right text-[13px] tabular-nums outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+        className={`h-[22px] ${width ?? 'w-[62px]'} rounded-[7px] border border-gray-300 pl-[6px] ${gutter} text-right text-[10.5px] leading-none tabular-nums outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100`}
       />
-      <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-gray-400">{suffix}</span>
+      <span className="pointer-events-none absolute right-[6px] top-1/2 -translate-y-1/2 text-[9px] leading-none text-gray-400">{suffix}</span>
     </div>
   );
 }

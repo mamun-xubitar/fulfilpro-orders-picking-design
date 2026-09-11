@@ -52,7 +52,7 @@ export default function InventoryModals(p: InventoryPage) {
                   gallery.step(-1);
                 }}
                 aria-label="Previous image"
-                className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-2.5 text-white transition-colors duration-150 hover:bg-white/20 cursor-pointer"
+                className="absolute left-4 top-1/2 z-10 -translate-y-1/2 rounded-full border border-white/40 bg-white/85 p-2.5 text-gray-900 shadow-lg backdrop-blur-sm transition-colors duration-150 hover:bg-white cursor-pointer"
               >
                 <ChevronLeft className="h-6 w-6" />
               </button>
@@ -63,7 +63,7 @@ export default function InventoryModals(p: InventoryPage) {
                   gallery.step(1);
                 }}
                 aria-label="Next image"
-                className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-2.5 text-white transition-colors duration-150 hover:bg-white/20 cursor-pointer"
+                className="absolute right-4 top-1/2 z-10 -translate-y-1/2 rounded-full border border-white/40 bg-white/85 p-2.5 text-gray-900 shadow-lg backdrop-blur-sm transition-colors duration-150 hover:bg-white cursor-pointer"
               >
                 <ChevronRight className="h-6 w-6" />
               </button>
@@ -101,19 +101,7 @@ export default function InventoryModals(p: InventoryPage) {
         <BulkUpdateStoresModal product={p.product} storeOptions={p.storeListings.listings} publish={p.storePublish} />
       )}
 
-      {pricing.confirmUse && (
-        <ModalShell
-          title="Apply this price?"
-          onClose={pricing.cancelUsePrice}
-          footer={<ModalActions onCancel={pricing.cancelUsePrice} onConfirm={pricing.confirmUsePrice} confirmLabel="Apply to all variants" disabled={pricing.applying} />}
-        >
-          <p className="text-sm text-gray-600">Every variant of this product will be updated to:</p>
-          <dl className="mt-3 space-y-2">
-            <SummaryRow label="Sell price (inc tax)" value={`${formatMoney(pricing.confirmUse.sellingIncTax)} ${p.globals.baseCurrency}`} />
-            <SummaryRow label="Buy price (landed)" value={`${formatMoney(pricing.confirmUse.totalBuying)} ${p.globals.baseCurrency}`} />
-          </dl>
-        </ModalShell>
-      )}
+      {pricing.confirmUse && <ApplyPriceModal p={p} />}
 
       {matrix.deleteTarget && (
         <ModalShell
@@ -128,46 +116,10 @@ export default function InventoryModals(p: InventoryPage) {
         </ModalShell>
       )}
 
-      {matrix.bulkDeleteOpen && (
-        <ModalShell
-          title="Delete selected variants?"
-          onClose={matrix.cancelBulkDelete}
-          footer={
-            <ModalActions
-              onCancel={matrix.cancelBulkDelete}
-              onConfirm={matrix.confirmBulkDelete}
-              confirmLabel={matrix.bulkDeleting ? 'Deleting...' : 'Delete variants'}
-              disabled={matrix.bulkDeleting}
-              danger
-            />
-          }
-        >
-          <p className="text-sm text-gray-600">
-            This removes <strong className="font-semibold text-gray-900">{matrix.selectedIds.size}</strong> selected variant
-            {matrix.selectedIds.size === 1 ? '' : 's'} and their stock history. This can&apos;t be undone.
-          </p>
-        </ModalShell>
-      )}
+      {matrix.bulkDeleteOpen && <BulkDeleteVariantsModal p={p} />}
 
       {p.deleteProductOpen && p.product && (
-        <ModalShell
-          title="Delete this product?"
-          onClose={p.closeDeleteProduct}
-          footer={
-            <ModalActions
-              onCancel={p.closeDeleteProduct}
-              onConfirm={p.confirmDeleteProduct}
-              confirmLabel={p.deletingProduct ? 'Deleting...' : 'Delete product'}
-              disabled={p.deletingProduct}
-              danger
-            />
-          }
-        >
-          <p className="text-sm text-gray-600">
-            This permanently removes <strong className="font-semibold text-gray-900">{p.product.name}</strong>, every variant, image and
-            history entry attached to it. This can&apos;t be undone.
-          </p>
-        </ModalShell>
+        <DeleteProductModal p={p} />
       )}
 
       <PoModals po={p.po} variants={variants} />
@@ -180,11 +132,115 @@ export default function InventoryModals(p: InventoryPage) {
   );
 }
 
+function BulkDeleteVariantsModal({ p }: { p: InventoryPage }) {
+  const { matrix } = p;
+  return (
+    <ModalShell
+      title="Delete selected variants?"
+      onClose={matrix.cancelBulkDelete}
+      footer={
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={matrix.cancelBulkDelete}
+            className="h-[22px] flex-1 rounded-[6px] border border-gray-300 bg-white px-[6px] text-[10px] font-bold leading-none text-gray-600 transition-colors duration-150 hover:bg-gray-50 cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={matrix.confirmBulkDelete}
+            disabled={matrix.bulkDeleting}
+            className="h-[22px] flex-1 rounded-[6px] bg-red-600 px-[6px] text-[10px] font-bold leading-none text-white transition-colors duration-150 hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+          >
+            {matrix.bulkDeleting ? 'Deleting...' : 'Delete variants'}
+          </button>
+        </div>
+      }
+    >
+      <p className="text-[12px] text-gray-600">
+        This removes <strong className="font-semibold text-gray-900">{matrix.selectedIds.size}</strong> selected variant
+        {matrix.selectedIds.size === 1 ? '' : 's'} and their stock history. This can&apos;t be undone.
+      </p>
+    </ModalShell>
+  );
+}
+
+function DeleteProductModal({ p }: { p: InventoryPage }) {
+  if (!p.product) return null;
+  return (
+    <ModalShell
+      title="Delete this product?"
+      onClose={p.closeDeleteProduct}
+      footer={
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={p.closeDeleteProduct}
+            className="h-[22px] flex-1 rounded-[6px] border border-gray-300 bg-white px-[6px] text-[10px] font-bold leading-none text-gray-600 transition-colors duration-150 hover:bg-gray-50 cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={p.confirmDeleteProduct}
+            disabled={p.deletingProduct}
+            className="h-[22px] flex-1 rounded-[6px] bg-red-600 px-[6px] text-[10px] font-bold leading-none text-white transition-colors duration-150 hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+          >
+            {p.deletingProduct ? 'Deleting...' : 'Delete product'}
+          </button>
+        </div>
+      }
+    >
+      <p className="text-[12px] text-gray-600">
+        This permanently removes <strong className="font-semibold text-gray-900">{p.product.name}</strong>, every variant, image and
+        history entry attached to it. This can&apos;t be undone.
+      </p>
+    </ModalShell>
+  );
+}
+
+function ApplyPriceModal({ p }: { p: InventoryPage }) {
+  const { pricing } = p;
+  if (!pricing.confirmUse) return null;
+  return (
+    <ModalShell
+      title="Apply this price?"
+      onClose={pricing.cancelUsePrice}
+      footer={
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={pricing.cancelUsePrice}
+            className="h-[22px] flex-1 rounded-[6px] border border-gray-300 bg-white px-[6px] text-[10px] font-bold leading-none text-gray-600 transition-colors duration-150 hover:bg-gray-50 cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={pricing.confirmUsePrice}
+            disabled={pricing.applying}
+            className="h-[22px] flex-1 rounded-[6px] bg-blue-600 px-[6px] text-[10px] font-bold leading-none text-white transition-colors duration-150 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+          >
+            Apply to all variants
+          </button>
+        </div>
+      }
+    >
+      <p className="text-[12px] text-gray-600">Every variant of this product will be updated to:</p>
+      <dl className="mt-2 space-y-1.5">
+        <SummaryRow label="Sell price (inc tax)" value={`${formatMoney(pricing.confirmUse.sellingIncTax)} ${p.globals.baseCurrency}`} />
+        <SummaryRow label="Buy price (landed)" value={`${formatMoney(pricing.confirmUse.totalBuying)} ${p.globals.baseCurrency}`} />
+      </dl>
+    </ModalShell>
+  );
+}
+
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2">
-      <dt className="text-[13px] font-medium text-gray-600">{label}</dt>
-      <dd className="text-[13px] font-bold text-gray-900 tabular-nums">{value}</dd>
+    <div className="flex items-center justify-between rounded-[7px] bg-gray-50 px-2 py-1.5">
+      <dt className="text-[11px] font-medium text-gray-600">{label}</dt>
+      <dd className="text-[11px] font-bold text-gray-900 tabular-nums">{value}</dd>
     </div>
   );
 }

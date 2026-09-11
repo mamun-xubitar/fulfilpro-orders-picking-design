@@ -7,13 +7,14 @@ import { FieldLabel } from './ProductFieldRows';
 import RichTextField from './RichTextField';
 import { Refresh, Sparkles } from './icons';
 
-/** One dark palette shared by every AI control here, so the standalone generate button and the
- * Original / Generated / Regenerate group read as the same feature. */
+/** Gray-bordered AI control sized to sit at the right end of the editor toolbar
+ * (same 24px footprint as the formatting buttons) — neutral deep gray so it matches
+ * the prototype's monochrome toolbar. */
 const AI_BUTTON =
-  'flex h-7 w-7 items-center justify-center rounded-md border border-transparent bg-gradient-to-br from-violet-600 to-indigo-600 text-white shadow-sm transition-colors duration-150 hover:from-violet-700 hover:to-indigo-700 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer';
+  'flex h-6 w-6 items-center justify-center rounded-md border border-gray-300 bg-white text-gray-700 shadow-sm transition-colors duration-150 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer';
 const AI_GROUP = 'flex items-center gap-0.5 rounded-lg border border-gray-300 bg-gray-50 p-0.5';
 const AI_GROUP_ICON_BUTTON =
-  'flex h-6 w-6 items-center justify-center rounded-md text-indigo-600 transition-colors duration-150 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer';
+  'flex h-6 w-6 items-center justify-center rounded-md text-gray-700 transition-colors duration-150 hover:bg-white disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer';
 
 type AiDescriptionFieldProps = {
   /** The live HTML value this field edits — the caller's own draft/form field. */
@@ -122,57 +123,57 @@ export default function AiDescriptionField({ value, onChange, buildRequestData, 
     });
   };
 
+  const toolbarEnd = !effectiveAi ? (
+    <button
+      type="button"
+      onClick={generate}
+      disabled={aiGenerating}
+      title="Generate a description with AI"
+      aria-label="Generate a description with AI"
+      className={AI_BUTTON}
+    >
+      {aiGenerating ? (
+        <span className="h-3 w-3 animate-spin rounded-full border-2 border-gray-300 border-t-gray-700" />
+      ) : (
+        <Sparkles className="h-3.5 w-3.5" />
+      )}
+    </button>
+  ) : (
+    <div className={AI_GROUP}>
+      <SegmentButton active={effectiveAi.active === 'original'} disabled={aiGenerating} onClick={() => setActive('original')}>
+        Original
+      </SegmentButton>
+      <SegmentButton active={effectiveAi.active === 'generated'} disabled={aiGenerating} onClick={() => setActive('generated')}>
+        Generated
+      </SegmentButton>
+      <button
+        type="button"
+        onClick={regenerate}
+        disabled={aiGenerating}
+        title="Regenerate"
+        aria-label="Regenerate description"
+        className={AI_GROUP_ICON_BUTTON}
+      >
+        {aiGenerating ? (
+          <span className="h-3 w-3 animate-spin rounded-full border-2 border-gray-300 border-t-gray-700" />
+        ) : (
+          <Refresh className="h-3.5 w-3.5" />
+        )}
+      </button>
+    </div>
+  );
+
   return (
     <div className="min-w-0">
-      <div className="mb-1 flex items-center justify-between gap-2">
+      <div className="mb-1">
         <FieldLabel>Description</FieldLabel>
-        {!effectiveAi && (
-          <button
-            type="button"
-            onClick={generate}
-            disabled={aiGenerating}
-            title="Generate a description with AI"
-            aria-label="Generate a description with AI"
-            className={AI_BUTTON}
-          >
-            {aiGenerating ? (
-              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-            ) : (
-              <Sparkles className="h-4 w-4" />
-            )}
-          </button>
-        )}
-        {effectiveAi && (
-          <div className={AI_GROUP}>
-            <SegmentButton active={effectiveAi.active === 'original'} disabled={aiGenerating} onClick={() => setActive('original')}>
-              Original
-            </SegmentButton>
-            <SegmentButton active={effectiveAi.active === 'generated'} disabled={aiGenerating} onClick={() => setActive('generated')}>
-              Generated
-            </SegmentButton>
-            <button
-              type="button"
-              onClick={regenerate}
-              disabled={aiGenerating}
-              title="Regenerate"
-              aria-label="Regenerate description"
-              className={AI_GROUP_ICON_BUTTON}
-            >
-              {aiGenerating ? (
-                <span className="h-3 w-3 animate-spin rounded-full border-2 border-indigo-200 border-t-indigo-600" />
-              ) : (
-                <Refresh className="h-3.5 w-3.5" />
-              )}
-            </button>
-          </div>
-        )}
       </div>
       <div className="relative">
-        <RichTextField label="Description" value={value} onChange={onChange} hideLabel />
+        <RichTextField label="Description" value={value} onChange={onChange} hideLabel toolbarEnd={toolbarEnd} />
         {aiGenerating && (
           <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-white/60">
             <div className="flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-[12px] font-semibold text-gray-600 shadow-sm">
-              <span className="h-3 w-3 animate-pulse rounded-full bg-indigo-500" />
+              <span className="h-3 w-3 animate-pulse rounded-full bg-gray-500" />
               Generating…
             </div>
           </div>
@@ -200,7 +201,7 @@ function SegmentButton({
       disabled={disabled}
       aria-pressed={active}
       className={`rounded-md px-2 py-1 text-[11px] font-semibold transition-colors duration-150 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
-        active ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-600 hover:bg-white hover:text-gray-900'
+        active ? 'bg-gray-900 text-white shadow-sm' : 'text-gray-600 hover:bg-white hover:text-gray-900'
       }`}
     >
       {children}

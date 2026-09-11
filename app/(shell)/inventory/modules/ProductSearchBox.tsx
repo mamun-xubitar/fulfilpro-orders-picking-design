@@ -18,8 +18,8 @@ export default function ProductSearchBox({ value, onChange, open, setOpen, resul
   const showPanel = open && value.trim().length > 0;
 
   return (
-    <div ref={containerRef} className="relative min-w-56 flex-1">
-      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+    <div ref={containerRef} className="relative min-w-40 flex-1">
+      <Search className="pointer-events-none absolute left-[8px] top-1/2 h-3 w-3 -translate-y-1/2 text-gray-400" />
       <input
         type="search"
         value={value}
@@ -36,9 +36,9 @@ export default function ProductSearchBox({ value, onChange, open, setOpen, resul
             setOpen(false);
           }
         }}
-        placeholder="Search products by name, SKU, barcode…"
+        placeholder="Search products, SKU, barcode…"
         aria-label="Search products"
-        className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm text-gray-800 shadow-sm outline-none placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+        className="h-[24px] w-full rounded-[7px] border border-gray-300 bg-white pl-[24px] pr-[8px] text-[11px] leading-none text-gray-800 shadow-sm outline-none placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
       />
 
       {showPanel && (

@@ -1,6 +1,6 @@
 'use client';
 
-import { ModalActions, ModalShell } from '@/components/ModalShell';
+import { ModalShell } from '@/components/ModalShell';
 import FilePicker from './FilePicker';
 import PoImportPreviewTable from './PoImportPreviewTable';
 import ProductImportPreviewTable from './ProductImportPreviewTable';
@@ -27,51 +27,62 @@ export default function ImportModal({ importExport: ie }: { importExport: Return
       extraWide
       footer={
         preview ? (
-          <ModalActions
-            onCancel={ie.closeImport}
-            onConfirm={ie.commitImport}
-            confirmLabel={ie.importing ? 'Importing...' : confirmLabel}
-            disabled={ie.importing || blockedByOverwrite}
-          />
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={ie.closeImport}
+              className="h-[22px] flex-1 rounded-[6px] border border-gray-300 bg-white px-[6px] text-[10px] font-bold leading-none text-gray-600 transition-colors duration-150 hover:bg-gray-50 cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={ie.commitImport}
+              disabled={ie.importing || blockedByOverwrite}
+              className="h-[22px] flex-1 rounded-[6px] bg-blue-600 px-[6px] text-[10px] font-bold leading-none text-white transition-colors duration-150 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+            >
+              {ie.importing ? 'Importing...' : confirmLabel}
+            </button>
+          </div>
         ) : undefined
       }
     >
-      <div className="space-y-3">
-        <p className="text-sm text-gray-600">
+      <div className="space-y-2">
+        <p className="text-[12px] text-gray-600">
           Drop a Shopify product CSV or a purchase-order CSV — the file type is detected automatically. A product CSV updates this product&apos;s details, main image and
           variants/stock matrix. A PO CSV inserts or updates purchase orders for this product (matched by PO number) and their line items; the Incoming column updates
           automatically. Pricing (buying price, freight, margin, tax) and the reorder Trigger aren&apos;t touched by import.
         </p>
-        <div className="space-y-1.5 rounded-lg border border-gray-200 bg-gray-50 p-3">
-          <label className="flex items-start gap-2 text-sm text-gray-700">
+        <div className="space-y-1.5 rounded-[7px] border border-gray-200 bg-gray-50 p-2">
+          <label className="flex items-start gap-2 text-[11px] leading-snug text-gray-700">
             <input
               type="checkbox"
               checked={ie.overwrite}
               onChange={(e) => ie.setOverwrite(e.target.checked)}
-              className="mt-0.5 h-3.5 w-3.5 cursor-pointer accent-blue-600"
+              className="mt-0.5 h-3 w-3 cursor-pointer accent-blue-600"
             />
             <span>
               <span className="font-medium">Overwrite this product if the file&apos;s handle matches.</span> Checked: this product&apos;s values are
               replaced by the file. Unchecked: the import is skipped instead. <span className="text-gray-400">(Product CSV only.)</span>
             </span>
           </label>
-          <label className="flex items-start gap-2 text-sm text-gray-700">
+          <label className="flex items-start gap-2 text-[11px] leading-snug text-gray-700">
             <input
               type="checkbox"
               checked={ie.markVerified}
               onChange={(e) => ie.setMarkVerified(e.target.checked)}
-              className="mt-0.5 h-3.5 w-3.5 cursor-pointer accent-blue-600"
+              className="mt-0.5 h-3 w-3 cursor-pointer accent-blue-600"
             />
             <span>
               <span className="font-medium">Mark this product as verified.</span> <span className="text-gray-400">(Product CSV only.)</span>
             </span>
           </label>
-          <div className="flex items-center gap-2 pt-1 text-sm text-gray-700">
+          <div className="flex items-center gap-2 pt-1 text-[11px] text-gray-700">
             <span className="font-medium">Attribute new purchase orders to</span>
             <select
               value={ie.poSupplierId}
               onChange={(e) => ie.setPoSupplierId(e.target.value)}
-              className="rounded-lg border border-gray-300 bg-white px-2 py-1 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 cursor-pointer"
+              className="h-[22px] rounded-[7px] border border-gray-300 bg-white px-[6px] text-[11px] leading-none outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 cursor-pointer"
             >
               {ie.poSupplierOptions.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -85,11 +96,11 @@ export default function ImportModal({ importExport: ie }: { importExport: Return
 
         <FilePicker onSelect={(file) => void ie.handleFile(file)} fileName={ie.pendingFile?.name} />
 
-        {ie.previewing && <p className="text-sm text-gray-400">Reading file…</p>}
+        {ie.previewing && <p className="text-[11px] text-gray-400">Reading file…</p>}
 
         {blockedByOverwrite && (
-          <p className="text-sm text-red-600">
-            This product already exists — tick &quot;Overwrite this product if the file&apos;s handle matches&quot; to replace its values.
+          <p className="text-[11px] text-red-600">
+            This product already exists — tick &quot;Overwrite this product if the file&apos;s handle matches&quot; to replace their values.
           </p>
         )}
 

@@ -100,7 +100,7 @@ export default function PresetComboField({
     <div>
       <FieldLabel>{label}</FieldLabel>
       {editing ? (
-        <div className="space-y-1.5">
+        <div className="space-y-[4px]">
           <div className="relative" ref={containerRef}>
             <input
               type="text"
@@ -110,7 +110,7 @@ export default function PresetComboField({
               onClick={() => setOpen(true)}
               placeholder={placeholder}
               aria-label={label}
-              className="w-full rounded-lg border border-gray-300 px-2.5 py-2 text-[13px] text-gray-900 outline-none placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              className="h-[24px] w-full rounded-[7px] border border-gray-300 px-[6px] text-[11px] leading-none text-gray-900 outline-none placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
             />
             {open && (
               <PresetPicker
@@ -124,11 +124,11 @@ export default function PresetComboField({
               />
             )}
           </div>
-          {displayError && <p className="mt-1 text-xs text-red-600">{displayError}</p>}
+          {displayError && <p className="mt-[2px] text-[10px] leading-tight text-red-600">{displayError}</p>}
           {!displayError && willCreateGroup && (
-            <p className="mt-1 text-xs text-gray-500">A new preset group ({groupLabel(names)}) will be saved on Save.</p>
+            <p className="mt-[2px] text-[10px] leading-tight text-gray-500">A new preset group ({groupLabel(names)}) will be saved on Save.</p>
           )}
-          <div className="flex flex-wrap gap-1.5">{renderChips(entries)}</div>
+          <div className="flex flex-wrap gap-[4px]">{renderChips(entries)}</div>
         </div>
       ) : (
         renderReadOnly()

@@ -40,12 +40,12 @@ export default function ProductSizesField({ value, sizes, editing, onChange, onV
   );
 }
 
-function SizeChips({ sizes }: { sizes: string[] }) {
+export function SizeChips({ sizes }: { sizes: string[] }) {
   const sorted = [...sizes].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
   return (
     <>
       {sorted.map((size, index) => (
-        <span key={`${size}-${index}`} className="rounded-md border border-gray-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-gray-700">
+        <span key={`${size}-${index}`} className="rounded-full border border-gray-200 bg-white px-[5px] py-[1px] text-[9px] font-semibold leading-none text-gray-700">
           {capitaliseFirst(size)}
         </span>
       ))}

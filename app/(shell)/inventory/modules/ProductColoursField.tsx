@@ -41,7 +41,7 @@ export default function ProductColoursField({ value, colours, editing, onChange,
   );
 }
 
-function ColourChips({ colours }: { colours: ColourOption[] }) {
+export function ColourChips({ colours }: { colours: ColourOption[] }) {
   const sorted = [...colours].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
   return (
     <>
@@ -50,10 +50,10 @@ function ColourChips({ colours }: { colours: ColourOption[] }) {
         return (
           <span
             key={`${colour.name}-${index}`}
-            className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-gray-700"
+            className="inline-flex items-center gap-[3px] rounded-full border border-gray-200 bg-white px-[5px] py-[1px] text-[9px] font-semibold leading-none text-gray-700"
           >
             <span
-              className={`h-2 w-2 rounded-full ${recognized ? 'ring-1 ring-black/10' : 'border border-dashed border-amber-400'}`}
+              className={`h-[6px] w-[6px] rounded-full ${recognized ? 'ring-1 ring-black/10' : 'border border-dashed border-amber-400'}`}
               style={{ backgroundColor: resolveSwatch(colour.color) }}
               title={recognized ? undefined : `"${colour.color}" isn't a recognized colour — showing a placeholder swatch`}
             />

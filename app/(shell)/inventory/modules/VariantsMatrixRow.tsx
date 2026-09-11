@@ -54,9 +54,9 @@ function VariantsMatrixRow({
 
   return (
     <tr className={`border-b border-gray-100 last:border-0 transition-colors duration-150 ${style.row} ${selected ? 'ring-1 ring-inset ring-blue-300' : ''}`}>
-      <td className="relative py-2 pl-4 pr-2">
+      <td className="relative px-[4px] py-0 pl-[6px]">
         <span className={`absolute left-0 top-0 h-full w-1 ${style.bar}`} aria-hidden="true" />
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-[4px]">
           <SelectCheckbox name={name} selected={selected} onToggleSelect={() => onToggleSelect(variant.id)} />
           <ColourCell value={variant.colour} colours={colours} swatch={swatch} label="Colour" onChange={(colour) => set({ colour })} />
         </div>
@@ -86,8 +86,8 @@ function VariantsMatrixRow({
       <IncomingCell lots={variant.incomingLots} />
       {showAllColumns && <NumCell value={variant.trigger} label={`Reorder trigger for ${name}`} onChange={(trigger) => set({ trigger })} />}
 
-      <td className="px-2 py-2 text-center">
-        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${style.badge}`}>
+      <td className="px-[4px] py-0 text-center">
+        <span className={`inline-flex items-center whitespace-nowrap rounded-full border px-[6px] py-[1px] text-[9px] font-bold uppercase leading-none tracking-[0.4px] ${style.badge}`}>
           {style.label}
         </span>
       </td>
@@ -97,25 +97,25 @@ function VariantsMatrixRow({
 
       <Num value={formatCurrencyValue(stockValue)} bold />
 
-      <td className="py-2 pl-2 pr-4">
+      <td className="px-[4px] py-0 pr-[6px]">
         {/* Fixed min-width so a row doesn't jitter sideways the moment it goes dirty. */}
-        <div className="flex min-w-[6.5rem] items-center justify-end gap-1">
+        <div className="flex min-w-[4rem] items-center justify-end gap-[4px]">
           {dirty && (
             <>
               <RowAction label={`Discard changes to ${name}`} disabled={saving} onClick={() => onRevert(variant.id)}>
-                <Close className="h-3.5 w-3.5" />
+                <Close className="h-3 w-3" />
               </RowAction>
               <RowAction label={`Save ${name}`} primary disabled={saving} onClick={() => onSave(variant.id)}>
                 {saving ? (
-                  <span className="block h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                  <span className="block h-3 w-3 animate-spin rounded-full border-2 border-white/40 border-t-white" />
                 ) : (
-                  <Check className="h-3.5 w-3.5" />
+                  <Check className="h-3 w-3" />
                 )}
               </RowAction>
             </>
           )}
           <RowAction label={`Delete ${variant.sku ?? 'variant'}`} danger onClick={() => onDelete(variant)}>
-            <Trash className="h-3.5 w-3.5" />
+            <Trash className="h-3 w-3" />
           </RowAction>
         </div>
       </td>
@@ -130,7 +130,7 @@ function SelectCheckbox({ name, selected, onToggleSelect }: { name: string; sele
       checked={selected}
       onChange={onToggleSelect}
       aria-label={`Select ${name}`}
-      className="h-3.5 w-3.5 cursor-pointer accent-blue-600"
+      className="h-3 w-3 cursor-pointer accent-blue-600"
     />
   );
 }

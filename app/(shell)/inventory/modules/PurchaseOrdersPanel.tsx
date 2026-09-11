@@ -16,39 +16,42 @@ export const STATUS_BADGES: Record<string, string> = {
 
 type PurchaseOrdersPanelProps = { po: ReturnType<typeof usePurchaseOrder> };
 
+/** Compact card for the bottom five-up row (design 6) — the same PO list and Receive action as
+ * before, sized to match its four siblings (Stocktake / Adjustments / Import-export / Recent
+ * activity) instead of the old full-width strip. */
 export default function PurchaseOrdersPanel({ po }: PurchaseOrdersPanelProps) {
   return (
-    <section className="rounded-xl border border-gray-200 bg-white shadow-sm">
-      <PanelHeading icon={<Clipboard className="h-4 w-4" />} title="Purchase orders" />
-      <div className="p-4">
+    <section className="flex min-h-0 flex-col rounded-[10px] border border-gray-200 bg-white shadow-[0_1px_2px_0_rgb(0_0_0/0.05)]">
+      <PanelHeading icon={<Clipboard className="h-3 w-3" />} title="Purchase orders" />
+      <div className="min-h-0 flex-1 overflow-y-auto p-[6px]">
         {po.loadingList ? (
-          <p className="py-6 text-center text-xs text-gray-400">Loading…</p>
+          <p className="py-3 text-center text-[10px] text-gray-400">Loading…</p>
         ) : po.purchaseOrders.length === 0 ? (
-          <p className="py-6 text-center text-xs text-gray-400">No purchase orders yet for this product.</p>
+          <p className="py-3 text-center text-[10px] text-gray-400">No purchase orders yet.</p>
         ) : (
-          <ul className="divide-y divide-gray-100">
+          <ul className="space-y-[4px]">
             {po.purchaseOrders.map((row) => {
               const outstanding = row.items.some((item) => item.receivedQuantity < item.quantity);
               return (
-                <li key={row.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
+                <li key={row.id} className="flex items-center justify-between gap-[6px]">
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[13px] font-semibold text-gray-900">{formatPoNumber(row.number)}</span>
-                      {row.referenceNumber && <span className="text-[11px] text-gray-400">· Ref {row.referenceNumber}</span>}
-                      <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${STATUS_BADGES[row.status]}`}>
+                    <div className="flex items-center gap-[4px]">
+                      <span className="text-[10px] font-bold leading-none text-gray-900">{formatPoNumber(row.number)}</span>
+                      <span
+                        className={`inline-flex items-center whitespace-nowrap rounded-full border px-[5px] py-[1px] text-[8px] font-bold uppercase leading-none tracking-[0.4px] ${STATUS_BADGES[row.status]}`}
+                      >
                         {row.status.replace('_', ' ')}
                       </span>
                     </div>
-                    <p className="mt-0.5 text-[11px] text-gray-400">
-                      {row.items.length} variant{row.items.length === 1 ? '' : 's'} · created {formatDate(row.createdAt)}
-                      {row.deliveryDate ? ` · due ${formatDate(row.deliveryDate)}` : ''}
+                    <p className="truncate text-[9px] leading-tight text-gray-400">
+                      {row.items.length} variant{row.items.length === 1 ? '' : 's'} · {formatDate(row.createdAt)}
                     </p>
                   </div>
                   {outstanding && row.status !== 'CANCELLED' && (
                     <button
                       type="button"
                       onClick={() => po.openReceive(row)}
-                      className="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white transition-colors duration-150 hover:bg-emerald-700 cursor-pointer"
+                      className="h-[20px] shrink-0 rounded-[6px] bg-emerald-600 px-[6px] text-[9px] font-bold leading-none text-white transition-colors duration-150 hover:bg-emerald-700 cursor-pointer"
                     >
                       Receive
                     </button>

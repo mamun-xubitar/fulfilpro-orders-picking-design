@@ -52,10 +52,24 @@ export function useProductPricing({ product, globals, storeListings, onSaved }: 
 
   const computed = useMemo(() => computePricing(pricingFormToInputs(form)), [form]);
 
-  // What the per-store margin rows actually display: any explicit edit, falling back to each
-  // store's resolved margin (its own product-specific margin, or that store's global default)
-  // for a store that hasn't been touched yet.
-  const effectiveMarginDraft = useMemo(
+  // What the per-store margin *rows* actually display: only a product-specific override (this
+  // product's own saved margin for that store, or a local unsaved edit) — a store that merely
+  // inherits its global default renders no row until explicitly added via "+". Falling back to
+  // the global default here (as `resolvedMarginDraft` below still does) would make every
+  // globally-defaulted store appear "already set", which is exactly what per-store margin should
+  // *not* show on load.
+  const explicitMarginDraft = useMemo(
+    () => ({
+      ...Object.fromEntries(storeListings.listings.filter((l) => l.marginPercent !== null).map((l) => [l.storeId, l.marginPercent])),
+      ...(marginDraft ?? {}),
+    }),
+    [storeListings.listings, marginDraft]
+  );
+
+  // The price *chips* still need each store's fully-resolved margin (product override, else the
+  // store's global default) so a globally-defaulted store keeps showing the price that margin
+  // actually produces — this must never lose the global-default fallback the rows above drop.
+  const resolvedMarginDraft = useMemo(
     () => ({
       ...Object.fromEntries(storeListings.listings.map((l) => [l.storeId, resolveStoreMargin(l.marginPercent, l.storeDefaultMarginPercent)])),
       ...(marginDraft ?? {}),
@@ -154,7 +168,8 @@ export function useProductPricing({ product, globals, storeListings, onSaved }: 
       setMarginDraftState(null);
     },
     savePricing,
-    marginDraft: effectiveMarginDraft,
+    marginDraft: explicitMarginDraft,
+    resolvedMarginDraft,
     savingMargins,
     setPendingMargin: (storeId: string, marginPercent: number | null) =>
       setMarginDraftState((prev) => ({ ...(prev ?? {}), [storeId]: marginPercent })),

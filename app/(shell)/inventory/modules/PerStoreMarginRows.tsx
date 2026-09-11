@@ -2,15 +2,15 @@
 
 import { useState } from 'react';
 import { Close, Plus } from './icons';
-import { marginForStore } from './utils';
 import type { StoreListingResult } from './types';
+import { marginForStore } from './utils';
 
 type PerStoreMarginRowsProps = {
   listings: StoreListingResult[];
-  /** The panel's staged margin edits (storeId -> percent, or null to clear), already merged over
-   * each store's *resolved* margin (its own product-specific override, or that store's global
-   * default) for anything untouched — see useProductPricing.marginDraft. Not written to the
-   * server until the panel's own Save button. */
+  /** The panel's staged *explicit* margin overrides only (storeId -> percent, or null to clear) —
+   * a store that merely inherits its global default is not included here, so it renders no row
+   * until added via "+". See useProductPricing.marginDraft. Not written to the server until the
+   * panel's own Save button. */
   values: Record<string, number | null>;
   onChange: (storeId: string, marginPercent: number | null) => void;
 };
@@ -20,7 +20,9 @@ type PerStoreMarginRowsProps = {
  * Shopify listing (when it's already published there) once the panel is saved, independently of
  * the product-level Sell price above. It never enters `computePricing`, so adding or editing a row
  * here leaves Sell price (ex/inc tax) unchanged — only that one store's prices move, and only on
- * Save. The panel is always editable, so every row here is always a live input.
+ * Save. The panel is always editable, so every row here is always a live input. Starts with only
+ * the "+" control showing — a store inheriting its global default margin (with no product-specific
+ * override of its own) shows no row until one is explicitly added.
  */
 export default function PerStoreMarginRows({ listings, values, onChange }: PerStoreMarginRowsProps) {
   const [adding, setAdding] = useState(false);
@@ -29,9 +31,9 @@ export default function PerStoreMarginRows({ listings, values, onChange }: PerSt
   const available = listings.filter((l) => marginFor(l.storeId) === null);
 
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-0.75">
       <div className="flex items-center justify-between">
-        <span className="text-[13px] font-medium text-gray-600" title="Saved margins reprice that store on Shopify when you save this panel">
+        <span className="text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-gray-500" title="Saved margins reprice that store on Shopify when you save this panel">
           Per store margin
         </span>
         {available.length > 0 && (
@@ -39,15 +41,15 @@ export default function PerStoreMarginRows({ listings, values, onChange }: PerSt
             type="button"
             onClick={() => setAdding((v) => !v)}
             aria-label="Add per-store margin"
-            className="flex h-5 w-5 items-center justify-center rounded-full border border-gray-300 text-gray-500 transition-colors duration-150 hover:bg-gray-50 cursor-pointer"
+            className="flex h-[18px] w-[18px] items-center justify-center rounded-full border border-gray-300 text-gray-500 transition-colors duration-150 hover:bg-gray-50 cursor-pointer"
           >
-            <Plus className="h-3 w-3" />
+            <Plus className="h-2.5 w-2.5" />
           </button>
         )}
       </div>
 
       {adding && (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-[6px]">
           <select
             autoFocus
             defaultValue=""
@@ -59,7 +61,7 @@ export default function PerStoreMarginRows({ listings, values, onChange }: PerSt
               if (e.key === 'Escape') setAdding(false);
             }}
             aria-label="Select a store to add a margin for"
-            className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-[13px] outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 cursor-pointer"
+            className="h-[22px] w-full rounded-[7px] border border-gray-300 px-[6px] text-[10.5px] leading-none outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 cursor-pointer"
           >
             <option value="" disabled>
               Select a store…
@@ -74,26 +76,16 @@ export default function PerStoreMarginRows({ listings, values, onChange }: PerSt
             type="button"
             onClick={() => setAdding(false)}
             aria-label="Cancel adding per-store margin"
-            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-gray-400 transition-colors duration-150 hover:bg-gray-100 hover:text-gray-600 cursor-pointer"
+            className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full text-gray-400 transition-colors duration-150 hover:bg-gray-100 hover:text-gray-600 cursor-pointer"
           >
-            <Close className="h-3 w-3" />
+            <Close className="h-2.5 w-2.5" />
           </button>
         </div>
       )}
 
       {withMargin.map((l) => (
-        <div key={l.storeId} className="flex items-center gap-2">
-          <span className="min-w-0 flex-1 truncate text-[13px] text-gray-700">
-            {l.storeName}
-            {/* This row's value came from the store's global default, not a saved override for
-                this product — clearing it (×) has nothing product-specific to remove, so the
-                value simply keeps following the global default. */}
-            {l.marginPercent === null && (
-              <span className="ml-1.5 text-[11px] font-normal text-gray-400" title="Inherited from this store's global default margin">
-                (global)
-              </span>
-            )}
-          </span>
+        <div key={l.storeId} className="flex items-center gap-[6px]">
+          <span className="min-w-0 flex-1 truncate text-[11px] leading-none text-gray-700">{l.storeName}</span>
           <div className="relative">
             <input
               type="number"
@@ -105,17 +97,17 @@ export default function PerStoreMarginRows({ listings, values, onChange }: PerSt
                 if (Number.isFinite(value) && value >= 0) onChange(l.storeId, value);
               }}
               aria-label={`Margin for ${l.storeName}`}
-              className="w-20 rounded-lg border border-gray-300 py-1 pl-2 pr-6 text-right text-[13px] tabular-nums outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              className="h-[22px] w-[68px] rounded-[7px] border border-gray-300 pl-[6px] pr-[18px] text-right text-[10.5px] leading-none tabular-nums outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
             />
-            <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-gray-400">%</span>
+            <span className="pointer-events-none absolute right-[5px] top-1/2 -translate-y-1/2 text-[9px] leading-none text-gray-400">%</span>
           </div>
           <button
             type="button"
             onClick={() => onChange(l.storeId, null)}
             aria-label={`Remove margin for ${l.storeName}`}
-            className="flex h-5 w-5 items-center justify-center rounded-full text-gray-400 transition-colors duration-150 hover:bg-gray-100 hover:text-gray-600 cursor-pointer"
+            className="flex h-[18px] w-[18px] items-center justify-center rounded-full text-gray-400 transition-colors duration-150 hover:bg-gray-100 hover:text-gray-600 cursor-pointer"
           >
-            <Close className="h-3 w-3" />
+            <Close className="h-2.5 w-2.5" />
           </button>
         </div>
       ))}
