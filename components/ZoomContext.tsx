@@ -22,10 +22,9 @@ function clamp(value: number) {
  * deliberately set (see `MANUAL_KEY`) overrides this; an untouched level always tracks
  * the current viewport's breakpoint, on every visit. */
 function defaultForWidth(width: number): number {
-  if (width >= 2560) return 150;
-  if (width >= 1920) return 140;
-  if (width >= 1536) return 120;
-  if (width >= 1280) return 110;
+  if (width >= 2560) return 130;
+  if (width >= 1920) return 120;
+  if (width >= 1536) return 110;
   return 100;
 }
 
