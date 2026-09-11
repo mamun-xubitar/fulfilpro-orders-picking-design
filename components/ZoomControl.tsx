@@ -5,7 +5,7 @@ import { useZoom } from './ZoomContext';
 /** Compact zoom-out / reset-to-100% / zoom-in trio for the shell header, shown only on the
  * Inventory page (the only page that currently consumes `useZoom()`'s value). */
 export default function ZoomControl() {
-  const { zoomPercent, zoomIn, zoomOut, resetZoom } = useZoom();
+  const { zoomPercent, defaultZoom, zoomIn, zoomOut, resetZoom } = useZoom();
 
   return (
     <div role="group" aria-label="Page zoom" className="flex items-center overflow-hidden rounded-lg border border-gray-300 bg-white">
@@ -21,7 +21,7 @@ export default function ZoomControl() {
       <button
         type="button"
         onClick={resetZoom}
-        title="Reset zoom to 100% (Ctrl 0)"
+        title={`Reset zoom to ${defaultZoom}% (Ctrl 0)`}
         aria-label="Reset zoom"
         className="flex h-7 items-center gap-1 border-x border-gray-200 bg-gray-50 px-1.5 text-gray-600 hover:bg-gray-100 cursor-pointer"
       >
