@@ -1,6 +1,7 @@
 "use client";
 
 import { resolveSwatch } from "@/lib/inventory/colour";
+import GalleryThumbRow from "./GalleryThumbRow";
 import type { useProductImages } from "./hooks/useProductImages";
 import { Expand, Image as ImageIcon, Pencil } from "./icons";
 
@@ -10,6 +11,17 @@ type MainImagePanelProps = {
   onEditImages: () => void;
 };
 
+/** `.btn.xs` — 22px tall action button, used at the bottom of several panels. */
+export const BTN_XS =
+  "flex h-[22px] items-center justify-center gap-1 rounded-[6px] border border-gray-300 px-[6px] text-[10px] font-bold leading-none text-gray-700 transition-colors duration-150 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer";
+export const BTN_XS_PRIMARY =
+  "flex h-[22px] items-center justify-center gap-1 rounded-[6px] bg-blue-600 px-[6px] text-[10px] font-bold leading-none text-white transition-colors duration-150 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer";
+/** Shared footer action-row wrapper — border-top strip housing one or more `.btn.xs` buttons. */
+export const BTN_ROW = 'flex gap-[6px] border-t border-gray-100 p-[6px]';
+/** `.iconbtn.xs` — 22×22 icon-only button. */
+export const ICONBTN_XS =
+  "flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-[6px] border border-gray-300 text-gray-600 transition-colors duration-150 hover:bg-gray-50 cursor-pointer";
+
 export default function MainImagePanel({
   gallery,
   productName,
@@ -18,65 +30,21 @@ export default function MainImagePanel({
   const { images, tiles, active, activeKey, setActiveKey } = gallery;
 
   return (
-    <section className="flex min-w-0 flex-col rounded-xl border border-gray-200 bg-white shadow-sm">
+    <section className="flex min-w-0 flex-col rounded-[10px] border border-gray-200 bg-white shadow-[0_1px_2px_0_rgb(0_0_0/0.05)]">
       <PanelHeading
-        icon={<ImageIcon className="h-4 w-4" />}
+        icon={<ImageIcon className="h-3 w-3" />}
         title="Main image"
         meta={`${images.length} image${images.length === 1 ? "" : "s"}`}
       />
 
-      <div className="flex flex-1 gap-2 p-3">
-        {tiles.length > 0 && (
-          <div className="relative w-14 shrink-0 max-h-75">
-            <div className="thin-scroll absolute inset-0 space-y-2 overflow-y-auto pr-1">
-              {tiles.map((tile) => {
-                const isActive = tile.key === activeKey;
-                return (
-                  <button
-                    key={tile.key}
-                    type="button"
-                    onClick={() => setActiveKey(tile.key)}
-                    title={tile.label}
-                    aria-label={`Show ${tile.label}`}
-                    aria-pressed={isActive}
-                    className={`block w-full overflow-hidden rounded-lg border-2 transition-colors duration-150 cursor-pointer ${
-                      isActive
-                        ? "border-blue-600"
-                        : "border-transparent hover:border-gray-300"
-                    }`}
-                  >
-                    {tile.kind === "photo" ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={tile.image.url}
-                        alt={tile.image.altText ?? ""}
-                        className="aspect-square w-full object-cover"
-                      />
-                    ) : (
-                      <div
-                        className="flex aspect-square w-full items-center justify-center text-[9px] font-semibold text-white"
-                        style={{
-                          backgroundColor: resolveSwatch(tile.color),
-                          textShadow: "0 1px 2px rgba(0,0,0,0.35)",
-                        }}
-                      >
-                        {tile.colourName.slice(0, 3).toUpperCase()}
-                      </div>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        <div className="min-w-0 flex-1">
+      <div className="flex flex-col gap-[4px] p-[6px]">
+        <div className="min-w-0">
           <button
             type="button"
             onClick={gallery.openLightbox}
             disabled={!active}
             aria-label="Enlarge image"
-            className="flex aspect-square w-full items-center justify-center overflow-hidden rounded-xl border border-gray-200 bg-gray-50 disabled:cursor-default cursor-zoom-in"
+            className="flex aspect-square w-full items-center justify-center overflow-hidden rounded-[8px] border border-gray-200 bg-gray-50 disabled:cursor-default cursor-zoom-in"
           >
             {active ? (
               active.kind === "photo" ? (
@@ -107,25 +75,20 @@ export default function MainImagePanel({
             )}
           </button>
         </div>
+
+        {tiles.length > 0 && (
+          <GalleryThumbRow tiles={tiles} activeKey={activeKey} onSelect={setActiveKey} />
+        )}
       </div>
 
-      <div className="flex gap-2 border-t border-gray-100 p-3">
-        <button
-          type="button"
-          onClick={gallery.openLightbox}
-          disabled={!active}
-          className="px-2 flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-gray-300 py-1.5 text-[13px] font-semibold text-gray-700 transition-colors duration-150 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
-        >
-          <Expand className="min-w-4 h-4 w-4" />
+      <div className="flex gap-[4px] border-t border-gray-100 p-[6px]">
+        <button type="button" onClick={gallery.openLightbox} disabled={!active} className={`flex-1 ${BTN_XS}`}>
+          <Expand className="h-3 w-3 min-w-3" />
           Enlarge
         </button>
-        <button
-          type="button"
-          onClick={onEditImages}
-          className="px-2 flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-gray-300 py-1.5 text-[13px] font-semibold text-gray-700 transition-colors duration-150 hover:bg-gray-50 cursor-pointer"
-        >
-          <Pencil className="min-w-4 h-4 w-4" />
-          Edit images ({images.length})
+        <button type="button" onClick={onEditImages} className={`flex-1 ${BTN_XS}`}>
+          <Pencil className="h-3 w-3 min-w-3" />
+          Edit ({images.length})
         </button>
       </div>
     </section>
@@ -141,21 +104,16 @@ export function PanelHeading({
   icon: React.ReactNode;
   title: string;
   meta?: string;
-  /** An optional trailing control (e.g. a "+" button) rendered after the meta badge. */
   action?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between gap-2 border-b border-gray-100 px-4 py-3">
-      <div className="flex min-w-0 items-center gap-1.5 text-gray-400">
+    <div className="flex items-center justify-between gap-2 border-b border-gray-100 px-[8px] py-[3px]">
+      <div className="flex min-w-0 items-center gap-[5px] text-gray-400" title={title}>
         {icon}
-        <h3 className="truncate text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-          {title}
-        </h3>
+        <h3 className="truncate text-[9.5px] font-bold uppercase leading-none tracking-[0.5px] text-gray-500">{title}</h3>
       </div>
-      <div className="flex shrink-0 items-center gap-1.5">
-        {meta && (
-          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-600">{meta}</span>
-        )}
+      <div className="flex shrink-0 items-center gap-[5px]">
+        {meta && <span className="whitespace-nowrap rounded-full bg-gray-100 px-[6px] py-[1px] text-[9.5px] font-bold leading-none text-gray-600">{meta}</span>}
         {action}
       </div>
     </div>

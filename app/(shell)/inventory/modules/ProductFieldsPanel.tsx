@@ -1,16 +1,17 @@
 'use client';
 
+import { useState } from 'react';
 import CategoryPicker from './CategoryPicker';
 import { PanelHeading } from './MainImagePanel';
 import { ActionButton } from './PricingMarginPanel';
-import ProductColoursField from './ProductColoursField';
-import { Field, FieldLabel, HtmlField, TextAreaField, TextField } from './ProductFieldRows';
+import { ColourChips } from './ProductColoursField';
+import { FieldLabel, TextField } from './ProductFieldRows';
+import { EditColoursModal, EditSizesModal } from './ProductOptionModals';
 import ProductStatusSelect from './ProductStatusSelect';
-import ProductSizesField from './ProductSizesField';
+import { SizeChips } from './ProductSizesField';
 import DescriptionField from './DescriptionField';
 import SupplierMultiSelect from './SupplierMultiSelect';
-import { productStatusLabel, PRODUCT_STATUS_BADGES } from './constants';
-import { Check, Close, Document, Lock, Pencil, Unlock } from './icons';
+import { Check, Document, Lock, Plus, Unlock } from './icons';
 import type { useProductDetails } from './hooks/useProductDetails';
 import type { useSuppliers } from './hooks/useSuppliers';
 import type { InventoryPresetsState } from './hooks/useInventoryPresets';
@@ -22,71 +23,68 @@ type ProductFieldsPanelProps = {
   supplierOptions: SupplierOption[];
   presets: InventoryPresetsState;
   suppliers: ReturnType<typeof useSuppliers>;
-  /** For the New Product wizard's Details step — hides the panel chrome (heading, Cancel/Save
-   * row) since the wizard's own footer drives saving and advancing. The panel is expected to
-   * already be in edit mode when embedded. */
+  /** For the New Product wizard's Details step — hides the panel chrome (heading, Save row)
+   * since the wizard's own footer drives saving and advancing. */
   embedded?: boolean;
 };
 
+const FIELD_VISUAL_CLASS =
+  'h-[24px] rounded-[7px] border border-gray-300 px-[6px] text-[11px] leading-none outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100';
+
+/** Always editable — every field is a live input; Save is the only action, disabled until the
+ * draft differs from what's saved (see useProductDetails' `dirty`). Two-column field grid
+ * (design 6), with Category forced full width regardless of the prototype's own pairing. */
 export default function ProductFieldsPanel({ details: d, supplierOptions, presets, suppliers, embedded }: ProductFieldsPanelProps) {
-  const editing = d.editing;
-  const itemNoAvailability = useItemNoAvailability(editing ? d.form.itemNo : '', d.productId ?? undefined);
+  const itemNoAvailability = useItemNoAvailability(d.form.itemNo, d.productId ?? undefined);
+  const [sizesOpen, setSizesOpen] = useState(false);
+  const [coloursOpen, setColoursOpen] = useState(false);
 
   return (
-    <section className={embedded ? 'flex min-w-0 flex-col' : 'flex min-w-0 flex-col rounded-xl border border-gray-200 bg-white shadow-sm'}>
-      {!embedded && <PanelHeading icon={<Document className="h-4 w-4" />} title="Product details" />}
+    <section className={embedded ? 'flex min-w-0 flex-col' : 'flex min-w-0 flex-col rounded-[10px] border border-gray-200 bg-white shadow-[0_1px_2px_0_rgb(0_0_0/0.05)] xl:min-h-0'}>
+      {!embedded && (
+        <PanelHeading
+          icon={<Document className="h-3 w-3" />}
+          title="Product details"
+          action={<ActionButton onClick={() => d.saveDetails()} icon={<Check className="h-3 w-3" />} label="Save" primary disabled={!d.dirty} compact />}
+        />
+      )}
 
-      <div className={embedded ? 'flex flex-1 flex-col gap-3' : 'flex flex-1 flex-col gap-3 p-4'}>
-        <div className="grid grid-cols-2 gap-3">
-          {editing ? (
-            <>
-              <TextField
-                label="Item no."
-                value={d.form.itemNo}
-                onChange={d.set('itemNo')}
-                error={d.errors?.itemNo ?? (itemNoAvailability.taken ? 'A product with this item number already exists' : undefined)}
+      <div className={embedded ? 'flex flex-1 flex-col gap-[4px]' : 'flex flex-1 flex-col gap-[4px] p-[6px] xl:min-h-0 xl:overflow-y-auto'}>
+        <div className="grid grid-cols-2 gap-x-[7px] gap-y-[3px]">
+          <TextField
+            label="Item no."
+            value={d.form.itemNo}
+            onChange={d.set('itemNo')}
+            error={d.errors?.itemNo ?? (itemNoAvailability.taken ? 'A product with this item number already exists' : undefined)}
+          />
+          <div className="min-w-0">
+            <FieldLabel>Handle</FieldLabel>
+            <div className="flex items-center gap-[5px]">
+              <input
+                type="text"
+                value={d.form.handle}
+                onChange={d.set('handle')}
+                disabled={d.handleLocked}
+                aria-label="Handle"
+                className="h-[24px] w-full min-w-0 rounded-[7px] border border-gray-300 px-[6px] text-[11px] leading-none outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500"
               />
-              <div className="min-w-0">
-                <FieldLabel>Handle</FieldLabel>
-                <div className="flex items-center gap-1.5">
-                  <input
-                    type="text"
-                    value={d.form.handle}
-                    onChange={d.set('handle')}
-                    disabled={d.handleLocked}
-                    aria-label="Handle"
-                    className="w-full min-w-0 rounded-lg border border-gray-300 px-2 py-1.5 text-[13px] outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500"
-                  />
-                  <button
-                    type="button"
-                    onClick={d.toggleHandleLock}
-                    aria-label={d.handleLocked ? 'Edit handle' : 'Auto-generate handle'}
-                    title={d.handleLocked ? 'Edit handle' : 'Auto-generate handle'}
-                    className="shrink-0 rounded-lg border border-gray-300 bg-white p-1.5 text-gray-500 transition-colors duration-150 hover:bg-gray-50 hover:text-gray-700 cursor-pointer"
-                  >
-                    {d.handleLocked ? <Lock className="h-3.5 w-3.5" /> : <Unlock className="h-3.5 w-3.5" />}
-                  </button>
-                </div>
-              </div>
-            </>
-          ) : (
-            <>
-              <Field label="Item no." value={d.form.itemNo} />
-              <Field label="Handle" value={d.form.handle} />
-            </>
-          )}
-        </div>
-        {d.errors?.handle && <p className="-mt-2 text-xs text-red-600">{d.errors.handle}</p>}
+              <button
+                type="button"
+                onClick={d.toggleHandleLock}
+                aria-label={d.handleLocked ? 'Edit handle' : 'Auto-generate handle'}
+                title={d.handleLocked ? 'Edit handle' : 'Auto-generate handle'}
+                className="flex h-[24px] w-[24px] shrink-0 items-center justify-center rounded-[7px] border border-gray-300 bg-white text-gray-500 transition-colors duration-150 hover:bg-gray-50 hover:text-gray-700 cursor-pointer"
+              >
+                {d.handleLocked ? <Lock className="h-3 w-3" /> : <Unlock className="h-3 w-3" />}
+              </button>
+            </div>
+          </div>
+          {d.errors?.handle && <p className="col-span-2 -mt-1 text-[10px] leading-tight text-red-600">{d.errors.handle}</p>}
 
-        {editing ? (
           <TextField label="Product name" value={d.form.name} onChange={d.setName} />
-        ) : (
-          <Field label="Product name" value={d.form.name} />
-        )}
+          <TextField label="SKU" value={d.form.sku} onChange={d.set('sku')} />
 
-        {editing ? <TextField label="Brand" value={d.form.brand} onChange={d.set('brand')} /> : <Field label="Brand" value={d.form.brand} />}
-
-        {editing ? (
+          <TextField label="Brand" value={d.form.brand} onChange={d.set('brand')} />
           <SupplierMultiSelect
             suppliers={supplierOptions}
             selectedIds={d.form.supplierIds}
@@ -99,90 +97,95 @@ export default function ProductFieldsPanel({ details: d, supplierOptions, preset
               suppliers.openCreate({ onCreated: (s) => d.setSupplierIds([...d.form.supplierIds, s.id]) })
             }
           />
-        ) : (
-          <div>
-            <FieldLabel>Suppliers</FieldLabel>
-            <div className="flex flex-wrap gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-2">
-              {d.form.supplierIds.length === 0 ? (
-                <span className="text-[13px] text-gray-400">—</span>
-              ) : (
-                d.form.supplierIds.map((id) => {
-                  const s = supplierOptions.find((o) => o.id === id);
-                  return (
-                    <span
-                      key={id}
-                      className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-gray-700"
-                    >
-                      {s?.name ?? id}
-                    </span>
-                  );
-                })
-              )}
+
+          <div className="col-span-2">
+            <CategoryPicker value={{ id: d.form.categoryId, name: d.form.category }} onChange={d.setCategory} />
+          </div>
+
+          <div className="min-w-0">
+            <FieldLabel>Sizes</FieldLabel>
+            <div className="flex flex-wrap items-center gap-[4px]">
+              <div className="flex min-w-0 flex-1 flex-wrap gap-[4px]">
+                {d.sizes.length === 0 ? (
+                  <span className="text-[11px] leading-none text-gray-400">—</span>
+                ) : (
+                  <SizeChips sizes={d.sizes} />
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setSizesOpen(true)}
+                aria-label="Edit sizes"
+                title="Edit sizes"
+                className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-[6px] border border-gray-300 bg-white text-gray-500 transition-colors duration-150 hover:bg-gray-50 hover:text-gray-700 cursor-pointer"
+              >
+                <Plus className="h-3 w-3" />
+              </button>
             </div>
+            {d.errors?.sizes && <p className="mt-[2px] text-[10px] leading-tight text-red-600">{d.errors.sizes}</p>}
           </div>
-        )}
 
-        <div className="grid grid-cols-2 gap-3">
-          {editing ? (
-            <>
-              <CategoryPicker value={{ id: d.form.categoryId, name: d.form.category }} onChange={d.setCategory} />
-              <TextField label="SKU" value={d.form.sku} onChange={d.set('sku')} />
-            </>
-          ) : (
-            <>
-              <Field label="Category" value={d.form.category} />
-              <Field label="SKU" value={d.form.sku} />
-            </>
-          )}
-        </div>
+          <div className="min-w-0">
+            <FieldLabel>Colours</FieldLabel>
+            <div className="flex flex-wrap items-center gap-[4px]">
+              <div className="flex min-w-0 flex-1 flex-wrap gap-[4px]">
+                {d.colours.length === 0 ? (
+                  <span className="text-[11px] leading-none text-gray-400">—</span>
+                ) : (
+                  <ColourChips colours={d.colours} />
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setColoursOpen(true)}
+                aria-label="Edit colours"
+                title="Edit colours"
+                className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-[6px] border border-gray-300 bg-white text-gray-500 transition-colors duration-150 hover:bg-gray-50 hover:text-gray-700 cursor-pointer"
+              >
+                <Plus className="h-3 w-3" />
+              </button>
+            </div>
+            {d.errors?.colours && <p className="mt-[2px] text-[10px] leading-tight text-red-600">{d.errors.colours}</p>}
+          </div>
 
-        {editing ? (
-          <>
+          <div className="min-w-0">
+            <FieldLabel>Status</FieldLabel>
+            <ProductStatusSelect value={d.form.status} onChange={d.setStatus} className={FIELD_VISUAL_CLASS} />
+          </div>
+          <div className="min-w-0">
+            <FieldLabel>Verified</FieldLabel>
+            <label className="inline-flex h-[24px] max-w-full cursor-pointer items-center gap-[5px] text-[11px] font-medium leading-none text-gray-700" aria-label="Verified">
+              <input
+                type="checkbox"
+                checked={d.form.verified}
+                onChange={(e) => d.setVerified(e.target.checked)}
+                className="h-3 w-3 cursor-pointer accent-blue-600"
+              />
+              <span className="cursor-pointer select-none">Verified</span>
+            </label>
+          </div>
+
+          <div className="col-span-2">
             <DescriptionField details={d} />
-            <TextAreaField label="Remarks" value={d.form.remarks} onChange={d.set('remarks')} />
-          </>
-        ) : (
-          <>
-            <HtmlField label="Description" value={d.form.description} />
-            <Field label="Remarks" value={d.form.remarks} multiline />
-          </>
-        )}
-
-        <ProductSizesField
-          value={d.form.sizes}
-          sizes={d.sizes}
-          editing={editing}
-          onChange={d.set('sizes')}
-          onValueChange={d.setSizesValue}
-          error={d.errors?.sizes}
-          presets={presets}
-        />
-
-        <ProductColoursField
-          value={d.form.colours}
-          colours={d.colours}
-          editing={editing}
-          onChange={d.set('colours')}
-          onValueChange={d.setColoursValue}
-          error={d.errors?.colours}
-          presets={presets}
-        />
-
-        <StatusRow details={d} editing={editing} />
-
-        {!embedded && (
-          <div className="mt-auto flex gap-2 pt-1">
-            {editing ? (
-              <>
-                <ActionButton onClick={d.cancelEdit} icon={<Close />} label="Cancel" />
-                <ActionButton onClick={() => d.saveDetails()} icon={<Check />} label="Save" primary />
-              </>
-            ) : (
-              <ActionButton onClick={d.startEdit} icon={<Pencil />} label="Edit" />
-            )}
           </div>
-        )}
+
+          <div className="col-span-2">
+            <TextField label="Remarks" value={d.form.remarks} onChange={d.set('remarks')} placeholder="Add remarks…" />
+          </div>
+        </div>
       </div>
+
+      {sizesOpen && (
+        <EditSizesModal initialValue={d.form.sizes} presets={presets} onClose={() => setSizesOpen(false)} onSave={d.setSizesValue} />
+      )}
+      {coloursOpen && (
+        <EditColoursModal
+          initialValue={d.form.colours}
+          presets={presets}
+          onClose={() => setColoursOpen(false)}
+          onSave={d.setColoursValue}
+        />
+      )}
     </section>
   );
 }
@@ -198,43 +201,5 @@ export function VerifiedBadge({ verified }: { verified: boolean }) {
     <span className="inline-flex items-center rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-700">
       Unverified
     </span>
-  );
-}
-
-function StatusRow({ details: d, editing }: { details: ReturnType<typeof useProductDetails>; editing: boolean }) {
-  if (editing) {
-    return (
-      <div className="grid grid-cols-2 items-start gap-3">
-        <div className="min-w-0">
-          <FieldLabel>Status</FieldLabel>
-          <ProductStatusSelect value={d.form.status} onChange={d.setStatus} className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-[13px] outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 cursor-pointer" />
-        </div>
-        <div className="min-w-0">
-          <FieldLabel>Verified</FieldLabel>
-          <label className="flex h-[34px] cursor-pointer items-center gap-1.5 text-[13px] font-medium text-gray-700">
-            <input
-              type="checkbox"
-              checked={d.form.verified}
-              onChange={(e) => d.setVerified(e.target.checked)}
-              className="h-3.5 w-3.5 cursor-pointer accent-blue-600"
-            />
-            Verified
-          </label>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex items-center gap-2 pt-0.5">
-      <span
-        className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${
-          PRODUCT_STATUS_BADGES[d.form.status] ?? PRODUCT_STATUS_BADGES.UNLISTED
-        }`}
-      >
-        {productStatusLabel(d.form.status)}
-      </span>
-      <VerifiedBadge verified={d.form.verified} />
-    </div>
   );
 }

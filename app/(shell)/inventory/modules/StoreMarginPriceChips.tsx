@@ -10,9 +10,9 @@ type StoreMarginPriceChipsProps = {
   /** The panel's live pricing draft — an unsaved cost/margin/tax edit is reflected immediately,
    * consistent with the panel's own "Sell price (inc tax)" figure. */
   form: PricingForm;
-  /** The panel's staged per-store margin edits — see useProductPricing.marginDraft. */
+  /** The panel's staged per-store margin edits, already merged over each store's live margin —
+   * see useProductPricing.marginDraft. */
   marginDraft: Record<string, number | null>;
-  editing: boolean;
   onEditPrice: (listing: StoreListingResult) => void;
   onUnpublished: (storeName: string) => void;
 };
@@ -26,16 +26,16 @@ type StoreMarginPriceChipsProps = {
  * modal with nothing to edit. Replaces StorePriceChips (parked in PricingMarginPanel), which
  * showed each store's *live* Shopify price rather than what its own margin computes.
  */
-export default function StoreMarginPriceChips({ listings, form, marginDraft, editing, onEditPrice, onUnpublished }: StoreMarginPriceChipsProps) {
+export default function StoreMarginPriceChips({ listings, form, marginDraft, onEditPrice, onUnpublished }: StoreMarginPriceChipsProps) {
   const pricing = pricingFormToInputs(form);
   const margined = listings
-    .map((listing) => ({ listing, margin: marginForStore(listing.storeId, listings, marginDraft, editing) }))
+    .map((listing) => ({ listing, margin: marginForStore(listing.storeId, marginDraft) }))
     .filter((entry): entry is { listing: StoreListingResult; margin: number } => entry.margin !== null);
 
   if (margined.length === 0) return null;
 
   return (
-    <div className="flex flex-wrap gap-1.5">
+    <div className="flex flex-wrap gap-[4px]">
       {margined.map(({ listing, margin }) => {
         const published = isPublished(listing) && !!listing.productGid && listing.variants.length > 0;
         const price = storePriceFromMargin(pricing, margin);
@@ -45,7 +45,7 @@ export default function StoreMarginPriceChips({ listings, form, marginDraft, edi
             type="button"
             onClick={() => (published ? onEditPrice(listing) : onUnpublished(listing.storeName))}
             title={published ? undefined : `Publish this product to ${listing.storeName} before editing its price`}
-            className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors duration-150 cursor-pointer ${
+            className={`flex items-center gap-[3px] rounded-full border px-[5px] py-[1px] text-[9px] font-semibold leading-none transition-colors duration-150 cursor-pointer ${
               published
                 ? 'border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100'
                 : 'border-dashed border-gray-300 bg-white text-gray-400 hover:bg-gray-50'

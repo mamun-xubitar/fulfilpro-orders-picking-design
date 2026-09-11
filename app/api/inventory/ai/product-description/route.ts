@@ -6,6 +6,11 @@ import { auth } from '@/auth';
 const controller = new AiDescriptionController();
 type ErrResult = { error: { message: string; errors?: string[]; status: number } };
 
+// OpenAI generation can run close to the default serverless/proxy timeout — raise the ceiling so a
+// slow (but successful) call doesn't get killed by the platform before the app's own AbortSignal
+// timeout in lib/ai/openai.server.ts even has a chance to fire.
+export const maxDuration = 120;
+
 export async function POST(request: NextRequest) {
   const session = await auth();
   const body = await request.json().catch(() => ({}));

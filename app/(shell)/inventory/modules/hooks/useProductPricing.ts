@@ -3,11 +3,26 @@
 import { useMemo, useState } from 'react';
 import { toast } from 'react-toastify';
 import useRequest from '@/hooks/useRequest';
+import { resolveStoreMargin } from '@/lib/inventory/store-price';
 import { computePricing, pricingFormToInputs, pricingInputsToForm, round2 } from '../utils';
 import type { InventoryGlobals, PricingForm, ProductRecord } from '../types';
 import type { StoreListingsState } from './useStoreListings';
 
 const EMPTY_FORM: PricingForm = { currencyCode: 'USD', exchangeRate: '1', buyingPrice: '0', freight: '0', misc: '0', marginPercent: '0', tax: '10' };
+
+/** Value equality for the dirty check below — every PricingForm field is a string, so a flat
+ * per-field compare is enough (mirrors useProductDetails' formsEqual). */
+function pricingFormsEqual(a: PricingForm, b: PricingForm): boolean {
+  return (
+    a.currencyCode === b.currencyCode &&
+    a.exchangeRate === b.exchangeRate &&
+    a.buyingPrice === b.buyingPrice &&
+    a.freight === b.freight &&
+    a.misc === b.misc &&
+    a.marginPercent === b.marginPercent &&
+    a.tax === b.tax
+  );
+}
 
 type UseProductPricingArgs = {
   product: ProductRecord | null;
@@ -17,23 +32,50 @@ type UseProductPricingArgs = {
 };
 
 export function useProductPricing({ product, globals, storeListings, onSaved }: UseProductPricingArgs) {
-  // Draft and edit mode are tagged with the product they belong to, so changing
-  // product discards them without an effect having to reset anything.
+  // Draft is tagged with the product it belongs to, so changing product discards it without an
+  // effect having to reset anything.
   const [draft, setDraft] = useState<{ productId: string; form: PricingForm } | null>(null);
-  const [editingId, setEditingId] = useState<string | null>(null);
   const [confirmUse, setConfirmUse] = useState<{ sellingIncTax: number; totalBuying: number } | null>(null);
   const { request: requestSave, loading: saving, errors } = useRequest<ProductRecord>();
   const { request: requestApply, loading: applying } = useRequest<ProductRecord>();
   // Per-store margin edits, staged locally until Save — never written on blur/change. Cleared by
-  // Cancel and by a successful Save. Seeded from the live listings when edit mode is entered.
+  // a successful Save. `null` means "untouched" — no explicit "start edit" moment exists anymore
+  // to seed it at, so it's resolved lazily below (`effectiveMarginDraft`) from whatever the live
+  // listings currently say instead.
   const [marginDraft, setMarginDraftState] = useState<Record<string, number | null> | null>(null);
   const [savingMargins, setSavingMargins] = useState(false);
 
   const saved = product ? pricingInputsToForm(product.pricing) : EMPTY_FORM;
   const form = draft && draft.productId === product?.id ? draft.form : saved;
-  const editing = editingId !== null && editingId === product?.id;
+  // The panel is always editable — `editing` now just means "there's a product loaded to edit".
+  const editing = product !== null;
 
   const computed = useMemo(() => computePricing(pricingFormToInputs(form)), [form]);
+
+  // What the per-store margin *rows* actually display: only a product-specific override (this
+  // product's own saved margin for that store, or a local unsaved edit) — a store that merely
+  // inherits its global default renders no row until explicitly added via "+". Falling back to
+  // the global default here (as `resolvedMarginDraft` below still does) would make every
+  // globally-defaulted store appear "already set", which is exactly what per-store margin should
+  // *not* show on load.
+  const explicitMarginDraft = useMemo(
+    () => ({
+      ...Object.fromEntries(storeListings.listings.filter((l) => l.marginPercent !== null).map((l) => [l.storeId, l.marginPercent])),
+      ...(marginDraft ?? {}),
+    }),
+    [storeListings.listings, marginDraft]
+  );
+
+  // The price *chips* still need each store's fully-resolved margin (product override, else the
+  // store's global default) so a globally-defaulted store keeps showing the price that margin
+  // actually produces — this must never lose the global-default fallback the rows above drop.
+  const resolvedMarginDraft = useMemo(
+    () => ({
+      ...Object.fromEntries(storeListings.listings.map((l) => [l.storeId, resolveStoreMargin(l.marginPercent, l.storeDefaultMarginPercent)])),
+      ...(marginDraft ?? {}),
+    }),
+    [storeListings.listings, marginDraft]
+  );
 
   const set = (field: keyof PricingForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     if (!product) return;
@@ -76,7 +118,6 @@ export function useProductPricing({ product, globals, storeListings, onSaved }: 
           toast.success(`Pricing saved · ${toApply.length} store margin${toApply.length === 1 ? '' : 's'} updated`);
         }
         setDraft(null);
-        setEditingId(null);
         setMarginDraftState(null);
         after?.();
       },
@@ -110,6 +151,7 @@ export function useProductPricing({ product, globals, storeListings, onSaved }: 
 
   return {
     editing,
+    dirty: !pricingFormsEqual(form, saved) || changedMargins().length > 0,
     saving,
     applying,
     errors,
@@ -118,18 +160,16 @@ export function useProductPricing({ product, globals, storeListings, onSaved }: 
     computed,
     currencies: globals.currencies,
     baseCurrency: globals.baseCurrency,
-    startEdit: () => {
-      if (!product) return;
-      setEditingId(product.id);
-      setMarginDraftState(Object.fromEntries(storeListings.listings.map((l) => [l.storeId, l.marginPercent])));
-    },
+    /** Discards the in-progress draft — the panel itself no longer has a Cancel button (always
+     * editable, Save-only), but the New Product wizard's "Skip" still uses this to back out of
+     * step 4 without saving. */
     cancelEdit: () => {
       setDraft(null);
-      setEditingId(null);
       setMarginDraftState(null);
     },
     savePricing,
-    marginDraft: marginDraft ?? {},
+    marginDraft: explicitMarginDraft,
+    resolvedMarginDraft,
     savingMargins,
     setPendingMargin: (storeId: string, marginPercent: number | null) =>
       setMarginDraftState((prev) => ({ ...(prev ?? {}), [storeId]: marginPercent })),

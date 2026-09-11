@@ -1,8 +1,11 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { FieldLabel } from './ProductFieldRows';
 import { Close, Plus } from './icons';
+
+type DropdownPosition = { top: number; left: number; width: number };
 
 type SupplierMultiSelectProps = {
   suppliers: { id: string; name: string }[];
@@ -27,10 +30,15 @@ export default function SupplierMultiSelect({ suppliers, selectedIds, onChange, 
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
+  const anchorRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState<DropdownPosition | null>(null);
 
   useEffect(() => {
     const onClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (containerRef.current?.contains(target) || dropdownRef.current?.contains(target)) return;
+      setOpen(false);
     };
     const onEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setOpen(false);
@@ -42,6 +50,33 @@ export default function SupplierMultiSelect({ suppliers, selectedIds, onChange, 
       document.removeEventListener('keydown', onEscape);
     };
   }, []);
+
+  // The dropdown is portalled to document.body (fixed position) so the Product
+  // details panel's `overflow-y-auto` scroll container can't clip it or force the
+  // grid row to reflow when it opens — same pattern as OrderPicker.
+  useEffect(() => {
+    if (!open) return;
+    const updatePosition = () => {
+      const rect = anchorRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const width = Math.min(Math.max(rect.width, 280), window.innerWidth - 16);
+      const left = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8));
+      const below = window.innerHeight - rect.bottom;
+      const top = below < 288 && rect.top > below ? Math.max(8, rect.top - 292) : rect.bottom + 4;
+      setPosition((prev) => (prev && prev.top === top && prev.left === left && prev.width === width ? prev : { top, left, width }));
+    };
+    updatePosition();
+    const panel = containerRef.current?.closest('section');
+    const resizeObserver = panel ? new ResizeObserver(updatePosition) : null;
+    if (panel) resizeObserver?.observe(panel);
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+    return () => {
+      resizeObserver?.disconnect();
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [open]);
 
   const results = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -59,17 +94,18 @@ export default function SupplierMultiSelect({ suppliers, selectedIds, onChange, 
       <FieldLabel>Suppliers</FieldLabel>
       <div className="relative flex items-start gap-1.5">
         <button
+          ref={anchorRef}
           type="button"
           onClick={() => setOpen((prev) => !prev)}
           aria-haspopup="listbox"
           aria-expanded={open}
-          className="flex min-h-[38px] w-full flex-wrap items-center gap-1 rounded-lg border border-gray-300 px-2 py-1.5 text-left text-[13px] outline-none hover:bg-gray-50 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 cursor-pointer"
+          className="flex min-h-[24px] w-full flex-wrap items-center gap-[4px] rounded-[7px] border border-gray-300 px-[6px] py-[3px] text-left text-[11px] leading-none outline-none hover:bg-gray-50 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 cursor-pointer"
         >
-          {selected.length === 0 && <span className="px-1 text-gray-400">Select suppliers…</span>}
+          {selected.length === 0 && <span className="px-[2px] text-gray-400">Select suppliers…</span>}
           {selected.map((s) => (
             <span
               key={s.id}
-              className="flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[11px] font-medium text-gray-700"
+              className="flex items-center gap-[3px] rounded-full border border-gray-200 bg-gray-50 px-[5px] py-[1px] text-[9px] font-semibold leading-none text-gray-700"
             >
               {s.name}
               <span
@@ -100,14 +136,18 @@ export default function SupplierMultiSelect({ suppliers, selectedIds, onChange, 
             onClick={onAddSupplier}
             aria-label="Add a new supplier"
             title="Add a new supplier"
-            className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-500 transition-colors duration-150 hover:bg-gray-50 hover:text-gray-700 cursor-pointer"
+            className="flex h-[24px] w-[24px] shrink-0 items-center justify-center rounded-[7px] border border-gray-300 bg-white text-gray-500 transition-colors duration-150 hover:bg-gray-50 hover:text-gray-700 cursor-pointer"
           >
-            <Plus className="h-4 w-4" />
+            <Plus className="h-3 w-3" />
           </button>
         )}
 
-        {open && (
-          <div className="absolute z-30 top-full mt-1 left-0 w-full sm:w-[20rem] max-w-[90vw] max-h-72 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+        {open && position && typeof document !== 'undefined' && createPortal(
+          <div
+            ref={dropdownRef}
+            style={{ position: 'fixed', top: position.top, left: position.left, width: position.width }}
+            className="z-[70] max-h-72 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+          >
             <input
               autoFocus
               type="text"
@@ -145,7 +185,8 @@ export default function SupplierMultiSelect({ suppliers, selectedIds, onChange, 
                 Create supplier “{trimmedQuery}”
               </button>
             )}
-          </div>
+          </div>,
+          document.body
         )}
       </div>
       {error && <p className="mt-1 text-xs text-red-600">{error}</p>}

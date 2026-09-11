@@ -1,7 +1,7 @@
 'use client';
 
 import { formatColourName } from '@/lib/inventory/colour';
-import { ModalActions, ModalShell } from '@/components/ModalShell';
+import { ModalShell } from '@/components/ModalShell';
 import { STATUS_BADGES } from './PurchaseOrdersPanel';
 import type { usePurchaseOrder } from './hooks/usePurchaseOrder';
 import { formatDate, formatPoNumber } from './utils';
@@ -16,17 +16,35 @@ export default function ReceivePoModal({ po }: { po: ReturnType<typeof usePurcha
       title={`Receive — ${target.productTitle}`}
       onClose={po.closeReceive}
       extraWide
-      footer={<ModalActions onCancel={po.closeReceive} onConfirm={po.submitReceive} confirmLabel={po.receiving ? 'Receiving...' : 'Receive'} disabled={po.receiving} />}
+      footer={
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={po.closeReceive}
+            className="h-[22px] flex-1 rounded-[6px] border border-gray-300 bg-white px-[6px] text-[10px] font-bold leading-none text-gray-600 transition-colors duration-150 hover:bg-gray-50 cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={po.submitReceive}
+            disabled={po.receiving}
+            className="h-[22px] flex-1 rounded-[6px] bg-blue-600 px-[6px] text-[10px] font-bold leading-none text-white transition-colors duration-150 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+          >
+            {po.receiving ? 'Receiving...' : 'Receive'}
+          </button>
+        </div>
+      }
     >
-      <div className="space-y-4">
-        <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+      <div className="space-y-2">
+        <div className="rounded-[7px] border border-gray-200 bg-gray-50 p-2">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-semibold text-gray-900">{formatPoNumber(target.number)}</span>
+            <span className="text-[12px] font-semibold text-gray-900">{formatPoNumber(target.number)}</span>
             <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${STATUS_BADGES[target.status]}`}>
               {target.status.replace('_', ' ')}
             </span>
           </div>
-          <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-600 sm:grid-cols-3">
+          <dl className="mt-1.5 grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-gray-600 sm:grid-cols-3">
             <div>
               <dt className="inline text-gray-400">Reference: </dt>
               <dd className="inline">{target.referenceNumber || '—'}</dd>
@@ -54,10 +72,10 @@ export default function ReceivePoModal({ po }: { po: ReturnType<typeof usePurcha
           </dl>
         </div>
 
-        <p className="text-sm text-gray-600">Enter the quantity received for each item. Leave 0 for items not yet shipped — receive again later for partial deliveries.</p>
+        <p className="text-[12px] text-gray-600">Enter the quantity received for each item. Leave 0 for items not yet shipped — receive again later for partial deliveries.</p>
 
         <div className="max-h-80 overflow-y-auto rounded-lg border border-gray-200">
-          <div className={`grid ${GRID_COLS} gap-3 border-b border-gray-100 bg-gray-50 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500`}>
+          <div className={`grid ${GRID_COLS} gap-2 border-b border-gray-100 bg-gray-50 px-2 py-1 text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-gray-500`}>
             <span>Variant</span>
             <span>Supplier SKU</span>
             <span>Colour</span>
@@ -72,7 +90,7 @@ export default function ReceivePoModal({ po }: { po: ReturnType<typeof usePurcha
             {target.items.map((item) => {
               const remaining = Math.max(0, item.quantity - item.receivedQuantity);
               return (
-                <div key={item.id} className={`grid ${GRID_COLS} items-center gap-3 px-3 py-1.5 text-sm`}>
+                <div key={item.id} className={`grid ${GRID_COLS} items-center gap-2 px-2 py-1 text-[11px] leading-none`}>
                   <span className="min-w-0 truncate text-gray-700">{item.variantTitle}</span>
                   <span className="truncate text-gray-500">{item.sku ?? '—'}</span>
                   <span className="truncate text-gray-500">{item.colour ? formatColourName(item.colour) : '—'}</span>
@@ -87,7 +105,7 @@ export default function ReceivePoModal({ po }: { po: ReturnType<typeof usePurcha
                     value={po.receiveCost[item.id] ?? ''}
                     onChange={(e) => po.setReceiveItemCost(item.id, e.target.value)}
                     aria-label={`Unit cost for ${item.variantTitle}`}
-                    className="w-full rounded-lg border border-gray-300 px-2 py-1 text-right text-sm outline-none focus:ring-2 focus:ring-blue-400"
+                    className="h-[22px] w-full rounded-[6px] border border-gray-300 px-[6px] text-right text-[11px] leading-none outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                   />
                   <input
                     type="number"
@@ -96,7 +114,7 @@ export default function ReceivePoModal({ po }: { po: ReturnType<typeof usePurcha
                     value={po.receiveQty[item.id] ?? ''}
                     onChange={(e) => po.setReceiveItemQty(item.id, e.target.value, remaining)}
                     aria-label={`Receive quantity for ${item.variantTitle}`}
-                    className="w-full rounded-lg border border-gray-300 px-2 py-1 text-right text-sm outline-none focus:ring-2 focus:ring-blue-400"
+                    className="h-[22px] w-full rounded-[6px] border border-gray-300 px-[6px] text-right text-[11px] leading-none outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                   />
                 </div>
               );

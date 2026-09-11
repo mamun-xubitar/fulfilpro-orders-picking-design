@@ -1,10 +1,10 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { deriveColorFromName } from '@/lib/inventory/colour';
 import { FieldLabel } from './ProductFieldRows';
 import PresetPicker from './PresetPicker';
-import { findCaseInsensitiveDuplicate, keyOf } from './utils';
+import { deriveColorFromName } from '@/lib/inventory/colour';
+import { findCaseInsensitiveDuplicate, groupKeyOf, groupLabel, keyOf } from './utils';
 import type { InventoryPresetsState } from './hooks/useInventoryPresets';
 
 export type PresetEntry = { name: string; color?: string };
@@ -16,7 +16,7 @@ type PresetComboFieldProps = {
   value: string;
   editing: boolean;
   onChange: React.ChangeEventHandler<HTMLInputElement>;
-  /** Sets the comma-separated value directly — used when a preset is toggled from the picker. */
+  /** Sets the comma-separated value directly — used when a preset group is applied from the picker. */
   onValueChange: (next: string) => void;
   /** Save-time server error (e.g. a duplicate caught on submit) — shown alongside, but not
    * instead of, this field's own instant duplicate check. */
@@ -34,9 +34,14 @@ type PresetComboFieldProps = {
 /**
  * Shared interactive shell for ProductColoursField and ProductSizesField (and the Variants matrix
  * toolbar's Add colour / Add size modals): owns the dropdown open state, outside-click/Escape
- * handling, instant case-insensitive duplicate validation on the typed list, and writing any
- * brand-new names back to the global preset table on blur. Visual chip rendering stays with each
- * caller — only the interaction logic is shared.
+ * handling, and instant case-insensitive duplicate validation on the typed list. Visual chip
+ * rendering stays with each caller — only the interaction logic is shared.
+ *
+ * Persisting a brand-new preset *group* is no longer this field's job — it used to write back on
+ * blur, but a group now needs an explicit save moment (Save / Next / Add colour / Add sizes), so
+ * that's handled by whichever of those the caller wires up (see useProductDetails' `ensureGroup`
+ * argument and its call sites). This field only shows a non-blocking hint when the typed list
+ * would create a new group on that save.
  */
 export default function PresetComboField({
   label,
@@ -73,36 +78,29 @@ export default function PresetComboField({
   }, [open]);
 
   const entries = parse(value);
-  const selectedKeys = new Set(entries.map((e) => keyOf(e.name)));
-  const duplicate = findCaseInsensitiveDuplicate(entries.map((e) => e.name));
-  const instantError = duplicate ? `"${duplicate}" is listed more than once` : null;
+  const names = entries.map((e) => e.name);
+  const selectedKeys = new Set(names.map(keyOf));
+  const duplicate = findCaseInsensitiveDuplicate(names);
+  const barred = names.find((n) => n.includes('|'));
+  const instantError = duplicate ? `"${duplicate}" is listed more than once` : barred ? `A name can't contain the "|" character` : null;
   const displayError = instantError ?? error;
 
-  const toggle = (name: string) => {
-    const key = keyOf(name);
-    const has = entries.some((e) => keyOf(e.name) === key);
-    const next = has ? entries.filter((e) => keyOf(e.name) !== key) : [...entries, { name, color: deriveColorFromName(name) }];
-    onValueChange(format(next));
-  };
+  const groups = kind === 'colour' ? presets.colours : presets.sizes;
+  const willCreateGroup = names.length > 0 && !instantError && !groups.some((g) => g.key === groupKeyOf(names));
 
-  /** Persists any typed name that isn't already a global preset — one create per missing name,
-   * fired when the field loses focus. Skipped while the instant duplicate error is showing, so a
-   * malformed in-progress list is never partially written back. */
-  const writeBackNewPresets = async () => {
-    if (instantError) return;
-    const existingKeys = new Set((kind === 'colour' ? presets.colours : presets.sizes).map((o) => keyOf(o.name)));
-    const missing = entries.filter((e) => e.name.trim() && !existingKeys.has(keyOf(e.name)));
-    for (const entry of missing) {
-      if (kind === 'colour') await presets.createColour(entry.name);
-      else await presets.createSize(entry.name);
-    }
+  /** Clicking a group replaces the whole input with that group's members (in the group's
+   * own order), discarding whatever was typed or previously selected. */
+  const applyGroup = (items: string[]) => {
+    onValueChange(
+      format(items.map((name) => (kind === 'colour' ? { name, color: deriveColorFromName(name) } : { name }))),
+    );
   };
 
   return (
     <div>
       <FieldLabel>{label}</FieldLabel>
       {editing ? (
-        <div className="space-y-1.5">
+        <div className="space-y-[4px]">
           <div className="relative" ref={containerRef}>
             <input
               type="text"
@@ -110,25 +108,27 @@ export default function PresetComboField({
               onChange={onChange}
               onFocus={() => setOpen(true)}
               onClick={() => setOpen(true)}
-              onBlur={() => void writeBackNewPresets()}
               placeholder={placeholder}
               aria-label={label}
-              className="w-full rounded-lg border border-gray-300 px-2.5 py-2 text-[13px] text-gray-900 outline-none placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              className="h-[24px] w-full rounded-[7px] border border-gray-300 px-[6px] text-[11px] leading-none text-gray-900 outline-none placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
             />
             {open && (
               <PresetPicker
                 kind={kind}
-                options={kind === 'colour' ? presets.colours : presets.sizes}
+                groups={groups}
                 selectedKeys={selectedKeys}
-                onToggle={toggle}
-                onCreate={kind === 'colour' ? presets.createColour : presets.createSize}
+                onApplyGroup={applyGroup}
+                onCreateGroup={(items) => presets.createGroup(kind, items)}
                 onDelete={(ids) => presets.deletePresets(kind, ids)}
                 saving={presets.savingPreset}
               />
             )}
           </div>
-          {displayError && <p className="mt-1 text-xs text-red-600">{displayError}</p>}
-          <div className="flex flex-wrap gap-1.5">{renderChips(entries)}</div>
+          {displayError && <p className="mt-[2px] text-[10px] leading-tight text-red-600">{displayError}</p>}
+          {!displayError && willCreateGroup && (
+            <p className="mt-[2px] text-[10px] leading-tight text-gray-500">A new preset group ({groupLabel(names)}) will be saved on Save.</p>
+          )}
+          <div className="flex flex-wrap gap-[4px]">{renderChips(entries)}</div>
         </div>
       ) : (
         renderReadOnly()

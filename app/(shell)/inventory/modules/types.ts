@@ -137,6 +137,11 @@ export type StoreListingResult = {
   /** Per-store margin % — pre-fills this store's suggested price in the publish/bulk-update
    * modals. Never affects the product-level Pricing & margin panel's calculation. */
   marginPercent: number | null;
+  /** This store's global default margin (set on the inventory toolbar's "Per store margin"
+   * section) — the fallback `marginPercent` resolves to when this product has no margin of its
+   * own for this store. Null when the store has no default set either, in which case pricing
+   * falls back further to the product's own sell price. See lib/inventory/store-price.ts. */
+  storeDefaultMarginPercent: number | null;
   lastError: string | null;
   lastPublishedAt: string | null;
 };

@@ -46,6 +46,9 @@ export class AiDescriptionController {
     try {
       generated = await getAiProvider().generateText({ system, prompt });
     } catch (error) {
+      // Logged server-side (pm2/console) since the client only ever sees the mapped message
+      // below — without this, a live failure leaves no trace to diagnose from.
+      console.error('[ai-description] generation failed:', error);
       const message = error instanceof Error ? error.message : 'Failed to generate description';
       const status = message === 'AI is not configured' ? 503 : 502;
       return { error: { message, status } };

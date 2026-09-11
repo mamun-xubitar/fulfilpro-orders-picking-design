@@ -25,10 +25,10 @@ export const PRODUCT_TABS: TabDef<ProductTabId>[] = [
 ];
 
 export const QUICK_FILTERS: { id: QuickFilterId; label: string }[] = [
-  { id: 'buying-lt-1', label: 'Buying < $1.00' },
-  { id: 'profit-lt-5', label: 'Profit < $5.00' },
-  { id: 'selling-lt-1', label: 'Selling < $1.00' },
-  { id: 'selling-lt-5', label: 'Selling < $5.00' },
+  { id: 'buying-lt-1', label: 'Buy < $1' },
+  { id: 'profit-lt-5', label: 'Profit < $5' },
+  { id: 'selling-lt-1', label: 'Sell < $1' },
+  { id: 'selling-lt-5', label: 'Sell < $5' },
 ];
 
 /** A row within this fraction above its trigger counts as "near". */
@@ -55,10 +55,10 @@ export const STATUS_STYLES: Record<VariantStatus, { row: string; badge: string; 
   },
 };
 
-export const STATUS_LEGEND: { id: VariantStatus; label: string; className: string }[] = [
-  { id: 'below', label: 'Below trigger', className: 'bg-red-100 text-red-700 border-red-200' },
-  { id: 'near', label: 'Within 20% of trigger', className: 'bg-amber-100 text-amber-800 border-amber-200' },
-  { id: 'above', label: 'Above trigger', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+export const STATUS_LEGEND: { id: VariantStatus; label: string; hint: string; className: string }[] = [
+  { id: 'below', label: 'Below', hint: 'Below trigger', className: 'bg-red-100 text-red-700 border-red-200' },
+  { id: 'near', label: 'Near', hint: 'Within 20% of trigger', className: 'bg-amber-100 text-amber-800 border-amber-200' },
+  { id: 'above', label: 'Above', hint: 'Above trigger', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
 ];
 
 export const PRODUCT_STATUS_BADGES: Record<string, string> = {

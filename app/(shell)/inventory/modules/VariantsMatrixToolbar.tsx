@@ -8,6 +8,7 @@ import { STATUS_LEGEND } from './constants';
 import type { InventoryPage } from './hooks/useInventoryPage';
 import type { InventoryPresetsState } from './hooks/useInventoryPresets';
 import { Adjust, Download, Expand, Plus, Trash } from './icons';
+import { BTN_XS } from './MainImagePanel';
 import { capitaliseFirst, formatSizesInput, parseSizesInput } from './utils';
 
 type VariantsMatrixToolbarProps = {
@@ -39,22 +40,22 @@ export default function VariantsMatrixToolbar({ p, fullView }: VariantsMatrixToo
   const totalVariants = p.product?.variants.length ?? 0;
 
   return (
-    <div className="flex flex-wrap items-center gap-2 border-b border-gray-200 px-4 py-3">
-      <h3 className="mr-1 text-[11px] font-semibold uppercase tracking-wide text-gray-500">Variants / stock matrix</h3>
-      <span className="mr-1 rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-600">
+    <div className="flex flex-wrap items-center gap-[4px] border-b border-gray-200 px-[8px] py-[4px]">
+      <h3 className="mr-[2px] text-[9.5px] font-bold uppercase leading-none tracking-[0.5px] text-gray-500">Variants / stock</h3>
+      <span className="mr-[2px] whitespace-nowrap rounded-full bg-gray-100 px-[6px] py-[1px] text-[9.5px] font-bold leading-none text-gray-600">
         {totalVariants} variant{totalVariants === 1 ? '' : 's'}
       </span>
 
-      <button
-        type="button"
-        onClick={fullView ? p.closeMatrixFullView : p.openMatrixFullView}
-        className="flex items-center gap-1.5 rounded-lg border border-gray-300 px-2.5 py-1.5 text-xs font-semibold text-gray-700 transition-colors duration-150 hover:bg-gray-50 cursor-pointer"
-      >
-        <Expand className="h-3.5 w-3.5" />
-        {fullView ? 'Exit full view' : 'Full view'}
-      </button>
+      {/* Full view has its own exit via the modal's own close (×) — no separate "exit" action
+          needed here once inside it. */}
+      {!fullView && (
+        <button type="button" onClick={p.openMatrixFullView} className={BTN_XS}>
+          <Expand className="h-3 w-3" />
+          Full view
+        </button>
+      )}
 
-      <span className="mx-1 h-5 w-px bg-gray-200" aria-hidden="true" />
+      <span className="mx-[2px] h-[18px] w-px bg-gray-200" aria-hidden="true" />
 
       {/* Colour filter pills */}
       <div className="flex flex-wrap items-center gap-1.5">
@@ -73,7 +74,7 @@ export default function VariantsMatrixToolbar({ p, fullView }: VariantsMatrixToo
         value={matrix.sizeFilter}
         onChange={(e) => matrix.setSizeFilter(e.target.value)}
         aria-label="Filter by size"
-        className="rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 cursor-pointer"
+        className="h-[22px] rounded-[7px] border border-gray-300 bg-white px-[6px] text-[10.5px] leading-none text-gray-700 shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 cursor-pointer"
       >
         <option value="">All sizes</option>
         {matrix.sizes.map((size) => (
@@ -83,14 +84,14 @@ export default function VariantsMatrixToolbar({ p, fullView }: VariantsMatrixToo
         ))}
       </select>
 
-      <label className="flex cursor-pointer items-center gap-1.5 text-xs font-medium text-gray-700">
+      <label className="flex cursor-pointer items-center gap-[4px] text-[10px] font-medium leading-none text-gray-700">
         <input
           type="checkbox"
           checked={matrix.showZeroStock}
           onChange={(e) => matrix.setShowZeroStock(e.target.checked)}
-          className="h-3.5 w-3.5 cursor-pointer accent-blue-600"
+          className="h-3 w-3 cursor-pointer accent-blue-600"
         />
-        Show zero stock
+        Zero stock
       </label>
 
       {/* Status legend, doubling as a filter */}
@@ -103,7 +104,8 @@ export default function VariantsMatrixToolbar({ p, fullView }: VariantsMatrixToo
               type="button"
               onClick={() => matrix.setStatusFilter(entry.id)}
               aria-pressed={isActive}
-              className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold transition-colors duration-150 cursor-pointer ${entry.className} ${
+              title={entry.hint}
+              className={`whitespace-nowrap rounded-full border px-[6px] py-[1px] text-[9px] font-bold uppercase leading-none tracking-[0.4px] transition-colors duration-150 cursor-pointer ${entry.className} ${
                 isActive ? 'ring-2 ring-blue-400 ring-offset-1' : 'opacity-90 hover:opacity-100'
               }`}
             >
@@ -113,12 +115,12 @@ export default function VariantsMatrixToolbar({ p, fullView }: VariantsMatrixToo
         })}
       </div>
 
-      <div className="ml-auto flex flex-wrap items-center gap-2">
+      <div className="ml-auto flex flex-wrap items-center gap-[6px]">
         <SecondaryButton onClick={exportCsv}>
-          <Download className="h-3.5 w-3.5" />
-          Export product CSV
+          <Download className="h-3 w-3" />
+          Export CSV
         </SecondaryButton>
-        <SecondaryButton onClick={matrix.toggleAllRows}>{matrix.allRowsSelected ? 'Deselect all Colours' : 'Select all Colours'}</SecondaryButton>
+        <SecondaryButton onClick={matrix.toggleAllRows}>{matrix.allRowsSelected ? 'Deselect all' : 'Select all'}</SecondaryButton>
         {/* Re-enable: uncomment to restore the "Apply to selected colours" action (see selectedColours/applyToSelected above).
         <button
           type="button"
@@ -135,9 +137,9 @@ export default function VariantsMatrixToolbar({ p, fullView }: VariantsMatrixToo
           onClick={adjustSelected}
           disabled={matrix.selectedIds.size === 0}
           title="Opens the stock adjustment modal for the selected variants"
-          className="flex items-center gap-1.5 rounded-lg bg-amber-600 px-2.5 py-1.5 text-xs font-semibold text-white transition-colors duration-150 hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+          className={`flex h-[22px] items-center gap-1 rounded-[6px] bg-amber-600 px-[6px] text-[10px] font-bold leading-none text-white transition-colors duration-150 hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer`}
         >
-          <Adjust className="h-3.5 w-3.5" />
+          <Adjust className="h-3 w-3" />
           Adjust Stock
         </button>
         <button
@@ -145,31 +147,31 @@ export default function VariantsMatrixToolbar({ p, fullView }: VariantsMatrixToo
           onClick={matrix.requestBulkDelete}
           disabled={matrix.selectedIds.size === 0}
           title="Deletes the selected variants"
-          className="flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-600 transition-colors duration-150 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+          className="flex h-[22px] items-center gap-1 rounded-[6px] border border-red-200 bg-red-50 px-[6px] text-[10px] font-bold leading-none text-red-600 transition-colors duration-150 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
         >
-          <Trash className="h-3.5 w-3.5" />
-          Delete selected{matrix.selectedIds.size > 0 ? ` (${matrix.selectedIds.size})` : ''}
+          <Trash className="h-3 w-3" />
+          Delete{matrix.selectedIds.size > 0 ? ` (${matrix.selectedIds.size})` : ''}
         </button>
         <button
           type="button"
           onClick={createPo}
           disabled={matrix.selectedIds.size === 0 && matrix.rows.length === 0}
           title={matrix.rows.length === 0 ? 'This product has no variants yet' : undefined}
-          className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white transition-colors duration-150 hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+          className="flex h-[22px] items-center gap-1 rounded-[6px] bg-emerald-600 px-[6px] text-[10px] font-bold leading-none text-white transition-colors duration-150 hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
         >
-          <Plus className="h-3.5 w-3.5" />
-          Create purchase order
+          <Plus className="h-3 w-3" />
+          Create PO
         </button>
 
-        <span className="mx-1 h-5 w-px bg-gray-200" aria-hidden="true" />
+        <span className="mx-[2px] h-[18px] w-px bg-gray-200" aria-hidden="true" />
 
         <SecondaryButton onClick={() => setAddColourOpen(true)}>
-          <Plus className="h-3.5 w-3.5" />
-          Add colour
+          <Plus className="h-3 w-3" />
+          Colour
         </SecondaryButton>
         <SecondaryButton onClick={() => setAddSizeOpen(true)}>
-          <Plus className="h-3.5 w-3.5" />
-          Add size
+          <Plus className="h-3 w-3" />
+          Size
         </SecondaryButton>
       </div>
 
@@ -212,14 +214,14 @@ function AddColourModal({
       allowOverflow
       footer={
         <div className="flex gap-2">
-          <button type="button" onClick={onClose} className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50 cursor-pointer">
+          <button type="button" onClick={onClose} className="h-[22px] flex-1 rounded-[6px] border border-gray-300 bg-white px-[6px] text-[10px] font-bold leading-none text-gray-600 transition-colors duration-150 hover:bg-gray-50 cursor-pointer">
             Cancel
           </button>
           <button
             type="button"
             onClick={handleAdd}
             disabled={names.length === 0}
-            className="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+            className="h-[22px] flex-1 rounded-[6px] bg-blue-600 px-[6px] text-[10px] font-bold leading-none text-white transition-colors duration-150 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
           >
             Add colour{names.length > 1 ? 's' : ''}
           </button>
@@ -279,14 +281,14 @@ function AddSizeModal({
       allowOverflow
       footer={
         <div className="flex gap-2">
-          <button type="button" onClick={onClose} className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50 cursor-pointer">
+          <button type="button" onClick={onClose} className="h-[22px] flex-1 rounded-[6px] border border-gray-300 bg-white px-[6px] text-[10px] font-bold leading-none text-gray-600 transition-colors duration-150 hover:bg-gray-50 cursor-pointer">
             Cancel
           </button>
           <button
             type="button"
             onClick={handleAdd}
             disabled={sizes.length === 0}
-            className="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+            className="h-[22px] flex-1 rounded-[6px] bg-blue-600 px-[6px] text-[10px] font-bold leading-none text-white transition-colors duration-150 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
           >
             Add size{sizes.length > 1 ? 's' : ''}
           </button>
@@ -349,7 +351,7 @@ function Pill({ active, onClick, children }: { active: boolean; onClick: () => v
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors duration-150 cursor-pointer ${
+      className={`flex h-[22px] items-center gap-1 whitespace-nowrap rounded-full border px-[7px] text-[10px] font-semibold leading-none transition-colors duration-150 cursor-pointer ${
         active ? 'border-blue-600 bg-blue-600 text-white' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
       }`}
     >
@@ -360,11 +362,7 @@ function Pill({ active, onClick, children }: { active: boolean; onClick: () => v
 
 function SecondaryButton({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-700 transition-colors duration-150 hover:bg-gray-50 cursor-pointer"
-    >
+    <button type="button" onClick={onClick} className={BTN_XS}>
       {children}
     </button>
   );

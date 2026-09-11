@@ -1,51 +1,68 @@
 import prisma from '@/lib/prisma.server';
 
-export type ColourPresetRow = { id: string; name: string; key: string; createdAt: string };
-export type SizePresetRow = { id: string; name: string; key: string; createdAt: string };
+export type ColourPresetGroupRow = { id: string; items: string[]; key: string; createdAt: string };
+export type SizePresetGroupRow = { id: string; items: string[]; key: string; createdAt: string };
 
-/** Normalises a preset name into its case-insensitive uniqueness key — lowercased, whitespace stripped. */
+/** Normalises a preset member into its case-insensitive uniqueness key — lowercased, whitespace stripped. */
 export function presetKeyOf(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, '');
 }
 
+/** Order-insensitive identity of a whole group — de-duped, sorted, "|"-joined member keys, so
+ * (Red, Blue) and (Blue, Red) collide as the same group. "|" is reserved and rejected as a member
+ * character by the controller, so a join can never be ambiguous. For a single-member group this
+ * equals presetKeyOf(that member) — the property the preset_groups migration relies on to convert
+ * every pre-existing preset into a one-item group without rewriting `key`. */
+export function groupKeyOf(items: string[]): string {
+  return [...new Set(items.map(presetKeyOf).filter(Boolean))].sort().join('|');
+}
+
+function toColourGroupRow(row: { id: string; items: string[]; key: string; createdAt: Date }): ColourPresetGroupRow {
+  return { id: row.id, items: row.items, key: row.key, createdAt: row.createdAt.toISOString() };
+}
+
+function toSizeGroupRow(row: { id: string; items: string[]; key: string; createdAt: Date }): SizePresetGroupRow {
+  return { id: row.id, items: row.items, key: row.key, createdAt: row.createdAt.toISOString() };
+}
+
 export class InventoryPresetModel {
-  async listColours(): Promise<ColourPresetRow[]> {
-    const rows = await prisma.colourPreset.findMany({ orderBy: { key: 'asc' } });
-    return rows.map((r) => ({ id: r.id, name: r.name, key: r.key, createdAt: r.createdAt.toISOString() }));
+  async listColourGroups(): Promise<ColourPresetGroupRow[]> {
+    const rows = await prisma.colourPresetGroup.findMany({ orderBy: { key: 'asc' } });
+    return rows.map(toColourGroupRow);
   }
 
-  async listSizes(): Promise<SizePresetRow[]> {
-    const rows = await prisma.sizePreset.findMany({ orderBy: { key: 'asc' } });
-    return rows.map((r) => ({ id: r.id, name: r.name, key: r.key, createdAt: r.createdAt.toISOString() }));
+  async listSizeGroups(): Promise<SizePresetGroupRow[]> {
+    const rows = await prisma.sizePresetGroup.findMany({ orderBy: { key: 'asc' } });
+    return rows.map(toSizeGroupRow);
   }
 
-  async findColourByKey(key: string): Promise<ColourPresetRow | null> {
-    const row = await prisma.colourPreset.findUnique({ where: { key } });
-    return row ? { id: row.id, name: row.name, key: row.key, createdAt: row.createdAt.toISOString() } : null;
+  async findColourGroupByKey(key: string): Promise<ColourPresetGroupRow | null> {
+    const row = await prisma.colourPresetGroup.findUnique({ where: { key } });
+    return row ? toColourGroupRow(row) : null;
   }
 
-  async findSizeByKey(key: string): Promise<SizePresetRow | null> {
-    const row = await prisma.sizePreset.findUnique({ where: { key } });
-    return row ? { id: row.id, name: row.name, key: row.key, createdAt: row.createdAt.toISOString() } : null;
+  async findSizeGroupByKey(key: string): Promise<SizePresetGroupRow | null> {
+    const row = await prisma.sizePresetGroup.findUnique({ where: { key } });
+    return row ? toSizeGroupRow(row) : null;
   }
 
-  async createColour(data: { name: string; key: string }): Promise<ColourPresetRow> {
-    const row = await prisma.colourPreset.create({ data });
-    return { id: row.id, name: row.name, key: row.key, createdAt: row.createdAt.toISOString() };
+  async createColourGroup(data: { items: string[]; key: string }): Promise<ColourPresetGroupRow> {
+    const row = await prisma.colourPresetGroup.create({ data });
+    return toColourGroupRow(row);
   }
 
-  async createSize(data: { name: string; key: string }): Promise<SizePresetRow> {
-    const row = await prisma.sizePreset.create({ data });
-    return { id: row.id, name: row.name, key: row.key, createdAt: row.createdAt.toISOString() };
+  async createSizeGroup(data: { items: string[]; key: string }): Promise<SizePresetGroupRow> {
+    const row = await prisma.sizePresetGroup.create({ data });
+    return toSizeGroupRow(row);
   }
 
-  async deleteColours(ids: string[]): Promise<number> {
-    const result = await prisma.colourPreset.deleteMany({ where: { id: { in: ids } } });
+  async deleteColourGroups(ids: string[]): Promise<number> {
+    const result = await prisma.colourPresetGroup.deleteMany({ where: { id: { in: ids } } });
     return result.count;
   }
 
-  async deleteSizes(ids: string[]): Promise<number> {
-    const result = await prisma.sizePreset.deleteMany({ where: { id: { in: ids } } });
+  async deleteSizeGroups(ids: string[]): Promise<number> {
+    const result = await prisma.sizePresetGroup.deleteMany({ where: { id: { in: ids } } });
     return result.count;
   }
 }

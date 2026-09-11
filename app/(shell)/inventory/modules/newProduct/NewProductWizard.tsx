@@ -27,18 +27,18 @@ export default function NewProductWizard({ p }: NewProductWizardProps) {
       title="New product"
       onClose={w.close}
       extraWide
-      bodyClassName="thin-scroll"
+      bodyClassName="thin-scroll overflow-x-clip"
       footer={<Footer p={p} w={w} />}
       disableBackdropClose
     >
-      <div className="mb-5">
+      <div className="mb-3">
         <StepPills step={w.step} labels={STEP_LABELS} />
       </div>
 
-      {/* A fixed floor keeps the modal's height stable across the step-1 → step-2 swap and the
-          "Setting up product…" wait — without it the shell collapses to the spinner's height and
-          re-expands the instant the panel mounts. */}
-      <div className="flex min-h-[26rem] flex-col">
+      {/* A modest floor keeps the modal's height stable across steps (and the "Setting up
+          product…" wait) without forcing a scrollbar — small enough that short steps still fit
+          typical viewports. */}
+      <div className="flex min-h-[20rem] flex-col">
         {w.step === 1 && <StepBasics p={p} basics={w.basics} />}
 
         {w.step > 1 && w.awaitingProduct && (
@@ -68,7 +68,7 @@ export default function NewProductWizard({ p }: NewProductWizardProps) {
 
 function Footer({ p, w }: { p: InventoryPage; w: ReturnType<typeof useNewProductWizard> }) {
   const buttonClass =
-    'rounded-lg px-4 py-2 text-sm font-semibold transition-colors duration-150 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60';
+    'h-[22px] rounded-[6px] px-[10px] text-[10px] font-bold leading-none transition-colors duration-150 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60';
   const secondaryClass = `${buttonClass} border border-gray-300 bg-white text-gray-600 hover:bg-gray-50`;
   const primaryClass = `${buttonClass} bg-blue-600 text-white hover:bg-blue-700`;
 

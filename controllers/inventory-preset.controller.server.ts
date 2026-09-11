@@ -1,4 +1,4 @@
-import { InventoryPresetModel, presetKeyOf } from '@/models/inventory-preset.model.server';
+import { groupKeyOf, InventoryPresetModel, presetKeyOf } from '@/models/inventory-preset.model.server';
 
 const model = new InventoryPresetModel();
 
@@ -17,35 +17,58 @@ function capitaliseFirst(name: string): string {
 export class InventoryPresetController {
   async list(session: Session) {
     if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
-    const [colours, sizes] = await Promise.all([model.listColours(), model.listSizes()]);
+    const [colours, sizes] = await Promise.all([model.listColourGroups(), model.listSizeGroups()]);
     return { data: { colours, sizes } };
   }
 
-  async create(body: unknown, session: Session) {
+  /** Idempotent — an existing group is a normal (200) outcome, not a 409, since this now fires on
+   * every product-details/pricing Save regardless of whether the typed list is new. Only a truly
+   * malformed request (missing kind, empty list, an internal duplicate, or the reserved "|"
+   * character) is an error. */
+  async ensure(body: unknown, session: Session) {
     if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
 
     const value = (body ?? {}) as Record<string, unknown>;
     const kind = value.kind === 'colour' || value.kind === 'size' ? value.kind : null;
-    const rawName = typeof value.name === 'string' ? value.name.trim() : '';
     if (!kind) return { error: { message: 'kind: Must be "colour" or "size"', status: 400 } };
-    if (!rawName) return { error: { message: 'name: A name is required', status: 400 } };
 
-    const name = capitaliseFirst(rawName);
-    const key = presetKeyOf(name);
+    const rawItems = Array.isArray(value.items) ? (value.items as unknown[]) : [];
+    const trimmed = rawItems.filter((v): v is string => typeof v === 'string').map((v) => v.trim()).filter(Boolean);
+    if (trimmed.length === 0) return { error: { message: 'Validation failed', errors: ['items: At least one name is required'], status: 400 } };
 
-    if (kind === 'colour') {
-      const existing = await model.findColourByKey(key);
-      if (existing) return { error: { message: 'Validation failed', errors: [`name: "${existing.name}" already exists`], status: 409 } };
-
-      const created = await model.createColour({ name, key });
-      return { data: { colour: created }, message: 'Colour preset added' };
+    const barred = trimmed.find((name) => name.includes('|'));
+    if (barred) {
+      return { error: { message: 'Validation failed', errors: [`items: "${barred}" can't contain the "|" character`], status: 400 } };
     }
 
-    const existing = await model.findSizeByKey(key);
-    if (existing) return { error: { message: 'Validation failed', errors: [`name: "${existing.name}" already exists`], status: 409 } };
+    const seenKeys = new Set<string>();
+    for (const name of trimmed) {
+      const key = presetKeyOf(name);
+      if (seenKeys.has(key)) return { error: { message: 'Validation failed', errors: [`items: "${name}" is listed more than once`], status: 400 } };
+      seenKeys.add(key);
+    }
 
-    const created = await model.createSize({ name, key });
-    return { data: { size: created }, message: 'Size preset added' };
+    const items = trimmed.map(capitaliseFirst);
+    const key = groupKeyOf(items);
+
+    const findByKey = kind === 'colour' ? model.findColourGroupByKey.bind(model) : model.findSizeGroupByKey.bind(model);
+    const createGroup = kind === 'colour' ? model.createColourGroup.bind(model) : model.createSizeGroup.bind(model);
+
+    const existing = await findByKey(key);
+    if (existing) return { data: { group: existing, created: false }, message: 'Preset group already exists' };
+
+    try {
+      const created = await createGroup({ items, key });
+      return { data: { group: created, created: true }, message: `${kind === 'colour' ? 'Colour' : 'Size'} preset group added`, status: 201 };
+    } catch {
+      // Unique-violation race — another request created the same group between the read above
+      // and this write (realistic now that a save can trigger this concurrently from two tabs).
+      // Re-read rather than surfacing the DB error, since the end state either request wanted —
+      // "this group exists" — was reached either way.
+      const race = await findByKey(key);
+      if (race) return { data: { group: race, created: false }, message: 'Preset group already exists' };
+      return { error: { message: 'Failed to save preset group', status: 500 } };
+    }
   }
 
   async bulkDelete(body: unknown, session: Session) {
@@ -55,9 +78,9 @@ export class InventoryPresetController {
     const kind = value.kind === 'colour' || value.kind === 'size' ? value.kind : null;
     const ids = Array.isArray(value.ids) ? (value.ids as unknown[]).filter((id): id is string => typeof id === 'string') : [];
     if (!kind) return { error: { message: 'kind: Must be "colour" or "size"', status: 400 } };
-    if (ids.length === 0) return { error: { message: 'ids: At least one preset id is required', status: 400 } };
+    if (ids.length === 0) return { error: { message: 'ids: At least one preset group id is required', status: 400 } };
 
-    const count = kind === 'colour' ? await model.deleteColours(ids) : await model.deleteSizes(ids);
-    return { data: { count }, message: `${count} preset${count === 1 ? '' : 's'} removed` };
+    const count = kind === 'colour' ? await model.deleteColourGroups(ids) : await model.deleteSizeGroups(ids);
+    return { data: { count }, message: `${count} preset group${count === 1 ? '' : 's'} removed` };
   }
 }

@@ -1,18 +1,23 @@
 'use client';
 
 import { PanelHeading } from './MainImagePanel';
+import PurchaseOrdersPanel from './PurchaseOrdersPanel';
 import type { InventoryPage } from './hooks/useInventoryPage';
 import { Activity, Adjust, Clipboard, Swap, Upload } from './icons';
 import { formatDate, formatRelative } from './utils';
 
 type BottomPanelsProps = { p: InventoryPage };
 
+/** Five-up row (design 6) — Purchase orders absorbed alongside Stocktake, Adjustments,
+ * Import/export and Recent activity, all sized to the same fixed height. */
 export default function BottomPanels({ p }: BottomPanelsProps) {
   const product = p.product!;
 
   return (
-    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-      <Card icon={<Clipboard className="h-4 w-4" />} title="Stocktake">
+    <div className="grid grid-cols-1 gap-[5px] md:grid-cols-2 xl:h-24 xl:flex-none xl:grid-cols-5">
+      <PurchaseOrdersPanel po={p.po} />
+
+      <Card icon={<Clipboard className="h-3 w-3" />} title="Stocktake">
         <Stat label="Last stocktake" value={formatDate(product.stocktake.lastAt)} />
         <Stat label="Next stocktake" value={formatDate(product.stocktake.nextAt)} />
         <Actions>
@@ -23,7 +28,7 @@ export default function BottomPanels({ p }: BottomPanelsProps) {
         </Actions>
       </Card>
 
-      <Card icon={<Adjust className="h-4 w-4" />} title="Adjustments">
+      <Card icon={<Adjust className="h-3 w-3" />} title="Adjustments">
         <Stat label="Last adjustment" value={formatDate(product.adjustments.lastAt)} />
         <Stat label="This month" value={String(product.adjustments.thisMonth)} />
         <Actions>
@@ -32,13 +37,13 @@ export default function BottomPanels({ p }: BottomPanelsProps) {
         </Actions>
       </Card>
 
-      <Card icon={<Swap className="h-4 w-4" />} title="Import / export">
+      <Card icon={<Swap className="h-3 w-3" />} title="Import / export">
         <button
           type="button"
           onClick={p.importExport.openImport}
-          className="mt-auto flex w-full items-center justify-center gap-1.5 rounded-lg bg-emerald-600 py-2 text-[13px] font-semibold text-white transition-colors duration-150 hover:bg-emerald-700 cursor-pointer"
+          className="mt-auto flex h-[22px] w-full items-center justify-center gap-1 rounded-[6px] bg-emerald-600 text-[10px] font-bold leading-none text-white transition-colors duration-150 hover:bg-emerald-700 cursor-pointer"
         >
-          <Upload className="h-4 w-4" />
+          <Upload className="h-3 w-3" />
           Import Product/PO CSV
         </button>
         {/* Not pinned: this card has no stat rows, so the exports sit with the import
@@ -49,17 +54,17 @@ export default function BottomPanels({ p }: BottomPanelsProps) {
         </Actions>
       </Card>
 
-      <Card icon={<Activity className="h-4 w-4" />} title="Recent activity">
+      <Card icon={<Activity className="h-3 w-3" />} title="Recent activity">
         {product.activity.length === 0 ? (
-          <p className="py-6 text-center text-xs text-gray-400">No recent activity</p>
+          <p className="py-3 text-center text-[10px] text-gray-400">No recent activity</p>
         ) : (
-          <ul className="max-h-28 space-y-2.5 overflow-y-auto pr-1">
+          <ul className="min-h-0 flex-1 space-y-1 overflow-y-auto pr-1">
             {product.activity.map((entry) => (
-              <li key={entry.id} className="flex gap-2">
-                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500" aria-hidden="true" />
+              <li key={entry.id} className="flex gap-1.5">
+                <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-blue-500" aria-hidden="true" />
                 <span className="min-w-0">
-                  <span className="block text-[13px] leading-snug text-gray-800">{entry.message}</span>
-                  <span className="block text-[11px] text-gray-400">
+                  <span className="block text-[10px] leading-snug text-gray-800">{entry.message}</span>
+                  <span className="block text-[9px] text-gray-400">
                     {entry.actor} · {formatRelative(entry.at, p.now)}
                   </span>
                 </span>
@@ -74,24 +79,24 @@ export default function BottomPanels({ p }: BottomPanelsProps) {
 
 function Card({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
   return (
-    <section className="flex flex-col rounded-xl border border-gray-200 bg-white shadow-sm">
+    <section className="flex min-h-0 flex-col rounded-[10px] border border-gray-200 bg-white shadow-[0_1px_2px_0_rgb(0_0_0/0.05)]">
       <PanelHeading icon={icon} title={title} />
-      <div className="flex flex-1 flex-col gap-2 p-4">{children}</div>
+      <div className="flex min-h-0 flex-1 flex-col gap-[4px] p-[6px]">{children}</div>
     </section>
   );
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between gap-2 border-b border-gray-100 pb-2 last-of-type:border-0">
-      <span className="text-[13px] font-medium text-gray-600">{label}</span>
-      <span className="text-[13px] font-bold text-gray-900 tabular-nums">{value}</span>
+    <div className="flex items-center justify-between gap-2 border-b border-gray-100 py-[4px] leading-none last-of-type:border-0">
+      <span className="text-[10px] font-medium text-gray-600">{label}</span>
+      <span className="text-[10px] font-bold text-gray-900 tabular-nums">{value}</span>
     </div>
   );
 }
 
 function Actions({ pin = true, children }: { pin?: boolean; children: React.ReactNode }) {
-  return <div className={`flex gap-2 pt-1 ${pin ? 'mt-auto' : ''}`}>{children}</div>;
+  return <div className={`flex gap-1 ${pin ? 'mt-auto' : ''}`}>{children}</div>;
 }
 
 function PrimaryButton({ onClick, disabled, children }: { onClick: () => void; disabled?: boolean; children: React.ReactNode }) {
@@ -100,7 +105,7 @@ function PrimaryButton({ onClick, disabled, children }: { onClick: () => void; d
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="flex-1 whitespace-nowrap rounded-lg bg-blue-600 px-2 py-1.5 text-[13px] font-semibold text-white transition-colors duration-150 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+      className="h-[22px] flex-1 whitespace-nowrap rounded-[6px] bg-blue-600 px-[6px] text-[10px] font-bold leading-none text-white transition-colors duration-150 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
     >
       {children}
     </button>
@@ -112,7 +117,7 @@ function SecondaryButton({ onClick, children }: { onClick: () => void; children:
     <button
       type="button"
       onClick={onClick}
-      className="flex-1 whitespace-nowrap rounded-lg border border-gray-300 px-2 py-1.5 text-[13px] font-semibold text-gray-700 transition-colors duration-150 hover:bg-gray-50 cursor-pointer"
+      className="h-[22px] flex-1 whitespace-nowrap rounded-[6px] border border-gray-300 px-[6px] text-[10px] font-bold leading-none text-gray-700 transition-colors duration-150 hover:bg-gray-50 cursor-pointer"
     >
       {children}
     </button>

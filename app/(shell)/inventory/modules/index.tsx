@@ -1,12 +1,14 @@
 'use client';
 
-import { useEffect } from 'react';
 import { usePageHeading } from '@/components/PageHeadingContext';
+import Pagination from '@/components/Pagination';
+import { useZoom } from '@/components/ZoomContext';
+import { useEffect } from 'react';
 import BottomPanels from './BottomPanels';
 import ComingSoon from './ComingSoon';
+import InventoryGlobals from './InventoryGlobals';
 import InventoryModals from './InventoryModals';
 import ModuleTabs from './ModuleTabs';
-import Pagination from '@/components/Pagination';
 import ProductDetailsTab from './ProductDetailsTab';
 import ProductSubTabs from './ProductSubTabs';
 import ProductsBulkModals from './ProductsBulkModals';
@@ -14,14 +16,14 @@ import ProductsSelectionBar from './ProductsSelectionBar';
 import ProductsTable from './ProductsTable';
 import ProductsTableToolbar from './ProductsTableToolbar';
 import ProductsToolbar from './ProductsToolbar';
-import PurchaseOrdersPanel from './PurchaseOrdersPanel';
 import SuppliersTab from './SuppliersTab';
 import VariantsMatrixSection from './VariantsMatrixSection';
-import { MODULE_TABS, PRODUCT_TABS } from './constants';
+import { MODULE_TABS, PRODUCT_STATUS_BADGES, PRODUCT_TABS, productStatusLabel } from './constants';
 import { useInventoryPage } from './hooks/useInventoryPage';
 
 export default function InventoryPage() {
   const p = useInventoryPage();
+  const { zoomPercent } = useZoom();
   const moduleTab = MODULE_TABS.find((t) => t.id === p.moduleTab)!;
   const productTab = PRODUCT_TABS.find((t) => t.id === p.productTab)!;
   const hasSelection = p.productsTable.selectAllFilters || p.productsTable.selectedIds.length > 0;
@@ -37,19 +39,22 @@ export default function InventoryPage() {
   }, [productName]);
 
   return (
-    <main className="flex-1 space-y-3 p-4 md:p-6">
-      <ModuleTabs active={p.moduleTab} onChange={p.setModuleTab} />
+    <main
+      className="flex-1 space-y-2 p-2 xl:flex xl:h-[calc(100vh-60px)] xl:min-h-0 xl:flex-col xl:space-y-0 xl:overflow-hidden xl:gap-2"
+      style={{ zoom: `${zoomPercent}%` }}
+    >
+      <ModuleTabs active={p.moduleTab} onChange={p.setModuleTab} right={p.moduleTab === 'products' ? <InventoryGlobals p={p} /> : undefined} />
 
       {p.moduleTab === 'suppliers' ? (
         <SuppliersTab suppliers={p.suppliers} />
       ) : p.moduleTab !== 'products' ? (
         <ComingSoon label={moduleTab.label} blurb={moduleTab.blurb} />
       ) : (
-        <>
+        <div className="space-y-2 xl:flex xl:min-h-0 xl:flex-1 xl:flex-col xl:space-y-0 xl:gap-2 xl:overflow-hidden">
           <ProductsToolbar {...p} />
 
           {p.nav.allRecords ? (
-            <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+            <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm xl:min-h-0 xl:flex-1 xl:overflow-y-auto">
               <ProductsTableToolbar table={p.productsTable} onRefresh={p.productsTable.refresh} loading={p.productsTable.loading} />
               {hasSelection && <ProductsSelectionBar table={p.productsTable} />}
               <ProductsTable table={p.productsTable} loading={p.productsTable.initialLoading} />
@@ -68,12 +73,25 @@ export default function InventoryPage() {
           ) : !p.product ? (
             <EmptyState />
           ) : (
-            <>
-              <div className="rounded-xl border border-gray-200 bg-white px-4 shadow-sm">
+            <div className="space-y-2 xl:flex xl:min-h-0 xl:flex-1 xl:flex-col xl:space-y-0 xl:gap-2 xl:overflow-hidden">
+              <div className="flex items-center gap-[8px] rounded-[10px] border border-gray-200 bg-white px-[8px] shadow-[0_1px_2px_0_rgb(0_0_0/0.05)] xl:flex-none">
                 <ProductSubTabs active={p.productTab} onChange={p.setProductTab} />
+                <span className="ml-auto min-w-0 truncate text-[9px] leading-none text-gray-400">
+                  {p.product.name} · {p.product.brand}
+                </span>
+                <span
+                  className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-full border px-[6px] py-[1px] text-[9px] font-bold uppercase leading-none tracking-[0.4px] ${PRODUCT_STATUS_BADGES[p.product.status]}`}
+                >
+                  {productStatusLabel(p.product.status)}
+                </span>
+                <span
+                  className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-full border px-[6px] py-[1px] text-[9px] font-bold uppercase leading-none tracking-[0.4px] ${
+                    p.product.verified ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-red-200 bg-red-50 text-red-700'
+                  }`}
+                >
+                  {p.product.verified ? 'Verified' : 'Unverified'}
+                </span>
               </div>
-
-              <VariantsMatrixSection p={p} />
 
               {p.productTab === 'details' ? (
                 <ProductDetailsTab p={p} />
@@ -81,12 +99,12 @@ export default function InventoryPage() {
                 <ComingSoon label={productTab.label} blurb={productTab.blurb} />
               )}
 
-              <PurchaseOrdersPanel po={p.po} />
+              <VariantsMatrixSection p={p} />
 
               <BottomPanels p={p} />
-            </>
+            </div>
           )}
-        </>
+        </div>
       )}
 
       {p.nav.allRecords && <ProductsBulkModals table={p.productsTable} />}

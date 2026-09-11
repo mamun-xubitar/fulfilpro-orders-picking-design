@@ -20,8 +20,8 @@ export default function PoItemsTable({ rows, quantities, skus, costs, onQuantity
   const grandTotal = rows.reduce((sum, v) => sum + (Number(quantities[v.id]) || 0) * (Number(costs[v.id]) || 0), 0);
 
   return (
-    <div className="max-h-80 overflow-y-auto rounded-lg border border-gray-200">
-      <div className={`grid ${GRID_COLS} gap-3 border-b border-gray-100 bg-gray-50 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500`}>
+    <div className="max-h-80 overflow-auto rounded-lg border border-gray-200">
+      <div className={`grid ${GRID_COLS} gap-2 border-b border-gray-100 bg-gray-50 px-2 py-1 text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-gray-500`}>
         <span>Variants</span>
         <span className="text-right">Stock</span>
         <span className="text-right">Supplier SKU</span>
@@ -35,7 +35,7 @@ export default function PoItemsTable({ rows, quantities, skus, costs, onQuantity
           const qty = Number(quantities[v.id]) || 0;
           const cost = Number(costs[v.id]) || 0;
           return (
-            <div key={v.id} className={`grid ${GRID_COLS} items-center gap-3 px-3 py-1.5 text-sm`}>
+            <div key={v.id} className={`grid ${GRID_COLS} items-center gap-2 px-2 py-1 text-[11px] leading-none`}>
               <span className="min-w-0 truncate text-gray-700">{name}</span>
               <span className="text-right tabular-nums text-gray-500">{v.stockOnHand}</span>
               <input
@@ -43,7 +43,7 @@ export default function PoItemsTable({ rows, quantities, skus, costs, onQuantity
                 value={skus[v.id] ?? ''}
                 onChange={(e) => onSkuChange(v.id, e.target.value)}
                 aria-label={`Supplier SKU for ${name}`}
-                className="w-full rounded-lg border border-gray-300 px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-blue-400"
+                className="h-[22px] w-full rounded-[6px] border border-gray-300 px-[6px] text-[11px] leading-none outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               />
               <input
                 type="number"
@@ -51,7 +51,7 @@ export default function PoItemsTable({ rows, quantities, skus, costs, onQuantity
                 value={quantities[v.id] ?? ''}
                 onChange={(e) => onQuantityChange(v.id, e.target.value)}
                 aria-label={`Quantity for ${name}`}
-                className="w-full rounded-lg border border-gray-300 px-2 py-1 text-right text-sm outline-none focus:ring-2 focus:ring-blue-400"
+                className="h-[22px] w-full rounded-[6px] border border-gray-300 px-[6px] text-right text-[11px] leading-none outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               />
               <input
                 type="number"
@@ -61,14 +61,14 @@ export default function PoItemsTable({ rows, quantities, skus, costs, onQuantity
                 onChange={(e) => onCostChange(v.id, e.target.value)}
                 aria-label={`Cost for ${name}`}
                 title="Defaults to the current average buy price"
-                className="w-full rounded-lg border border-gray-300 px-2 py-1 text-right text-sm outline-none focus:ring-2 focus:ring-blue-400"
+                className="h-[22px] w-full rounded-[6px] border border-gray-300 px-[6px] text-right text-[11px] leading-none outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               />
               <span className="text-right font-medium tabular-nums text-gray-700">{formatCurrencyValue(qty * cost)}</span>
             </div>
           );
         })}
       </div>
-      <div className={`grid ${GRID_COLS} gap-3 border-t-2 border-gray-200 bg-gray-50 px-3 py-1.5 text-sm font-semibold text-gray-900`}>
+      <div className={`grid ${GRID_COLS} gap-2 border-t-2 border-gray-200 bg-gray-50 px-2 py-1 text-[11px] font-semibold leading-none text-gray-900`}>
         <span>Total</span>
         <span />
         <span />

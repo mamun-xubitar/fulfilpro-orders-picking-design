@@ -1,10 +1,12 @@
 import prisma from '@/lib/prisma.server';
 import { CurrencyRateModel } from '@/models/currency-rate.model.server';
 import { SettingsModel } from '@/models/settings.model.server';
+import { StoreModel } from '@/models/store.model.server';
 import type { UpdateAppSettingsData } from '@/models/settings.model.server';
 
 const currencyModel = new CurrencyRateModel();
 const settingsModel = new SettingsModel();
+const storeModel = new StoreModel();
 
 const CODE_RE = /^[A-Z]{3}$/;
 
@@ -130,5 +132,40 @@ export class InventorySettingsController {
 
     await currencyModel.delete(id);
     return { data: null, message: 'Currency removed' };
+  }
+
+  /** The "Per store margin" section on the inventory toolbar's Store-wide defaults card — a
+   * global fallback margin per connected store, used when a product has no product-specific
+   * per-store margin of its own (see the resolution chain in lib/inventory/store-price.ts). */
+  async listStoreMargins(session: Session) {
+    if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
+
+    const stores = await storeModel.findConnectedWithDefaultMargins();
+    return {
+      data: {
+        stores: stores.map((s) => ({ storeId: s.id, storeName: s.name ?? s.storeDomain, marginPercent: s.defaultMarginPercent })),
+      },
+    };
+  }
+
+  async setStoreMargin(body: unknown, session: Session) {
+    if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
+
+    const value = (body ?? {}) as Record<string, unknown>;
+    const storeId = typeof value.storeId === 'string' ? value.storeId : '';
+    if (!storeId) return { error: { message: 'storeId: A store is required', status: 400 } };
+
+    if (value.marginPercent === null) {
+      await storeModel.setDefaultMargin(storeId, null);
+      return { data: { storeId, marginPercent: null }, message: 'Store margin removed' };
+    }
+
+    const marginPercent = Number(value.marginPercent);
+    if (!Number.isFinite(marginPercent) || marginPercent < 0) {
+      return { error: { message: 'Validation failed', errors: ['marginPercent: Enter a margin of 0 or more'], status: 400 } };
+    }
+    const rounded = Math.round(marginPercent * 100) / 100;
+    await storeModel.setDefaultMargin(storeId, rounded);
+    return { data: { storeId, marginPercent: rounded }, message: 'Store margin saved' };
   }
 }

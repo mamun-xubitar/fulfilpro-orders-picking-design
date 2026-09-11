@@ -5,12 +5,14 @@ import { fetchStoreListings, updateStoreVariantPrices, storeListingsTag } from '
 import { publishProductToStore, type PublishAspect, type PublishPayload } from '@/lib/shopify-product-publish.server';
 import { searchStoreCollections } from '@/lib/shopify-store-collections.server';
 import { createStoreCollection, searchStoreTaxonomy, type TaxonomyField } from '@/lib/shopify-taxonomy.server';
-import { storePriceFromMargin } from '@/lib/inventory/store-price';
+import { resolveStoreMargin, storePriceFromMargin } from '@/lib/inventory/store-price';
 import { sanitizeHtml } from '@/lib/sanitize-html';
 import { toPublicUrl } from '@/lib/uploads.server';
+import { StoreModel } from '@/models/store.model.server';
 
 const model = new SupplierProductModel();
 const listingModel = new StoreListingModel();
+const storeModel = new StoreModel();
 
 type Session = { user?: { id?: string | null; name?: string | null; email?: string | null; role?: string | null } | null } | null;
 
@@ -75,12 +77,16 @@ export class StoreListingController {
    * Shopify unless something changed. Persisted listing rows (status, margin, error) are merged
    * onto the live per-store lookup so the panel can show publish state without another round trip. */
   private async mergedListings(productId: string, handle: string) {
-    const persisted = await listingModel.listForProduct(productId);
+    const [persisted, defaultMarginStores] = await Promise.all([
+      listingModel.listForProduct(productId),
+      storeModel.findConnectedWithDefaultMargins(),
+    ]);
     const listings = await fetchStoreListings(
       handle,
       persisted.map((p) => ({ storeId: p.storeId, productGid: p.productGid }))
     );
     const persistedByStore = new Map(persisted.map((p) => [p.storeId, p]));
+    const defaultMarginByStore = new Map(defaultMarginStores.map((s) => [s.id, s.defaultMarginPercent]));
     return listings.map((listing) => {
       const p = persistedByStore.get(listing.storeId);
       // Reconcile DB status with live Shopify truth: an externally listed product with no row
@@ -95,6 +101,7 @@ export class StoreListingController {
         productGid,
         listingStatus,
         marginPercent: p?.marginPercent ?? null,
+        storeDefaultMarginPercent: defaultMarginByStore.get(listing.storeId) ?? null,
         lastError: p?.lastError ?? null,
         lastPublishedAt: p?.lastPublishedAt ?? null,
       };
@@ -365,6 +372,10 @@ export class StoreListingController {
     if (targets.some((t) => !t.storeId)) return { error: { message: 'Validation failed', errors: ['targets: Each target needs a storeId'], status: 400 } };
 
     const results: { storeId: string; status: 'LISTED' | 'FAILED'; error?: string; url?: string | null }[] = [];
+    // Fetched once for every target rather than per store inside the loop below — the resolution
+    // chain (product-specific margin wins, then this store's global default) is applied per
+    // target, but the defaults themselves don't change across a single publish call.
+    const defaultMarginByStore = new Map((await storeModel.findConnectedWithDefaultMargins()).map((s) => [s.id, s.defaultMarginPercent]));
 
     for (const target of targets) {
       await listingModel.markPublishing(productId, target.storeId);
@@ -374,7 +385,8 @@ export class StoreListingController {
           listingModel.listVariantMappings(productId, target.storeId),
         ]);
         const mappingByHub = new Map(mappings.map((m) => [m.hubVariantId, m]));
-        const marginPercent = existing?.marginPercent != null ? Number(existing.marginPercent) : null;
+        const productMargin = existing?.marginPercent != null ? Number(existing.marginPercent) : null;
+        const marginPercent = resolveStoreMargin(productMargin, defaultMarginByStore.get(target.storeId) ?? null);
         const payload = buildPublishPayload(product, target, mappingByHub, marginPercent);
         // Every candidate image failed toPublicUrl (no public APP_URL) — fail loudly instead of
         // silently pushing an empty `files` list, which productSet's full-replacement semantics

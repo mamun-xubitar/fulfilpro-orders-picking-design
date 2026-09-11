@@ -67,12 +67,22 @@ export default function useRequest<TData = unknown>() {
       }
 
       const res = await fetch(finalUrl, { method, headers, body });
-      const json = (await res.json()) as {
+      const rawText = await res.text();
+      let json: {
         success: boolean;
         message: string;
         data?: TData;
         errors?: string[];
       };
+      try {
+        json = rawText ? JSON.parse(rawText) : { success: false, message: '' };
+      } catch {
+        // The response wasn't JSON at all — a gateway/proxy error page (502/504), a timeout, or a
+        // body-size rejection. Surfacing the real status here is what makes this failure mode
+        // distinguishable from a genuine network/fetch-level error, which lands in the catch below
+        // as "Network error. Please try again." instead.
+        json = { success: false, message: `Request failed (${res.status} ${res.statusText})` };
+      }
 
       if (!res.ok || !json.success) {
         const errorMessage = json.message || 'Something went wrong';

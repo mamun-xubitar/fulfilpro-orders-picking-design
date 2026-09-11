@@ -19,10 +19,12 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const session = await auth();
   const body = await request.json().catch(() => ({}));
-  const result = await controller.create(body, session);
+  const result = await controller.ensure(body, session);
   if ('error' in result) {
     const { error } = result as ErrResult;
     return apiError({ message: error.message, errors: error.errors, status: error.status });
   }
-  return apiSuccess({ message: result.message, data: result.data, status: 201 });
+  // 201 when a new group was created, 200 when the typed list already matched an existing one —
+  // see InventoryPresetController.ensure, which is idempotent by design.
+  return apiSuccess({ message: result.message, data: result.data, status: result.status ?? 200 });
 }

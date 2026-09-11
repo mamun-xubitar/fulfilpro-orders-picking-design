@@ -64,7 +64,10 @@ export function useInventoryPage() {
   const gallery = useProductImages(product);
   const imageMutations = useProductImageMutations({ product, onSaved: onProductSaved });
   const pricing = useProductPricing({ product, globals: data.globals, storeListings, onSaved: onProductSaved });
-  const details = useProductDetails({ product, onSaved: onProductSaved });
+  // Created here (rather than lower down with the page's other misc hooks) since `details` below
+  // needs its `ensureGroup` to persist colour/size preset groups on save.
+  const presets = useInventoryPresets();
+  const details = useProductDetails({ product, onSaved: onProductSaved, ensureGroup: presets.ensureGroup });
   // A variant delete (or edit) can prune a colour/size the details draft doesn't know about yet
   // — sync the draft's lists from the server's copy so a since-removed value isn't offered back.
   const onVariantSaved = (updated: ProductRecord) => {
@@ -79,7 +82,6 @@ export function useInventoryPage() {
   const productsTable = useProductsTable({ enabled: data.allRecords, verifiedOnly: nav.verifiedOnly, quickFilter: nav.quickFilter, onView: nav.viewProduct, onCounts: data.syncCounts, onDeleted: bumpSupplierRefresh });
   const importProducts = useImportProducts({ supplierOptions: po.supplierOptions, onImported: () => { data.refresh(); productsTable.refresh(); bumpSupplierRefresh(); } });
   const suppliers = useSuppliers({ onChanged: po.refreshSuppliers, refreshKey: po.receivedNonce + supplierRefreshNonce });
-  const presets = useInventoryPresets();
 
   /** Stock Summary always reflects the whole product, not the matrix's filtered rows. */
   const summary = useMemo(() => summariseVariants(product?.variants ?? []), [product]);

@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { toast } from 'react-toastify';
 import useRequest from '@/hooks/useRequest';
-import { getStatus, makeSwatchResolver, quickFilterMatches, sortVariantsForDisplay, summariseVariants } from '../utils';
+import { getStatus, makeSwatchResolver, quickFilterMatches, sortVariantsForDisplay, summariseVariants, variantDraftChanges } from '../utils';
 import type { ColourOption, ProductRecord, QuickFilterId, VariantRow, VariantStatus } from '../types';
 
 type MatrixFilters = {
@@ -16,6 +16,10 @@ type MatrixFilters = {
 };
 
 const DEFAULT_FILTERS: MatrixFilters = { colours: null, size: '', status: null, showZeroStock: false, selected: [] };
+
+// Module-level so its identity is stable across renders — a fresh {} every render would defeat
+// the `variants` useMemo below whenever there's no active product draft.
+const EMPTY_DRAFTS: Record<string, Partial<VariantRow>> = {};
 
 type UseVariantsMatrixArgs = {
   product: ProductRecord | null;
@@ -35,12 +39,16 @@ export function useVariantsMatrix({ product, sizes, colours, quickFilter, onVari
   const [stored, setStored] = useState<{ productId: string; filters: MatrixFilters } | null>(null);
   const filters = stored && stored.productId === product?.id ? stored.filters : DEFAULT_FILTERS;
 
-  // Only one row edits at a time, tagged with its product so navigation exits it.
-  const [storedEditingRow, setStoredEditingRow] = useState<{ productId: string; rowId: string } | null>(null);
-  const editingRowId = storedEditingRow && storedEditingRow.productId === product?.id ? storedEditingRow.rowId : null;
-
-  const [rowDraft, setRowDraft] = useState<Partial<VariantRow> | null>(null);
-  const { request, loading: saving } = useRequest<ProductRecord>();
+  // Every row can carry its own unsaved draft at once (always-edit mode), tagged with the
+  // product they belong to so navigation discards them without an effect having to reset
+  // anything — same pattern as `stored` above.
+  const [storedDrafts, setStoredDrafts] = useState<{ productId: string; drafts: Record<string, Partial<VariantRow>> } | null>(null);
+  const drafts = storedDrafts && storedDrafts.productId === product?.id ? storedDrafts.drafts : EMPTY_DRAFTS;
+  const { request } = useRequest<ProductRecord>();
+  // Which row's own PATCH is currently in flight — useRequest's own `loading` is shared across
+  // every row (one hook instance), so this is what lets only the row actually being saved show a
+  // spinner instead of all of them lighting up together.
+  const [savingRowId, setSavingRowId] = useState<string | null>(null);
 
   // Tagged with its product so navigation exits any pending confirmation.
   const [storedDeleteTarget, setStoredDeleteTarget] = useState<{ productId: string; variant: VariantRow } | null>(null);
@@ -57,12 +65,28 @@ export function useVariantsMatrix({ product, sizes, colours, quickFilter, onVari
     setStored({ productId: product.id, filters: { ...filters, ...next } });
   };
 
-  // The row being edited shows its unsaved draft; every other row shows the server value.
+  // Every row with a draft shows it overlaid; every other row is returned *by reference* —
+  // which is what keeps VariantsMatrixRow's memo effective, since an edit to one row leaves
+  // every other row's `variant` prop identity untouched.
   const variants = useMemo(() => {
     const base = product?.variants ?? [];
-    if (!editingRowId || !rowDraft) return base;
-    return base.map((v) => (v.id === editingRowId ? { ...v, ...rowDraft } : v));
-  }, [product, editingRowId, rowDraft]);
+    if (Object.keys(drafts).length === 0) return base;
+    return base.map((v) => (drafts[v.id] ? { ...v, ...drafts[v.id] } : v));
+  }, [product, drafts]);
+
+  // The exact PATCH body for each dirty row, keyed by variant id — computed by diffing every
+  // row's draft against its server value (not by tracking which fields were merely touched), so
+  // typing a value and typing it back to the original disarms that row's Save button. Doubles as
+  // the dirty-row lookup: presence in this map is what the table uses to decide whether a row
+  // shows its Save/Revert actions.
+  const dirtyById = useMemo(() => {
+    const map: Record<string, Partial<VariantRow>> = {};
+    for (const v of product?.variants ?? []) {
+      const changes = variantDraftChanges(v, drafts[v.id]);
+      if (Object.keys(changes).length > 0) map[v.id] = changes;
+    }
+    return map;
+  }, [product, drafts]);
 
   // Union of the product's defined palette and any colour actually present on a variant, so a
   // variant whose colour isn't in the defined palette (e.g. a migrated "Default Title") still gets
@@ -127,36 +151,44 @@ export function useVariantsMatrix({ product, sizes, colours, quickFilter, onVari
 
   const allRowsSelected = rows.length > 0 && rows.every((r) => selectedIds.has(r.id));
 
-  const startRowEdit = (rowId: string) => {
-    if (!product) return;
-    setStoredEditingRow({ productId: product.id, rowId });
-    setRowDraft(null);
-  };
-
-  const cancelRowEdit = () => {
-    setStoredEditingRow(null);
-    setRowDraft(null);
-  };
-
   const setVariantEdit = (variantId: string, patchValue: Partial<VariantRow>) => {
-    if (editingRowId !== variantId) return;
-    setRowDraft((prev) => ({ ...prev, ...patchValue }));
+    if (!product) return;
+    setStoredDrafts((prev) => {
+      const base = prev && prev.productId === product.id ? prev.drafts : {};
+      return { productId: product.id, drafts: { ...base, [variantId]: { ...base[variantId], ...patchValue } } };
+    });
   };
 
-  const saveRowEdit = () => {
-    if (!product || !editingRowId || !rowDraft) {
-      cancelRowEdit();
-      return;
-    }
+  /** Drops one row's draft — used both after a successful save (the fresh server value is now
+   * current) and as the row's own Revert action while dirty. */
+  const clearRowDraft = (variantId: string) => {
+    setStoredDrafts((prev) => {
+      if (!prev || !prev.drafts[variantId]) return prev;
+      const next = { ...prev.drafts };
+      delete next[variantId];
+      return { productId: prev.productId, drafts: next };
+    });
+  };
+
+  const revertRow = (variantId: string) => clearRowDraft(variantId);
+
+  const saveRow = (variantId: string) => {
+    const changes = dirtyById[variantId];
+    if (!product || !changes) return;
+    setSavingRowId(variantId);
     request({
-      url: `/api/inventory/catalog/${product.id}/variants/${editingRowId}`,
+      url: `/api/inventory/catalog/${product.id}/variants/${variantId}`,
       method: 'PATCH',
-      data: rowDraft as unknown as Record<string, unknown>,
+      data: changes as unknown as Record<string, unknown>,
       successMessage: 'Variant updated',
       onSuccess: ({ data }) => {
+        setSavingRowId(null);
         onVariantSaved(data);
-        cancelRowEdit();
+        clearRowDraft(variantId);
       },
+      // useRequest has no onSettled — savingRowId must be cleared on both branches, since a
+      // validation/network failure leaves the draft in place for the admin to fix and retry.
+      onError: () => setSavingRowId(null),
     });
   };
 
@@ -217,12 +249,11 @@ export function useVariantsMatrix({ product, sizes, colours, quickFilter, onVari
     sizes,
     rows,
     totals,
-    editingRowId,
-    rowDraft,
-    saving,
-    startRowEdit,
-    cancelRowEdit,
-    saveRowEdit,
+    dirtyById,
+    isRowDirty: (id: string) => dirtyById[id] !== undefined,
+    savingRowId,
+    saveRow,
+    revertRow,
     setVariantEdit,
     deleteTarget,
     deleting,

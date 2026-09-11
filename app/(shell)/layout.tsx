@@ -7,6 +7,8 @@ import NotificationBell from "@/app/(shell)/NotificationBell";
 import TasksButton from "@/app/(shell)/TasksButton";
 import useLoginManager from "@/app/(shell)/useLoginManager";
 import { PageHeadingProvider, usePageHeading } from "@/components/PageHeadingContext";
+import { ZoomProvider } from "@/components/ZoomContext";
+import ZoomControl from "@/components/ZoomControl";
 import { isDecoratorRole, isOrderPickerRole, isRestrictedSessionRole } from "@/lib/roles";
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
@@ -390,6 +392,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
 
   return (
     <PageHeadingProvider>
+    <ZoomProvider>
     <div className={blockOrdersCopy ? "protected-orders-page" : undefined}>
       {blockOrdersCopy && blockedActionMessage && (
         <div
@@ -636,6 +639,12 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
           </div>
           <div className="flex items-center gap-3 relative">
 
+            {activeId === "inventory" && (
+              <>
+                <ZoomControl />
+                <span className="h-5 w-px bg-gray-200" aria-hidden="true" />
+              </>
+            )}
             <TasksButton isAdmin={user?.role === "admin"} />
             {user?.id && <MessagesChatButton unreadCount={unreadMessageCount} currentUserId={user.id} />}
             {/* <LoginManager isAdmin={user?.role === "admin"} onOpen={() => loginManager.setOpen(true)} /> */}
@@ -669,6 +678,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
         {children}
       </div>
     </div>
+    </ZoomProvider>
     </PageHeadingProvider>
   );
 }
