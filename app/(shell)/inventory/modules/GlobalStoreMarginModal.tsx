@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ModalShell } from '@/components/ModalShell';
+import { MODAL_FOOTER_BTN_PRIMARY, MODAL_FOOTER_BTN_SECONDARY, ModalShell } from '@/components/ModalShell';
 import type { GlobalStoreMarginsState } from './hooks/useGlobalStoreMargins';
 import { Close, Plus } from './icons';
 
@@ -30,15 +30,16 @@ export default function GlobalStoreMarginModal({ state, onClose }: GlobalStoreMa
   };
 
   return (
-    <ModalShell
+    <ModalShell disableBackdropClose
       title="Per store margin defaults"
+      compact
       onClose={handleCancel}
       footer={
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={handleCancel}
-            className="h-[22px] flex-1 rounded-[6px] border border-gray-300 bg-white px-[6px] text-[10px] font-bold leading-none text-gray-600 transition-colors duration-150 hover:bg-gray-50 cursor-pointer"
+            className={`flex-1 ${MODAL_FOOTER_BTN_SECONDARY}`}
           >
             Cancel
           </button>
@@ -46,7 +47,7 @@ export default function GlobalStoreMarginModal({ state, onClose }: GlobalStoreMa
             type="button"
             onClick={handleSave}
             disabled={state.saving}
-            className="h-[22px] flex-1 rounded-[6px] bg-blue-600 px-[6px] text-[10px] font-bold leading-none text-white transition-colors duration-150 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+            className={`flex-1 ${MODAL_FOOTER_BTN_PRIMARY}`}
           >
             Save
           </button>

@@ -1,8 +1,10 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { FieldLabel } from './ProductFieldRows';
 import TaxonomyAddButton from './TaxonomyAddButton';
+import { useAnchoredDropdown } from './hooks/useAnchoredDropdown';
 
 type ApiResponse<T> = { success: boolean; message: string; data: T };
 
@@ -22,18 +24,13 @@ export default function VendorPicker({ storeId, value, onChange }: VendorPickerP
   const [open, setOpen] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const anchorRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  // Fixed 280px menu, measured-height above-placement, auto-close off-screen — shared hook.
+  const position = useAnchoredDropdown({ anchorRef, dropdownRef, open, onClose: () => setOpen(false), width: 280, maxHeight: 224 });
   // Guards against an older, slower request's response overwriting a newer one when responses
   // arrive out of order.
   const requestIdRef = useRef(0);
-
-  useEffect(() => {
-    const onClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', onClickOutside);
-    return () => document.removeEventListener('mousedown', onClickOutside);
-  }, []);
 
   useEffect(() => {
     if (!open || !storeId) return;
@@ -55,10 +52,11 @@ export default function VendorPicker({ storeId, value, onChange }: VendorPickerP
   }, [value, open, storeId]);
 
   return (
-    <div className="min-w-0" ref={containerRef}>
+    <div className="min-w-0">
       <FieldLabel>Brand (Vendor)</FieldLabel>
       <div className="relative">
         <input
+          ref={anchorRef}
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
@@ -67,12 +65,16 @@ export default function VendorPicker({ storeId, value, onChange }: VendorPickerP
             if (e.key === 'Escape') setOpen(false);
           }}
           placeholder="e.g. Flex Kindy"
-          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400"
+          className="h-[24px] w-full rounded-[7px] border border-gray-300 px-[6px] text-[11px] leading-none outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 placeholder:text-gray-400"
         />
 
-        {open && (
-          <div className="absolute z-30 top-full mt-1 left-0 w-full max-h-56 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
-            {loading && <div className="px-3 py-2 text-xs text-gray-400">Loading…</div>}
+        {open && position && typeof document !== 'undefined' && createPortal(
+          <div
+            ref={dropdownRef}
+            style={{ position: 'fixed', top: position.top, left: position.left, width: position.width }}
+            className="z-[70] max-h-56 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+          >
+            {loading && <div className="px-2 py-1 text-[11px] text-gray-400">Loading…</div>}
             {!loading &&
               suggestions.map((vendor) => (
                 <button
@@ -83,13 +85,14 @@ export default function VendorPicker({ storeId, value, onChange }: VendorPickerP
                     onChange(vendor);
                     setOpen(false);
                   }}
-                  className="block w-full truncate px-3 py-2 text-left text-sm text-gray-900 hover:bg-gray-50 cursor-pointer"
+                  className="block w-full truncate px-2 py-1 text-left text-[11px] leading-none text-gray-900 hover:bg-gray-50 cursor-pointer"
                 >
                   {vendor}
                 </button>
               ))}
             {!loading && <TaxonomyAddButton query={value} options={suggestions} label="vendor" onAdd={(v) => { onChange(v); setOpen(false); }} />}
-          </div>
+          </div>,
+          document.body
         )}
       </div>
     </div>

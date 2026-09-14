@@ -49,7 +49,7 @@ function FileField({
         {attachments[field].map((file, fi) => (
           <span key={fi} className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-600">
             <a href={file.url} target="_blank" rel="noopener noreferrer" className="hover:underline">{file.name}</a>
-            <button type="button" onClick={() => onRemoveFile(field, fi)} className="text-gray-400 hover:text-red-500">×</button>
+            <button type="button" onClick={() => onRemoveFile(field, fi)} className="text-gray-400 hover:text-red-500 cursor-pointer">×</button>
           </span>
         ))}
       </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { ModalActions, ModalShell } from '@/components/ModalShell';
+import { MODAL_FOOTER_BTN_PRIMARY, MODAL_FOOTER_BTN_SECONDARY, ModalShell } from '@/components/ModalShell';
 import FilePicker from './FilePicker';
 import type { ProductImportPreviewGroup, useImportProducts } from './hooks/useImportProducts';
 import type { SupplierOption } from './types';
@@ -26,18 +26,30 @@ export default function ImportProductsModal({ importProducts: ip, suppliers }: I
   const allSkipped = !!ip.preview && ip.preview.length > 0 && actionableCount === 0;
 
   return (
-    <ModalShell
+    <ModalShell disableBackdropClose
       title="Import products"
+      compact
       onClose={ip.closeModal}
       extraWide
       footer={
         ip.preview ? (
-          <ModalActions
-            onCancel={ip.closeModal}
-            onConfirm={ip.commitImport}
-            confirmLabel={ip.importing ? 'Importing...' : `Import ${actionableCount} product${actionableCount === 1 ? '' : 's'}`}
-            disabled={ip.importing || actionableCount === 0}
-          />
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={ip.closeModal}
+              className={`flex-1 ${MODAL_FOOTER_BTN_SECONDARY}`}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={ip.commitImport}
+              disabled={ip.importing || actionableCount === 0}
+              className={`flex-1 ${MODAL_FOOTER_BTN_PRIMARY}`}
+            >
+              {ip.importing ? 'Importing...' : `Import ${actionableCount} product${actionableCount === 1 ? '' : 's'}`}
+            </button>
+          </div>
         ) : undefined
       }
     >

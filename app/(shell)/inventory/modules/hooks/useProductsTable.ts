@@ -3,11 +3,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'react-toastify';
 import { buildPageNumbers } from '@/hooks/usePagination';
+import { PAGE_SIZE_OPTIONS, useProductsFilters } from './useProductsFilters';
 import type { CataloguePagination, ProductRecord, ProductStatusValue, ProductsResponse, QuickFilterId } from '../types';
 
 export type ProductsSortKey = 'name' | 'brand' | 'category' | 'sku' | 'status' | 'variants' | 'stock' | 'stockValue' | 'createdAt';
 
-const PAGE_SIZE_OPTIONS = [20, 50, 100];
 const EMPTY_PAGINATION: CataloguePagination = { page: 1, pageSize: PAGE_SIZE_OPTIONS[0], total: 0, totalPages: 1, hasPrev: false, hasNext: false };
 
 type DeleteTarget = { kind: 'selection' } | { kind: 'single'; id: string; name: string };
@@ -47,49 +47,17 @@ export function useProductsTable({ enabled, verifiedOnly, quickFilter, onView, o
   const [supplierOptions, setSupplierOptions] = useState<{ id: string; name: string }[]>([]);
   // Named distinctly from the exposed `loading` below — see useCatalogData's `fetching` for why.
   const [fetching, setFetching] = useState(false);
-  const [loaded, setLoaded] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
 
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSizeState] = useState(PAGE_SIZE_OPTIONS[0]);
-
-  // Every filter/sort/page-size setter resets to page 1 inline — mirrors how
-  // useOrdersFilters resets its own pagination, instead of a useEffect side effect.
-  const [search, setSearchState] = useState('');
-  const setSearch = (value: string) => {
-    setSearchState(value);
-    setPage(1);
-  };
-  const [status, setStatusState] = useState<ProductStatusValue | ''>('');
-  const setStatus = (value: ProductStatusValue | '') => {
-    setStatusState(value);
-    setPage(1);
-  };
-  const [supplierId, setSupplierIdState] = useState('');
-  const setSupplierId = (value: string) => {
-    setSupplierIdState(value);
-    setPage(1);
-  };
-  const [sort, setSortState] = useState<ProductsSortKey>('name');
-  const [dir, setDir] = useState<'asc' | 'desc'>('asc');
-  const setPageSize = (size: number) => {
-    setPageSizeState(size);
-    setPage(1);
-  };
+  const filters = useProductsFilters({ verifiedOnly, quickFilter });
+  const { page, setPage, pageSize, search, status, supplierId, sort, dir } = filters;
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectAllFilters, setSelectAllFilters] = useState(false);
   const [bulkRunning, setBulkRunning] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<DeleteTarget | null>(null);
   const [statusModal, setStatusModal] = useState<ProductStatusValue | null>(null);
-
-  const hasActiveFilters = search.trim() !== '' || status !== '' || supplierId !== '';
-  const handleClearFilters = () => {
-    setSearch('');
-    setStatus('');
-    setSupplierId('');
-  };
 
   const buildParams = (overrides?: { page?: number; pageSize?: number }) => {
     const params = new URLSearchParams({
@@ -113,6 +81,9 @@ export function useProductsTable({ enabled, verifiedOnly, quickFilter, onView, o
     if (!enabled) return;
     const controller = new AbortController();
     abortRef.current = controller;
+    // Canonical "fetching data" effect shape (see React's Effects guide) — the loading flag has
+    // to flip the instant the request starts, not after it resolves.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setFetching(true);
 
     fetch(`/api/inventory/catalog?${buildParams().toString()}`, { signal: controller.signal })
@@ -122,7 +93,6 @@ export function useProductsTable({ enabled, verifiedOnly, quickFilter, onView, o
         setRows(json.data.products);
         setPagination(json.data.pagination);
         setSupplierOptions(json.data.supplierOptions);
-        setLoaded(true);
         if (json.data.stepperTotal !== undefined) {
           onCounts?.({ totalAll: json.data.totalAll, filteredCount: json.data.stepperTotal });
         }
@@ -150,16 +120,6 @@ export function useProductsTable({ enabled, verifiedOnly, quickFilter, onView, o
   // Derived, not stored: reads false immediately once "All records" flips off, without waiting
   // for the (skipped) fetch effect to reset it.
   const loading = fetching && enabled;
-
-  const handleSortChange = (key: ProductsSortKey) => {
-    if (sort === key) {
-      setDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
-    } else {
-      setSortState(key);
-      setDir('asc');
-    }
-    setPage(1);
-  };
 
   const isCurrentPageAllSelected = rows.length > 0 && rows.every((p) => selectedIds.includes(p.id));
 
@@ -257,27 +217,26 @@ export function useProductsTable({ enabled, verifiedOnly, quickFilter, onView, o
   const setVerified = (verified: boolean) => void runBulk({ action: 'set_verified', verified });
 
   return {
-    search,
-    setSearch,
+    searchInput: filters.searchInput,
+    setSearch: filters.setSearchInput,
     status,
-    setStatus,
+    setStatus: filters.setStatus,
     supplierId,
-    setSupplierId,
+    setSupplierId: filters.setSupplierId,
     supplierOptions,
-    hasActiveFilters,
-    handleClearFilters,
+    hasActiveFilters: filters.hasActiveFilters,
+    handleClearFilters: filters.handleClearFilters,
     sort,
     dir,
-    handleSortChange,
+    handleSortChange: filters.handleSortChange,
     products: rows,
     loading,
-    initialLoading: loading && !loaded,
     pagination,
     pageNumbers,
     goToPage: setPage,
     pageSize,
-    setPageSize,
-    pageSizeOptions: PAGE_SIZE_OPTIONS,
+    setPageSize: filters.setPageSize,
+    pageSizeOptions: filters.pageSizeOptions,
     selectedIds,
     selectAllFilters,
     isCurrentPageAllSelected,

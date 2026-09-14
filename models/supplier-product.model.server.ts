@@ -828,7 +828,8 @@ function normalizeColours(raw: unknown): ColourOptionData[] {
 
 /** Common table expressions shared by list/listIds/findPosition: a weighted-average received
  * cost per variant (mirrors hydrate()'s buyPrice fallback), and a per-product rollup used for
- * sorting (variant count, total stock, stock value) and for the quick-filter EXISTS check. */
+ * sorting (variant count, total stock, stock value) and for the quick filter, which flags a
+ * product when *any* of its variants falls under the threshold — never an average. */
 const CATALOGUE_CTE_SQL = Prisma.sql`
   WITH avg_cost AS (
     SELECT "variantId", SUM("unitCost" * "receivedQuantity") / NULLIF(SUM("receivedQuantity"), 0) AS wac
@@ -851,7 +852,11 @@ const CATALOGUE_CTE_SQL = Prisma.sql`
       pid,
       COUNT(*) AS variant_count,
       SUM(stock) AS total_stock,
-      SUM(stock * sell) AS stock_value
+      SUM(stock * sell) AS stock_value,
+      BOOL_OR(buy < 1) AS any_buy_lt_1,
+      BOOL_OR((sell - buy) < 5) AS any_profit_lt_5,
+      BOOL_OR(sell < 1) AS any_sell_lt_1,
+      BOOL_OR(sell < 5) AS any_sell_lt_5
     FROM variant_eff
     GROUP BY pid
   )
@@ -862,16 +867,20 @@ function buildLikePattern(value: string): string {
   return `%${escaped}%`;
 }
 
+/** Matches a product if *any* of its variants falls under the threshold — a product with
+ * variants on both sides (e.g. buy $0.50 and $3.00) still qualifies for "Buy < $1", same as the
+ * client-side per-variant predicate in the single-product detail view. `pa.any_*` is NULL for a
+ * variant-less product, so it never matches (same as before). */
 function quickFilterPredicateSql(quickFilter: QuickFilterId): Prisma.Sql {
   switch (quickFilter) {
     case 'buying-lt-1':
-      return Prisma.sql`buy < 1`;
+      return Prisma.sql`pa.any_buy_lt_1`;
     case 'profit-lt-5':
-      return Prisma.sql`(sell - buy) < 5`;
+      return Prisma.sql`pa.any_profit_lt_5`;
     case 'selling-lt-1':
-      return Prisma.sql`sell < 1`;
+      return Prisma.sql`pa.any_sell_lt_1`;
     case 'selling-lt-5':
-      return Prisma.sql`sell < 5`;
+      return Prisma.sql`pa.any_sell_lt_5`;
     default:
       return Prisma.sql`false`;
   }
@@ -914,8 +923,9 @@ function buildCatalogueWhereSql(params: {
   }
 
   if (params.quickFilter) {
-    const predicate = quickFilterPredicateSql(params.quickFilter);
-    whereParts.push(Prisma.sql`EXISTS (SELECT 1 FROM variant_eff ve WHERE ve.pid = sp.id AND ${predicate})`);
+    // `pa` (product_agg) is already LEFT JOINed onto `sp` by buildCatalogueFilteredSql, so the
+    // predicate can reference it directly rather than re-deriving it via an EXISTS subquery.
+    whereParts.push(quickFilterPredicateSql(params.quickFilter));
   }
 
   return Prisma.join(whereParts, ' AND ');

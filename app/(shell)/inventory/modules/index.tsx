@@ -57,7 +57,7 @@ export default function InventoryPage() {
             <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm xl:min-h-0 xl:flex-1 xl:overflow-y-auto">
               <ProductsTableToolbar table={p.productsTable} onRefresh={p.productsTable.refresh} loading={p.productsTable.loading} />
               {hasSelection && <ProductsSelectionBar table={p.productsTable} />}
-              <ProductsTable table={p.productsTable} loading={p.productsTable.initialLoading} />
+              <ProductsTable table={p.productsTable} loading={p.productsTable.loading} />
               <Pagination
                 pagination={p.productsTable.pagination}
                 loading={p.productsTable.loading}
@@ -68,7 +68,7 @@ export default function InventoryPage() {
                 onPageSizeChange={p.productsTable.setPageSize}
               />
             </div>
-          ) : p.initialLoading ? (
+          ) : p.showSkeleton ? (
             <LoadingState />
           ) : !p.product ? (
             <EmptyState />
@@ -115,13 +115,29 @@ export default function InventoryPage() {
 
 function LoadingState() {
   return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-1 gap-3 xl:grid-cols-2 2xl:grid-cols-5">
+    <div className="space-y-2">
+      <div className="h-8 animate-pulse rounded-[10px] border border-gray-200 bg-gray-100" />
+
+      <div className="grid grid-cols-1 gap-[5px] md:grid-cols-2 xl:grid-cols-[172px_minmax(0,2fr)_minmax(0,1.32fr)_206px]">
+        <div className="flex flex-col gap-[5px]">
+          <div className="h-40 animate-pulse rounded-xl border border-gray-200 bg-gray-100" />
+          <div className="h-32 animate-pulse rounded-xl border border-gray-200 bg-gray-100" />
+        </div>
+        <div className="h-80 animate-pulse rounded-xl border border-gray-200 bg-gray-100" />
+        <div className="h-80 animate-pulse rounded-xl border border-gray-200 bg-gray-100" />
+        <div className="h-80 animate-pulse rounded-xl border border-gray-200 bg-gray-100" />
+      </div>
+
+      <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+        <div className="m-2 h-6 animate-pulse rounded bg-gray-100" />
+        <div className="m-2 h-40 animate-pulse rounded bg-gray-100" />
+      </div>
+
+      <div className="grid grid-cols-1 gap-[5px] md:grid-cols-2 xl:h-24 xl:grid-cols-5">
         {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} className="h-80 animate-pulse rounded-xl border border-gray-200 bg-gray-100" />
+          <div key={i} className="h-24 animate-pulse rounded-[10px] border border-gray-200 bg-gray-100 xl:h-full" />
         ))}
       </div>
-      <div className="h-64 animate-pulse rounded-xl border border-gray-200 bg-gray-100" />
     </div>
   );
 }

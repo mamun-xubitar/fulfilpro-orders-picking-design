@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { toast } from 'react-toastify';
 import useRequest from '@/hooks/useRequest';
 import { buildCountSheetDocument } from '../utils';
 import type { ProductRecord, StocktakeRecord } from '../types';
@@ -22,11 +23,12 @@ export function useStocktake({ product, onSaved }: UseStocktakeArgs) {
     requestStart({
       url: `/api/inventory/catalog/${product.id}/stocktakes`,
       method: 'POST',
-      successMessage: 'Stocktake started',
+      showToast: false,
       onSuccess: ({ data }) => {
         setActive(data);
         setCounts(Object.fromEntries(data.items.map((i) => [i.id, String(i.countedQty ?? i.expectedQty)])));
       },
+      onError: (err) => toast.error(err.general || 'Failed to start stocktake'),
     });
   };
 

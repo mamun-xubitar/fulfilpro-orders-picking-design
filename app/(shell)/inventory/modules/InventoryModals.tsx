@@ -1,6 +1,6 @@
 'use client';
 
-import { ModalActions, ModalShell } from '@/components/ModalShell';
+import { MODAL_FOOTER_BTN_DANGER, MODAL_FOOTER_BTN_PRIMARY, MODAL_FOOTER_BTN_SECONDARY, ModalShell } from '@/components/ModalShell';
 import AdjustmentModals from './AdjustmentModals';
 import BulkUpdateStoresModal from './BulkUpdateStoresModal';
 import EditImagesModal from './EditImagesModal';
@@ -28,7 +28,7 @@ export default function InventoryModals(p: InventoryPage) {
       {p.newProductOpen && <NewProductWizard p={p} />}
 
       {p.matrixFullView && p.product && (
-        <ModalShell title="Variants / stock matrix" onClose={p.closeMatrixFullView} fullScreen>
+        <ModalShell disableBackdropClose title="Variants / stock matrix" compact onClose={p.closeMatrixFullView} fullScreen>
           <VariantsMatrixSection p={p} fullView />
         </ModalShell>
       )}
@@ -38,7 +38,7 @@ export default function InventoryModals(p: InventoryPage) {
       )}
 
       {gallery.lightboxOpen && gallery.lightboxActive && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80" role="dialog" aria-modal="true" onClick={gallery.closeLightbox}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80" role="dialog" aria-modal="true">
           <button type="button" onClick={gallery.closeLightbox} aria-label="Close" className="absolute right-4 top-4 text-white/80 hover:text-white cursor-pointer">
             <Close className="h-6 w-6" />
           </button>
@@ -104,12 +104,31 @@ export default function InventoryModals(p: InventoryPage) {
       {pricing.confirmUse && <ApplyPriceModal p={p} />}
 
       {matrix.deleteTarget && (
-        <ModalShell
+        <ModalShell disableBackdropClose
           title="Delete this variant?"
+          compact
           onClose={matrix.cancelDeleteRow}
-          footer={<ModalActions onCancel={matrix.cancelDeleteRow} onConfirm={matrix.confirmDeleteRow} confirmLabel="Delete variant" disabled={matrix.deleting} />}
+          footer={
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={matrix.cancelDeleteRow}
+                className={`flex-1 ${MODAL_FOOTER_BTN_SECONDARY}`}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={matrix.confirmDeleteRow}
+                disabled={matrix.deleting}
+                className={`flex-1 ${MODAL_FOOTER_BTN_DANGER}`}
+              >
+                Delete variant
+              </button>
+            </div>
+          }
         >
-          <p className="text-sm text-gray-600">
+          <p className="text-[12px] text-gray-600">
             This removes <strong className="font-semibold text-gray-900">{variantTitle(matrix.deleteTarget)}</strong>
             {matrix.deleteTarget.sku ? ` (${matrix.deleteTarget.sku})` : ''} and its stock history. This can&apos;t be undone.
           </p>
@@ -135,15 +154,16 @@ export default function InventoryModals(p: InventoryPage) {
 function BulkDeleteVariantsModal({ p }: { p: InventoryPage }) {
   const { matrix } = p;
   return (
-    <ModalShell
+    <ModalShell disableBackdropClose
       title="Delete selected variants?"
+      compact
       onClose={matrix.cancelBulkDelete}
       footer={
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={matrix.cancelBulkDelete}
-            className="h-[22px] flex-1 rounded-[6px] border border-gray-300 bg-white px-[6px] text-[10px] font-bold leading-none text-gray-600 transition-colors duration-150 hover:bg-gray-50 cursor-pointer"
+            className={`flex-1 ${MODAL_FOOTER_BTN_SECONDARY}`}
           >
             Cancel
           </button>
@@ -151,7 +171,7 @@ function BulkDeleteVariantsModal({ p }: { p: InventoryPage }) {
             type="button"
             onClick={matrix.confirmBulkDelete}
             disabled={matrix.bulkDeleting}
-            className="h-[22px] flex-1 rounded-[6px] bg-red-600 px-[6px] text-[10px] font-bold leading-none text-white transition-colors duration-150 hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+            className={`flex-1 ${MODAL_FOOTER_BTN_DANGER}`}
           >
             {matrix.bulkDeleting ? 'Deleting...' : 'Delete variants'}
           </button>
@@ -169,15 +189,16 @@ function BulkDeleteVariantsModal({ p }: { p: InventoryPage }) {
 function DeleteProductModal({ p }: { p: InventoryPage }) {
   if (!p.product) return null;
   return (
-    <ModalShell
+    <ModalShell disableBackdropClose
       title="Delete this product?"
+      compact
       onClose={p.closeDeleteProduct}
       footer={
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={p.closeDeleteProduct}
-            className="h-[22px] flex-1 rounded-[6px] border border-gray-300 bg-white px-[6px] text-[10px] font-bold leading-none text-gray-600 transition-colors duration-150 hover:bg-gray-50 cursor-pointer"
+            className={`flex-1 ${MODAL_FOOTER_BTN_SECONDARY}`}
           >
             Cancel
           </button>
@@ -185,7 +206,7 @@ function DeleteProductModal({ p }: { p: InventoryPage }) {
             type="button"
             onClick={p.confirmDeleteProduct}
             disabled={p.deletingProduct}
-            className="h-[22px] flex-1 rounded-[6px] bg-red-600 px-[6px] text-[10px] font-bold leading-none text-white transition-colors duration-150 hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+            className={`flex-1 ${MODAL_FOOTER_BTN_DANGER}`}
           >
             {p.deletingProduct ? 'Deleting...' : 'Delete product'}
           </button>
@@ -204,15 +225,16 @@ function ApplyPriceModal({ p }: { p: InventoryPage }) {
   const { pricing } = p;
   if (!pricing.confirmUse) return null;
   return (
-    <ModalShell
+    <ModalShell disableBackdropClose
       title="Apply this price?"
+      compact
       onClose={pricing.cancelUsePrice}
       footer={
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={pricing.cancelUsePrice}
-            className="h-[22px] flex-1 rounded-[6px] border border-gray-300 bg-white px-[6px] text-[10px] font-bold leading-none text-gray-600 transition-colors duration-150 hover:bg-gray-50 cursor-pointer"
+            className={`flex-1 ${MODAL_FOOTER_BTN_SECONDARY}`}
           >
             Cancel
           </button>
@@ -220,7 +242,7 @@ function ApplyPriceModal({ p }: { p: InventoryPage }) {
             type="button"
             onClick={pricing.confirmUsePrice}
             disabled={pricing.applying}
-            className="h-[22px] flex-1 rounded-[6px] bg-blue-600 px-[6px] text-[10px] font-bold leading-none text-white transition-colors duration-150 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+            className={`flex-1 ${MODAL_FOOTER_BTN_PRIMARY}`}
           >
             Apply to all variants
           </button>

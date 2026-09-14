@@ -150,7 +150,7 @@ export default function GalleryThumbRow({ tiles, activeKey, onSelect }: GalleryT
           onMouseUp={endDrag}
           onMouseLeave={endDrag}
           onClickCapture={onClickCapture}
-          className="no-scrollbar flex flex-1 cursor-grab gap-[4px] overflow-x-auto px-1 active:cursor-grabbing"
+          className="no-scrollbar flex flex-1 cursor-grab gap-[4px] overflow-x-auto overflow-y-hidden px-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden active:cursor-grabbing"
         >
           {tiles.map((tile) => {
             const isActive = tile.key === activeKey;

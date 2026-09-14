@@ -18,6 +18,8 @@ type SupplierMultiSelectProps = {
   onCreateSupplier?: (name: string) => void;
   /** Opens the Add supplier modal with a blank form — rendered as a "+" button beside the trigger. */
   onAddSupplier?: () => void;
+  /** Shows a red asterisk after the label — the product can't be saved without a supplier. */
+  required?: boolean;
 };
 
 /**
@@ -26,7 +28,7 @@ type SupplierMultiSelectProps = {
  * the supplier list is already loaded page-wide. Every linked supplier is equal: there's no
  * default/primary among them.
  */
-export default function SupplierMultiSelect({ suppliers, selectedIds, onChange, error, onCreateSupplier, onAddSupplier }: SupplierMultiSelectProps) {
+export default function SupplierMultiSelect({ suppliers, selectedIds, onChange, error, onCreateSupplier, onAddSupplier, required }: SupplierMultiSelectProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
@@ -91,7 +93,9 @@ export default function SupplierMultiSelect({ suppliers, selectedIds, onChange, 
 
   return (
     <div className="min-w-0" ref={containerRef}>
-      <FieldLabel>Suppliers</FieldLabel>
+      <FieldLabel>
+        Suppliers{required && <span className="ml-0.5 text-red-500">*</span>}
+      </FieldLabel>
       <div className="relative flex items-start gap-1.5">
         <button
           ref={anchorRef}

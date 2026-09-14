@@ -310,8 +310,9 @@ export default function RichTextField({ label, value, onChange, hideLabel, toolb
       </div>
 
       {linkModalOpen && (
-        <ModalShell
+        <ModalShell disableBackdropClose
           title={isEditingLink ? 'Edit link' : 'Insert link'}
+          compact
           onClose={closeLinkModal}
           footer={
             <div className="flex items-center gap-2">

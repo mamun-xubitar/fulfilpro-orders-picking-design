@@ -1,9 +1,9 @@
 'use client';
 
-import { ModalShell } from '@/components/ModalShell';
-import { formatDate, variantTitle } from './utils';
+import { MODAL_FOOTER_BTN_PRIMARY, MODAL_FOOTER_BTN_SECONDARY, ModalShell } from '@/components/ModalShell';
 import type { useAdjustments } from './hooks/useAdjustments';
 import type { VariantRow } from './types';
+import { formatDate, variantTitle } from './utils';
 
 type AdjustmentModalsProps = { adjustments: ReturnType<typeof useAdjustments>; variants: VariantRow[] };
 
@@ -21,8 +21,9 @@ function NewAdjustmentModal({ a, variants }: { a: ReturnType<typeof useAdjustmen
   const targetVariants = a.variantIds.map((id) => variantById.get(id)).filter((v): v is VariantRow => !!v);
 
   return (
-    <ModalShell
+    <ModalShell disableBackdropClose
       title="New stock adjustment"
+      compact
       onClose={a.closeModal}
       extraWide
       footer={
@@ -32,7 +33,7 @@ function NewAdjustmentModal({ a, variants }: { a: ReturnType<typeof useAdjustmen
             <button
               type="button"
               onClick={a.closeModal}
-              className="h-[22px] rounded-[6px] border border-gray-300 bg-white px-[10px] text-[10px] font-bold leading-none text-gray-600 transition-colors duration-150 hover:bg-gray-50 cursor-pointer"
+              className={MODAL_FOOTER_BTN_SECONDARY}
             >
               Close
             </button>
@@ -40,7 +41,7 @@ function NewAdjustmentModal({ a, variants }: { a: ReturnType<typeof useAdjustmen
               type="button"
               onClick={a.saveAll}
               disabled={a.savingAll || a.dirtyCount === 0}
-              className="h-[22px] rounded-[6px] bg-blue-600 px-[10px] text-[10px] font-bold leading-none text-white transition-colors duration-150 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+              className={MODAL_FOOTER_BTN_PRIMARY}
             >
               {a.savingAll ? 'Saving all...' : `Save all (${a.dirtyCount})`}
             </button>
@@ -168,11 +169,12 @@ function AdjustmentRow({ a, v }: { a: ReturnType<typeof useAdjustments>; v: Vari
         </select>
       </td>
       <td className="px-2 py-1">
-        <textarea
-          rows={2}
+        <input
+          type="text"
           value={row?.note ?? ''}
           onChange={(e) => a.setRowField(v.id, { note: e.target.value })}
-          className="w-72 resize-none rounded-[6px] border border-gray-300 px-[6px] py-[4px] text-[11px] leading-tight outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+          placeholder="Add note..."
+          className="h-[22px] w-72 rounded-[6px] border border-gray-300 px-[6px] text-[11px] leading-none outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
         />
       </td>
       <td className="px-2 py-1 text-right">
@@ -191,7 +193,7 @@ function AdjustmentRow({ a, v }: { a: ReturnType<typeof useAdjustments>; v: Vari
 
 function AdjustmentHistoryModal({ a }: { a: ReturnType<typeof useAdjustments> }) {
   return (
-    <ModalShell title="Adjustment history" onClose={a.closeHistory} wide>
+    <ModalShell disableBackdropClose title="Adjustment history" compact onClose={a.closeHistory} wide>
       {a.loadingHistory ? (
         <p className="py-6 text-center text-[11px] text-gray-400">Loading...</p>
       ) : a.history.length === 0 ? (

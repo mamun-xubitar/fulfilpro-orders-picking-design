@@ -72,13 +72,13 @@ export default function StoreDraftVariantImage({ variantLabel, storeName, images
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={`Image for ${variantLabel} at ${storeName}`}
-        className="flex w-full items-center gap-1.5 rounded-lg border border-gray-300 px-1.5 py-1 text-left text-[12px] outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+        className="flex h-[24px] w-full items-center gap-1.5 rounded-[7px] border border-gray-300 px-[6px] text-left text-[11px] leading-none outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {selected ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={selected.url} alt="" className="h-6 w-6 shrink-0 rounded object-cover" />
+          <img src={selected.url} alt="" className="h-5 w-5 shrink-0 rounded object-cover" />
         ) : (
-          <div className="h-6 w-6 shrink-0 rounded border border-dashed border-gray-300" />
+          <div className="h-5 w-5 shrink-0 rounded border border-dashed border-gray-300" />
         )}
         <span className="min-w-0 flex-1 truncate text-gray-700">{selected ? imageLabel(selected) : images.length === 0 ? 'No images' : '— none —'}</span>
         <ChevronDown className="h-3 w-3 shrink-0 text-gray-400" />
@@ -97,11 +97,11 @@ export default function StoreDraftVariantImage({ variantLabel, storeName, images
             role="option"
             aria-selected={selectedImageId === null}
             onClick={() => pick(null)}
-            className={`flex w-full items-center gap-2 px-2 py-1.5 text-left text-[12px] hover:bg-gray-50 cursor-pointer ${
+            className={`flex w-full items-center gap-2 px-2 py-1 text-left text-[11px] leading-none hover:bg-gray-50 cursor-pointer ${
               selectedImageId === null ? 'bg-blue-50 font-semibold text-blue-700' : 'text-gray-700'
             }`}
           >
-            <div className="h-6 w-6 shrink-0 rounded border border-dashed border-gray-300" />
+            <div className="h-5 w-5 shrink-0 rounded border border-dashed border-gray-300" />
             — none —
           </button>
           {images.map((img) => (
@@ -111,12 +111,12 @@ export default function StoreDraftVariantImage({ variantLabel, storeName, images
               role="option"
               aria-selected={selectedImageId === img.id}
               onClick={() => pick(img.id)}
-              className={`flex w-full items-center gap-2 px-2 py-1.5 text-left text-[12px] hover:bg-gray-50 cursor-pointer ${
+              className={`flex w-full items-center gap-2 px-2 py-1 text-left text-[11px] leading-none hover:bg-gray-50 cursor-pointer ${
                 selectedImageId === img.id ? 'bg-blue-50 font-semibold text-blue-700' : 'text-gray-700'
               }`}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={img.url} alt="" className="h-6 w-6 shrink-0 rounded object-cover" />
+              <img src={img.url} alt="" className="h-5 w-5 shrink-0 rounded object-cover" />
               <span className="min-w-0 flex-1 truncate">{imageLabel(img)}</span>
             </button>
           ))}

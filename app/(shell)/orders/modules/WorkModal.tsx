@@ -33,7 +33,7 @@ export default function WorkModal({
             <h3 className="text-sm font-semibold text-gray-800">Mark as done</h3>
             <p className="text-xs text-gray-500 mt-0.5">Order {workModal.order.number} · {workModal.item.name || workModal.item.title}</p>
           </div>
-          <button onClick={closeWorkModal} className="text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
+          <button onClick={closeWorkModal} className="text-gray-400 hover:text-gray-600 text-lg leading-none cursor-pointer">×</button>
         </div>
 
         <div className="px-5 py-4 space-y-4">
@@ -78,7 +78,7 @@ export default function WorkModal({
                   {comment.files.map((file, fi) => (
                     <span key={fi} className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-600">
                       <a href={file.url} target="_blank" rel="noopener noreferrer" className="hover:underline">{file.name}</a>
-                      <button onClick={() => removeCommentFile(ci, fi)} className="text-gray-400 hover:text-red-500">×</button>
+                      <button onClick={() => removeCommentFile(ci, fi)} className="text-gray-400 hover:text-red-500 cursor-pointer">×</button>
                     </span>
                   ))}
                   {workModal.comments.length > 1 && (

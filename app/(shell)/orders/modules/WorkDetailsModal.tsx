@@ -24,7 +24,7 @@ export default function WorkDetailsModal({
             <h3 className="text-sm font-semibold text-gray-800">Decoration work</h3>
             <p className="text-xs text-gray-500 mt-0.5">Order {workDetails.order.number} · {workDetails.item.name || workDetails.item.title}</p>
           </div>
-          <button onClick={closeWorkDetails} className="text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
+          <button onClick={closeWorkDetails} className="text-gray-400 hover:text-gray-600 text-lg leading-none cursor-pointer">×</button>
         </div>
 
         <div className="px-5 py-4 space-y-3">

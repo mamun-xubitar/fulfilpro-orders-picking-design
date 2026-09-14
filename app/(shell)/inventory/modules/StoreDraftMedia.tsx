@@ -26,15 +26,15 @@ type StoreDraftMediaProps = {
  * removing one here never deletes the hub's image, exactly like every other field in this modal. */
 export default function StoreDraftMedia({ productId, draft, toggleImage, setAlt, addImages, removeImage }: StoreDraftMediaProps) {
   return (
-    <div className="mb-4 space-y-2">
+    <div className="mb-3 space-y-2">
       <div>
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+        <p className="text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-gray-500">
           Media (Images) — {draft.images.length - draft.excludedImages.length} of {draft.images.length} selected
         </p>
-        <p className="text-[11px] text-gray-400">This store&apos;s own image list — added/removed here only, pushed on Save. The hub gallery is never touched.</p>
+        <p className="mt-1 text-[10px] leading-snug text-gray-400">This store&apos;s own image list — added/removed here only, pushed on Save. The hub gallery is never touched.</p>
       </div>
-      {draft.images.length === 0 && <p className="text-[13px] text-gray-400">No images for this store yet.</p>}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:gap-3">
+      {draft.images.length === 0 && <p className="text-[11px] text-gray-400">No images for this store yet.</p>}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
         {draft.images.map((img) => (
           <StoreDraftImageCard
             key={img.id}
@@ -64,8 +64,8 @@ function AddImageTile({ productId, onAdded }: { productId: string; onAdded: (ima
         disabled={uploading}
         className="flex aspect-square flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-gray-300 text-gray-500 transition-colors duration-150 hover:border-blue-400 hover:text-blue-500 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
       >
-        <Plus className="h-5 w-5" />
-        <span className="text-[11px] font-semibold">{uploading ? 'Uploading…' : 'Add image'}</span>
+        <Plus className="h-4 w-4" />
+        <span className="text-[10px] font-semibold">{uploading ? 'Uploading…' : 'Add image'}</span>
       </button>
       <input
         ref={fileInputRef}
