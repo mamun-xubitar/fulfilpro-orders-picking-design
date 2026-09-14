@@ -1,6 +1,6 @@
 'use client';
 
-import { ModalActions, ModalShell } from '@/components/ModalShell';
+import { MODAL_FOOTER_BTN_PRIMARY, MODAL_FOOTER_BTN_SECONDARY, ModalShell } from '@/components/ModalShell';
 import PoFormBody from './PoFormBody';
 import ReceivePoModal from './ReceivePoModal';
 import type { usePurchaseOrder } from './hooks/usePurchaseOrder';
@@ -19,11 +19,30 @@ export default function PoModals({ po, variants }: PoModalsProps) {
 
 function CreatePoModal({ po, variants }: { po: ReturnType<typeof usePurchaseOrder>; variants: VariantRow[] }) {
   return (
-    <ModalShell
+    <ModalShell disableBackdropClose
       title="Create purchase order"
+      compact
       onClose={po.closeCreate}
       extraWide
-      footer={<ModalActions onCancel={po.closeCreate} onConfirm={() => po.saveAndSend()} confirmLabel={po.saving ? 'Saving...' : 'Save and send'} disabled={po.saving} />}
+      footer={
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={po.closeCreate}
+            className={`flex-1 ${MODAL_FOOTER_BTN_SECONDARY}`}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => po.saveAndSend()}
+            disabled={po.saving}
+            className={`flex-1 ${MODAL_FOOTER_BTN_PRIMARY}`}
+          >
+            {po.saving ? 'Saving...' : 'Save and send'}
+          </button>
+        </div>
+      }
     >
       <PoFormBody po={po} variants={variants} />
     </ModalShell>

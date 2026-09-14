@@ -22,7 +22,7 @@ export default function NotesModal<O extends OrderRef>({ state, setState, onClos
             <h3 id="order-notes-title" className="text-base font-semibold text-gray-900">Order notes</h3>
             <p className="mt-1 text-sm text-gray-500">Order {state.order.number} · {state.order.customer}</p>
           </div>
-          <button type="button" onClick={onClose} disabled={state.saving || Boolean(state.deletingId)} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-50" aria-label="Close">
+          <button type="button" onClick={onClose} disabled={state.saving || Boolean(state.deletingId)} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer" aria-label="Close">
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>

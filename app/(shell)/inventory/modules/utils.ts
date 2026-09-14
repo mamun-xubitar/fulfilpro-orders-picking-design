@@ -36,9 +36,9 @@ export function getStockValue(v: VariantRow): number {
 }
 
 /** The four price-shortcut buttons, applied to a single variant. In single-product view this
- * runs entirely client-side against the already-loaded product — the server's `SupplierProductVariant`
- * query (`models/supplier-product.model.server.ts`) uses the identical four predicates for
- * All-records mode, where it decides which *products* to list rather than which rows to show. */
+ * runs entirely client-side against the already-loaded product, narrowing which variant *rows*
+ * are shown. In All-records mode the server (`models/supplier-product.model.server.ts`) applies
+ * the same per-variant thresholds and lists a *product* if any one of its variants matches. */
 export function quickFilterMatches(quickFilter: QuickFilterId, v: VariantRow): boolean {
   switch (quickFilter) {
     case 'buying-lt-1':

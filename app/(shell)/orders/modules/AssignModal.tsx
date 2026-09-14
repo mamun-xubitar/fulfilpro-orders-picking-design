@@ -32,7 +32,7 @@ export default function AssignModal({
               Order {assignModal.orderNumber} · {assignModal.productName}
             </p>
           </div>
-          <button onClick={closeAssignModal} className="text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
+          <button onClick={closeAssignModal} className="text-gray-400 hover:text-gray-600 text-lg leading-none cursor-pointer">×</button>
         </div>
 
         <div className="px-5 py-4 space-y-4">

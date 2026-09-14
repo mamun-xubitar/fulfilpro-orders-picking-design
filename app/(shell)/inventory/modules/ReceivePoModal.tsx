@@ -1,7 +1,7 @@
 'use client';
 
 import { formatColourName } from '@/lib/inventory/colour';
-import { ModalShell } from '@/components/ModalShell';
+import { MODAL_FOOTER_BTN_PRIMARY, MODAL_FOOTER_BTN_SECONDARY, ModalShell } from '@/components/ModalShell';
 import { STATUS_BADGES } from './PurchaseOrdersPanel';
 import type { usePurchaseOrder } from './hooks/usePurchaseOrder';
 import { formatDate, formatPoNumber } from './utils';
@@ -12,8 +12,9 @@ export default function ReceivePoModal({ po }: { po: ReturnType<typeof usePurcha
   const target = po.receiveTarget!;
 
   return (
-    <ModalShell
+    <ModalShell disableBackdropClose
       title={`Receive — ${target.productTitle}`}
+      compact
       onClose={po.closeReceive}
       extraWide
       footer={
@@ -21,7 +22,7 @@ export default function ReceivePoModal({ po }: { po: ReturnType<typeof usePurcha
           <button
             type="button"
             onClick={po.closeReceive}
-            className="h-[22px] flex-1 rounded-[6px] border border-gray-300 bg-white px-[6px] text-[10px] font-bold leading-none text-gray-600 transition-colors duration-150 hover:bg-gray-50 cursor-pointer"
+            className={`flex-1 ${MODAL_FOOTER_BTN_SECONDARY}`}
           >
             Cancel
           </button>
@@ -29,7 +30,7 @@ export default function ReceivePoModal({ po }: { po: ReturnType<typeof usePurcha
             type="button"
             onClick={po.submitReceive}
             disabled={po.receiving}
-            className="h-[22px] flex-1 rounded-[6px] bg-blue-600 px-[6px] text-[10px] font-bold leading-none text-white transition-colors duration-150 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+            className={`flex-1 ${MODAL_FOOTER_BTN_PRIMARY}`}
           >
             {po.receiving ? 'Receiving...' : 'Receive'}
           </button>

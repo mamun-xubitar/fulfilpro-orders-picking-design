@@ -113,6 +113,12 @@ export function useVariantsMatrix({ product, sizes, colours, quickFilter, onVari
 
   const rows = useMemo(() => {
     const filtered = variants.filter((v) => {
+      // Unsaved edits must never hide their own row: every filter below reads the
+      // draft-overlaid values, so typing a value that breaks the active filter (e.g.
+      // raising stock while "Zero stock" is checked, or raising the sell price while
+      // "Sell < $1" is active) would otherwise unmount the row mid-edit and make Save
+      // unreachable. Pinned dirty rows re-evaluate normally once saved/reverted.
+      if (dirtyById[v.id]) return true;
       if (quickFilter && !quickFilterMatches(quickFilter, v)) return false;
       if (!allColoursSelected && !activeColours.some((c) => c.toLowerCase() === v.colour.toLowerCase())) return false;
       if (sizeFilter && v.size !== sizeFilter) return false;
@@ -125,7 +131,7 @@ export function useVariantsMatrix({ product, sizes, colours, quickFilter, onVari
     // the product's own declared size order — see sortVariantsForDisplay, shared with the
     // publish/bulk-update store draft tables so all three read the same way.
     return sortVariantsForDisplay(filtered, sizes);
-  }, [variants, sizes, quickFilter, allColoursSelected, activeColours, sizeFilter, filters.status, filters.showZeroStock]);
+  }, [variants, sizes, quickFilter, allColoursSelected, activeColours, sizeFilter, filters.status, filters.showZeroStock, dirtyById]);
 
   // Selection is narrowed to the visible rows here rather than pruned in an effect.
   const selectedIds = useMemo(() => {

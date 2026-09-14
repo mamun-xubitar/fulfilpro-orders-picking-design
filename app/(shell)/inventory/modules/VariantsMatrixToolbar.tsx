@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ModalShell } from '@/components/ModalShell';
+import { MODAL_FOOTER_BTN_PRIMARY, MODAL_FOOTER_BTN_SECONDARY, ModalShell } from '@/components/ModalShell';
 import { deriveColorFromName, formatColourName, formatColoursInput, parseColoursInput, resolveSwatch } from '@/lib/inventory/colour';
 import PresetComboField from './PresetComboField';
 import { STATUS_LEGEND } from './constants';
@@ -207,21 +207,22 @@ function AddColourModal({
   };
 
   return (
-    <ModalShell
+    <ModalShell disableBackdropClose
       title="Add colour"
+      compact
       onClose={onClose}
       wide
       allowOverflow
       footer={
         <div className="flex gap-2">
-          <button type="button" onClick={onClose} className="h-[22px] flex-1 rounded-[6px] border border-gray-300 bg-white px-[6px] text-[10px] font-bold leading-none text-gray-600 transition-colors duration-150 hover:bg-gray-50 cursor-pointer">
+          <button type="button" onClick={onClose} className={`flex-1 ${MODAL_FOOTER_BTN_SECONDARY}`}>
             Cancel
           </button>
           <button
             type="button"
             onClick={handleAdd}
             disabled={names.length === 0}
-            className="h-[22px] flex-1 rounded-[6px] bg-blue-600 px-[6px] text-[10px] font-bold leading-none text-white transition-colors duration-150 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+            className={`flex-1 ${MODAL_FOOTER_BTN_PRIMARY}`}
           >
             Add colour{names.length > 1 ? 's' : ''}
           </button>
@@ -274,21 +275,22 @@ function AddSizeModal({
   };
 
   return (
-    <ModalShell
+    <ModalShell disableBackdropClose
       title="Add size"
+      compact
       onClose={onClose}
       wide
       allowOverflow
       footer={
         <div className="flex gap-2">
-          <button type="button" onClick={onClose} className="h-[22px] flex-1 rounded-[6px] border border-gray-300 bg-white px-[6px] text-[10px] font-bold leading-none text-gray-600 transition-colors duration-150 hover:bg-gray-50 cursor-pointer">
+          <button type="button" onClick={onClose} className={`flex-1 ${MODAL_FOOTER_BTN_SECONDARY}`}>
             Cancel
           </button>
           <button
             type="button"
             onClick={handleAdd}
             disabled={sizes.length === 0}
-            className="h-[22px] flex-1 rounded-[6px] bg-blue-600 px-[6px] text-[10px] font-bold leading-none text-white transition-colors duration-150 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+            className={`flex-1 ${MODAL_FOOTER_BTN_PRIMARY}`}
           >
             Add size{sizes.length > 1 ? 's' : ''}
           </button>

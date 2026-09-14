@@ -28,7 +28,7 @@ export default function TaxonomyAddButton({ query, options, label, onAdd }: Taxo
         e.preventDefault();
         onAdd(clean);
       }}
-      className="flex w-full items-center gap-1.5 border-t border-dashed border-gray-200 px-3 py-2 text-left text-sm font-semibold text-blue-700 hover:bg-blue-50 cursor-pointer"
+      className="flex w-full items-center gap-1.5 border-t border-dashed border-gray-200 px-2 py-1 text-left text-[11px] font-semibold leading-none text-blue-700 hover:bg-blue-50 cursor-pointer"
     >
       <span aria-hidden>+</span>
       <span className="truncate">

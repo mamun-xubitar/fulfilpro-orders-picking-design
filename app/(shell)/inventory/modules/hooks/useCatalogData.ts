@@ -27,11 +27,16 @@ export function useCatalogData() {
   const [globals, setGlobals] = useState<InventoryGlobals>(EMPTY_GLOBALS);
   const [rateInput, setRateInput] = useState('');
   const [marginInput, setMarginInput] = useState('');
-  const [loaded, setLoaded] = useState(false);
   // Named distinctly from the exposed `loading` below: while "All records" is on this stays
   // whatever it last was (the fetch effect bails out without touching it) — `loading` itself is
   // derived so it reads false immediately, without an extra setState-in-effect round trip.
-  const [fetching, setFetching] = useState(false);
+  // Starts true (matching `skeleton` below) so the very first render — before the fetch effect
+  // has had a chance to run — already shows the skeleton instead of an EmptyState flash.
+  const [fetching, setFetching] = useState(true);
+  // True while the in-flight (or about-to-start) fetch was triggered by navigation/filter
+  // changes rather than a silent background refresh — see showSkeleton below. Starts true so the
+  // very first load also shows the skeleton instead of an instantaneous empty flash.
+  const [skeleton, setSkeleton] = useState(true);
   const [fetchNonce, setFetchNonce] = useState(0);
   const { request: requestSettings } = useRequest();
 
@@ -47,6 +52,9 @@ export function useCatalogData() {
 
     const controller = new AbortController();
     abortRef.current = controller;
+    // Canonical "fetching data" effect shape (see React's Effects guide) — the loading flag has
+    // to flip the instant the request starts, not after it resolves.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setFetching(true);
 
     const params = new URLSearchParams({ mode: 'detail' });
@@ -72,24 +80,39 @@ export function useCatalogData() {
         setMarginInput(String(d.globals.marginPercent));
         pageRef.current = d.pagination.page;
         focusIdRef.current = null;
-        setLoaded(true);
       })
       .catch((err: unknown) => {
         if (err instanceof DOMException && err.name === 'AbortError') return;
         toast.error(err instanceof Error ? err.message : 'Failed to load product');
       })
       .finally(() => {
-        if (abortRef.current === controller) setFetching(false);
+        if (abortRef.current === controller) {
+          setFetching(false);
+          setSkeleton(false);
+        }
       });
 
     return () => controller.abort();
   }, [allRecords, verifiedOnly, fetchNonce]);
 
   const bump = () => setFetchNonce((n) => n + 1);
+  /** Marks the next fetch as navigation (vs. a silent background refresh) so it shows the
+   * skeleton — see showSkeleton below. */
+  const bumpWithSkeleton = () => {
+    setSkeleton(true);
+    bump();
+  };
 
-  const setAllRecords = (value: boolean) => setAllRecordsState(value);
+  // Marks skeleton unconditionally: turning "All records" on skips this hook's fetch entirely
+  // (the table owns its own loading state), so the flag is inert until the toggle is turned back
+  // off, at which point the resumed fetch should show the skeleton like any other navigation.
+  const setAllRecords = (value: boolean) => {
+    setSkeleton(true);
+    setAllRecordsState(value);
+  };
   const setVerifiedOnly = (value: boolean) => {
     pageRef.current = 1;
+    setSkeleton(true);
     setVerifiedOnlyState(value);
   };
   // No pageRef reset here — the quick filter no longer affects detail-mode pagination at all.
@@ -100,28 +123,29 @@ export function useCatalogData() {
   const goFirst = () => {
     if (pagination.total === 0) return;
     pageRef.current = 1;
-    bump();
+    bumpWithSkeleton();
   };
   const goPrev = () => {
     if (!pagination.hasPrev) return;
     pageRef.current = pagination.page - 1;
-    bump();
+    bumpWithSkeleton();
   };
   const goNext = () => {
     if (!pagination.hasNext) return;
     pageRef.current = pagination.page + 1;
-    bump();
+    bumpWithSkeleton();
   };
   const goLast = () => {
     if (pagination.total === 0) return;
     pageRef.current = pagination.totalPages;
-    bump();
+    bumpWithSkeleton();
   };
 
   /** Jumps straight to one product's position under the current filters — used by search
    * selection and by "view" from the All-records table. */
   const focusProduct = useCallback((id: string) => {
     focusIdRef.current = id;
+    setSkeleton(true);
     bump();
   }, []);
 
@@ -151,6 +175,7 @@ export function useCatalogData() {
    * pulls its replacement — the product now sitting at the same page index, since sort order is
    * createdAt desc and pageSize is 1 in detail mode. */
   const removeProduct = useCallback((productId: string) => {
+    setSkeleton(true);
     setProduct((prev) => (prev?.id === productId ? null : prev));
     setTotalAll((n) => Math.max(0, n - 1));
     setPagination((prev) => {
@@ -199,9 +224,11 @@ export function useCatalogData() {
 
   return {
     loading,
-    /** True only for the page's first load — a background refresh (after a mutation) never
-     * flips this, so the detail view stays mounted instead of flashing to a skeleton. */
-    initialLoading: loading && !loaded,
+    /** True while a navigation/filter-driven fetch (first load, stepper, search-select,
+     * Verified toggle, table "view", coming back from All records) is in flight — a silent
+     * background refresh after a mutation never flips this, so the detail view stays mounted
+     * instead of flashing to a skeleton. */
+    showSkeleton: loading && skeleton,
     allRecords,
     setAllRecords,
     verifiedOnly,

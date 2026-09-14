@@ -61,15 +61,15 @@ export default function StoreDraftVariants({
 
   return (
     <div className="mb-1">
-      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+      <p className="mb-1.5 text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-gray-500">
         Variants / stock matrix {showPricing ? '(Price AUD ex-tax)' : ''}
       </p>
       <div className="overflow-x-auto rounded-lg border border-gray-200">
-        <table className="w-full min-w-[560px] text-sm">
+        <table className="w-full min-w-[560px] text-[11px] leading-none">
           <thead>
             <tr className="border-b border-gray-200 bg-gray-50">
               {showVariants && (
-                <th className="w-20 px-2 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                <th className="w-20 px-2 py-1 text-left text-[10px] font-bold uppercase tracking-[0.4px] text-gray-500">
                   <span className="flex items-center gap-1.5">
                     <input
                       ref={headerCheckboxRef}
@@ -78,22 +78,22 @@ export default function StoreDraftVariants({
                       onChange={() => setExcludedVariants(allIncluded ? product.variants.map((v) => v.id) : [])}
                       aria-label={`Include all variants for ${storeName}`}
                       title="Include all variants"
-                      className="rounded border-gray-300 text-blue-600 cursor-pointer"
+                      className="h-3 w-3 rounded border-gray-300 text-blue-600 cursor-pointer"
                     />
                     Include
                   </span>
                 </th>
               )}
-              <th className="px-2 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">Variant</th>
+              <th className="px-2 py-1 text-left text-[10px] font-bold uppercase tracking-[0.4px] text-gray-500">Variant</th>
               {showVariants && (
                 <>
-                  <th className="px-2 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">SKU</th>
-                  <th className="px-2 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">Barcode</th>
-                  <th className="px-2 py-2 text-right text-[11px] font-semibold uppercase tracking-wide text-gray-500">Available</th>
+                  <th className="px-2 py-1 text-left text-[10px] font-bold uppercase tracking-[0.4px] text-gray-500">SKU</th>
+                  <th className="px-2 py-1 text-left text-[10px] font-bold uppercase tracking-[0.4px] text-gray-500">Barcode</th>
+                  <th className="px-2 py-1 text-right text-[10px] font-bold uppercase tracking-[0.4px] text-gray-500">Available</th>
                 </>
               )}
-              {showVariantImages && <th className="w-40 px-2 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">Image</th>}
-              {showPricing && <th className="w-28 px-2 py-2 text-right text-[11px] font-semibold uppercase tracking-wide text-gray-500">Price (AUD)</th>}
+              {showVariantImages && <th className="w-40 px-2 py-1 text-left text-[10px] font-bold uppercase tracking-[0.4px] text-gray-500">Image</th>}
+              {showPricing && <th className="w-28 px-2 py-1 text-right text-[10px] font-bold uppercase tracking-[0.4px] text-gray-500">Price (AUD)</th>}
             </tr>
           </thead>
           <tbody>
@@ -102,41 +102,41 @@ export default function StoreDraftVariants({
               return (
                 <tr key={v.id} className={`border-b border-gray-100 last:border-0 ${excluded ? 'opacity-50' : ''}`}>
                   {showVariants && (
-                    <td className="px-2 py-1.5">
+                    <td className="px-2 py-1">
                       <input
                         type="checkbox"
                         checked={!draft.excludedVariants.includes(v.id)}
                         onChange={() => toggleVariant(v.id)}
                         aria-label={`Include ${v.colour} / ${v.size} for ${storeName}`}
-                        className="rounded border-gray-300 text-blue-600"
+                        className="h-3 w-3 rounded border-gray-300 text-blue-600 cursor-pointer"
                       />
                     </td>
                   )}
-                  <td className="px-2 py-1.5 text-[13px] font-medium text-gray-900">
+                  <td className="px-2 py-1 text-[11px] font-medium text-gray-900">
                     {v.colour} / {v.size}
-                    <span className="block text-[11px] font-normal text-gray-400">Sizes: {v.size} · Colours: {v.colour}</span>
+                    <span className="block text-[10px] font-normal text-gray-400">Sizes: {v.size} · Colours: {v.colour}</span>
                   </td>
                   {showVariants && (
                     <>
-                      <td className="px-2 py-1.5">
+                      <td className="px-2 py-1">
                         <input
                           type="text"
                           value={draft.variantSku[v.id] ?? v.sku ?? ''}
                           onChange={(e) => setSku(v.id, e.target.value)}
                           aria-label={`SKU for ${v.colour} / ${v.size} at ${storeName}`}
-                          className="w-28 rounded-lg border border-gray-300 px-2 py-1 text-[13px] outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                          className="h-[22px] w-28 rounded-[6px] border border-gray-300 px-[6px] text-[11px] leading-none outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                         />
                       </td>
-                      <td className="px-2 py-1.5">
+                      <td className="px-2 py-1">
                         <input
                           type="text"
                           value={draft.variantBarcode[v.id] ?? v.barcode ?? ''}
                           onChange={(e) => setBarcode(v.id, e.target.value)}
                           aria-label={`Barcode for ${v.colour} / ${v.size} at ${storeName}`}
-                          className="w-28 rounded-lg border border-gray-300 px-2 py-1 text-[13px] outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                          className="h-[22px] w-28 rounded-[6px] border border-gray-300 px-[6px] text-[11px] leading-none outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                         />
                       </td>
-                      <td className="px-2 py-1.5 text-right">
+                      <td className="px-2 py-1 text-right">
                         <input
                           type="number"
                           step="1"
@@ -144,14 +144,14 @@ export default function StoreDraftVariants({
                           value={draft.variantStock[v.id] ?? String(defaultStock[v.id] ?? 0)}
                           onChange={(e) => setStock(v.id, e.target.value)}
                           aria-label={`Available stock for ${v.colour} / ${v.size} at ${storeName}`}
-                          className="w-20 rounded-lg border border-gray-300 px-2 py-1 text-right text-[13px] tabular-nums outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                          className="h-[22px] w-20 rounded-[6px] border border-gray-300 px-[6px] text-right text-[11px] leading-none tabular-nums outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                         />
-                        <span className="ml-1 text-[11px] text-gray-400">/ {Math.max(0, v.stockOnHand - v.allocated)}</span>
+                        <span className="ml-1 text-[10px] text-gray-400">/ {Math.max(0, v.stockOnHand - v.allocated)}</span>
                       </td>
                     </>
                   )}
                   {showVariantImages && (
-                    <td className="px-2 py-1.5">
+                    <td className="px-2 py-1">
                       <StoreDraftVariantImage
                         variantLabel={`${v.colour} / ${v.size}`}
                         storeName={storeName}
@@ -162,7 +162,7 @@ export default function StoreDraftVariants({
                     </td>
                   )}
                   {showPricing && (
-                    <td className="px-2 py-1.5 text-right">
+                    <td className="px-2 py-1 text-right">
                       <input
                         type="number"
                         step="0.01"
@@ -170,7 +170,7 @@ export default function StoreDraftVariants({
                         value={draft.variantPrices[v.id] ?? String(v.sellPrice)}
                         onChange={(e) => setPrice(v.id, e.target.value)}
                         aria-label={`Price for ${v.colour} / ${v.size} at ${storeName}`}
-                        className="w-24 rounded-lg border border-gray-300 px-2 py-1 text-right text-[13px] tabular-nums outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                        className="h-[22px] w-24 rounded-[6px] border border-gray-300 px-[6px] text-right text-[11px] leading-none tabular-nums outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                       />
                     </td>
                   )}

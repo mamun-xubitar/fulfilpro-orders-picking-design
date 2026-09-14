@@ -67,7 +67,7 @@ export default function ClampedHtml({ html, className, title }: ClampedHtmlProps
         </button>
       )}
       {modalOpen && (
-        <ModalShell title={title ?? 'Description'} onClose={() => setModalOpen(false)} wide>
+        <ModalShell disableBackdropClose title={title ?? 'Description'} compact onClose={() => setModalOpen(false)} wide>
           <div
             className="text-[13px] text-gray-900 [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-4 [&_ol]:pl-4 [&_a]:text-blue-600 [&_a]:underline"
             dangerouslySetInnerHTML={{ __html: safeHtml }}

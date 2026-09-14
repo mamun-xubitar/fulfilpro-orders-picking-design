@@ -24,7 +24,7 @@ export default function PrintModal({ orders, setOrders, onClose, onPrint }: Prop
             <h3 className="text-base font-semibold text-gray-900">Print picking slip</h3>
             <p className="text-sm text-gray-500">{orders.length} order{orders.length === 1 ? '' : 's'}</p>
           </div>
-          <button onClick={onClose} className="rounded-lg p-2 text-gray-500 hover:bg-gray-100">×</button>
+          <button onClick={onClose} className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 cursor-pointer">×</button>
         </div>
         <div className="flex-1 space-y-5 overflow-y-auto px-5 py-4">
           {orders.map((order) => (

@@ -11,6 +11,12 @@
         ],
         "createdAt": "2026-09-08T07:18:44.799Z",
         "reason": "pre-existing house pattern unchanged from original file (icon button: gray idle, red on hover) — identical to ProductsTableRow.tsx and ProductsToolbar.tsx delete buttons; out of scope for this task"
+      },
+      {
+        "rule": "overused-font",
+        "value": "arial",
+        "createdAt": "2026-09-14T04:19:08.536Z",
+        "reason": "print-only stylesheet for the stocktake count sheet (buildCountSheetDocument), not app UI chrome; pre-existing, unrelated to this session's inventory filter/loading fix"
       }
     ]
   }

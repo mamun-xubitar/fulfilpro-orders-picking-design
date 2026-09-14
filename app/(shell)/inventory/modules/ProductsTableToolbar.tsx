@@ -12,22 +12,22 @@ type ProductsTableToolbarProps = {
 
 export default function ProductsTableToolbar({ table, onRefresh, loading }: ProductsTableToolbarProps) {
   return (
-    <div className="flex flex-wrap items-center gap-2 border-b border-gray-200 px-4 py-3">
-      <div className="relative min-w-56 flex-1 sm:flex-none sm:w-64">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+    <div className="flex flex-wrap items-center gap-[6px] border-b border-gray-200 px-2 py-1.5">
+      <div className="relative min-w-44 flex-1 sm:flex-none sm:w-56">
+        <Search className="pointer-events-none absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-gray-400" />
         <input
           type="search"
-          value={table.search}
+          value={table.searchInput}
           onChange={(e) => table.setSearch(e.target.value)}
           placeholder="Search products..."
-          className="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+          className="h-[24px] w-full rounded-[7px] border border-gray-300 pl-7 pr-2 text-[11px] leading-none outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
         />
       </div>
 
       <select
         value={table.status}
         onChange={(e) => table.setStatus(e.target.value as typeof table.status)}
-        className="rounded-lg border border-gray-300 bg-white px-2.5 py-2 text-sm text-gray-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 cursor-pointer"
+        className="h-[24px] rounded-[7px] border border-gray-300 bg-white px-[6px] text-[11px] leading-none text-gray-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 cursor-pointer"
       >
         <option value="">All statuses</option>
         {STATUS_OPTIONS.map((s) => (
@@ -40,7 +40,7 @@ export default function ProductsTableToolbar({ table, onRefresh, loading }: Prod
       <select
         value={table.supplierId}
         onChange={(e) => table.setSupplierId(e.target.value)}
-        className="rounded-lg border border-gray-300 bg-white px-2.5 py-2 text-sm text-gray-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 cursor-pointer"
+        className="h-[24px] rounded-[7px] border border-gray-300 bg-white px-[6px] text-[11px] leading-none text-gray-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 cursor-pointer"
       >
         <option value="">All suppliers</option>
         {table.supplierOptions.map((s) => (
@@ -54,7 +54,7 @@ export default function ProductsTableToolbar({ table, onRefresh, loading }: Prod
         <button
           type="button"
           onClick={table.handleClearFilters}
-          className="flex items-center gap-1 rounded-lg px-2.5 py-2 text-sm text-gray-500 transition-colors duration-150 hover:bg-red-50 hover:text-red-500 cursor-pointer"
+          className="flex h-[22px] items-center gap-1 rounded-[6px] px-[6px] text-[11px] text-gray-500 transition-colors duration-150 hover:bg-red-50 hover:text-red-500 cursor-pointer"
         >
           Clear filters
         </button>
@@ -64,9 +64,9 @@ export default function ProductsTableToolbar({ table, onRefresh, loading }: Prod
         type="button"
         onClick={onRefresh}
         disabled={loading}
-        className="ml-auto flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-600 shadow-sm transition-colors duration-150 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+        className="ml-auto flex h-[22px] items-center gap-1 rounded-[6px] border border-gray-300 bg-white px-[6px] text-[10px] font-bold leading-none text-gray-600 shadow-sm transition-colors duration-150 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
       >
-        <Refresh className="h-4 w-4" />
+        <Refresh className="h-3 w-3" />
         Refresh
       </button>
     </div>

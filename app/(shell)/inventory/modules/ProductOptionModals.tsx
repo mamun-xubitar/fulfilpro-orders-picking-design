@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ModalShell } from '@/components/ModalShell';
+import { MODAL_FOOTER_BTN_PRIMARY, MODAL_FOOTER_BTN_SECONDARY, ModalShell } from '@/components/ModalShell';
 import { formatColoursInput, parseColoursInput } from '@/lib/inventory/colour';
 import PresetComboField from './PresetComboField';
 import { ColourChips } from './ProductColoursField';
@@ -34,8 +34,9 @@ export function EditSizesModal({ initialValue, presets, onClose, onSave }: EditS
   };
 
   return (
-    <ModalShell
+    <ModalShell disableBackdropClose
       title="Sizes"
+      compact
       onClose={onClose}
       wide
       allowOverflow
@@ -44,7 +45,7 @@ export function EditSizesModal({ initialValue, presets, onClose, onSave }: EditS
           <button
             type="button"
             onClick={onClose}
-            className="h-[22px] flex-1 rounded-[6px] border border-gray-300 bg-white px-[6px] text-[10px] font-bold leading-none text-gray-600 transition-colors duration-150 hover:bg-gray-50 cursor-pointer"
+            className={`flex-1 ${MODAL_FOOTER_BTN_SECONDARY}`}
           >
             Cancel
           </button>
@@ -52,7 +53,7 @@ export function EditSizesModal({ initialValue, presets, onClose, onSave }: EditS
             type="button"
             onClick={handleSave}
             disabled={sizes.length === 0}
-            className="h-[22px] flex-1 rounded-[6px] bg-blue-600 px-[6px] text-[10px] font-bold leading-none text-white transition-colors duration-150 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+            className={`flex-1 ${MODAL_FOOTER_BTN_PRIMARY}`}
           >
             Save
           </button>
@@ -99,8 +100,9 @@ export function EditColoursModal({ initialValue, presets, onClose, onSave }: Edi
   };
 
   return (
-    <ModalShell
+    <ModalShell disableBackdropClose
       title="Colours"
+      compact
       onClose={onClose}
       wide
       allowOverflow
@@ -109,7 +111,7 @@ export function EditColoursModal({ initialValue, presets, onClose, onSave }: Edi
           <button
             type="button"
             onClick={onClose}
-            className="h-[22px] flex-1 rounded-[6px] border border-gray-300 bg-white px-[6px] text-[10px] font-bold leading-none text-gray-600 transition-colors duration-150 hover:bg-gray-50 cursor-pointer"
+            className={`flex-1 ${MODAL_FOOTER_BTN_SECONDARY}`}
           >
             Cancel
           </button>
@@ -117,7 +119,7 @@ export function EditColoursModal({ initialValue, presets, onClose, onSave }: Edi
             type="button"
             onClick={handleSave}
             disabled={names.length === 0}
-            className="h-[22px] flex-1 rounded-[6px] bg-blue-600 px-[6px] text-[10px] font-bold leading-none text-white transition-colors duration-150 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+            className={`flex-1 ${MODAL_FOOTER_BTN_PRIMARY}`}
           >
             Save
           </button>

@@ -17,7 +17,7 @@ export default function RequestStockModal({ open, closeModal, picker, toggleOrde
           <button
             onClick={closeModal}
             disabled={saving}
-            className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-50"
+            className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
             aria-label="Close stock request modal"
           >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

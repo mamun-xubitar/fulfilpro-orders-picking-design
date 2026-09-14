@@ -1,8 +1,10 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { FieldLabel } from './ProductFieldRows';
 import { Close } from './icons';
+import { useAnchoredDropdown } from './hooks/useAnchoredDropdown';
 
 type StoreCollection = { id: string; title: string };
 type ApiResponse<T> = { success: boolean; message: string; data: T };
@@ -26,18 +28,13 @@ export default function CollectionsPicker({ storeId, value, onChange }: Collecti
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<StoreCollection[]>([]);
   const [loading, setLoading] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const anchorRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  // Fixed 320px menu, measured-height above-placement, auto-close off-screen — shared hook.
+  const position = useAnchoredDropdown({ anchorRef, dropdownRef, open, onClose: () => setOpen(false), width: 320, maxHeight: 288 });
   // Guards against an older, slower request's response landing after a newer one and
   // overwriting it — without this, fast typing can flash stale results back in.
   const requestIdRef = useRef(0);
-
-  useEffect(() => {
-    const onClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', onClickOutside);
-    return () => document.removeEventListener('mousedown', onClickOutside);
-  }, []);
 
   useEffect(() => {
     if (!open || !storeId) return;
@@ -93,19 +90,20 @@ export default function CollectionsPicker({ storeId, value, onChange }: Collecti
   };
 
   return (
-    <div className="min-w-0" ref={containerRef}>
+    <div className="min-w-0">
       <FieldLabel>Collections</FieldLabel>
       <div className="relative">
         <button
+          ref={anchorRef}
           type="button"
           onClick={() => setOpen((prev) => !prev)}
-          className="flex min-h-[38px] w-full flex-wrap items-center gap-1 rounded-lg border border-gray-300 px-2 py-1.5 text-left text-[13px] outline-none hover:bg-gray-50 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 cursor-pointer"
+          className="flex min-h-[24px] w-full flex-wrap items-center gap-[4px] rounded-[7px] border border-gray-300 px-[6px] py-[3px] text-left text-[11px] leading-none outline-none hover:bg-gray-50 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 cursor-pointer"
         >
-          {value.length === 0 && <span className="px-1 text-gray-400">Select collections…</span>}
+          {value.length === 0 && <span className="px-[2px] text-gray-400">Select collections…</span>}
           {value.map((c) => (
             <span
               key={c.id}
-              className="flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[11px] font-medium text-gray-700"
+              className="flex items-center gap-[3px] rounded-full border border-gray-200 bg-gray-50 px-[5px] py-[1px] text-[9px] font-semibold leading-none text-gray-700"
             >
               {c.title}
               <span
@@ -124,8 +122,12 @@ export default function CollectionsPicker({ storeId, value, onChange }: Collecti
           ))}
         </button>
 
-        {open && (
-          <div className="absolute z-30 top-full mt-1 left-0 w-full sm:w-[20rem] max-w-[90vw] max-h-72 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+        {open && position && typeof document !== 'undefined' && createPortal(
+          <div
+            ref={dropdownRef}
+            style={{ position: 'fixed', top: position.top, left: position.left, width: position.width }}
+            className="z-[70] max-h-72 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+          >
             <input
               autoFocus
               type="text"
@@ -135,13 +137,13 @@ export default function CollectionsPicker({ storeId, value, onChange }: Collecti
                 if (e.key === 'Escape') setOpen(false);
               }}
               placeholder="Search collections…"
-              className="w-full border-b border-gray-100 px-3 py-2 text-sm outline-none"
+              className="w-full border-b border-gray-100 px-2 py-1.5 text-[11px] outline-none"
             />
-            {loading && <div className="px-3 py-2 text-xs text-gray-400">Loading…</div>}
+            {loading && <div className="px-2 py-1 text-[11px] text-gray-400">Loading…</div>}
             {!loading &&
               results.map((c) => (
-                <label key={c.id} className="flex cursor-pointer items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50">
-                  <input type="checkbox" checked={selectedIds.has(c.id)} onChange={() => toggle(c)} className="rounded border-gray-300 text-blue-600" />
+                <label key={c.id} className="flex cursor-pointer items-center gap-2 px-2 py-1 text-[11px] leading-none hover:bg-gray-50">
+                  <input type="checkbox" checked={selectedIds.has(c.id)} onChange={() => toggle(c)} className="h-3 w-3 rounded border-gray-300 text-blue-600" />
                   <span className="truncate text-gray-900">{c.title}</span>
                 </label>
               ))}
@@ -153,7 +155,7 @@ export default function CollectionsPicker({ storeId, value, onChange }: Collecti
                   void createAndSelect(query);
                 }}
                 disabled={creating}
-                className="flex w-full items-center gap-1.5 border-t border-dashed border-gray-200 px-3 py-2 text-left text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-60 cursor-pointer"
+                className="flex w-full items-center gap-1.5 border-t border-dashed border-gray-200 px-2 py-1 text-left text-[11px] font-semibold leading-none text-blue-700 hover:bg-blue-50 disabled:opacity-60 cursor-pointer"
               >
                 <span aria-hidden>+</span>
                 <span className="truncate">
@@ -161,9 +163,10 @@ export default function CollectionsPicker({ storeId, value, onChange }: Collecti
                 </span>
               </button>
             )}
-            {!loading && results.length === 0 && !query.trim() && <div className="px-3 py-2 text-xs text-gray-400">No collections yet</div>}
-            {createError && <div className="px-3 py-2 text-xs text-red-600">{createError}</div>}
-          </div>
+            {!loading && results.length === 0 && !query.trim() && <div className="px-2 py-1 text-[11px] text-gray-400">No collections yet</div>}
+            {createError && <div className="px-2 py-1 text-[10px] leading-tight text-red-600">{createError}</div>}
+          </div>,
+          document.body
         )}
       </div>
     </div>

@@ -131,7 +131,7 @@ export function useInventoryPage() {
 
   return {
     loading: data.loading,
-    initialLoading: data.initialLoading,
+    showSkeleton: data.showSkeleton,
     refresh: data.refresh,
     product,
     globals: data.globals,

@@ -1,6 +1,6 @@
 "use client";
 
-import { ModalShell } from "@/components/ModalShell";
+import { MODAL_FOOTER_BTN_PRIMARY, MODAL_FOOTER_BTN_SECONDARY, ModalShell } from "@/components/ModalShell";
 import { sanitizeHtml } from "@/lib/sanitize-html";
 import { useEffect, useRef } from "react";
 import { productStatusLabel } from "./constants";
@@ -47,8 +47,9 @@ export default function PublishToStoresModal({
   }, [someSelected]);
 
   return (
-    <ModalShell
+    <ModalShell disableBackdropClose
       title="Online stores & prices"
+      compact
       onClose={p.closePublish}
       fullScreen
       footer={
@@ -56,7 +57,7 @@ export default function PublishToStoresModal({
           <button
             type="button"
             onClick={p.closePublish}
-            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-600 transition-colors duration-150 hover:bg-gray-50 cursor-pointer"
+            className={MODAL_FOOTER_BTN_SECONDARY}
           >
             Cancel
           </button>
@@ -64,7 +65,7 @@ export default function PublishToStoresModal({
             type="button"
             onClick={p.publishToSelected}
             disabled={p.publishing || p.selectedStoreIds.size === 0 || noVariantsStores.length > 0}
-            className="ml-auto rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors duration-150 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+            className={`ml-auto ${MODAL_FOOTER_BTN_PRIMARY}`}
           >
             {p.publishing
               ? "Publishing…"
@@ -73,7 +74,7 @@ export default function PublishToStoresModal({
         </div>
       }
     >
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[220px_1fr]">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-[220px_1fr]">
         <aside className="space-y-1">
           <div className="mb-1 flex items-center gap-2">
             {storeOptions.length > 0 && (
@@ -84,32 +85,32 @@ export default function PublishToStoresModal({
                 onChange={() => p.toggleAllStores()}
                 aria-label="Select all connected stores"
                 title="Select all connected stores"
-                className="rounded border-gray-300 text-blue-600 cursor-pointer"
+                className="h-3 w-3 rounded border-gray-300 text-blue-600 cursor-pointer"
               />
             )}
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+            <p className="text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-gray-500">
               Connected stores
             </p>
           </div>
           {storeOptions.length === 0 && (
-            <p className="text-[13px] text-gray-400">No connected stores.</p>
+            <p className="text-[11px] text-gray-400">No connected stores.</p>
           )}
           {storeOptions.map((store) => (
             <label
               key={store.storeId}
-              className="flex cursor-pointer items-start gap-2 rounded-lg px-2 py-1.5 hover:bg-gray-50"
+              className="flex cursor-pointer items-start gap-2 rounded-[6px] px-2 py-1 hover:bg-gray-50"
             >
               <input
                 type="checkbox"
                 checked={p.selectedStoreIds.has(store.storeId)}
                 onChange={() => p.toggleStore(store.storeId)}
-                className="mt-0.5 rounded border-gray-300 text-blue-600 cursor-pointer"
+                className="mt-0.5 h-3 w-3 rounded border-gray-300 text-blue-600 cursor-pointer"
               />
               <span className="min-w-0">
-                <span className="block truncate text-[13px] font-medium text-gray-900">
+                <span className="block truncate text-[12px] font-medium leading-tight text-gray-900">
                   {store.storeName}
                 </span>
-                <span className="block truncate text-[11px] text-gray-400">
+                <span className="block truncate text-[10px] text-gray-400">
                   {store.listingStatus.replace("_", " ")}
                 </span>
               </span>
@@ -117,25 +118,25 @@ export default function PublishToStoresModal({
           ))}
         </aside>
 
-        <div className="min-w-0 space-y-4">
-          <section className="rounded-xl border border-gray-200 p-4">
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+        <div className="min-w-0 space-y-3">
+          <section className="rounded-xl border border-gray-200 p-3">
+            <p className="mb-1.5 text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-gray-500">
               Current product (hub source)
             </p>
-            <div className="flex gap-3">
+            <div className="flex gap-2">
               {product.images[0] && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={product.images[0].url}
                   alt={product.images[0].altText ?? product.name}
-                  className="h-16 w-16 shrink-0 rounded-lg object-cover"
+                  className="h-12 w-12 shrink-0 rounded-lg object-cover"
                 />
               )}
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-gray-900">
+                <p className="truncate text-[12px] font-semibold text-gray-900">
                   {product.name}
                 </p>
-                <p className="text-[12px] text-gray-500">
+                <p className="text-[11px] text-gray-500">
                   {product.brand} · {product.category} ·{" "}
                   {product.variants.length} variant
                   {product.variants.length === 1 ? "" : "s"} ·{" "}
@@ -146,14 +147,14 @@ export default function PublishToStoresModal({
                     ? " (will publish, accessible only by direct link)"
                     : ""}
                 </p>
-                <p className="text-[12px] text-gray-400">
+                <p className="text-[11px] text-gray-400">
                   Handle: <span className="font-mono">{product.handle}</span> ·
                   Sizes: {product.sizes.join(", ") || "—"} · Colours:{" "}
                   {product.colours.map((c) => c.name).join(", ") || "—"}
                 </p>
                 {product.description && (
                   <div
-                    className="mt-1 line-clamp-2 break-words text-[12px] text-gray-500"
+                    className="mt-1 line-clamp-2 break-words text-[11px] text-gray-500"
                     dangerouslySetInnerHTML={{
                       __html: sanitizeHtml(product.description),
                     }}
@@ -161,7 +162,7 @@ export default function PublishToStoresModal({
                 )}
               </div>
             </div>
-            <p className="mt-2 text-[11px] text-gray-400">
+            <p className="mt-1.5 text-[10px] leading-snug text-gray-400">
               Edit each store&apos;s copy below — title, description, media,
               type, category, collections, status, handle (read-only), brand,
               SKU, sizes, colours, stock matrix, per-store AUD price and selling
@@ -175,12 +176,12 @@ export default function PublishToStoresModal({
           {p.stockWarnings.length > 0 && <StockWarningBanner warnings={p.stockWarnings} />}
 
           {selectedStores.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-gray-200 p-8 text-center text-[13px] text-gray-400">
+            <p className="rounded-xl border border-dashed border-gray-200 p-6 text-center text-[11px] text-gray-400">
               Select at least one store to edit its listing and publish.
             </p>
           ) : (
             selectedStores.map((store, i) => (
-              <div key={store.storeId} className="space-y-4">
+              <div key={store.storeId} className="space-y-3">
                 {i > 0 && <StoreBlockSeparator />}
                 <StoreDraftBlock
                   storeId={store.storeId}

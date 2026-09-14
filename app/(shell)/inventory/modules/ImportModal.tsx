@@ -1,6 +1,6 @@
 'use client';
 
-import { ModalShell } from '@/components/ModalShell';
+import { MODAL_FOOTER_BTN_PRIMARY, MODAL_FOOTER_BTN_SECONDARY, ModalShell } from '@/components/ModalShell';
 import FilePicker from './FilePicker';
 import PoImportPreviewTable from './PoImportPreviewTable';
 import ProductImportPreviewTable from './ProductImportPreviewTable';
@@ -21,8 +21,9 @@ export default function ImportModal({ importExport: ie }: { importExport: Return
         : '';
 
   return (
-    <ModalShell
+    <ModalShell disableBackdropClose
       title="Import"
+      compact
       onClose={ie.closeImport}
       extraWide
       footer={
@@ -31,7 +32,7 @@ export default function ImportModal({ importExport: ie }: { importExport: Return
             <button
               type="button"
               onClick={ie.closeImport}
-              className="h-[22px] flex-1 rounded-[6px] border border-gray-300 bg-white px-[6px] text-[10px] font-bold leading-none text-gray-600 transition-colors duration-150 hover:bg-gray-50 cursor-pointer"
+              className={`flex-1 ${MODAL_FOOTER_BTN_SECONDARY}`}
             >
               Cancel
             </button>
@@ -39,7 +40,7 @@ export default function ImportModal({ importExport: ie }: { importExport: Return
               type="button"
               onClick={ie.commitImport}
               disabled={ie.importing || blockedByOverwrite}
-              className="h-[22px] flex-1 rounded-[6px] bg-blue-600 px-[6px] text-[10px] font-bold leading-none text-white transition-colors duration-150 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+              className={`flex-1 ${MODAL_FOOTER_BTN_PRIMARY}`}
             >
               {ie.importing ? 'Importing...' : confirmLabel}
             </button>

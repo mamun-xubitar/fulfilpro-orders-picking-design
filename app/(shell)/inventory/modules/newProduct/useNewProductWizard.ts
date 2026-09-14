@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import type { InventoryPage } from '../hooks/useInventoryPage';
+import { STEP_META } from './steps';
 import { useStepBasicsForm } from './useStepBasicsForm';
 
 export type WizardStep = 1 | 2 | 3 | 4 | 5;
 
-export const STEP_LABELS = ['Basics', 'Details', 'Images', 'Pricing', 'Purchase order'];
+export const STEP_LABELS = STEP_META.map((s) => s.label);
 
 /**
  * Drives the New Product wizard. Step 1 is the only step with its own create action (the product
