@@ -1,4 +1,5 @@
-import type { TaskState } from './types';
+import type { RecurringTaskRow, TaskState } from './types';
+import { RECURRENCE_OPTIONS } from './constants';
 
 export function formatDueDate(iso: string): string {
   return new Date(iso).toLocaleString('en-AU', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' });
@@ -45,4 +46,17 @@ export function deriveTaskState(status: string, dueDate: string): TaskState {
 
 export function taskRowKey(taskId: string): string {
   return `task-${taskId}`;
+}
+
+export function formatSchedule(recurringTask: Pick<RecurringTaskRow, 'recurrenceType' | 'recurrenceEndDate'>): string {
+  const label = RECURRENCE_OPTIONS.find((o) => o.value === recurringTask.recurrenceType)?.label ?? recurringTask.recurrenceType;
+  const endDate = new Date(recurringTask.recurrenceEndDate).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+  return `${label}, ends ${endDate}`;
+}
+
+export function summarizeAssignees(assignees: RecurringTaskRow['assignees']): string {
+  if (assignees.length === 0) return '—';
+  const names = assignees.slice(0, 2).map((a) => a.assigneeName || a.assigneeEmail);
+  const extra = assignees.length - names.length;
+  return extra > 0 ? `${names.join(', ')} +${extra}` : names.join(', ');
 }

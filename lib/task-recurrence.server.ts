@@ -1,11 +1,11 @@
 import moment from 'moment-timezone';
 import prisma from '@/lib/prisma.server';
-import { TaskModel } from '@/models/task.model.server';
-import { resolveDueDate, applyTimeOfDayToDate } from '@/lib/task-due-date.server';
+import { RecurringTaskModel } from '@/models/recurring-task.model.server';
+import { resolveOccurrenceDueDate } from '@/lib/task-due-date.server';
 import { fireTaskEvent } from '@/lib/task-events.server';
-import type { Task, TaskRecurrenceType } from '@prisma/client';
+import type { TaskRecurrenceType } from '@prisma/client';
 
-const taskModel = new TaskModel();
+const recurringTaskModel = new RecurringTaskModel();
 const RECURRING_CHECK_TIME = '00:05';
 
 export function computeNextOccurrenceAt(anchor: Date, timezone: string, type: TaskRecurrenceType): Date {
@@ -14,13 +14,6 @@ export function computeNextOccurrenceAt(anchor: Date, timezone: string, type: Ta
     .add(type === 'DAILY' ? 1 : 7, 'days')
     .startOf('day')
     .toDate();
-}
-
-async function computeChildDueDate(parent: Task, todayStr: string, timezone: string, now: Date): Promise<Date> {
-  if (parent.dueType === 'CUSTOM') {
-    return applyTimeOfDayToDate(parent.dueDate, todayStr, timezone);
-  }
-  return resolveDueDate(parent.dueType, parent.assigneeId, undefined, now);
 }
 
 export async function runRecurringTaskCheck(now: Date) {
@@ -35,19 +28,34 @@ export async function runRecurringTaskCheck(now: Date) {
   });
   if (currentHHmm !== RECURRING_CHECK_TIME) return;
 
-  const parents = await taskModel.findActiveRecurringParentsDueForGeneration(now);
-  if (parents.length === 0) return;
+  const groups = await recurringTaskModel.findActiveDueForGeneration(now);
+  if (groups.length === 0) return;
 
-  const todayStr = moment(now).tz(timezone).format('YYYY-MM-DD');
-
-  for (const parent of parents) {
+  for (const group of groups) {
     try {
-      const dueDate = await computeChildDueDate(parent, todayStr, timezone, now);
-      const nextOccurrenceAt = computeNextOccurrenceAt(parent.nextOccurrenceAt ?? now, timezone, parent.recurrenceType as TaskRecurrenceType);
-      const child = await taskModel.createRecurringChild(parent, dueDate, nextOccurrenceAt);
-      void fireTaskEvent('assigned', child.id, child.title, child.assigneeId, child.assigneeName, child.assigneeEmail, parent.assignerName).catch(() => {});
+      const occurrences = await Promise.all(
+        group.assignees.map(async (assignee) => ({
+          assigneeId: assignee.assigneeId,
+          assigneeName: assignee.assigneeName,
+          assigneeEmail: assignee.assigneeEmail,
+          title: group.title,
+          description: assignee.description,
+          dueType: group.dueType,
+          dueDate: await resolveOccurrenceDueDate(group, assignee.assigneeId, timezone, now),
+          assignerId: group.assignerId,
+          assignerName: group.assignerName,
+          assignerEmail: group.assignerEmail,
+        })),
+      );
+
+      const nextOccurrenceAt = computeNextOccurrenceAt(group.nextOccurrenceAt, timezone, group.recurrenceType);
+      const tasks = await recurringTaskModel.createOccurrences(group.id, occurrences, nextOccurrenceAt);
+
+      for (const task of tasks) {
+        void fireTaskEvent('assigned', task.id, task.title, task.assigneeId, task.assigneeName, task.assigneeEmail, group.assignerName).catch(() => {});
+      }
     } catch (error) {
-      console.error(`Recurring task generation failed for parent ${parent.id}`, error);
+      console.error(`Recurring task generation failed for group ${group.id}`, error);
     }
   }
 }
