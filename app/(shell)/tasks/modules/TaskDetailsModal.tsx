@@ -44,22 +44,28 @@ export default function TaskDetailsModal({ task, onClose }: Props) {
               <p className="text-xs text-gray-500">{task.assigneeEmail}</p>
             </div>
             <div>
-              <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Status</p>
-              <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-full ${style.badge}`}>
-                {style.label}
-              </span>
+              <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Assigner</p>
+              <p className="text-sm text-gray-800">{task.assignerName}</p>
+              <p className="text-xs text-gray-500">{task.assignerEmail}</p>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
+              <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Status</p>
+              <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-full ${style.badge}`}>
+                {style.label}
+              </span>
+            </div>
+            <div>
               <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Due Date</p>
               <p className="text-sm text-gray-700">{formatDueDate(task.dueDate)}</p>
             </div>
-            <div>
-              <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Completed At</p>
-              <p className="text-sm text-gray-700">{task.completedAt ? formatDueDate(task.completedAt) : '—'}</p>
-            </div>
+          </div>
+
+          <div>
+            <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Completed At</p>
+            <p className="text-sm text-gray-700">{task.completedAt ? formatDueDate(task.completedAt) : '—'}</p>
           </div>
         </div>
 
