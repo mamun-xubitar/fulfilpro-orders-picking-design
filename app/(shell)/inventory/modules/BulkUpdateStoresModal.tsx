@@ -80,50 +80,50 @@ export default function BulkUpdateStoresModal({ product, storeOptions, publish: 
                 onChange={() => p.toggleAllStores(publishableStores.map((s) => s.storeId))}
                 aria-label="Select all published stores"
                 title="Select all published stores"
-                className="h-3 w-3 rounded border-gray-300 text-blue-600 cursor-pointer"
+                className="h-3 w-3 rounded border-inventory-border-strong text-inventory-secondary cursor-pointer"
               />
             )}
-            <p className="text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-gray-500">Published stores</p>
+            <p className="text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-inventory-text-subtle">Published stores</p>
           </div>
           {publishableStores.length === 0 && (
-            <p className="text-[11px] text-gray-400">No published stores yet — publish first before bulk-updating.</p>
+            <p className="text-[11px] text-inventory-text-subtle">No published stores yet — publish first before bulk-updating.</p>
           )}
           {publishableStores.map((store) => (
-            <label key={store.storeId} className="flex cursor-pointer items-start gap-2 rounded-[6px] px-2 py-1 hover:bg-gray-50">
+            <label key={store.storeId} className="flex cursor-pointer items-start gap-2 rounded-[6px] border-b border-inventory-divider px-2 py-1 last:border-0 hover:bg-inventory-surface-hover">
               <input
                 type="checkbox"
                 checked={p.selectedStoreIds.has(store.storeId)}
                 onChange={() => p.toggleStore(store.storeId)}
-                className="mt-0.5 h-3 w-3 rounded border-gray-300 text-blue-600 cursor-pointer"
+                className="mt-0.5 h-3 w-3 rounded border-inventory-border-strong text-inventory-secondary cursor-pointer"
               />
               <span className="min-w-0">
-                <span className="block truncate text-[12px] font-medium leading-tight text-gray-900">{store.storeName}</span>
-                <span className="block truncate text-[10px] text-gray-400">{store.listingStatus.replace('_', ' ')}</span>
+                <span className="block truncate text-[12px] font-medium leading-tight text-inventory-text">{store.storeName}</span>
+                <span className="block truncate text-[10px] text-inventory-text-subtle">{store.listingStatus.replace('_', ' ')}</span>
               </span>
             </label>
           ))}
         </aside>
 
         <div className="min-w-0 space-y-3">
-          <section className="rounded-xl border border-gray-200 bg-gray-50 p-3">
-            <p className="mb-1.5 text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-gray-500">What to update</p>
+          <section className="rounded-xl border border-inventory-border bg-inventory-surface-muted p-3">
+            <p className="mb-1.5 text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-inventory-text-subtle">What to update</p>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
               {ASPECT_OPTIONS.map((a) => (
                 <label
                   key={a.id}
                   title={a.hint}
-                  className="flex cursor-pointer items-center gap-1.5 text-[12px] font-medium text-gray-700"
+                  className="flex cursor-pointer items-center gap-1.5 text-[12px] font-medium text-inventory-text-muted"
                 >
                   <input
                     type="checkbox"
                     checked={p.bulkAspects.has(a.id)}
                     onChange={() => p.toggleBulkAspect(a.id)}
-                    className="h-3 w-3 rounded border-gray-300 text-blue-600 cursor-pointer"
+                    className="h-3 w-3 rounded border-inventory-border-strong text-inventory-secondary cursor-pointer"
                   />
                   {a.label}
                 </label>
               ))}
-              <label className="flex cursor-pointer items-center gap-1.5 border-l border-gray-300 pl-4 text-[12px] font-semibold text-gray-900">
+              <label className="flex cursor-pointer items-center gap-1.5 border-l border-inventory-border-strong pl-4 text-[12px] font-semibold text-inventory-text">
                 <input
                   type="checkbox"
                   checked={allChecked}
@@ -132,7 +132,7 @@ export default function BulkUpdateStoresModal({ product, storeOptions, publish: 
                       if (allChecked ? p.bulkAspects.has(a.id) : !p.bulkAspects.has(a.id)) p.toggleBulkAspect(a.id);
                     }
                   }}
-                  className="h-3 w-3 rounded border-gray-300 text-blue-600 cursor-pointer"
+                  className="h-3 w-3 rounded border-inventory-border-strong text-inventory-secondary cursor-pointer"
                 />
                 All
               </label>
@@ -142,7 +142,7 @@ export default function BulkUpdateStoresModal({ product, storeOptions, publish: 
           <NoVariantsWarningBanner storeNames={noVariantsStores.map((s) => s.storeName)} />
 
           {selectedStores.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-gray-200 p-6 text-center text-[11px] text-gray-400">No stores selected.</p>
+            <p className="rounded-xl border border-dashed border-inventory-border p-6 text-center text-[11px] text-inventory-text-subtle">No stores selected.</p>
           ) : (
             selectedStores.map((store, i) => (
               <div key={store.storeId} className="space-y-3">

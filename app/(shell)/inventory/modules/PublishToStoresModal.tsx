@@ -85,32 +85,32 @@ export default function PublishToStoresModal({
                 onChange={() => p.toggleAllStores()}
                 aria-label="Select all connected stores"
                 title="Select all connected stores"
-                className="h-3 w-3 rounded border-gray-300 text-blue-600 cursor-pointer"
+                className="h-3 w-3 rounded border-inventory-border-strong text-inventory-secondary cursor-pointer"
               />
             )}
-            <p className="text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-gray-500">
+            <p className="text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-inventory-text-subtle">
               Connected stores
             </p>
           </div>
           {storeOptions.length === 0 && (
-            <p className="text-[11px] text-gray-400">No connected stores.</p>
+            <p className="text-[11px] text-inventory-text-subtle">No connected stores.</p>
           )}
           {storeOptions.map((store) => (
             <label
               key={store.storeId}
-              className="flex cursor-pointer items-start gap-2 rounded-[6px] px-2 py-1 hover:bg-gray-50"
+              className="flex cursor-pointer items-start gap-2 rounded-[6px] px-2 py-1 hover:bg-inventory-surface-hover"
             >
               <input
                 type="checkbox"
                 checked={p.selectedStoreIds.has(store.storeId)}
                 onChange={() => p.toggleStore(store.storeId)}
-                className="mt-0.5 h-3 w-3 rounded border-gray-300 text-blue-600 cursor-pointer"
+                className="mt-0.5 h-3 w-3 rounded border-inventory-border-strong text-inventory-secondary cursor-pointer"
               />
               <span className="min-w-0">
-                <span className="block truncate text-[12px] font-medium leading-tight text-gray-900">
+                <span className="block truncate text-[12px] font-medium leading-tight text-inventory-text">
                   {store.storeName}
                 </span>
-                <span className="block truncate text-[10px] text-gray-400">
+                <span className="block truncate text-[10px] text-inventory-text-subtle">
                   {store.listingStatus.replace("_", " ")}
                 </span>
               </span>
@@ -119,8 +119,8 @@ export default function PublishToStoresModal({
         </aside>
 
         <div className="min-w-0 space-y-3">
-          <section className="rounded-xl border border-gray-200 p-3">
-            <p className="mb-1.5 text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-gray-500">
+          <section className="rounded-xl border border-inventory-border p-3">
+            <p className="mb-1.5 text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-inventory-text-subtle">
               Current product (hub source)
             </p>
             <div className="flex gap-2">
@@ -133,10 +133,10 @@ export default function PublishToStoresModal({
                 />
               )}
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[12px] font-semibold text-gray-900">
+                <p className="truncate text-[12px] font-semibold text-inventory-text">
                   {product.name}
                 </p>
-                <p className="text-[11px] text-gray-500">
+                <p className="text-[11px] text-inventory-text-subtle">
                   {product.brand} · {product.category} ·{" "}
                   {product.variants.length} variant
                   {product.variants.length === 1 ? "" : "s"} ·{" "}
@@ -147,14 +147,14 @@ export default function PublishToStoresModal({
                     ? " (will publish, accessible only by direct link)"
                     : ""}
                 </p>
-                <p className="text-[11px] text-gray-400">
+                <p className="text-[11px] text-inventory-text-subtle">
                   Handle: <span className="font-mono">{product.handle}</span> ·
                   Sizes: {product.sizes.join(", ") || "—"} · Colours:{" "}
                   {product.colours.map((c) => c.name).join(", ") || "—"}
                 </p>
                 {product.description && (
                   <div
-                    className="mt-1 line-clamp-2 break-words text-[11px] text-gray-500"
+                    className="mt-1 line-clamp-2 break-words text-[11px] text-inventory-text-subtle"
                     dangerouslySetInnerHTML={{
                       __html: sanitizeHtml(product.description),
                     }}
@@ -162,7 +162,7 @@ export default function PublishToStoresModal({
                 )}
               </div>
             </div>
-            <p className="mt-1.5 text-[10px] leading-snug text-gray-400">
+            <p className="mt-1.5 text-[10px] leading-snug text-inventory-text-subtle">
               Edit each store&apos;s copy below — title, description, media,
               type, category, collections, status, handle (read-only), brand,
               SKU, sizes, colours, stock matrix, per-store AUD price and selling
@@ -176,7 +176,7 @@ export default function PublishToStoresModal({
           {p.stockWarnings.length > 0 && <StockWarningBanner warnings={p.stockWarnings} />}
 
           {selectedStores.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-gray-200 p-6 text-center text-[11px] text-gray-400">
+            <p className="rounded-xl border border-dashed border-inventory-border p-6 text-center text-[11px] text-inventory-text-subtle">
               Select at least one store to edit its listing and publish.
             </p>
           ) : (

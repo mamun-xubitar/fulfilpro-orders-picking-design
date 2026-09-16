@@ -34,11 +34,11 @@ export default function FilePicker({ onSelect, disabled, fileName }: FilePickerP
         type="button"
         disabled={disabled}
         onClick={() => inputRef.current?.click()}
-        className="h-[22px] shrink-0 rounded-[6px] bg-blue-600 px-[10px] text-[10px] font-bold leading-none text-white transition-colors duration-150 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+        className="h-[22px] shrink-0 rounded-[6px] bg-inventory-primary px-[10px] text-[10px] font-bold leading-none text-white transition-colors duration-150 hover:bg-inventory-primary-hover disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
       >
         Choose file
       </button>
-      <span className="truncate text-[11px] text-gray-600">{fileName || 'No file chosen'}</span>
+      <span className="truncate text-[11px] text-inventory-text-muted">{fileName || 'No file chosen'}</span>
     </div>
   );
 }

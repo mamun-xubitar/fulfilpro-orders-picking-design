@@ -65,16 +65,16 @@ export default function VendorPicker({ storeId, value, onChange }: VendorPickerP
             if (e.key === 'Escape') setOpen(false);
           }}
           placeholder="e.g. Flex Kindy"
-          className="h-[24px] w-full rounded-[7px] border border-gray-300 px-[6px] text-[11px] leading-none outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 placeholder:text-gray-400"
+          className="h-[24px] w-full rounded-[7px] border border-inventory-border-strong px-[6px] text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring placeholder:text-inventory-text-subtle"
         />
 
         {open && position && typeof document !== 'undefined' && createPortal(
           <div
             ref={dropdownRef}
             style={{ position: 'fixed', top: position.top, left: position.left, width: position.width }}
-            className="z-[70] max-h-56 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+            className="z-[70] max-h-56 overflow-y-auto rounded-lg border border-inventory-border bg-inventory-surface py-1 shadow-lg inventory-dropdown-in"
           >
-            {loading && <div className="px-2 py-1 text-[11px] text-gray-400">Loading…</div>}
+            {loading && <div className="px-2 py-1 text-[11px] text-inventory-text-subtle">Loading…</div>}
             {!loading &&
               suggestions.map((vendor) => (
                 <button
@@ -85,7 +85,7 @@ export default function VendorPicker({ storeId, value, onChange }: VendorPickerP
                     onChange(vendor);
                     setOpen(false);
                   }}
-                  className="block w-full truncate px-2 py-1 text-left text-[11px] leading-none text-gray-900 hover:bg-gray-50 cursor-pointer"
+                  className="block w-full truncate px-2 py-1 text-left text-[11px] leading-none text-inventory-text hover:bg-inventory-surface-hover cursor-pointer"
                 >
                   {vendor}
                 </button>

@@ -18,7 +18,8 @@ const EMPTY_FORM: ProductDetailsForm = {
   categoryId: null,
   sku: '',
   description: '',
-  remarks: '',
+  productRemark: '',
+  poQuantity: '1',
   sizes: '',
   colours: '',
   status: 'DRAFT',
@@ -36,7 +37,8 @@ function productToForm(product: ProductRecord): ProductDetailsForm {
     categoryId: product.categoryId,
     sku: product.sku,
     description: product.description,
-    remarks: product.remarks,
+    productRemark: product.productRemark,
+    poQuantity: String(product.poQuantity),
     sizes: formatSizesInput(product.sizes),
     colours: formatColoursInput(product.colours),
     status: product.status,
@@ -57,7 +59,8 @@ function formsEqual(a: ProductDetailsForm, b: ProductDetailsForm): boolean {
     a.categoryId === b.categoryId &&
     a.sku === b.sku &&
     a.description === b.description &&
-    a.remarks === b.remarks &&
+    a.productRemark === b.productRemark &&
+    a.poQuantity === b.poQuantity &&
     a.sizes === b.sizes &&
     a.colours === b.colours &&
     a.status === b.status &&
@@ -147,7 +150,8 @@ export function useProductDetails({ product, onSaved, ensureGroup }: UseProductD
         categoryId: form.categoryId,
         sku: form.sku,
         description: form.description,
-        remarks: form.remarks,
+        productRemark: form.productRemark,
+        poQuantity: Number(form.poQuantity) || 1,
         sizes: parseSizesInput(form.sizes),
         colours: parseColoursInput(form.colours),
         status: form.status,
@@ -161,6 +165,7 @@ export function useProductDetails({ product, onSaved, ensureGroup }: UseProductD
         if (dupColour) validationErrors.colours = `"${dupColour}" is listed more than once`;
         const dupSize = findCaseInsensitiveDuplicate(parseSizesInput(form.sizes));
         if (dupSize) validationErrors.sizes = `"${dupSize}" is listed more than once`;
+        if (!Number.isFinite(Number(form.poQuantity)) || Number(form.poQuantity) < 1) validationErrors.poQuantity = 'Enter a quantity of at least 1';
         return validationErrors;
       },
       successMessage: 'Product details saved',

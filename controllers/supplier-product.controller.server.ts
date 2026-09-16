@@ -7,6 +7,7 @@ import { deriveColorFromName } from '@/lib/inventory/colour';
 import { isValidHandle, slugifyHandle } from '@/lib/inventory/handle';
 import { sanitizeHtml } from '@/lib/sanitize-html';
 import { SupplierProductStatus } from '@prisma/client';
+import { upperTrim } from '@/lib/utils/common';
 import type { CatalogueListParams, ProductsSortKey, QuickFilterId } from '@/models/supplier-product.model.server';
 
 const model = new SupplierProductModel();
@@ -71,9 +72,10 @@ export class SupplierProductController {
     const sortParam = searchParams.get('sort');
     const sort = sortParam && SORT_KEYS.has(sortParam) ? (sortParam as ProductsSortKey) : 'createdAt';
     const dir = searchParams.get('dir') === 'desc' ? 'desc' : searchParams.get('dir') === 'asc' ? 'asc' : sort === 'createdAt' ? 'desc' : 'asc';
+    const includeOmitted = searchParams.get('includeOmitted') === '1';
 
     if (mode === 'ids') {
-      const ids = await model.listIds({ search: searchParams.get('search')?.trim() || undefined, verified, status, supplierId, quickFilter, sort, dir });
+      const ids = await model.listIds({ search: searchParams.get('search')?.trim() || undefined, verified, status, supplierId, quickFilter, sort, dir, includeOmitted });
       return { data: { ids } };
     }
 
@@ -90,17 +92,17 @@ export class SupplierProductController {
       const page = Math.max(1, Number(searchParams.get('page')) || 1);
       const pageSize = [20, 50, 100].includes(Number(searchParams.get('pageSize'))) ? Number(searchParams.get('pageSize')) : 20;
       const search = searchParams.get('search')?.trim() || undefined;
-      const params: CatalogueListParams = { page, pageSize, search, verified, status, supplierId, quickFilter, sort, dir };
+      const params: CatalogueListParams = { page, pageSize, search, verified, status, supplierId, quickFilter, sort, dir, includeOmitted };
       // Every supplier in the system, not just ones with linked products — a supplier with zero
       // products should still be pickable in the filter dropdown.
-      const [{ products, total }, supplierOptionRows, totalAll, stepperTotal] = await Promise.all([
+      const [{ products, total, totals }, supplierOptionRows, totalAll, stepperTotal] = await Promise.all([
         model.list(params),
         supplierModel.listOptions(),
         model.countAll(),
         model.countForStepper(verified),
       ]);
       const supplierOptions = supplierOptionRows.map((s) => ({ id: s.id, name: s.name }));
-      return { data: { products, pagination: paginationOf(page, pageSize, total), totalAll, stepperTotal, globals, supplierOptions } };
+      return { data: { products, pagination: paginationOf(page, pageSize, total), totalAll, stepperTotal, totals, globals, supplierOptions } };
     }
 
     // detail mode — the quick filter deliberately never reaches here: it only narrows the
@@ -153,9 +155,9 @@ export class SupplierProductController {
         ? [value.supplierId.trim()]
         : [];
     const supplierIds = [...new Set(rawSupplierIds)];
-    const itemNo = typeof value.itemNo === 'string' ? value.itemNo.trim() : '';
-    const name = typeof value.name === 'string' ? value.name.trim() : '';
-    const brand = typeof value.brand === 'string' ? value.brand.trim() : '';
+    const itemNo = typeof value.itemNo === 'string' ? upperTrim(value.itemNo) : '';
+    const name = typeof value.name === 'string' ? upperTrim(value.name) : '';
+    const brand = typeof value.brand === 'string' ? upperTrim(value.brand) : '';
     const handleInput = typeof value.handle === 'string' ? value.handle.trim() : '';
     const handle = handleInput || slugifyHandle(name) || slugifyHandle(itemNo);
 
@@ -229,7 +231,7 @@ export class SupplierProductController {
     if (errors.length) return { error: { message: 'Validation failed', errors, status: 400 } };
 
     // itemNo is globally unique — re-check whenever it's about to change, mirroring create.
-    const effectiveItemNo = typeof value.itemNo === 'string' ? value.itemNo.trim() : current.itemNo;
+    const effectiveItemNo = typeof value.itemNo === 'string' ? upperTrim(value.itemNo) : current.itemNo;
     if (effectiveItemNo !== current.itemNo) {
       const conflict = await prisma.supplierProduct.findUnique({ where: { itemNo: effectiveItemNo }, select: { id: true } });
       if (conflict && conflict.id !== id) {
@@ -237,26 +239,37 @@ export class SupplierProductController {
       }
     }
 
+    let poQuantity: number | undefined;
+    if (value.poQuantity !== undefined) {
+      const parsed = Number(value.poQuantity);
+      if (!Number.isFinite(parsed) || parsed < 1) {
+        return { error: { message: 'Validation failed', errors: ['poQuantity: Enter a quantity of at least 1'], status: 400 } };
+      }
+      poQuantity = Math.trunc(parsed);
+    }
+
     await model.updateDetails(id, {
-      ...(typeof value.itemNo === 'string' ? { itemNo: value.itemNo.trim() } : {}),
+      ...(typeof value.itemNo === 'string' ? { itemNo: upperTrim(value.itemNo) } : {}),
       ...(handle !== undefined ? { handle } : {}),
       ...(supplierIds !== undefined ? { supplierIds } : {}),
-      ...(typeof value.brand === 'string' ? { brand: value.brand.trim() } : {}),
-      ...(typeof value.name === 'string' ? { name: value.name.trim() } : {}),
+      ...(typeof value.brand === 'string' ? { brand: upperTrim(value.brand) } : {}),
+      ...(typeof value.name === 'string' ? { name: upperTrim(value.name) } : {}),
       ...(typeof value.category === 'string' ? { category: value.category.trim() } : {}),
       ...('categoryId' in value ? { categoryId: typeof value.categoryId === 'string' ? value.categoryId : null } : {}),
-      ...(typeof value.sku === 'string' ? { sku: value.sku.trim() } : {}),
+      ...(typeof value.sku === 'string' ? { sku: upperTrim(value.sku) } : {}),
       ...(typeof value.description === 'string' ? { description: sanitizeHtml(value.description) } : {}),
-      ...(typeof value.remarks === 'string' ? { remarks: value.remarks.trim() } : {}),
+      ...(typeof value.productRemark === 'string' ? { productRemark: upperTrim(value.productRemark) } : {}),
+      ...(poQuantity !== undefined ? { poQuantity } : {}),
+      ...(typeof value.omitted === 'boolean' ? { omitted: value.omitted } : {}),
       ...(typeof value.status === 'string' ? { status: value.status as SupplierProductStatus } : {}),
       ...(typeof value.verified === 'boolean' ? { verified: value.verified } : {}),
-      ...(Array.isArray(value.sizes) ? { sizes: (value.sizes as unknown[]).filter((s): s is string => typeof s === 'string') } : {}),
+      ...(Array.isArray(value.sizes) ? { sizes: (value.sizes as unknown[]).filter((s): s is string => typeof s === 'string').map((s) => upperTrim(s)) } : {}),
       ...(Array.isArray(value.colours)
         ? {
             colours: (value.colours as unknown[])
               .filter((c): c is Record<string, unknown> => !!c && typeof c === 'object')
               .map((c) => {
-                const name = String(c.name ?? '');
+                const name = upperTrim(String(c.name ?? ''));
                 return { name, color: typeof c.color === 'string' && c.color ? c.color : deriveColorFromName(name) };
               }),
           }
@@ -523,6 +536,14 @@ export class SupplierProductController {
       const count = await model.setVerifiedMany(productIds, value.verified);
       const message = value.verified ? 'Marked as verified' : 'Marked as unverified';
       await Promise.all(productIds.map((id) => model.logActivity(id, message, 'verified_updated', actorFromSession(session))));
+      return { data: { count }, message: `${count} product${count === 1 ? '' : 's'} updated` };
+    }
+
+    if (action === 'set_omitted') {
+      if (typeof value.omitted !== 'boolean') return { error: { message: 'omitted: Must be true or false', status: 400 } };
+      const count = await model.setOmittedMany(productIds, value.omitted);
+      const message = value.omitted ? 'Omitted from list' : 'Restored to list';
+      await Promise.all(productIds.map((id) => model.logActivity(id, message, 'omitted_updated', actorFromSession(session))));
       return { data: { count }, message: `${count} product${count === 1 ? '' : 's'} updated` };
     }
 

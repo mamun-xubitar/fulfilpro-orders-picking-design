@@ -26,17 +26,17 @@ export default function StepPills({ step, steps }: StepPillsProps) {
                 aria-current={active ? 'step' : undefined}
                 className={`flex h-7 w-7 items-center justify-center rounded-full transition-all duration-300 ${
                   done
-                    ? 'bg-emerald-500 text-white shadow-[0_1px_3px_0_rgb(16_185_129/0.4)]'
+                    ? 'bg-inventory-success text-white shadow-[0_1px_3px_0_rgb(22_163_74/0.4)]'
                     : active
-                      ? 'bg-gradient-to-br from-blue-600 to-indigo-600 text-white ring-4 ring-blue-100 shadow-[0_2px_6px_0_rgb(37_99_235/0.35)]'
-                      : 'border border-gray-200 bg-white text-gray-400'
+                      ? 'bg-gradient-to-br from-inventory-primary to-inventory-primary-hover text-white ring-4 ring-inventory-primary-ring shadow-[0_2px_6px_0_rgb(91_63_214/0.35)]'
+                      : 'border border-inventory-border bg-inventory-surface text-inventory-text-subtle'
                 }`}
               >
                 {done ? <Check className="h-3.5 w-3.5" /> : <Icon className="h-3.5 w-3.5" />}
               </div>
               <span
                 className={`max-w-full truncate whitespace-nowrap text-[10px] ${
-                  active ? 'font-semibold text-blue-700' : done ? 'font-medium text-emerald-700' : 'font-medium text-gray-400'
+                  active ? 'font-semibold text-inventory-secondary' : done ? 'font-medium text-inventory-success-hover' : 'font-medium text-inventory-text-subtle'
                 }`}
               >
                 {meta.label}
@@ -45,7 +45,7 @@ export default function StepPills({ step, steps }: StepPillsProps) {
             {stepNumber < steps.length && (
               <div
                 className={`mx-2 h-[3px] flex-1 rounded-full transition-colors duration-300 ${
-                  done ? 'bg-emerald-400' : stepNumber === step ? 'bg-gradient-to-r from-emerald-400 to-blue-500' : 'bg-gray-200'
+                  done ? 'bg-inventory-success' : stepNumber === step ? 'bg-gradient-to-r from-inventory-success to-inventory-primary' : 'bg-inventory-border'
                 }`}
               />
             )}

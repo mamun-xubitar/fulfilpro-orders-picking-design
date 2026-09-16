@@ -1,6 +1,6 @@
 'use client';
 
-import { PanelHeading } from './MainImagePanel';
+import { PanelHeading, panelBorderClass, type PanelTone } from './MainImagePanel';
 import PurchaseOrdersPanel from './PurchaseOrdersPanel';
 import type { InventoryPage } from './hooks/useInventoryPage';
 import { Activity, Adjust, Clipboard, Swap, Upload } from './icons';
@@ -17,7 +17,7 @@ export default function BottomPanels({ p }: BottomPanelsProps) {
     <div className="grid grid-cols-1 gap-[5px] md:grid-cols-2 xl:h-24 xl:flex-none xl:grid-cols-5">
       <PurchaseOrdersPanel po={p.po} />
 
-      <Card icon={<Clipboard className="h-3 w-3" />} title="Stocktake">
+      <Card tone="stocktake" icon={<Clipboard className="h-3 w-3" />} title="Stocktake">
         <Stat label="Last stocktake" value={formatDate(product.stocktake.lastAt)} />
         <Stat label="Next stocktake" value={formatDate(product.stocktake.nextAt)} />
         <Actions>
@@ -28,7 +28,7 @@ export default function BottomPanels({ p }: BottomPanelsProps) {
         </Actions>
       </Card>
 
-      <Card icon={<Adjust className="h-3 w-3" />} title="Adjustments">
+      <Card tone="adjust" icon={<Adjust className="h-3 w-3" />} title="Adjustments">
         <Stat label="Last adjustment" value={formatDate(product.adjustments.lastAt)} />
         <Stat label="This month" value={String(product.adjustments.thisMonth)} />
         <Actions>
@@ -37,11 +37,11 @@ export default function BottomPanels({ p }: BottomPanelsProps) {
         </Actions>
       </Card>
 
-      <Card icon={<Swap className="h-3 w-3" />} title="Import / export">
+      <Card tone="import" icon={<Swap className="h-3 w-3" />} title="Import / export">
         <button
           type="button"
           onClick={p.importExport.openImport}
-          className="mt-auto flex h-[22px] w-full items-center justify-center gap-1 rounded-[6px] bg-emerald-600 text-[10px] font-bold leading-none text-white transition-colors duration-150 hover:bg-emerald-700 cursor-pointer"
+          className="mt-auto flex h-[22px] w-full items-center justify-center gap-1 rounded-[6px] bg-inventory-success text-[10px] font-bold leading-none text-white transition-colors duration-150 hover:bg-inventory-success-hover cursor-pointer"
         >
           <Upload className="h-3 w-3" />
           Import Product/PO CSV
@@ -54,17 +54,17 @@ export default function BottomPanels({ p }: BottomPanelsProps) {
         </Actions>
       </Card>
 
-      <Card icon={<Activity className="h-3 w-3" />} title="Recent activity">
+      <Card tone="activity" icon={<Activity className="h-3 w-3" />} title="Recent activity">
         {product.activity.length === 0 ? (
-          <p className="py-3 text-center text-[10px] text-gray-400">No recent activity</p>
+          <p className="py-3 text-center text-[10px] text-inventory-text-subtle">No recent activity</p>
         ) : (
           <ul className="min-h-0 flex-1 space-y-1 overflow-y-auto pr-1">
             {product.activity.map((entry) => (
               <li key={entry.id} className="flex gap-1.5">
-                <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-blue-500" aria-hidden="true" />
+                <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-inventory-primary" aria-hidden="true" />
                 <span className="min-w-0">
-                  <span className="block text-[10px] leading-snug text-gray-800">{entry.message}</span>
-                  <span className="block text-[9px] text-gray-400">
+                  <span className="block text-[10px] leading-snug text-inventory-text">{entry.message}</span>
+                  <span className="block text-[9px] text-inventory-text-subtle">
                     {entry.actor} · {formatRelative(entry.at, p.now)}
                   </span>
                 </span>
@@ -77,10 +77,10 @@ export default function BottomPanels({ p }: BottomPanelsProps) {
   );
 }
 
-function Card({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
+function Card({ icon, title, tone, children }: { icon: React.ReactNode; title: string; tone: PanelTone; children: React.ReactNode }) {
   return (
-    <section className="flex min-h-0 flex-col rounded-[10px] border border-gray-200 bg-white shadow-[0_1px_2px_0_rgb(0_0_0/0.05)]">
-      <PanelHeading icon={icon} title={title} />
+    <section className={`flex min-h-0 flex-col rounded-[10px] border ${panelBorderClass(tone)} bg-inventory-surface shadow-inventory`}>
+      <PanelHeading tone={tone} icon={icon} title={title} />
       <div className="flex min-h-0 flex-1 flex-col gap-[4px] p-[6px]">{children}</div>
     </section>
   );
@@ -88,9 +88,9 @@ function Card({ icon, title, children }: { icon: React.ReactNode; title: string;
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between gap-2 border-b border-gray-100 py-[4px] leading-none last-of-type:border-0">
-      <span className="text-[10px] font-medium text-gray-600">{label}</span>
-      <span className="text-[10px] font-bold text-gray-900 tabular-nums">{value}</span>
+    <div className="flex items-center justify-between gap-2 border-b border-inventory-divider py-[4px] leading-none last-of-type:border-0">
+      <span className="text-[10px] font-medium text-inventory-text-muted">{label}</span>
+      <span className="text-[10px] font-bold text-inventory-text tabular-nums">{value}</span>
     </div>
   );
 }
@@ -105,7 +105,7 @@ function PrimaryButton({ onClick, disabled, children }: { onClick: () => void; d
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="h-[22px] flex-1 whitespace-nowrap rounded-[6px] bg-blue-600 px-[6px] text-[10px] font-bold leading-none text-white transition-colors duration-150 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+      className="h-[22px] flex-1 whitespace-nowrap rounded-[6px] bg-inventory-primary px-[6px] text-[10px] font-bold leading-none text-white transition-colors duration-150 hover:bg-inventory-primary-hover disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
     >
       {children}
     </button>
@@ -117,7 +117,7 @@ function SecondaryButton({ onClick, children }: { onClick: () => void; children:
     <button
       type="button"
       onClick={onClick}
-      className="h-[22px] flex-1 whitespace-nowrap rounded-[6px] border border-gray-300 px-[6px] text-[10px] font-bold leading-none text-gray-700 transition-colors duration-150 hover:bg-gray-50 cursor-pointer"
+      className="h-[22px] flex-1 whitespace-nowrap rounded-[6px] border border-inventory-border-strong px-[6px] text-[10px] font-bold leading-none text-inventory-text-muted transition-colors duration-150 hover:bg-inventory-surface-hover cursor-pointer"
     >
       {children}
     </button>

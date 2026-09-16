@@ -1,6 +1,8 @@
 'use client';
 
-import { MODAL_FOOTER_BTN_PRIMARY, MODAL_FOOTER_BTN_SECONDARY, ModalShell } from '@/components/ModalShell';
+import { ModalShell } from '@/components/ModalShell';
+import AnimatedStepBody from './newProduct/AnimatedStepBody';
+import { SPINNER, WIZARD_BODY_CLASS, WIZARD_BTN_PRIMARY, WIZARD_BTN_SECONDARY, WIZARD_CARD_CLASS } from './modalStyles';
 import PoFormBody from './PoFormBody';
 import ReceivePoModal from './ReceivePoModal';
 import type { usePurchaseOrder } from './hooks/usePurchaseOrder';
@@ -23,13 +25,14 @@ function CreatePoModal({ po, variants }: { po: ReturnType<typeof usePurchaseOrde
       title="Create purchase order"
       compact
       onClose={po.closeCreate}
-      extraWide
+      wide
+      bodyClassName={WIZARD_BODY_CLASS}
       footer={
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={po.closeCreate}
-            className={`flex-1 ${MODAL_FOOTER_BTN_SECONDARY}`}
+            className={`flex-1 ${WIZARD_BTN_SECONDARY}`}
           >
             Cancel
           </button>
@@ -37,14 +40,25 @@ function CreatePoModal({ po, variants }: { po: ReturnType<typeof usePurchaseOrde
             type="button"
             onClick={() => po.saveAndSend()}
             disabled={po.saving}
-            className={`flex-1 ${MODAL_FOOTER_BTN_PRIMARY}`}
+            className={`flex-1 ${WIZARD_BTN_PRIMARY}`}
           >
-            {po.saving ? 'Saving...' : 'Save and send'}
+            {po.saving ? (
+              <>
+                {SPINNER}
+                Saving…
+              </>
+            ) : (
+              'Save and send'
+            )}
           </button>
         </div>
       }
     >
-      <PoFormBody po={po} variants={variants} />
+      <div className={WIZARD_CARD_CLASS}>
+        <AnimatedStepBody minHeightClassName="min-h-0">
+          <PoFormBody compact po={po} variants={variants} />
+        </AnimatedStepBody>
+      </div>
     </ModalShell>
   );
 }

@@ -12,6 +12,11 @@ type UsePurchaseOrderArgs = {
   onSaved: (product: ProductRecord) => void;
 };
 
+/** Seeded onto every new PO's Shipping Remark field. `{orderNumber}` is a literal token the
+ * server substitutes with this PO's own display number ("PO-00074") once it's created — see
+ * PurchaseOrderModel.create. */
+const DEFAULT_SHIPPING_REMARK = 'NF.{orderNumber}, color: , size: , quantity: , made in china.';
+
 export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
   const [supplierOptions, setSupplierOptions] = useState<SupplierOption[]>([]);
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrderRecord[]>([]);
@@ -20,7 +25,8 @@ export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
   const [createOpen, setCreateOpen] = useState(false);
   const [supplierId, setSupplierId] = useState('');
   const [deliveryDate, setDeliveryDate] = useState('');
-  const [remark, setRemark] = useState('');
+  const [poRemark, setPoRemark] = useState('');
+  const [shippingRemark, setShippingRemark] = useState('');
   const [referenceNumber, setReferenceNumber] = useState('');
   const [quantities, setQuantities] = useState<Record<string, string>>({});
   const [skus, setSkus] = useState<Record<string, string>>({});
@@ -72,13 +78,17 @@ export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
     if (!product) return;
     setSupplierId(supplierOptions[0]?.id ?? '');
     setDeliveryDate('');
-    setRemark('');
+    setPoRemark('');
+    setShippingRemark(DEFAULT_SHIPPING_REMARK);
     setReferenceNumber('');
     const ids = variantIds.length > 0 ? variantIds : product.variants.map((v) => v.id);
     const variantById = new Map(product.variants.map((v) => [v.id, v]));
-    setQuantities(Object.fromEntries(ids.map((id) => [id, '1'])));
+    // Buying price (converted to AUD) — not the landed total (which also folds in freight/misc)
+    // and not the variant's own weighted-average received cost.
+    const seedCost = (product.pricing.buyingPrice * product.pricing.exchangeRate).toFixed(2);
+    setQuantities(Object.fromEntries(ids.map((id) => [id, String(product.poQuantity)])));
     setSkus(Object.fromEntries(ids.map((id) => [id, variantById.get(id)?.sku ?? ''])));
-    setCosts(Object.fromEntries(ids.map((id) => [id, (variantById.get(id)?.buyPrice ?? 0).toFixed(2)])));
+    setCosts(Object.fromEntries(ids.map((id) => [id, seedCost])));
   };
 
   const openCreate = (variantIds: string[]) => {
@@ -91,6 +101,9 @@ export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
   const setQuantity = (variantId: string, value: string) => setQuantities((prev) => ({ ...prev, [variantId]: value }));
   const setSku = (variantId: string, value: string) => setSkus((prev) => ({ ...prev, [variantId]: value }));
   const setCost = (variantId: string, value: string) => setCosts((prev) => ({ ...prev, [variantId]: value }));
+  /** Bulk column fill for the create-PO items table's Qty header (item 8) — writes every row
+   * currently in the form, not just the ones the caller happens to know about. */
+  const setAllQuantities = (value: number) => setQuantities((prev) => Object.fromEntries(Object.keys(prev).map((id) => [id, String(value)])));
 
   /** `after` fires once the PO is created — used by the New Product wizard to close itself only
    * on a confirmed save. */
@@ -109,7 +122,15 @@ export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
     requestCreate({
       url: '/api/inventory/purchase-orders',
       method: 'POST',
-      data: { supplierId, supplierProductId: product.id, referenceNumber: referenceNumber || undefined, deliveryDate: deliveryDate || undefined, remark: remark || undefined, items },
+      data: {
+        supplierId,
+        supplierProductId: product.id,
+        referenceNumber: referenceNumber || undefined,
+        deliveryDate: deliveryDate || undefined,
+        poRemark: poRemark || undefined,
+        shippingRemark: shippingRemark || undefined,
+        items,
+      },
       successMessage: 'Purchase order created',
       validation: async () => {
         const errors: Record<string, string> = {};
@@ -121,13 +142,16 @@ export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
         const po = data.purchaseOrder;
         if (supplier) {
           const variantById = new Map(product.variants.map((v) => [v.id, v]));
+          // The server-resolved copy — {orderNumber} has already been substituted with this PO's
+          // own display number by the time it comes back.
           const { subject, body } = buildPoEmail({
             number: po.number,
             productTitle: po.productTitle,
             supplierName: supplier.name,
             referenceNumber: po.referenceNumber,
             deliveryDate: po.deliveryDate,
-            remark: po.remark,
+            poRemark: po.poRemark,
+            shippingRemark: po.shippingRemark,
             items: po.items.map((item) => ({
               quantity: item.quantity,
               variantTitle: item.variantTitle,
@@ -151,14 +175,43 @@ export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
     setReceiveCost(Object.fromEntries(po.items.map((item) => [item.id, item.unitCost !== null ? String(item.unitCost) : ''])));
   };
   const closeReceive = () => setReceiveTarget(null);
-  const setReceiveItemQty = (itemId: string, value: string, max?: number) => {
-    const clamped = max !== undefined && Number(value) > max ? String(max) : value;
-    setReceiveQty((prev) => ({ ...prev, [itemId]: clamped }));
+  const getReceiveQtyError = (value: string | undefined, remaining: number): string | null => {
+    if (value === undefined || value.trim() === '') return null;
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return 'Enter a valid number';
+    if (parsed < 0) return 'Cannot be negative';
+    if (!Number.isInteger(parsed)) return 'Must be a whole number';
+    if (parsed > remaining) return `Max ${remaining}`;
+    return null;
+  };
+  const setReceiveItemQty = (itemId: string, value: string, _max?: number) => {
+    setReceiveQty((prev) => ({ ...prev, [itemId]: value }));
   };
   const setReceiveItemCost = (itemId: string, value: string) => setReceiveCost((prev) => ({ ...prev, [itemId]: value }));
+  /** Bulk column fill for the Receive PO modal's Receive qty header (item 8) — each row still
+   * clamps to its own remaining (quantity - receivedQuantity), same as a per-row edit. */
+  const setAllReceiveQty = (value: number) => {
+    if (!receiveTarget) return;
+    setReceiveQty(
+      Object.fromEntries(
+        receiveTarget.items.map((item) => {
+          const remaining = Math.max(0, item.quantity - item.receivedQuantity);
+          return [item.id, String(Math.min(value, remaining))];
+        })
+      )
+    );
+  };
 
   const submitReceive = () => {
     if (!receiveTarget) return;
+    for (const item of receiveTarget.items) {
+      const remaining = Math.max(0, item.quantity - item.receivedQuantity);
+      const err = getReceiveQtyError(receiveQty[item.id], remaining);
+      if (err) {
+        toast.error(`${item.variantTitle}: ${err}`);
+        return;
+      }
+    }
     const receipts = Object.entries(receiveQty)
       .filter(([, v]) => Number(v) > 0)
       .map(([itemId, v]) => {
@@ -198,12 +251,15 @@ export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
     setSupplierId,
     deliveryDate,
     setDeliveryDate,
-    remark,
-    setRemark,
+    poRemark,
+    setPoRemark,
+    shippingRemark,
+    setShippingRemark,
     referenceNumber,
     setReferenceNumber,
     quantities,
     setQuantity,
+    setAllQuantities,
     skus,
     setSku,
     costs,
@@ -216,6 +272,8 @@ export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
     closeReceive,
     receiveQty,
     setReceiveItemQty,
+    getReceiveQtyError,
+    setAllReceiveQty,
     receiveCost,
     setReceiveItemCost,
     receiving,

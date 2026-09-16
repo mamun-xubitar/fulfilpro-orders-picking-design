@@ -110,7 +110,7 @@ export default function PresetComboField({
               onClick={() => setOpen(true)}
               placeholder={placeholder}
               aria-label={label}
-              className="h-[24px] w-full rounded-[7px] border border-gray-300 px-[6px] text-[11px] leading-none text-gray-900 outline-none placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              className="h-[24px] w-full rounded-[7px] border border-inventory-border-strong px-[6px] text-[11px] leading-none text-inventory-text outline-none placeholder:text-inventory-text-subtle focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring"
             />
             {open && (
               <PresetPicker
@@ -124,9 +124,9 @@ export default function PresetComboField({
               />
             )}
           </div>
-          {displayError && <p className="mt-[2px] text-[10px] leading-tight text-red-600">{displayError}</p>}
+          {displayError && <p className="mt-[2px] text-[10px] leading-tight text-inventory-danger">{displayError}</p>}
           {!displayError && willCreateGroup && (
-            <p className="mt-[2px] text-[10px] leading-tight text-gray-500">A new preset group ({groupLabel(names)}) will be saved on Save.</p>
+            <p className="mt-[2px] text-[10px] leading-tight text-inventory-text-subtle">A new preset group ({groupLabel(names)}) will be saved on Save.</p>
           )}
           <div className="flex flex-wrap gap-[4px]">{renderChips(entries)}</div>
         </div>

@@ -19,7 +19,7 @@ type ProductStatusSelectProps = {
  * the right edge. */
 const TRIGGER_LAYOUT_CLASS = 'flex w-full items-center justify-between gap-2 text-left cursor-pointer';
 const DEFAULT_TRIGGER_VISUAL_CLASS =
-  'h-[24px] rounded-[7px] border border-gray-300 px-[6px] text-[11px] leading-none outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100';
+  'h-[24px] rounded-[7px] border border-inventory-border-strong px-[6px] text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring';
 
 /**
  * Shopify-style status dropdown — Active / Draft / Unlisted. Each row shows its own explanatory
@@ -136,7 +136,7 @@ export default function ProductStatusSelect({ value, onChange, id, className }: 
         className={`${TRIGGER_LAYOUT_CLASS} ${className ?? DEFAULT_TRIGGER_VISUAL_CLASS}`}
       >
         <span className="truncate">{selected.label}</span>
-        <ChevronDown className={`h-3 w-3 shrink-0 text-gray-400 transition-transform duration-150 ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`h-3 w-3 shrink-0 text-inventory-text-subtle transition-transform duration-150 ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && position && typeof document !== 'undefined' && createPortal(
         <ul
@@ -144,7 +144,7 @@ export default function ProductStatusSelect({ value, onChange, id, className }: 
           role="listbox"
           aria-label="Status"
           style={{ position: 'fixed', top: position.top, left: position.left, width: position.width }}
-          className="z-[70] max-h-72 overflow-y-auto rounded-[7px] border border-gray-200 bg-white py-1 shadow-lg"
+          className="z-[70] max-h-72 overflow-y-auto rounded-[7px] border border-inventory-border bg-inventory-surface py-1 shadow-lg inventory-dropdown-in"
         >
           {STATUS_OPTIONS.map((option, index) => (
             <li key={option.value} role="option" aria-selected={option.value === value}>
@@ -153,11 +153,11 @@ export default function ProductStatusSelect({ value, onChange, id, className }: 
                 onClick={() => commit(index)}
                 onMouseEnter={() => setHighlighted(index)}
                 className={`block w-full px-[10px] py-[6px] text-left transition-colors duration-100 cursor-pointer ${
-                  index === highlighted ? 'bg-blue-50' : 'hover:bg-gray-50'
+                  index === highlighted ? 'bg-inventory-secondary/10' : 'hover:bg-inventory-surface-hover'
                 }`}
               >
-                <span className="block text-[11px] font-bold leading-snug text-gray-900">{option.label}</span>
-                <span className="block text-[10px] leading-snug text-gray-400">{option.hint}</span>
+                <span className="block text-[11px] font-bold leading-snug text-inventory-text">{option.label}</span>
+                <span className="block text-[10px] leading-snug text-inventory-text-subtle">{option.hint}</span>
               </button>
             </li>
           ))}

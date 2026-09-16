@@ -32,7 +32,9 @@ type ImageCardsGridProps = {
 export default function ImageCardsGrid({ images, colours, imageMutations }: ImageCardsGridProps) {
   const swatchOf = makeSwatchResolver(colours);
   const assigned = images.filter((i) => i.colour);
-  const unassigned = images.filter((i) => !i.colour);
+  // Newest first (matches the Main image gallery) — `images` itself stays position-ascending
+  // since Assigned above, and the product-list thumbnail, still want oldest-first.
+  const unassigned = images.filter((i) => !i.colour).reverse();
   const takenByOtherImages = new Set(assigned.map((i) => i.colour!.toLowerCase()));
 
   const availableColoursFor = (image: ProductImage) =>
@@ -72,14 +74,14 @@ export default function ImageCardsGrid({ images, colours, imageMutations }: Imag
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-medium text-gray-500">
+        <span className="text-xs font-medium text-inventory-text-subtle">
           {images.length} / {MAX_IMAGES} images
         </span>
       </div>
 
       {assigned.length > 0 && (
         <section>
-          <h4 className="z-10 -mx-1 mb-2 bg-white/95 px-1 py-1 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+          <h4 className="z-10 -mx-1 mb-2 bg-inventory-surface/95 px-1 py-1 text-[11px] font-semibold uppercase tracking-wide text-inventory-text-subtle">
             Assigned ({assigned.length})
           </h4>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
@@ -91,7 +93,7 @@ export default function ImageCardsGrid({ images, colours, imageMutations }: Imag
       )}
 
       <section>
-        <h4 className="z-10 -mx-1 mb-2 bg-white/95 px-1 py-1 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+        <h4 className="z-10 -mx-1 mb-2 bg-inventory-surface/95 px-1 py-1 text-[11px] font-semibold uppercase tracking-wide text-inventory-text-subtle">
           Unassigned ({unassigned.length})
         </h4>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
@@ -129,13 +131,13 @@ function ImageCard({
   const assigning = imageMutations.settingColourForImageId === image.id;
 
   return (
-    <figure className="overflow-hidden rounded-xl border border-gray-200 flex flex-col justify-between">
+    <figure className="overflow-hidden rounded-xl border border-inventory-border flex flex-col justify-between">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={image.url} alt={image.altText ?? ''} className="aspect-square w-full object-cover " />
-      <figcaption className="space-y-1.5 bg-gray-50 px-2 py-1.5">
+      <figcaption className="space-y-1.5 bg-inventory-surface-muted px-2 py-1.5">
         {image.colour && (
           <div className="flex flex-wrap gap-1">
-            <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-white pl-1.5 pr-1 py-0.5 text-[10px] font-semibold text-gray-700">
+            <span className="inline-flex items-center gap-1 rounded-full border border-inventory-border bg-inventory-surface pl-1.5 pr-1 py-0.5 text-[10px] font-semibold text-inventory-text-muted">
               <span className="h-2 w-2 shrink-0 rounded-full ring-1 ring-black/10" style={{ backgroundColor: swatchOf(image.colour) }} aria-hidden="true" />
               {formatColourName(image.colour)}
               <button
@@ -144,7 +146,7 @@ function ImageCard({
                 disabled={assigning}
                 aria-label={`Remove ${formatColourName(image.colour)} from this image`}
                 title="Remove colour"
-                className="rounded-full p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+                className="rounded-full p-0.5 text-inventory-text-subtle hover:bg-inventory-surface-hover hover:text-inventory-text-muted disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
               >
                 <Close className="h-2.5 w-2.5" />
               </button>
@@ -157,7 +159,7 @@ function ImageCard({
             onChange={(e) => imageMutations.setImageColour(image.id, e.target.value || null)}
             disabled={assigning}
             aria-label="Assign this image to a colour"
-            className="min-w-0 flex-1 rounded border border-gray-200 bg-white px-1.5 py-0.5 text-[11px] font-medium text-gray-600 outline-none focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+            className="min-w-0 flex-1 rounded border border-inventory-border bg-inventory-surface px-1.5 py-0.5 text-[11px] font-medium text-inventory-text-muted outline-none focus:ring-2 focus:ring-inventory-primary-ring disabled:cursor-not-allowed disabled:opacity-50"
           >
             <option value="">— assign a colour —</option>
             {colours.map((c) => (
@@ -172,7 +174,7 @@ function ImageCard({
             disabled={imageMutations.removingId === image.id}
             aria-label="Remove image"
             title="Remove image"
-            className="shrink-0 rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+            className="shrink-0 rounded p-1 text-inventory-text-subtle hover:bg-inventory-danger/10 hover:text-inventory-danger-hover disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
           >
             <Trash className="h-3.5 w-3.5" />
           </button>
@@ -205,7 +207,7 @@ function AddImageTile({
       }}
       disabled={uploading || full}
       title={full ? `Gallery full (${MAX_IMAGES})` : undefined}
-      className="flex aspect-square flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-gray-500 text-gray-700 transition-colors duration-150 hover:border-blue-400 hover:text-blue-500 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+      className="flex aspect-square flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-inventory-border-strong text-inventory-text-muted transition-colors duration-150 hover:border-inventory-primary hover:text-inventory-secondary-hover disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
     >
       <Plus className="h-5 w-5" />
       <span className="text-[11px] font-semibold">{full ? `Gallery full (${MAX_IMAGES})` : uploading ? 'Uploading…' : 'Add image'}</span>

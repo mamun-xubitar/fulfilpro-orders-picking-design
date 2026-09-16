@@ -903,7 +903,8 @@ model PurchaseOrder {
   productTitle        String
   status              PurchaseOrderStatus @default(REQUESTED)
   deliveryDate        DateTime?
-  remark              String?
+  poRemark            String?
+  shippingRemark      String?
   createdById         String
   createdByName       String
   statusUpdatedById   String?
@@ -959,7 +960,9 @@ model SupplierProduct {
   categoryId      String?
   sku             String
   description     String?
-  remarks         String?
+  productRemark   String?
+  poQuantity      Int                           @default(1)
+  omitted         Boolean                       @default(false)
   status          SupplierProductStatus         @default(DRAFT)
   verified        Boolean                       @default(false)
   sizes           String[]                      @default([])

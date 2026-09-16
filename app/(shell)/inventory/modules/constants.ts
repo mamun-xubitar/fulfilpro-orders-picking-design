@@ -36,43 +36,43 @@ export const NEAR_TRIGGER_RATIO = 1.2;
 
 export const STATUS_STYLES: Record<VariantStatus, { row: string; badge: string; bar: string; label: string }> = {
   below: {
-    row: 'bg-red-50/70 hover:bg-red-50',
-    badge: 'bg-red-100 text-red-700 border-red-200',
-    bar: 'bg-red-500',
+    row: 'bg-inventory-danger/10 hover:bg-inventory-danger/10',
+    badge: 'bg-inventory-danger/15 text-inventory-danger-hover border-inventory-danger/30',
+    bar: 'bg-inventory-danger',
     label: 'Reorder',
   },
   near: {
-    row: 'bg-amber-50/70 hover:bg-amber-50',
-    badge: 'bg-amber-100 text-amber-800 border-amber-200',
-    bar: 'bg-amber-500',
+    row: 'bg-inventory-warning/8 hover:bg-inventory-warning/10',
+    badge: 'bg-inventory-warning/15 text-inventory-warning-ink border-inventory-warning/30',
+    bar: 'bg-inventory-accent',
     label: 'Low',
   },
   above: {
-    row: 'hover:bg-gray-50',
-    badge: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    bar: 'bg-emerald-500',
+    row: 'hover:bg-inventory-surface-hover',
+    badge: 'bg-inventory-success/10 text-inventory-success-hover border-inventory-success/30',
+    bar: 'bg-inventory-success',
     label: 'OK',
   },
 };
 
 export const STATUS_LEGEND: { id: VariantStatus; label: string; hint: string; className: string }[] = [
-  { id: 'below', label: 'Below', hint: 'Below trigger', className: 'bg-red-100 text-red-700 border-red-200' },
-  { id: 'near', label: 'Near', hint: 'Within 20% of trigger', className: 'bg-amber-100 text-amber-800 border-amber-200' },
-  { id: 'above', label: 'Above', hint: 'Above trigger', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  { id: 'below', label: 'Below', hint: 'Below trigger', className: 'bg-inventory-danger/15 text-inventory-danger-hover border-inventory-danger/30' },
+  { id: 'near', label: 'Near', hint: 'Within 20% of trigger', className: 'bg-inventory-warning/15 text-inventory-warning-ink border-inventory-warning/30' },
+  { id: 'above', label: 'Above', hint: 'Above trigger', className: 'bg-inventory-success/10 text-inventory-success-hover border-inventory-success/30' },
 ];
 
 export const PRODUCT_STATUS_BADGES: Record<string, string> = {
-  ACTIVE: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  DRAFT: 'bg-amber-50 text-amber-700 border-amber-200',
-  UNLISTED: 'bg-gray-50 text-gray-600 border-gray-200',
+  ACTIVE: 'bg-inventory-success/10 text-inventory-success-hover border-inventory-success/30',
+  DRAFT: 'bg-inventory-warning/10 text-inventory-warning-ink border-inventory-warning/30',
+  UNLISTED: 'bg-inventory-surface-muted text-inventory-text-muted border-inventory-border',
 };
 
 /** SupplierProductStoreListing.status — our own record of the publish, shown on each store card. */
 export const LISTING_STATUS_BADGES: Record<string, string> = {
-  NOT_LISTED: 'bg-gray-50 text-gray-500 border-gray-200',
-  PUBLISHING: 'bg-blue-50 text-blue-700 border-blue-200',
-  LISTED: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  FAILED: 'bg-red-50 text-red-700 border-red-200',
+  NOT_LISTED: 'bg-inventory-surface-muted text-inventory-text-subtle border-inventory-border',
+  PUBLISHING: 'bg-inventory-secondary/10 text-inventory-secondary border-inventory-secondary/30',
+  LISTED: 'bg-inventory-success/10 text-inventory-success-hover border-inventory-success/30',
+  FAILED: 'bg-inventory-danger/10 text-inventory-danger-hover border-inventory-danger/30',
 };
 
 /** Shopify-style product status — used by the products table's status filter, the bulk "Set

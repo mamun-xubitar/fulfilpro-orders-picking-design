@@ -1,4 +1,5 @@
 import { SupplierModel } from '@/models/supplier.model.server';
+import { upperTrim } from '@/lib/utils/common';
 
 const model = new SupplierModel();
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -39,7 +40,7 @@ export class SupplierController {
     if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
 
     const value = (body ?? {}) as Record<string, unknown>;
-    const name = typeof value.name === 'string' ? value.name.trim() : '';
+    const name = typeof value.name === 'string' ? upperTrim(value.name) : '';
     const poEmail = typeof value.poEmail === 'string' ? value.poEmail.trim() : '';
     const contactEmailRaw = typeof value.contactEmail === 'string' ? value.contactEmail.trim() : '';
     const description = typeof value.description === 'string' ? value.description.trim() : '';
@@ -68,7 +69,7 @@ export class SupplierController {
     if (!existing) return { error: { message: 'Supplier not found', status: 404 } };
 
     const value = (body ?? {}) as Record<string, unknown>;
-    const name = typeof value.name === 'string' ? value.name.trim() : undefined;
+    const name = typeof value.name === 'string' ? upperTrim(value.name) : undefined;
     const poEmail = typeof value.poEmail === 'string' ? value.poEmail.trim() : undefined;
     const contactEmailRaw = typeof value.contactEmail === 'string' ? value.contactEmail.trim() : undefined;
     const description = typeof value.description === 'string' ? value.description.trim() : undefined;

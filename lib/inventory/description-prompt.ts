@@ -10,7 +10,7 @@ export type DescriptionPromptInput = {
   colours: string[];
   /** The description currently in the field, if any — improved rather than replaced when present. */
   currentDescription: string;
-  remarks: string;
+  productRemark: string;
 };
 
 const SYSTEM = `You are an ecommerce copywriter generating a product description for an internal inventory system.
@@ -30,7 +30,7 @@ export function buildProductDescriptionPrompt(input: DescriptionPromptInput): { 
   if (input.category) lines.push(`Category: ${input.category}`);
   if (input.colours.length > 0) lines.push(`Available colours: ${input.colours.join(', ')}`);
   if (input.sizes.length > 0) lines.push(`Available sizes: ${input.sizes.join(', ')}`);
-  if (input.remarks) lines.push(`Internal remarks (context only, do not quote verbatim): ${input.remarks}`);
+  if (input.productRemark) lines.push(`Internal remarks (context only, do not quote verbatim): ${input.productRemark}`);
   if (input.currentDescription) {
     lines.push('');
     lines.push('Current description (HTML) to rewrite and improve:');

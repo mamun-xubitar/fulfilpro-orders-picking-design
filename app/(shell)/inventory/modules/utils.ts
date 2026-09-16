@@ -1,4 +1,5 @@
 import { deriveColorFromName, isValidCssColor, FALLBACK_SWATCH, parseColoursInput, formatColoursInput, formatColourName } from '@/lib/inventory/colour';
+import { formatPoNumber } from '@/lib/inventory/po-number';
 import { NEAR_TRIGGER_RATIO } from './constants';
 import type {
   ColourOption,
@@ -193,6 +194,17 @@ export function formatIncomingLot(lot: IncomingLot): string {
   return `${formatNumber(lot.quantity)} (${date})`;
 }
 
+/** Quantity-weighted average unit cost across a PO's line items — `Σ(qty × unitCost) / Σ(qty)`.
+ * Null when there's no quantity to weight by, or every line is missing a cost. Shared by the
+ * Purchase orders panel (one-line summary) and the Buying history modal (per-PO row). */
+export function poAveragePrice(items: { quantity: number; unitCost: number | null }[]): number | null {
+  const priced = items.filter((i) => i.unitCost !== null);
+  const totalQty = priced.reduce((sum, i) => sum + i.quantity, 0);
+  if (totalQty === 0) return null;
+  const totalCost = priced.reduce((sum, i) => sum + i.quantity * (i.unitCost ?? 0), 0);
+  return totalCost / totalQty;
+}
+
 export function formatRelative(iso: string, now: number): string {
   const diffMinutes = Math.round((now - new Date(iso).getTime()) / 60000);
   if (diffMinutes < 1) return 'just now';
@@ -334,11 +346,19 @@ export function buildGalleryTiles(images: ProductImage[], variants: VariantRow[]
     variantsByImageId.set(v.imageId, bucket);
   }
 
+  // One tile per image, in caller order (newest first — see useProductImages) regardless of
+  // whether it's linked to a variant yet: a freshly uploaded, still-unassigned photo needs to
+  // sort by recency alongside every other photo, not trail behind every colour placeholder.
   const tiles: GalleryTile[] = [];
   for (const image of images) {
     const linked = variantsByImageId.get(image.id);
-    if (!linked || linked.length === 0) continue;
-    tiles.push({ kind: 'photo', key: image.id, image, label: linked.map(variantTitle).join(', '), variantIds: linked.map((v) => v.id) });
+    tiles.push({
+      kind: 'photo',
+      key: image.id,
+      image,
+      label: linked && linked.length > 0 ? linked.map(variantTitle).join(', ') : 'Unassigned',
+      variantIds: linked ? linked.map((v) => v.id) : [],
+    });
   }
 
   // Declared colours first, then any stray colour only a variant carries — mirrors the old
@@ -364,12 +384,6 @@ export function buildGalleryTiles(images: ProductImage[], variants: VariantRow[]
     const hasUnlinkedVariant = variants.some((v) => v.colour.trim().toLowerCase() === key && !v.imageId);
     if (!hasUnlinkedVariant) continue;
     tiles.push({ kind: 'placeholder', key: `placeholder:${key}`, colourName, color: swatchOf(colourName), label: colourName });
-  }
-
-  for (const image of images) {
-    const linked = variantsByImageId.get(image.id);
-    if (linked && linked.length > 0) continue;
-    tiles.push({ kind: 'photo', key: image.id, image, label: 'Unassigned', variantIds: [] });
   }
 
   return tiles;
@@ -553,7 +567,7 @@ export function buildShopifyProductCsv(product: ProductRecord, rows: VariantRow[
   return lines.join('\r\n');
 }
 
-const PO_CSV_HEADERS = ['PO Number', 'Reference', 'Status', 'Delivery Date', 'Remark', 'Colour', 'Size', 'SKU', 'Quantity', 'Received Quantity', 'Unit Cost'];
+const PO_CSV_HEADERS = ['PO Number', 'Reference', 'Status', 'Delivery Date', 'PO Remark', 'Colour', 'Size', 'SKU', 'Quantity', 'Received Quantity', 'Unit Cost'];
 
 /**
  * Round-trippable PO export — one row per line item. Re-importing this file (via the unified
@@ -570,7 +584,7 @@ export function buildPoCsv(purchaseOrders: PurchaseOrderRecord[]): string {
           po.referenceNumber ?? '',
           po.status,
           po.deliveryDate ? po.deliveryDate.slice(0, 10) : '',
-          po.remark ?? '',
+          po.poRemark ?? '',
           item.colour ?? '',
           item.size ?? '',
           item.sku ?? '',
@@ -588,9 +602,7 @@ export function buildPoCsv(purchaseOrders: PurchaseOrderRecord[]): string {
 
 // — Purchase order email —
 
-export function formatPoNumber(number: number): string {
-  return `PO-${String(number).padStart(5, '0')}`;
-}
+export { formatPoNumber };
 
 type PoEmailSource = {
   number: number;
@@ -598,7 +610,8 @@ type PoEmailSource = {
   supplierName: string;
   referenceNumber: string | null;
   deliveryDate: string | null;
-  remark: string | null;
+  poRemark: string | null;
+  shippingRemark: string | null;
   items: { quantity: number; variantTitle: string; sku: string | null; unitCost: number | null }[];
 };
 
@@ -618,7 +631,12 @@ export function buildPoEmail(po: PoEmailSource): { subject: string; body: string
         item.unitCost !== null ? formatCurrencyValue(item.quantity * item.unitCost) : '-'
       }`
   );
-  const footerLines = [...(po.remark ? ['', `Remark: ${po.remark}`] : []), '', 'Thanks'];
+  const footerLines = [
+    ...(po.poRemark ? ['', `PO Remark: ${po.poRemark}`] : []),
+    ...(po.shippingRemark ? ['', `Shipping remark: ${po.shippingRemark}`] : []),
+    '',
+    'Thanks',
+  ];
 
   const body = [...headerLines, '', ...itemLines, '', totalLine, ...footerLines].join('\n');
   return { subject, body };

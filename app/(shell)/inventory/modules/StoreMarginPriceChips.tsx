@@ -47,12 +47,12 @@ export default function StoreMarginPriceChips({ listings, form, marginDraft, onE
             title={published ? undefined : `Publish this product to ${listing.storeName} before editing its price`}
             className={`flex items-center gap-[3px] rounded-full border px-[5px] py-[1px] text-[9px] font-semibold leading-none transition-colors duration-150 cursor-pointer ${
               published
-                ? 'border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100'
-                : 'border-dashed border-gray-300 bg-white text-gray-400 hover:bg-gray-50'
+                ? 'border-inventory-border bg-inventory-surface-muted text-inventory-text-muted hover:bg-inventory-surface-hover'
+                : 'border-dashed border-inventory-border-strong bg-inventory-surface text-inventory-text-subtle hover:bg-inventory-surface-hover'
             }`}
           >
             <span className="max-w-20 truncate">{listing.storeName}</span>
-            <span className="tabular-nums text-gray-500">{formatCurrencyValue(price)}</span>
+            <span className="tabular-nums text-inventory-text-subtle">{formatCurrencyValue(price)}</span>
           </button>
         );
       })}

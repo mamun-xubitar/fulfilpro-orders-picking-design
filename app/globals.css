@@ -3,6 +3,61 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  /* Inventory-only tokens (app/(shell)/inventory) — namespaced with an `inventory-` prefix so
+   * they're inert everywhere else in the app. Declared on :root (rather than a scoped class)
+   * because several inventory pickers portal their dropdown panels to document.body, outside
+   * any wrapper element. */
+  --inventory-bg: #eeedf6;
+  --inventory-surface: #ffffff;
+  --inventory-surface-muted: #f8f7fc;
+  --inventory-surface-hover: #f1eef9;
+
+  --inventory-border: #cfcae3;
+  --inventory-border-strong: #aea7cc;
+  --inventory-divider: #e6e2f2;
+
+  --inventory-text: #1d1a36;
+  --inventory-text-muted: #524e6e;
+  --inventory-text-subtle: #5c5876;
+
+  --inventory-primary: #5b3fd6;
+  --inventory-primary-hover: #4a2fbf;
+  --inventory-primary-ring: #c9bdf7;
+
+  --inventory-secondary: #2563eb;
+  --inventory-secondary-hover: #1d4ed8;
+
+  --inventory-accent: #f59e0b;
+  --inventory-accent-hover: #e08a00;
+  --inventory-accent-ink: #3b2300;
+
+  --inventory-success: #16a34a;
+  --inventory-success-hover: #15803d;
+
+  --inventory-danger: #dc2626;
+  --inventory-danger-hover: #b91c1c;
+
+  --inventory-warning: #d97706;
+  --inventory-warning-ink: #92400e;
+
+  /* One accent hue per panel/section so the page reads as distinct zones, not one grey mass. */
+  --inventory-sec-image: #4338ca;
+  --inventory-sec-details: #6d28d9;
+  --inventory-sec-pricing: #1d4ed8;
+  --inventory-sec-stock: #0f766e;
+  --inventory-sec-stores: #047857;
+  --inventory-sec-variants: #a21caf;
+  --inventory-sec-po: #b45309;
+  --inventory-sec-stocktake: #0369a1;
+  --inventory-sec-adjust: #be123c;
+  --inventory-sec-import: #0e7490;
+  --inventory-sec-activity: #334155;
+  --inventory-sec-toolbar: #4d7c0f;
+  --inventory-sec-subtabs: #be185d;
+
+  --inventory-shadow: 0 1px 2px rgba(40, 30, 90, 0.06), 0 1px 3px rgba(40, 30, 90, 0.08);
+  --inventory-shadow-md: 0 8px 20px rgba(40, 30, 90, 0.14), 0 2px 6px rgba(40, 30, 90, 0.08);
 }
 
 @theme inline {
@@ -10,6 +65,59 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  /* Registering the inventory tokens as theme colors/shadows turns them into real Tailwind
+   * utilities (bg-inventory-primary, text-inventory-text-muted, shadow-inventory, …) with full
+   * opacity-modifier support (bg-inventory-secondary/10), instead of ad hoc `[var(--x)]` values. */
+  --color-inventory-bg: var(--inventory-bg);
+  --color-inventory-surface: var(--inventory-surface);
+  --color-inventory-surface-muted: var(--inventory-surface-muted);
+  --color-inventory-surface-hover: var(--inventory-surface-hover);
+
+  --color-inventory-border: var(--inventory-border);
+  --color-inventory-border-strong: var(--inventory-border-strong);
+  --color-inventory-divider: var(--inventory-divider);
+
+  --color-inventory-text: var(--inventory-text);
+  --color-inventory-text-muted: var(--inventory-text-muted);
+  --color-inventory-text-subtle: var(--inventory-text-subtle);
+
+  --color-inventory-primary: var(--inventory-primary);
+  --color-inventory-primary-hover: var(--inventory-primary-hover);
+  --color-inventory-primary-ring: var(--inventory-primary-ring);
+
+  --color-inventory-secondary: var(--inventory-secondary);
+  --color-inventory-secondary-hover: var(--inventory-secondary-hover);
+
+  --color-inventory-accent: var(--inventory-accent);
+  --color-inventory-accent-hover: var(--inventory-accent-hover);
+  --color-inventory-accent-ink: var(--inventory-accent-ink);
+
+  --color-inventory-success: var(--inventory-success);
+  --color-inventory-success-hover: var(--inventory-success-hover);
+
+  --color-inventory-danger: var(--inventory-danger);
+  --color-inventory-danger-hover: var(--inventory-danger-hover);
+
+  --color-inventory-warning: var(--inventory-warning);
+  --color-inventory-warning-ink: var(--inventory-warning-ink);
+
+  --color-inventory-sec-image: var(--inventory-sec-image);
+  --color-inventory-sec-details: var(--inventory-sec-details);
+  --color-inventory-sec-pricing: var(--inventory-sec-pricing);
+  --color-inventory-sec-stock: var(--inventory-sec-stock);
+  --color-inventory-sec-stores: var(--inventory-sec-stores);
+  --color-inventory-sec-variants: var(--inventory-sec-variants);
+  --color-inventory-sec-po: var(--inventory-sec-po);
+  --color-inventory-sec-stocktake: var(--inventory-sec-stocktake);
+  --color-inventory-sec-adjust: var(--inventory-sec-adjust);
+  --color-inventory-sec-import: var(--inventory-sec-import);
+  --color-inventory-sec-activity: var(--inventory-sec-activity);
+  --color-inventory-sec-toolbar: var(--inventory-sec-toolbar);
+  --color-inventory-sec-subtabs: var(--inventory-sec-subtabs);
+
+  --shadow-inventory: var(--inventory-shadow);
+  --shadow-inventory-md: var(--inventory-shadow-md);
 }
 
 body {

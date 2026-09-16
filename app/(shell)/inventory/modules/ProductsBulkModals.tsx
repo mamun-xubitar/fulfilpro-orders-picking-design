@@ -18,7 +18,7 @@ export default function ProductsBulkModals({ table }: ProductsBulkModalsProps) {
                 type="button"
                 onClick={() => table.applyStatus(option.value)}
                 disabled={table.bulkRunning}
-                className="h-[28px] w-full rounded-[7px] border border-gray-300 px-3 text-left text-[12px] text-gray-700 transition-colors duration-150 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+                className="h-[28px] w-full rounded-[7px] border border-inventory-border-strong px-3 text-left text-[12px] text-inventory-text-muted transition-colors duration-150 hover:bg-inventory-surface-hover disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
               >
                 {option.label}
               </button>
@@ -52,7 +52,7 @@ export default function ProductsBulkModals({ table }: ProductsBulkModalsProps) {
             </div>
           }
         >
-          <p className="text-[12px] text-gray-600">
+          <p className="text-[12px] text-inventory-text-muted">
             {table.deleteConfirm.kind === 'single'
               ? `Delete "${table.deleteConfirm.name}"? This cannot be undone.`
               : `Delete the selected products? This cannot be undone.`}

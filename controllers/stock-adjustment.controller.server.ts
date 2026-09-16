@@ -1,6 +1,7 @@
 import prisma from '@/lib/prisma.server';
 import { StockAdjustmentModel } from '@/models/stock-adjustment.model.server';
 import { SupplierProductModel } from '@/models/supplier-product.model.server';
+import { upperTrim } from '@/lib/utils/common';
 import { StockAdjustmentReason } from '@prisma/client';
 
 const model = new StockAdjustmentModel();
@@ -36,7 +37,7 @@ export class StockAdjustmentController {
       const variantId = typeof item.variantId === 'string' ? item.variantId.trim() : '';
       const delta = Number(item.delta);
       const reasonRaw = typeof item.reason === 'string' ? item.reason : '';
-      const note = typeof item.note === 'string' ? item.note.trim() : '';
+      const note = typeof item.note === 'string' ? upperTrim(item.note) : '';
 
       if (!variantId) {
         errors.push('variantId: Select a variant');

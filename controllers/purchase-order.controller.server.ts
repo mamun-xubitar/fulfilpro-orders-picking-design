@@ -1,6 +1,7 @@
 import prisma from '@/lib/prisma.server';
 import { PurchaseOrderModel } from '@/models/purchase-order.model.server';
 import { SupplierProductModel } from '@/models/supplier-product.model.server';
+import { upperTrim } from '@/lib/utils/common';
 import { PurchaseOrderStatus } from '@prisma/client';
 
 const model = new PurchaseOrderModel();
@@ -53,8 +54,9 @@ export class PurchaseOrderController {
     const value = (body ?? {}) as Record<string, unknown>;
     const supplierId = typeof value.supplierId === 'string' ? value.supplierId.trim() : '';
     const supplierProductId = typeof value.supplierProductId === 'string' ? value.supplierProductId.trim() : '';
-    const referenceNumberRaw = typeof value.referenceNumber === 'string' ? value.referenceNumber.trim() : '';
-    const remarkRaw = typeof value.remark === 'string' ? value.remark.trim() : '';
+    const referenceNumberRaw = typeof value.referenceNumber === 'string' ? upperTrim(value.referenceNumber) : '';
+    const poRemarkRaw = typeof value.poRemark === 'string' ? upperTrim(value.poRemark) : '';
+    const shippingRemarkRaw = typeof value.shippingRemark === 'string' ? upperTrim(value.shippingRemark) : '';
     const deliveryDateRaw = typeof value.deliveryDate === 'string' ? value.deliveryDate.trim() : '';
     const rawItems = Array.isArray(value.items) ? value.items : [];
 
@@ -89,7 +91,7 @@ export class PurchaseOrderController {
         }
         unitCost = parsed;
       }
-      const sku = typeof v.sku === 'string' ? v.sku.trim() : undefined;
+      const sku = typeof v.sku === 'string' ? upperTrim(v.sku) : undefined;
       items.push({ variantId, quantity: Math.trunc(quantity), unitCost, sku: sku || undefined });
     }
     if (items.length === 0 && !errors.some((e) => e.startsWith('items:'))) errors.push('items: Select at least one variant');
@@ -121,7 +123,8 @@ export class PurchaseOrderController {
       productTitle: product.name,
       referenceNumber: referenceNumberRaw || null,
       deliveryDate,
-      remark: remarkRaw || null,
+      poRemark: poRemarkRaw || null,
+      shippingRemark: shippingRemarkRaw || null,
       createdById: actor.id,
       createdByName: actor.name,
       items: items.map((i) => {

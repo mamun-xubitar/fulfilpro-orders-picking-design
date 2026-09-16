@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import CategoryPicker from './CategoryPicker';
-import { PanelHeading } from './MainImagePanel';
+import { PanelHeading, panelBorderClass } from './MainImagePanel';
 import { ActionButton } from './PricingMarginPanel';
 import { ColourChips } from './ProductColoursField';
 import { FieldLabel, TextField } from './ProductFieldRows';
@@ -29,7 +29,7 @@ type ProductFieldsPanelProps = {
 };
 
 const FIELD_VISUAL_CLASS =
-  'h-[24px] rounded-[7px] border border-gray-300 px-[6px] text-[11px] leading-none outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100';
+  'h-[24px] rounded-[7px] border border-inventory-border-strong px-[6px] text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring';
 
 /** Always editable — every field is a live input; Save is the only action, disabled until the
  * draft differs from what's saved (see useProductDetails' `dirty`). Two-column field grid
@@ -40,9 +40,10 @@ export default function ProductFieldsPanel({ details: d, supplierOptions, preset
   const [coloursOpen, setColoursOpen] = useState(false);
 
   return (
-    <section className={embedded ? 'flex min-w-0 flex-col' : 'flex min-w-0 flex-col rounded-[10px] border border-gray-200 bg-white shadow-[0_1px_2px_0_rgb(0_0_0/0.05)] xl:min-h-0'}>
+    <section className={embedded ? 'flex min-w-0 flex-col' : `flex min-w-0 flex-col rounded-[10px] border ${panelBorderClass('details')} bg-inventory-surface shadow-inventory xl:min-h-0`}>
       {!embedded && (
         <PanelHeading
+          tone="details"
           icon={<Document className="h-3 w-3" />}
           title="Product details"
           action={<ActionButton onClick={() => d.saveDetails()} icon={<Check className="h-3 w-3" />} label="Save" primary disabled={!d.dirty} compact />}
@@ -66,20 +67,20 @@ export default function ProductFieldsPanel({ details: d, supplierOptions, preset
                 onChange={d.set('handle')}
                 disabled={d.handleLocked}
                 aria-label="Handle"
-                className="h-[24px] w-full min-w-0 rounded-[7px] border border-gray-300 px-[6px] text-[11px] leading-none outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500"
+                className="h-[24px] w-full min-w-0 rounded-[7px] border border-inventory-border-strong px-[6px] text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring disabled:cursor-not-allowed disabled:bg-inventory-surface-muted disabled:text-inventory-text-subtle"
               />
               <button
                 type="button"
                 onClick={d.toggleHandleLock}
                 aria-label={d.handleLocked ? 'Edit handle' : 'Auto-generate handle'}
                 title={d.handleLocked ? 'Edit handle' : 'Auto-generate handle'}
-                className="flex h-[24px] w-[24px] shrink-0 items-center justify-center rounded-[7px] border border-gray-300 bg-white text-gray-500 transition-colors duration-150 hover:bg-gray-50 hover:text-gray-700 cursor-pointer"
+                className="flex h-[24px] w-[24px] shrink-0 items-center justify-center rounded-[7px] border border-inventory-border-strong bg-inventory-surface text-inventory-text-subtle transition-colors duration-150 hover:bg-inventory-surface-hover hover:text-inventory-text-muted cursor-pointer"
               >
                 {d.handleLocked ? <Lock className="h-3 w-3" /> : <Unlock className="h-3 w-3" />}
               </button>
             </div>
           </div>
-          {d.errors?.handle && <p className="col-span-2 -mt-1 text-[10px] leading-tight text-red-600">{d.errors.handle}</p>}
+          {d.errors?.handle && <p className="col-span-2 -mt-1 text-[10px] leading-tight text-inventory-danger">{d.errors.handle}</p>}
 
           <TextField label="Product name" value={d.form.name} onChange={d.setName} />
           <TextField label="SKU" value={d.form.sku} onChange={d.set('sku')} />
@@ -107,7 +108,7 @@ export default function ProductFieldsPanel({ details: d, supplierOptions, preset
             <div className="flex flex-wrap items-center gap-[4px]">
               <div className="flex min-w-0 flex-1 flex-wrap gap-[4px]">
                 {d.sizes.length === 0 ? (
-                  <span className="text-[11px] leading-none text-gray-400">—</span>
+                  <span className="text-[11px] leading-none text-inventory-text-subtle">—</span>
                 ) : (
                   <SizeChips sizes={d.sizes} />
                 )}
@@ -117,12 +118,12 @@ export default function ProductFieldsPanel({ details: d, supplierOptions, preset
                 onClick={() => setSizesOpen(true)}
                 aria-label="Edit sizes"
                 title="Edit sizes"
-                className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-[6px] border border-gray-300 bg-white text-gray-500 transition-colors duration-150 hover:bg-gray-50 hover:text-gray-700 cursor-pointer"
+                className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-[6px] border border-inventory-border-strong bg-inventory-surface text-inventory-text-subtle transition-colors duration-150 hover:bg-inventory-surface-hover hover:text-inventory-text-muted cursor-pointer"
               >
                 <Plus className="h-3 w-3" />
               </button>
             </div>
-            {d.errors?.sizes && <p className="mt-[2px] text-[10px] leading-tight text-red-600">{d.errors.sizes}</p>}
+            {d.errors?.sizes && <p className="mt-[2px] text-[10px] leading-tight text-inventory-danger">{d.errors.sizes}</p>}
           </div>
 
           <div className="min-w-0">
@@ -130,7 +131,7 @@ export default function ProductFieldsPanel({ details: d, supplierOptions, preset
             <div className="flex flex-wrap items-center gap-[4px]">
               <div className="flex min-w-0 flex-1 flex-wrap gap-[4px]">
                 {d.colours.length === 0 ? (
-                  <span className="text-[11px] leading-none text-gray-400">—</span>
+                  <span className="text-[11px] leading-none text-inventory-text-subtle">—</span>
                 ) : (
                   <ColourChips colours={d.colours} />
                 )}
@@ -140,29 +141,44 @@ export default function ProductFieldsPanel({ details: d, supplierOptions, preset
                 onClick={() => setColoursOpen(true)}
                 aria-label="Edit colours"
                 title="Edit colours"
-                className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-[6px] border border-gray-300 bg-white text-gray-500 transition-colors duration-150 hover:bg-gray-50 hover:text-gray-700 cursor-pointer"
+                className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-[6px] border border-inventory-border-strong bg-inventory-surface text-inventory-text-subtle transition-colors duration-150 hover:bg-inventory-surface-hover hover:text-inventory-text-muted cursor-pointer"
               >
                 <Plus className="h-3 w-3" />
               </button>
             </div>
-            {d.errors?.colours && <p className="mt-[2px] text-[10px] leading-tight text-red-600">{d.errors.colours}</p>}
+            {d.errors?.colours && <p className="mt-[2px] text-[10px] leading-tight text-inventory-danger">{d.errors.colours}</p>}
           </div>
 
-          <div className="min-w-0">
-            <FieldLabel>Status</FieldLabel>
-            <ProductStatusSelect value={d.form.status} onChange={d.setStatus} className={FIELD_VISUAL_CLASS} />
-          </div>
-          <div className="min-w-0">
-            <FieldLabel>Verified</FieldLabel>
-            <label className="inline-flex h-[24px] max-w-full cursor-pointer items-center gap-[5px] text-[11px] font-medium leading-none text-gray-700" aria-label="Verified">
+          <div className="col-span-2 grid grid-cols-3 gap-x-[7px]">
+            <div className="min-w-0">
+              <FieldLabel>PO Quantity</FieldLabel>
               <input
-                type="checkbox"
-                checked={d.form.verified}
-                onChange={(e) => d.setVerified(e.target.checked)}
-                className="h-3 w-3 cursor-pointer accent-blue-600"
+                type="number"
+                min={1}
+                value={d.form.poQuantity}
+                onChange={d.set('poQuantity')}
+                aria-label="PO Quantity"
+                title="Default quantity seeded onto every variant when creating a purchase order"
+                className={FIELD_VISUAL_CLASS + ' w-full'}
               />
-              <span className="cursor-pointer select-none">Verified</span>
-            </label>
+              {d.errors?.poQuantity && <p className="mt-[2px] text-[10px] leading-tight text-inventory-danger">{d.errors.poQuantity}</p>}
+            </div>
+            <div className="min-w-0">
+              <FieldLabel>Status</FieldLabel>
+              <ProductStatusSelect value={d.form.status} onChange={d.setStatus} className={FIELD_VISUAL_CLASS} />
+            </div>
+            <div className="min-w-0">
+              <FieldLabel>Verified</FieldLabel>
+              <label className="inline-flex h-[24px] max-w-full cursor-pointer items-center gap-[5px] text-[11px] font-medium leading-none text-inventory-text-muted" aria-label="Verified">
+                <input
+                  type="checkbox"
+                  checked={d.form.verified}
+                  onChange={(e) => d.setVerified(e.target.checked)}
+                  className="h-3 w-3 cursor-pointer accent-inventory-primary"
+                />
+                <span className="cursor-pointer select-none">Verified</span>
+              </label>
+            </div>
           </div>
 
           <div className="col-span-2">
@@ -170,7 +186,7 @@ export default function ProductFieldsPanel({ details: d, supplierOptions, preset
           </div>
 
           <div className="col-span-2">
-            <TextField label="Remarks" value={d.form.remarks} onChange={d.set('remarks')} placeholder="Add remarks…" />
+            <TextField label="Product Remark" value={d.form.productRemark} onChange={d.set('productRemark')} placeholder="Add remarks…" />
           </div>
         </div>
       </div>
@@ -194,11 +210,11 @@ export default function ProductFieldsPanel({ details: d, supplierOptions, preset
  * a warning rather than fading into "no badge at all". */
 export function VerifiedBadge({ verified }: { verified: boolean }) {
   return verified ? (
-    <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700">
+    <span className="inline-flex items-center rounded-full border border-inventory-secondary/30 bg-inventory-secondary/10 px-2 py-0.5 text-[11px] font-semibold text-inventory-secondary">
       Verified
     </span>
   ) : (
-    <span className="inline-flex items-center rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-700">
+    <span className="inline-flex items-center rounded-full border border-inventory-danger/30 bg-inventory-danger/10 px-2 py-0.5 text-[11px] font-semibold text-inventory-danger-hover">
       Unverified
     </span>
   );

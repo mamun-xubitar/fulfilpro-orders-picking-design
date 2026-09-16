@@ -42,6 +42,13 @@ export function useProductsFilters({ verifiedOnly, quickFilter }: UseProductsFil
     setSupplierIdState(value);
     setPage(1);
   };
+  // Hidden by default (item 19) — a separate visibility toggle, not a filter "Clear filters"
+  // resets, same treatment as the Verified toggle above it in the toolbar.
+  const [includeOmitted, setIncludeOmittedState] = useState(false);
+  const setIncludeOmitted = (value: boolean) => {
+    setIncludeOmittedState(value);
+    setPage(1);
+  };
   const [sort, setSortState] = useState<ProductsSortKey>('name');
   const [dir, setDir] = useState<'asc' | 'desc'>('asc');
   const setPageSize = (size: number) => {
@@ -90,6 +97,8 @@ export function useProductsFilters({ verifiedOnly, quickFilter }: UseProductsFil
     setStatus,
     supplierId,
     setSupplierId,
+    includeOmitted,
+    setIncludeOmitted,
     sort,
     dir,
     handleSortChange,

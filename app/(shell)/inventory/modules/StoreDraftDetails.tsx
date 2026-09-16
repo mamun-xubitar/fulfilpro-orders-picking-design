@@ -27,7 +27,7 @@ export default function StoreDraftDetails({ storeId, product, draft, set, setFie
   return (
     <div className="mb-3 space-y-3">
       <div className="space-y-2">
-        <p className="text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-gray-500">Product details</p>
+        <p className="text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-inventory-text-subtle">Product details</p>
         <div className="grid grid-cols-1 gap-x-[7px] gap-y-2 sm:grid-cols-2">
           <div className="sm:col-span-2">
             <TextField label="Title (Product name)" value={draft.title} onChange={setField('title')} placeholder={product.name} />
@@ -50,32 +50,32 @@ export default function StoreDraftDetails({ storeId, product, draft, set, setFie
             name: draft.title || product.name,
             brand: draft.vendor || product.brand,
             category: draft.category.name || product.category,
-            remarks: product.remarks,
+            productRemark: product.productRemark,
             sizes: product.sizes,
             colours: product.colours,
           })}
         />
       </div>
 
-      <div className="space-y-2 border-t border-gray-100 pt-2">
-        <p className="text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-gray-500">Settings</p>
+      <div className="space-y-2 border-t border-inventory-divider pt-2">
+        <p className="text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-inventory-text-subtle">Settings</p>
         <div className="grid grid-cols-1 gap-x-[7px] gap-y-2 sm:grid-cols-2">
           <div>
-            <label className="mb-[2px] block text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-gray-500">Status</label>
+            <label className="mb-[2px] block text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-inventory-text-subtle">Status</label>
             <ProductStatusSelect
               value={draft.status}
               onChange={(status) => set({ status })}
-              className="h-[24px] w-full rounded-[7px] border border-gray-300 px-[6px] text-[11px] leading-none outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              className="h-[24px] w-full rounded-[7px] border border-inventory-border-strong px-[6px] text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring"
             />
           </div>
           <div>
-            <label className="mb-[2px] block text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-gray-500">Handle</label>
+            <label className="mb-[2px] block text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-inventory-text-subtle">Handle</label>
             <input
               type="text"
               value={product.handle}
               disabled
               title="Handle is hub-owned and cannot diverge per store"
-              className="h-[24px] w-full cursor-not-allowed rounded-[7px] border border-gray-200 bg-gray-50 px-[6px] text-[11px] leading-none text-gray-500"
+              className="h-[24px] w-full cursor-not-allowed rounded-[7px] border border-inventory-border bg-inventory-surface-muted px-[6px] text-[11px] leading-none text-inventory-text-subtle"
             />
           </div>
           <TagsPicker storeId={storeId} value={draft.tags} onChange={(tags) => set({ tags })} />

@@ -1,7 +1,9 @@
 'use client';
 
-import { MODAL_FOOTER_BTN_PRIMARY, MODAL_FOOTER_BTN_SECONDARY, ModalShell } from '@/components/ModalShell';
+import { ModalShell } from '@/components/ModalShell';
 import type { useAdjustments } from './hooks/useAdjustments';
+import { SPINNER, WIZARD_BODY_CLASS, WIZARD_BTN_PRIMARY, WIZARD_BTN_SECONDARY, WIZARD_CARD_CLASS } from './modalStyles';
+import AnimatedStepBody from './newProduct/AnimatedStepBody';
 import type { VariantRow } from './types';
 import { formatDate, variantTitle } from './utils';
 
@@ -25,15 +27,17 @@ function NewAdjustmentModal({ a, variants }: { a: ReturnType<typeof useAdjustmen
       title="New stock adjustment"
       compact
       onClose={a.closeModal}
-      extraWide
+      wide
+      maxWidthClass="max-w-[720px]"
+      bodyClassName={WIZARD_BODY_CLASS}
       footer={
         <div className="flex items-center justify-between gap-3">
-          <span className="text-[11px] text-gray-500">{a.dirtyCount} row{a.dirtyCount === 1 ? '' : 's'} with a pending change</span>
+          <span className="text-[11px] text-inventory-text-subtle">{a.dirtyCount} row{a.dirtyCount === 1 ? '' : 's'} with a pending change</span>
           <div className="flex gap-2">
             <button
               type="button"
               onClick={a.closeModal}
-              className={MODAL_FOOTER_BTN_SECONDARY}
+              className={WIZARD_BTN_SECONDARY}
             >
               Close
             </button>
@@ -41,46 +45,57 @@ function NewAdjustmentModal({ a, variants }: { a: ReturnType<typeof useAdjustmen
               type="button"
               onClick={a.saveAll}
               disabled={a.savingAll || a.dirtyCount === 0}
-              className={MODAL_FOOTER_BTN_PRIMARY}
+              className={WIZARD_BTN_PRIMARY}
             >
-              {a.savingAll ? 'Saving all...' : `Save all (${a.dirtyCount})`}
+              {a.savingAll ? (
+                <>
+                  {SPINNER}
+                  Saving all…
+                </>
+              ) : (
+                `Save all (${a.dirtyCount})`
+              )}
             </button>
           </div>
         </div>
       }
     >
-      <AdjustmentChipsStrip a={a} />
+      <div className={WIZARD_CARD_CLASS}>
+        <AnimatedStepBody minHeightClassName="min-h-0">
+          <AdjustmentChipsStrip a={a} />
 
-      <div className="max-h-[60vh] overflow-y-auto rounded-lg border border-gray-200">
-        <table className="w-full border-collapse text-[11px] leading-none">
-          <thead className="sticky top-0 bg-gray-50">
-            <tr className="border-b border-gray-200 text-left text-[10px] font-bold uppercase tracking-[0.4px] text-gray-500">
-              <th className="w-8 px-2 py-1">
-                <input
-                  type="checkbox"
-                  checked={a.allSelected}
-                  ref={(el) => {
-                    if (el) el.indeterminate = a.someSelected;
-                  }}
-                  onChange={a.toggleSelectAll}
-                  aria-label="Select all rows"
-                  className="h-3 w-3 cursor-pointer accent-blue-600"
-                />
-              </th>
-              <th className="px-2 py-1">Variant</th>
-              <th className="px-2 py-1 text-right">On hand</th>
-              <th className="px-2 py-1">Adjustment</th>
-              <th className="px-2 py-1">Reason</th>
-              <th className="px-2 py-1">Note</th>
-              <th className="px-2 py-1" />
-            </tr>
-          </thead>
-          <tbody>
-            {targetVariants.map((v) => (
-              <AdjustmentRow key={v.id} a={a} v={v} />
-            ))}
-          </tbody>
-        </table>
+          <div className="max-h-[60vh] overflow-x-auto overflow-y-auto rounded-lg border border-inventory-border">
+            <table className="w-full min-w-[560px] border-collapse text-[11px] leading-none">
+              <thead className="sticky top-0 bg-inventory-surface-muted">
+                <tr className="border-b border-inventory-border text-left text-[10px] font-bold uppercase tracking-[0.4px] text-inventory-text-subtle">
+                  <th className="w-8 px-2 py-1">
+                    <input
+                      type="checkbox"
+                      checked={a.allSelected}
+                      ref={(el) => {
+                        if (el) el.indeterminate = a.someSelected;
+                      }}
+                      onChange={a.toggleSelectAll}
+                      aria-label="Select all rows"
+                      className="h-3 w-3 cursor-pointer accent-inventory-primary"
+                    />
+                  </th>
+                  <th className="whitespace-nowrap px-2 py-1">Variant</th>
+                  <th className="whitespace-nowrap px-2 py-1 text-right">On hand</th>
+                  <th className="whitespace-nowrap px-2 py-1">Adjustment</th>
+                  <th className="whitespace-nowrap px-2 py-1">Reason</th>
+                  <th className="whitespace-nowrap px-2 py-1">Note</th>
+                  <th className="px-2 py-1" />
+                </tr>
+              </thead>
+              <tbody>
+                {targetVariants.map((v) => (
+                  <AdjustmentRow key={v.id} a={a} v={v} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </AnimatedStepBody>
       </div>
     </ModalShell>
   );
@@ -94,9 +109,9 @@ function AdjustmentChipsStrip({ a }: { a: ReturnType<typeof useAdjustments> }) {
   return (
     <div
       aria-disabled={disabled}
-      className={`mb-2 rounded-[7px] border border-gray-200 bg-gray-50 p-2 transition-opacity duration-150 ${disabled ? 'pointer-events-none opacity-50' : ''}`}
+      className={`mb-2 rounded-[7px] border border-inventory-border bg-inventory-surface-muted p-2 transition-opacity duration-150 ${disabled ? 'pointer-events-none opacity-50' : ''}`}
     >
-      <p className="mb-1.5 text-[11px] font-medium text-gray-600">
+      <p className="mb-1.5 text-[11px] font-medium text-inventory-text-muted">
         Applies to the {a.selectedIds.size} selected row{a.selectedIds.size === 1 ? '' : 's'}
       </p>
       <div className="flex flex-wrap gap-1.5">
@@ -107,8 +122,8 @@ function AdjustmentChipsStrip({ a }: { a: ReturnType<typeof useAdjustments> }) {
             onClick={() => a.applyChip(preset)}
             className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold leading-none transition-colors duration-150 cursor-pointer ${
               preset > 0
-                ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                : 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100'
+                ? 'border-inventory-success/30 bg-inventory-success/10 text-inventory-success-hover hover:bg-inventory-success/15'
+                : 'border-inventory-danger/30 bg-inventory-danger/10 text-inventory-danger-hover hover:bg-inventory-danger/15'
             }`}
           >
             {preset > 0 ? `+${preset}` : preset}
@@ -117,7 +132,7 @@ function AdjustmentChipsStrip({ a }: { a: ReturnType<typeof useAdjustments> }) {
         <button
           type="button"
           onClick={() => a.applyChip(null)}
-          className="rounded-full border border-gray-300 bg-white px-2 py-0.5 text-[11px] font-semibold leading-none text-gray-600 transition-colors duration-150 hover:bg-gray-50 cursor-pointer"
+          className="rounded-full border border-inventory-border-strong bg-inventory-surface px-2 py-0.5 text-[11px] font-semibold leading-none text-inventory-text-muted transition-colors duration-150 hover:bg-inventory-surface-hover cursor-pointer"
         >
           Clear
         </button>
@@ -133,33 +148,33 @@ function AdjustmentRow({ a, v }: { a: ReturnType<typeof useAdjustments>; v: Vari
   const selected = a.selectedIds.has(v.id);
 
   return (
-    <tr className="border-b border-gray-100 align-top last:border-0">
+    <tr className="border-b border-inventory-divider align-top last:border-0 transition-colors duration-150 hover:bg-inventory-surface-hover">
       <td className="px-2 py-1">
         <input
           type="checkbox"
           checked={selected}
           onChange={() => a.toggleSelect(v.id)}
           aria-label={`Select ${variantTitle(v)}`}
-          className="h-3 w-3 cursor-pointer accent-blue-600"
+          className="h-3 w-3 cursor-pointer accent-inventory-primary"
         />
       </td>
-      <td className="px-2 py-1 text-gray-700">{variantTitle(v)}</td>
-      <td className="px-2 py-1 text-right tabular-nums text-gray-500">{v.stockOnHand}</td>
+      <td className="px-2 py-1 text-inventory-text-muted">{variantTitle(v)}</td>
+      <td className="px-2 py-1 text-right tabular-nums text-inventory-text-subtle">{v.stockOnHand}</td>
       <td className="px-2 py-1">
         <input
           type="number"
           value={row?.delta ?? ''}
           onChange={(e) => a.setRowField(v.id, { delta: e.target.value })}
           placeholder="0"
-          className="h-[22px] w-24 rounded-[6px] border border-gray-300 px-[6px] text-[11px] leading-none outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+          className="h-[22px] w-16 rounded-[6px] border border-inventory-border-strong px-[6px] text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring"
         />
-        {error && <p className="mt-1 text-[10px] leading-tight text-red-600">{error}</p>}
+        {error && <p className="mt-1 text-[10px] leading-tight text-inventory-danger">{error}</p>}
       </td>
       <td className="px-2 py-1">
         <select
           value={row?.reason ?? 'CORRECTION'}
           onChange={(e) => a.setRowField(v.id, { reason: e.target.value as typeof row.reason })}
-          className="h-[22px] w-32 rounded-[6px] border border-gray-300 px-[6px] text-[11px] leading-none outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 cursor-pointer"
+          className="h-[22px] w-28 rounded-[6px] border border-inventory-border-strong px-[6px] text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring cursor-pointer"
         >
           {a.reasons.map((r) => (
             <option key={r} value={r}>
@@ -172,9 +187,9 @@ function AdjustmentRow({ a, v }: { a: ReturnType<typeof useAdjustments>; v: Vari
         <input
           type="text"
           value={row?.note ?? ''}
-          onChange={(e) => a.setRowField(v.id, { note: e.target.value })}
+          onChange={(e) => a.setRowField(v.id, { note: e.target.value.toUpperCase() })}
           placeholder="Add note..."
-          className="h-[22px] w-72 rounded-[6px] border border-gray-300 px-[6px] text-[11px] leading-none outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+          className="h-[22px] w-40 rounded-[6px] border border-inventory-border-strong px-[6px] text-[11px] uppercase leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring placeholder:normal-case"
         />
       </td>
       <td className="px-2 py-1 text-right">
@@ -182,7 +197,7 @@ function AdjustmentRow({ a, v }: { a: ReturnType<typeof useAdjustments>; v: Vari
           type="button"
           onClick={() => a.saveRow(v.id)}
           disabled={saving}
-          className="h-[22px] rounded-[6px] border border-gray-300 bg-white px-2 text-[10px] font-bold leading-none text-gray-700 transition-colors duration-150 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+          className="h-[22px] rounded-[6px] border border-inventory-border-strong bg-inventory-surface px-2 text-[10px] font-bold leading-none text-inventory-text-muted transition-colors duration-150 hover:bg-inventory-surface-hover disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
         >
           {saving ? 'Saving...' : 'Save'}
         </button>
@@ -195,19 +210,19 @@ function AdjustmentHistoryModal({ a }: { a: ReturnType<typeof useAdjustments> })
   return (
     <ModalShell disableBackdropClose title="Adjustment history" compact onClose={a.closeHistory} wide>
       {a.loadingHistory ? (
-        <p className="py-6 text-center text-[11px] text-gray-400">Loading...</p>
+        <p className="py-6 text-center text-[11px] text-inventory-text-subtle">Loading...</p>
       ) : a.history.length === 0 ? (
-        <p className="py-6 text-center text-[11px] text-gray-400">No adjustments recorded yet.</p>
+        <p className="py-6 text-center text-[11px] text-inventory-text-subtle">No adjustments recorded yet.</p>
       ) : (
-        <ul className="max-h-96 divide-y divide-gray-100 overflow-y-auto">
+        <ul className="max-h-96 divide-y divide-inventory-divider overflow-y-auto">
           {a.history.map((row) => (
             <li key={row.id} className="flex items-center justify-between gap-2 py-1.5 text-[11px]">
-              <span className="min-w-0 truncate text-gray-700">
+              <span className="min-w-0 truncate text-inventory-text-muted">
                 {variantTitle(row)} · {row.reason.toLowerCase()} {row.note ? `— ${row.note}` : ''}
               </span>
-              <span className={`shrink-0 font-semibold tabular-nums ${row.delta > 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+              <span className={`shrink-0 font-semibold tabular-nums ${row.delta > 0 ? 'text-inventory-success-hover' : 'text-inventory-danger'}`}>
                 {row.delta > 0 ? '+' : ''}
-                {row.delta} <span className="font-normal text-gray-400">· {formatDate(row.createdAt)}</span>
+                {row.delta} <span className="font-normal text-inventory-text-subtle">· {formatDate(row.createdAt)}</span>
               </span>
             </li>
           ))}

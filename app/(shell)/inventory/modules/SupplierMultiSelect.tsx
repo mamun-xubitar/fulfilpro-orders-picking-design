@@ -94,7 +94,7 @@ export default function SupplierMultiSelect({ suppliers, selectedIds, onChange, 
   return (
     <div className="min-w-0" ref={containerRef}>
       <FieldLabel>
-        Suppliers{required && <span className="ml-0.5 text-red-500">*</span>}
+        Suppliers{required && <span className="ml-0.5 text-inventory-danger">*</span>}
       </FieldLabel>
       <div className="relative flex items-start gap-1.5">
         <button
@@ -103,13 +103,13 @@ export default function SupplierMultiSelect({ suppliers, selectedIds, onChange, 
           onClick={() => setOpen((prev) => !prev)}
           aria-haspopup="listbox"
           aria-expanded={open}
-          className="flex min-h-[24px] w-full flex-wrap items-center gap-[4px] rounded-[7px] border border-gray-300 px-[6px] py-[3px] text-left text-[11px] leading-none outline-none hover:bg-gray-50 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 cursor-pointer"
+          className="flex min-h-[24px] w-full flex-wrap items-center gap-[4px] rounded-[7px] border border-inventory-border-strong px-[6px] py-[3px] text-left text-[11px] leading-none outline-none hover:bg-inventory-surface-hover focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring cursor-pointer"
         >
-          {selected.length === 0 && <span className="px-[2px] text-gray-400">Select suppliers…</span>}
+          {selected.length === 0 && <span className="px-[2px] text-inventory-text-subtle">Select suppliers…</span>}
           {selected.map((s) => (
             <span
               key={s.id}
-              className="flex items-center gap-[3px] rounded-full border border-gray-200 bg-gray-50 px-[5px] py-[1px] text-[9px] font-semibold leading-none text-gray-700"
+              className="flex items-center gap-[3px] rounded-full border border-inventory-border bg-inventory-surface-muted px-[5px] py-[1px] text-[9px] font-semibold uppercase leading-none text-inventory-text-muted"
             >
               {s.name}
               <span
@@ -126,7 +126,7 @@ export default function SupplierMultiSelect({ suppliers, selectedIds, onChange, 
                   }
                 }}
                 aria-label={`Remove supplier ${s.name}`}
-                className="text-gray-400 hover:text-red-600"
+                className="text-inventory-text-subtle hover:text-inventory-danger-hover"
               >
                 <Close className="h-2.5 w-2.5" />
               </span>
@@ -140,7 +140,7 @@ export default function SupplierMultiSelect({ suppliers, selectedIds, onChange, 
             onClick={onAddSupplier}
             aria-label="Add a new supplier"
             title="Add a new supplier"
-            className="flex h-[24px] w-[24px] shrink-0 items-center justify-center rounded-[7px] border border-gray-300 bg-white text-gray-500 transition-colors duration-150 hover:bg-gray-50 hover:text-gray-700 cursor-pointer"
+            className="flex h-[24px] w-[24px] shrink-0 items-center justify-center rounded-[7px] border border-inventory-border-strong bg-inventory-surface text-inventory-text-subtle transition-colors duration-150 hover:bg-inventory-surface-hover hover:text-inventory-text-muted cursor-pointer"
           >
             <Plus className="h-3 w-3" />
           </button>
@@ -150,7 +150,7 @@ export default function SupplierMultiSelect({ suppliers, selectedIds, onChange, 
           <div
             ref={dropdownRef}
             style={{ position: 'fixed', top: position.top, left: position.left, width: position.width }}
-            className="z-[70] max-h-72 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+            className="z-[70] max-h-72 overflow-y-auto rounded-lg border border-inventory-border bg-inventory-surface py-1 shadow-lg inventory-dropdown-in"
           >
             <input
               autoFocus
@@ -158,22 +158,22 @@ export default function SupplierMultiSelect({ suppliers, selectedIds, onChange, 
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search suppliers…"
-              className="w-full border-b border-gray-100 px-3 py-2 text-sm outline-none"
+              className="w-full border-b border-inventory-divider px-3 py-2 text-sm outline-none"
             />
-            {suppliers.length === 0 && !trimmedQuery && <div className="px-3 py-2 text-xs text-gray-400">No suppliers yet.</div>}
+            {suppliers.length === 0 && !trimmedQuery && <div className="px-3 py-2 text-xs text-inventory-text-subtle">No suppliers yet.</div>}
             {results.map((s) => (
-              <label key={s.id} className="flex cursor-pointer items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50">
+              <label key={s.id} className="flex cursor-pointer items-center gap-2 px-3 py-2 text-sm hover:bg-inventory-surface-hover">
                 <input
                   type="checkbox"
                   checked={selectedIds.includes(s.id)}
                   onChange={() => toggle(s.id)}
-                  className="rounded border-gray-300 text-blue-600"
+                  className="rounded border-inventory-border-strong text-inventory-secondary"
                 />
-                <span className="truncate text-gray-900">{s.name}</span>
+                <span className="truncate text-inventory-text">{s.name}</span>
               </label>
             ))}
             {results.length === 0 && trimmedQuery && (
-              <div className="px-3 py-2 text-xs text-gray-400">No suppliers match “{trimmedQuery}”.</div>
+              <div className="px-3 py-2 text-xs text-inventory-text-subtle">No suppliers match “{trimmedQuery}”.</div>
             )}
             {trimmedQuery && onCreateSupplier && (
               <button
@@ -183,7 +183,7 @@ export default function SupplierMultiSelect({ suppliers, selectedIds, onChange, 
                   setOpen(false);
                   setQuery('');
                 }}
-                className="flex w-full items-center gap-1.5 border-t border-gray-100 px-3 py-2 text-left text-sm font-semibold text-blue-600 hover:bg-blue-50 cursor-pointer"
+                className="flex w-full items-center gap-1.5 border-t border-inventory-divider px-3 py-2 text-left text-sm font-semibold text-inventory-secondary hover:bg-inventory-secondary/10 cursor-pointer"
               >
                 <Plus className="h-3.5 w-3.5" />
                 Create supplier “{trimmedQuery}”
@@ -193,7 +193,7 @@ export default function SupplierMultiSelect({ suppliers, selectedIds, onChange, 
           document.body
         )}
       </div>
-      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+      {error && <p className="mt-1 text-xs text-inventory-danger">{error}</p>}
     </div>
   );
 }

@@ -224,8 +224,8 @@ export default function RichTextField({ label, value, onChange, hideLabel, toolb
   return (
     <div className="min-w-0">
       {!hideLabel && <FieldLabel>{label}</FieldLabel>}
-      <div className="rounded-lg border border-gray-300 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100">
-        <div className="flex flex-wrap items-center gap-1 rounded-t-lg border-b border-gray-200 bg-gray-50 px-1.5 py-0.5">
+      <div className="rounded-lg border border-inventory-border-strong focus-within:border-inventory-primary focus-within:ring-2 focus-within:ring-inventory-primary-ring">
+        <div className="flex flex-wrap items-center gap-1 rounded-t-lg border-b border-inventory-border bg-inventory-surface-muted px-1.5 py-0.5">
           <LetterButton letter="B" title="Bold" bold active={active.bold} onClick={() => runCommand('bold')} />
           <LetterButton letter="I" title="Italic" italic active={active.italic} onClick={() => runCommand('italic')} />
           <LetterButton letter="U" title="Underline" underline active={active.underline} onClick={() => runCommand('underline')} />
@@ -255,7 +255,7 @@ export default function RichTextField({ label, value, onChange, hideLabel, toolb
               <Palette className="h-3 w-3" />
             </IconButton>
             {colorOpen && (
-              <div className="absolute z-20 top-full mt-1 left-0 flex w-36 flex-wrap gap-1.5 rounded-lg border border-gray-200 bg-white p-2 shadow-lg">
+              <div className="absolute z-20 top-full mt-1 left-0 flex w-36 flex-wrap gap-1.5 rounded-lg border border-inventory-border bg-inventory-surface p-2 shadow-lg">
                 {TEXT_COLORS.map((hex) => (
                   <button
                     key={hex}
@@ -269,7 +269,7 @@ export default function RichTextField({ label, value, onChange, hideLabel, toolb
                   />
                 ))}
                 <label
-                  className="relative flex h-5 w-5 cursor-pointer items-center justify-center overflow-hidden rounded-full border border-dashed border-gray-300 text-[10px] text-gray-400"
+                  className="relative flex h-5 w-5 cursor-pointer items-center justify-center overflow-hidden rounded-full border border-dashed border-inventory-border-strong text-[10px] text-inventory-text-subtle"
                   title="Custom colour"
                   onMouseDown={(e) => e.preventDefault()}
                 >
@@ -308,7 +308,7 @@ export default function RichTextField({ label, value, onChange, hideLabel, toolb
             }
           }}
           aria-label={label}
-          className={`min-h-16 w-full px-2.5 py-2 text-[13px] text-gray-900 outline-none [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-4 [&_ol]:pl-4 [&_a]:text-blue-600 [&_a]:underline ${fixedHeight ? 'max-h-16 overflow-y-auto' : ''}`}
+          className={`min-h-16 w-full px-2.5 py-2 text-[13px] text-inventory-text outline-none [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-4 [&_ol]:pl-4 [&_a]:text-inventory-secondary [&_a]:underline ${fixedHeight ? 'max-h-16 overflow-y-auto' : ''}`}
         />
       </div>
 
@@ -322,7 +322,7 @@ export default function RichTextField({ label, value, onChange, hideLabel, toolb
               <button
                 type="button"
                 onClick={closeLinkModal}
-                className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50 cursor-pointer"
+                className="rounded-lg border border-inventory-border-strong bg-inventory-surface px-3 py-2 text-sm font-semibold text-inventory-text-muted hover:bg-inventory-surface-hover cursor-pointer"
               >
                 Cancel
               </button>
@@ -330,7 +330,7 @@ export default function RichTextField({ label, value, onChange, hideLabel, toolb
                 <button
                   type="button"
                   onClick={removeLink}
-                  className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 cursor-pointer"
+                  className="rounded-lg border border-inventory-border-strong bg-inventory-surface px-3 py-2 text-sm font-semibold text-inventory-danger hover:bg-inventory-danger/10 cursor-pointer"
                 >
                   Remove link
                 </button>
@@ -339,7 +339,7 @@ export default function RichTextField({ label, value, onChange, hideLabel, toolb
                 type="button"
                 onClick={applyLink}
                 disabled={!linkUrl.trim()}
-                className="ml-auto flex-1 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+                className="ml-auto flex-1 rounded-lg bg-inventory-primary px-3 py-2 text-sm font-semibold text-white hover:bg-inventory-primary-hover disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
               >
                 {isEditingLink ? 'Save' : 'Insert'}
               </button>
@@ -348,24 +348,24 @@ export default function RichTextField({ label, value, onChange, hideLabel, toolb
         >
           <div className="space-y-3">
             <div>
-              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-gray-500">Link text</label>
+              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-inventory-text-subtle">Link text</label>
               <input
                 type="text"
                 value={linkText}
                 onChange={(e) => setLinkText(e.target.value)}
                 placeholder="Text to display"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400"
+                className="w-full rounded-lg border border-inventory-border-strong px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-inventory-primary"
               />
             </div>
             <div>
-              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-gray-500">URL</label>
+              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-inventory-text-subtle">URL</label>
               <input
                 type="url"
                 value={linkUrl}
                 onChange={(e) => setLinkUrl(e.target.value)}
                 placeholder="https://example.com"
                 autoFocus
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400"
+                className="w-full rounded-lg border border-inventory-border-strong px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-inventory-primary"
               />
             </div>
           </div>
@@ -376,7 +376,7 @@ export default function RichTextField({ label, value, onChange, hideLabel, toolb
 }
 
 function Divider() {
-  return <div className="mx-1 h-4 w-px shrink-0 bg-gray-200" aria-hidden="true" />;
+  return <div className="mx-1 h-4 w-px shrink-0 bg-inventory-border" aria-hidden="true" />;
 }
 
 /** Shared icon-toolbar-button chrome. `onMouseDown` defaults to `preventDefault` (keeps the
@@ -407,7 +407,7 @@ function IconButton({
       }}
       onClick={onClick}
       className={`flex h-6 w-6 shrink-0 items-center justify-center rounded transition-colors duration-150 cursor-pointer ${
-        active ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'
+        active ? 'bg-inventory-secondary/15 text-inventory-secondary' : 'text-inventory-text-muted hover:bg-inventory-surface-hover'
       }`}
     >
       {children}

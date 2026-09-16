@@ -4,11 +4,13 @@ import PoItemsTable from './PoItemsTable';
 import type { usePurchaseOrder } from './hooks/usePurchaseOrder';
 import type { VariantRow } from './types';
 
-type PoFormBodyProps = { po: ReturnType<typeof usePurchaseOrder>; variants: VariantRow[] };
+type PoFormBodyProps = { po: ReturnType<typeof usePurchaseOrder>; variants: VariantRow[]; compact?: boolean };
 
 /** The Create purchase order form's fields — shared by the standalone Create PO modal
- * (PoModals.tsx) and the New Product wizard's Purchase order step. */
-export default function PoFormBody({ po, variants }: PoFormBodyProps) {
+ * (PoModals.tsx) and the New Product wizard's Purchase order step. Pass `compact` in the
+ * narrow wizard (max-w-2xl) so the items table tightens its fixed columns; the wide Create
+ * PO modal (max-w-5xl) uses the comfortable density by default. */
+export default function PoFormBody({ po, variants, compact }: PoFormBodyProps) {
   const rows = variants.filter((v) => v.id in po.quantities);
   const selectedSupplier = po.supplierOptions.find((s) => s.id === po.supplierId) ?? null;
 
@@ -18,7 +20,7 @@ export default function PoFormBody({ po, variants }: PoFormBodyProps) {
         <select
           value={po.supplierId}
           onChange={(e) => po.setSupplierId(e.target.value)}
-          className="h-[24px] w-full rounded-[7px] border border-gray-300 px-[6px] text-[11px] leading-none outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 cursor-pointer"
+          className="h-[24px] w-full rounded-[7px] border border-inventory-border-strong px-[6px] text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring cursor-pointer"
         >
           <option value="">Select a supplier</option>
           {po.supplierOptions.map((s) => (
@@ -27,7 +29,7 @@ export default function PoFormBody({ po, variants }: PoFormBodyProps) {
             </option>
           ))}
         </select>
-        {selectedSupplier && <p className="mt-1 text-[10px] leading-tight text-gray-400">{selectedSupplier.poEmail}</p>}
+        {selectedSupplier && <p className="mt-1 text-[10px] leading-tight text-inventory-text-subtle">{selectedSupplier.poEmail}</p>}
       </Field>
 
       <div className="grid gap-x-[7px] gap-y-[8px] sm:grid-cols-2">
@@ -37,7 +39,7 @@ export default function PoFormBody({ po, variants }: PoFormBodyProps) {
             value={po.referenceNumber}
             onChange={(e) => po.setReferenceNumber(e.target.value)}
             placeholder="Supplier or internal reference"
-            className="h-[24px] w-full rounded-[7px] border border-gray-300 px-[6px] text-[11px] leading-none outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            className="h-[24px] w-full rounded-[7px] border border-inventory-border-strong px-[6px] text-[11px] uppercase leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring placeholder:normal-case"
           />
         </Field>
 
@@ -46,19 +48,39 @@ export default function PoFormBody({ po, variants }: PoFormBodyProps) {
             type="date"
             value={po.deliveryDate}
             onChange={(e) => po.setDeliveryDate(e.target.value)}
-            className="h-[24px] w-full rounded-[7px] border border-gray-300 px-[6px] text-[11px] leading-none outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            className="h-[24px] w-full rounded-[7px] border border-inventory-border-strong px-[6px] text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring"
           />
         </Field>
       </div>
 
-      <Field label="Remark">
+      <Field label="PO Remark">
         <textarea
           rows={2}
-          value={po.remark}
-          onChange={(e) => po.setRemark(e.target.value)}
+          value={po.poRemark}
+          onChange={(e) => po.setPoRemark(e.target.value)}
           placeholder="Optional notes"
-          className="w-full resize-none rounded-[7px] border border-gray-300 px-[6px] py-[4px] text-[11px] leading-tight outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+          className="w-full resize-none rounded-[7px] border border-inventory-border-strong px-[6px] py-[4px] text-[11px] uppercase leading-tight outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring placeholder:normal-case"
         />
+      </Field>
+
+      <Field label="Shipping Remark">
+        <textarea
+          rows={2}
+          value={po.shippingRemark}
+          onChange={(e) => po.setShippingRemark(e.target.value)}
+          placeholder="NF.{ORDERNUMBER}, color: , size: , quantity: , made in china."
+          className="w-full resize-none rounded-[7px] border border-inventory-border-strong px-[6px] py-[4px] text-[11px] uppercase leading-tight outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring placeholder:normal-case"
+        />
+        <p className="mt-1 text-[10px] leading-tight text-inventory-text-subtle">
+          <button
+            type="button"
+            onClick={() => po.setShippingRemark('{orderNumber}')}
+            className="mr-1 rounded-[5px] border border-inventory-secondary/30 bg-inventory-secondary/10 px-[5px] py-[1px] text-[10px] font-bold leading-none text-inventory-secondary transition-colors duration-150 hover:bg-inventory-secondary/15 cursor-pointer"
+          >
+            Use
+          </button>
+          {'{ORDERNUMBER}'} — replaced with the PO number when the order is created.
+        </p>
       </Field>
 
       <Field label="Items" error={po.createErrors.items}>
@@ -70,10 +92,12 @@ export default function PoFormBody({ po, variants }: PoFormBodyProps) {
           onQuantityChange={po.setQuantity}
           onSkuChange={po.setSku}
           onCostChange={po.setCost}
+          onFillQuantities={po.setAllQuantities}
+          compact={compact}
         />
       </Field>
 
-      {po.createErrors.general && <p className="text-[11px] text-red-600">{po.createErrors.general}</p>}
+      {po.createErrors.general && <p className="text-[11px] text-inventory-danger">{po.createErrors.general}</p>}
     </div>
   );
 }
@@ -81,9 +105,9 @@ export default function PoFormBody({ po, variants }: PoFormBodyProps) {
 function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="mb-[2px] block text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-gray-500">{label}</label>
+      <label className="mb-[2px] block text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-inventory-text-subtle">{label}</label>
       {children}
-      {error && <p className="mt-1 text-[10px] leading-tight text-red-600">{error}</p>}
+      {error && <p className="mt-1 text-[10px] leading-tight text-inventory-danger">{error}</p>}
     </div>
   );
 }

@@ -1,17 +1,19 @@
 'use client';
 
+import { useState } from 'react';
 import { toast } from 'react-toastify';
-import { PanelHeading } from './MainImagePanel';
+import BuyingHistoryModal from './BuyingHistoryModal';
+import { PanelHeading, panelBorderClass } from './MainImagePanel';
 import PerStoreMarginRows from './PerStoreMarginRows';
 import StoreMarginPriceChips from './StoreMarginPriceChips';
 // Re-enable: StorePriceChips showed each store's *live* Shopify price — swap back in for
 // StoreMarginPriceChips (below) to restore that instead of the margin-derived price badge.
 // import StorePriceChips from './StorePriceChips';
-import { Check, Tag } from './icons';
-import { formatMoney } from './utils';
 import type { useProductPricing } from './hooks/useProductPricing';
 import type { StoreListingsState } from './hooks/useStoreListings';
-import type { StoreListingResult } from './types';
+import { Check, Clipboard, Tag } from './icons';
+import type { PurchaseOrderRecord, StoreListingResult } from './types';
+import { formatMoney } from './utils';
 
 type PricingMarginPanelInner = ReturnType<typeof useProductPricing>;
 
@@ -19,6 +21,12 @@ type PricingMarginPanelProps = {
   pricing: PricingMarginPanelInner;
   storeListings: StoreListingsState;
   onEditStorePrice: (listing: StoreListingResult) => void;
+  /** For the "Buying history" button — reuses whatever `usePurchaseOrder` already has loaded
+   * (empty in the New Product wizard, where there's no PO history to show yet). */
+  purchaseOrders: PurchaseOrderRecord[];
+  /** Wired to `p.po.openReceive` — Buying history's "Receive" action opens the Receive PO
+   * modal on top while the history stays open behind it. */
+  onReceive: (po: PurchaseOrderRecord) => void;
   /** For the New Product wizard's Pricing step — hides the panel heading and the Edit/Cancel/Save
    * row (the wizard's own footer drives saving and advancing; the panel is expected to already be
    * in edit mode when embedded), but keeps "Use price" — applying the computed price to every
@@ -26,22 +34,23 @@ type PricingMarginPanelProps = {
   embedded?: boolean;
 };
 
-export default function PricingMarginPanel({ pricing: p, storeListings, onEditStorePrice, embedded }: PricingMarginPanelProps) {
+export default function PricingMarginPanel({ pricing: p, storeListings, onEditStorePrice, purchaseOrders, onReceive, embedded }: PricingMarginPanelProps) {
   const foreign = p.form.currencyCode;
   const base = p.baseCurrency;
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   return (
-    <section className={embedded ? 'flex min-w-0 flex-col' : 'flex min-w-0 flex-col rounded-[10px] border border-gray-200 bg-white shadow-[0_1px_2px_0_rgb(0_0_0/0.05)] xl:min-h-0'}>
-      {!embedded && <PanelHeading icon={<Tag className="h-3 w-3" />} title={`Pricing & margin (${base})`} meta={foreign} />}
+    <section className={embedded ? 'flex min-w-0 flex-col' : `flex min-w-0 flex-col rounded-[10px] border ${panelBorderClass('pricing')} bg-inventory-surface shadow-inventory xl:min-h-0`}>
+      {!embedded && <PanelHeading tone="pricing" icon={<Tag className="h-3 w-3" />} title={`Pricing & margin (${base})`} meta={foreign} />}
 
-      <div className={embedded ? 'flex flex-1 flex-col gap-[3px]' : 'flex flex-1 flex-col gap-[3px] p-[6px] xl:min-h-0 xl:overflow-y-auto'}>
+      <div className={embedded ? 'flex flex-col gap-[3px]' : 'flex flex-col gap-[3px] p-[6px] xl:min-h-0 xl:overflow-y-auto'}>
         <Row label="Currency">
           <div className="flex gap-[4px]">
             <select
               value={p.form.currencyCode}
               onChange={p.set('currencyCode')}
               aria-label="Currency"
-              className="h-[22px] w-[58px] rounded-[7px] border border-gray-300 px-[4px] text-right text-[10.5px] leading-none outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 cursor-pointer"
+              className="h-[22px] w-[58px] rounded-[7px] border border-inventory-border-strong px-[4px] text-right text-[10.5px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring cursor-pointer"
             >
               {p.currencies.map((c) => (
                 <option key={c.code} value={c.code}>
@@ -64,9 +73,9 @@ export default function PricingMarginPanel({ pricing: p, storeListings, onEditSt
           </div>
         </Row>
 
-        <div className="flex items-center justify-between rounded-[9px] bg-gray-100 px-[9px] py-[6px]">
-          <span className="text-[9.5px] font-bold uppercase leading-none tracking-[0.4px] text-red-600">Total buying (landed)</span>
-          <span className="text-[11.5px] font-bold leading-none text-red-700 tabular-nums">
+        <div className="flex items-center justify-between rounded-[9px] bg-inventory-surface-muted px-[9px] py-[6px]">
+          <span className="text-[9.5px] font-bold uppercase leading-none tracking-[0.4px] text-inventory-danger">Total buying (landed)</span>
+          <span className="text-[11.5px] font-bold leading-none text-inventory-danger-hover tabular-nums">
             {formatMoney(p.computed.totalBuying)} <Unit>{base}</Unit>
           </span>
         </div>
@@ -87,7 +96,7 @@ export default function PricingMarginPanel({ pricing: p, storeListings, onEditSt
         {/* Per-store overrides — kept visually separate from the product-level calculation
            above, since neither of these ever feeds computePricing. */}
         {storeListings.listings.length > 0 && (
-          <div className="space-y-[6px] border-t border-gray-100 pt-[6px]">
+          <div className="space-y-[6px] border-t border-inventory-divider pt-[6px]">
             <PerStoreMarginRows listings={storeListings.listings} values={p.marginDraft} onChange={p.setPendingMargin} />
             {/* Re-enable: uncomment to restore the live-Shopify-price chips (see the parked import above).
             <StorePriceChips listings={storeListings.listings} onEditPrice={onEditStorePrice} />
@@ -102,20 +111,22 @@ export default function PricingMarginPanel({ pricing: p, storeListings, onEditSt
           </div>
         )}
 
-        <div className="mt-auto flex items-center justify-between rounded-[9px] border border-blue-100 bg-blue-50 px-[9px] py-[6px]">
-          <span className="text-[9.5px] font-bold uppercase leading-none tracking-[0.4px] text-blue-700">Sell price (inc tax)</span>
-          <span className="text-[14px] font-bold leading-none text-blue-900 tabular-nums">
+        <div className="flex items-center justify-between rounded-[9px] border border-inventory-secondary/20 bg-inventory-secondary/10 px-[9px] py-[6px]">
+          <span className="text-[9.5px] font-bold uppercase leading-none tracking-[0.4px] text-inventory-secondary">Sell price (inc tax)</span>
+          <span className="text-[14px] font-bold leading-none text-inventory-secondary tabular-nums">
             {formatMoney(p.computed.sellingIncTax)} <Unit>{base}</Unit>
           </span>
         </div>
 
-        <PricingActions p={p} embedded={embedded} />
+        <PricingActions p={p} embedded={embedded} onOpenHistory={() => setHistoryOpen(true)} />
       </div>
+
+      {historyOpen && <BuyingHistoryModal purchaseOrders={purchaseOrders} onClose={() => setHistoryOpen(false)} onReceive={onReceive} />}
     </section>
   );
 }
 
-function PricingActions({ p, embedded }: { p: PricingMarginPanelInner; embedded?: boolean }) {
+function PricingActions({ p, embedded, onOpenHistory }: { p: PricingMarginPanelInner; embedded?: boolean; onOpenHistory: () => void }) {
   // Embedded (the New Product wizard's Pricing step): the wizard's own footer already drives
   // Save/Next, so only "Use price" belongs here — applying the computed price to every variant
   // is a distinct, one-off action neither Save nor Next performs.
@@ -130,6 +141,7 @@ function PricingActions({ p, embedded }: { p: PricingMarginPanelInner; embedded?
     <div className="flex gap-[6px]">
       <ActionButton onClick={() => p.savePricing()} icon={<Check className="h-3 w-3" />} label="Save" primary disabled={!p.dirty} />
       <ActionButton onClick={p.requestUsePrice} icon={<Tag className="h-3 w-3" />} label="Use price" />
+      <ActionButton onClick={onOpenHistory} icon={<Clipboard className="h-3 w-3" />} label="PO history" />
     </div>
   );
 }
@@ -159,7 +171,7 @@ export function ActionButton({
       className={`flex items-center justify-center gap-1 rounded-[6px] text-[10px] font-bold leading-none transition-colors duration-150 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
         compact ? 'h-[20px] flex-none px-2' : 'h-[22px] flex-1 px-[6px]'
       } ${
-        primary ? 'bg-blue-600 text-white hover:bg-blue-700' : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
+        primary ? 'bg-inventory-primary text-white hover:bg-inventory-primary-hover' : 'border border-inventory-border-strong text-inventory-text-muted hover:bg-inventory-surface-hover'
       }`}
     >
       {icon}
@@ -171,18 +183,18 @@ export function ActionButton({
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-2">
-      <span className="text-[11.5px] font-medium leading-none text-gray-700">{label}</span>
+      <span className="text-[11.5px] font-medium leading-none text-inventory-text-muted">{label}</span>
       {children}
     </div>
   );
 }
 
 function Value({ children }: { children: React.ReactNode }) {
-  return <span className="text-[11.5px] font-bold leading-none text-gray-900 tabular-nums">{children}</span>;
+  return <span className="text-[11.5px] font-bold leading-none text-inventory-text tabular-nums">{children}</span>;
 }
 
 function Unit({ children }: { children: React.ReactNode }) {
-  return <span className="text-[10px] font-medium leading-none text-gray-400">{children}</span>;
+  return <span className="text-[10px] font-medium leading-none text-inventory-text-subtle">{children}</span>;
 }
 
 function NumberInput({
@@ -210,9 +222,9 @@ function NumberInput({
         value={value}
         onChange={onChange}
         aria-label={suffix}
-        className={`h-[22px] ${width ?? 'w-[62px]'} rounded-[7px] border border-gray-300 pl-[6px] ${gutter} text-right text-[10.5px] leading-none tabular-nums outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100`}
+        className={`h-[22px] ${width ?? 'w-[62px]'} rounded-[7px] border border-inventory-border-strong pl-[6px] ${gutter} text-right text-[10.5px] leading-none tabular-nums outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring`}
       />
-      <span className="pointer-events-none absolute right-[6px] top-1/2 -translate-y-1/2 text-[9px] leading-none text-gray-400">{suffix}</span>
+      <span className="pointer-events-none absolute right-[6px] top-1/2 -translate-y-1/2 text-[9px] leading-none text-inventory-text-subtle">{suffix}</span>
     </div>
   );
 }

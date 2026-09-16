@@ -72,13 +72,13 @@ export default function TagsPicker({ storeId, value, onChange }: TagsPickerProps
           ref={anchorRef}
           type="button"
           onClick={() => setOpen((prev) => !prev)}
-          className="flex min-h-[24px] w-full flex-wrap items-center gap-[4px] rounded-[7px] border border-gray-300 px-[6px] py-[3px] text-left text-[11px] leading-none outline-none hover:bg-gray-50 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 cursor-pointer"
+          className="flex min-h-[24px] w-full flex-wrap items-center gap-[4px] rounded-[7px] border border-inventory-border-strong px-[6px] py-[3px] text-left text-[11px] leading-none outline-none hover:bg-inventory-surface-hover focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring cursor-pointer"
         >
-          {value.length === 0 && <span className="px-[2px] text-gray-400">Select tags…</span>}
+          {value.length === 0 && <span className="px-[2px] text-inventory-text-subtle">Select tags…</span>}
           {value.map((tag) => (
             <span
               key={tag}
-              className="flex items-center gap-[3px] rounded-full border border-gray-200 bg-gray-50 px-[5px] py-[1px] text-[9px] font-semibold leading-none text-gray-700"
+              className="flex items-center gap-[3px] rounded-full border border-inventory-border bg-inventory-surface-muted px-[5px] py-[1px] text-[9px] font-semibold leading-none text-inventory-text-muted"
             >
               {tag}
               <span
@@ -95,7 +95,7 @@ export default function TagsPicker({ storeId, value, onChange }: TagsPickerProps
                   }
                 }}
                 aria-label={`Remove tag ${tag}`}
-                className="text-gray-400 hover:text-red-600"
+                className="text-inventory-text-subtle hover:text-inventory-danger-hover"
               >
                 <Close className="h-2.5 w-2.5" />
               </span>
@@ -107,7 +107,7 @@ export default function TagsPicker({ storeId, value, onChange }: TagsPickerProps
           <div
             ref={dropdownRef}
             style={{ position: 'fixed', top: position.top, left: position.left, width: position.width }}
-            className="z-[70] max-h-72 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+            className="z-[70] max-h-72 overflow-y-auto rounded-lg border border-inventory-border bg-inventory-surface py-1 shadow-lg inventory-dropdown-in"
           >
             <input
               autoFocus
@@ -118,19 +118,19 @@ export default function TagsPicker({ storeId, value, onChange }: TagsPickerProps
                 if (e.key === 'Escape') setOpen(false);
               }}
               placeholder="Search tags…"
-              className="w-full border-b border-gray-100 px-2 py-1.5 text-[11px] outline-none"
+              className="w-full border-b border-inventory-divider px-2 py-1.5 text-[11px] outline-none"
             />
-            {loading && <div className="px-2 py-1 text-[11px] text-gray-400">Loading…</div>}
+            {loading && <div className="px-2 py-1 text-[11px] text-inventory-text-subtle">Loading…</div>}
             {!loading &&
               results.map((tag) => (
-                <label key={tag} className="flex cursor-pointer items-center gap-2 px-2 py-1 text-[11px] leading-none hover:bg-gray-50">
+                <label key={tag} className="flex cursor-pointer items-center gap-2 px-2 py-1 text-[11px] leading-none hover:bg-inventory-surface-hover">
                   <input
                     type="checkbox"
                     checked={selectedKeys.has(tag.trim().toLowerCase())}
                     onChange={() => toggle(tag)}
-                    className="h-3 w-3 rounded border-gray-300 text-blue-600"
+                    className="h-3 w-3 rounded border-inventory-border-strong text-inventory-secondary"
                   />
-                  <span className="truncate text-gray-900">{tag}</span>
+                  <span className="truncate text-inventory-text">{tag}</span>
                 </label>
               ))}
             {!loading && <TaxonomyAddButton query={query} options={results} label="tag" onAdd={addNew} />}
