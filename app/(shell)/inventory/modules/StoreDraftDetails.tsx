@@ -50,7 +50,7 @@ export default function StoreDraftDetails({ storeId, product, draft, set, setFie
             name: draft.title || product.name,
             brand: draft.vendor || product.brand,
             category: draft.category.name || product.category,
-            remarks: product.remarks,
+            productRemark: product.productRemark,
             sizes: product.sizes,
             colours: product.colours,
           })}

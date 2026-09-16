@@ -5,7 +5,7 @@ import { ColourCell, IncomingCell, Num, NumCell, RowAction, SizeCell, SkuCell } 
 import { STATUS_STYLES } from './constants';
 import { Check, Close, Trash } from './icons';
 import { computeVariant, formatCurrencyValue, formatMoney, formatNumber } from './utils';
-import type { ColourOption, VariantRow } from './types';
+import type { VariantRow } from './types';
 
 type VariantsMatrixRowProps = {
   /** Already draft-overlaid by the hook — the row only ever renders values, never merges them. */
@@ -21,8 +21,6 @@ type VariantsMatrixRowProps = {
   /** Full view renders every column; the inline table hides SKU / Barcode and Trigger. */
   showAllColumns: boolean;
   swatch: string;
-  colours: ColourOption[];
-  sizes: string[];
   onToggleSelect: (id: string) => void;
   onFieldChange: (id: string, patch: Partial<VariantRow>) => void;
   onSave: (id: string) => void;
@@ -39,8 +37,6 @@ function VariantsMatrixRow({
   saving,
   showAllColumns,
   swatch,
-  colours,
-  sizes,
   onToggleSelect,
   onFieldChange,
   onSave,
@@ -53,16 +49,16 @@ function VariantsMatrixRow({
   const set = (patch: Partial<VariantRow>) => onFieldChange(variant.id, patch);
 
   return (
-    <tr className={`border-b border-gray-100 last:border-0 transition-colors duration-150 ${style.row} ${selected ? 'ring-1 ring-inset ring-blue-300' : ''}`}>
+    <tr className={`border-b border-gray-200 last:border-0 transition-colors duration-150 ${style.row} ${selected ? 'ring-1 ring-inset ring-blue-300' : ''}`}>
       <td className="relative px-[4px] py-0 pl-[6px]">
         <span className={`absolute left-0 top-0 h-full w-1 ${style.bar}`} aria-hidden="true" />
         <div className="flex items-center gap-[4px]">
           <SelectCheckbox name={name} selected={selected} onToggleSelect={() => onToggleSelect(variant.id)} />
-          <ColourCell value={variant.colour} colours={colours} swatch={swatch} label="Colour" onChange={(colour) => set({ colour })} />
+          <ColourCell value={variant.colour} swatch={swatch} />
         </div>
       </td>
 
-      <SizeCell value={variant.size} sizes={sizes} label="Size" onChange={(size) => set({ size })} />
+      <SizeCell value={variant.size} />
 
       {showAllColumns && (
         <SkuCell

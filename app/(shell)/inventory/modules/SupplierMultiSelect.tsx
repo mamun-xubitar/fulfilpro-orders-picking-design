@@ -109,7 +109,7 @@ export default function SupplierMultiSelect({ suppliers, selectedIds, onChange, 
           {selected.map((s) => (
             <span
               key={s.id}
-              className="flex items-center gap-[3px] rounded-full border border-gray-200 bg-gray-50 px-[5px] py-[1px] text-[9px] font-semibold leading-none text-gray-700"
+              className="flex items-center gap-[3px] rounded-full border border-gray-200 bg-gray-50 px-[5px] py-[1px] text-[9px] font-semibold uppercase leading-none text-gray-700"
             >
               {s.name}
               <span

@@ -14,7 +14,9 @@ export function useProductImages(product: ProductRecord | null) {
    * once. */
   const tiles = useMemo(() => {
     if (!product) return [];
-    return buildGalleryTiles(product.images, product.variants, product.colours);
+    // Newest upload first (item 18) — the product's own images array stays position-ascending
+    // for the Edit images grid and the product-list thumbnail, so the reverse happens only here.
+    return buildGalleryTiles([...product.images].reverse(), product.variants, product.colours);
   }, [product]);
 
   /**
@@ -27,6 +29,22 @@ export function useProductImages(product: ProductRecord | null) {
   }, [tiles, activeKey]);
 
   const active = tiles[activeIndex] ?? null;
+
+  // `product.images` is `position asc` (oldest→newest — every upload gets the next position, see
+  // SupplierProductModel.addImage/addImages), so the last element is always the newest. Render-time
+  // reset (same pattern as useProductsFilters' `applied` — avoids an effect round trip): resetting
+  // both keys whenever this id changes falls back to `tiles[0]` above — which, after
+  // buildGalleryTiles' merged photo pass, is genuinely the newest image — covering both "just
+  // uploaded" and "switched to a different product" without a special case for either. Tagging an
+  // existing photo's colour (setImageColour) doesn't touch this id, so it leaves the selection
+  // alone.
+  const latestImageId = product?.images[product.images.length - 1]?.id ?? null;
+  const [seenLatestImageId, setSeenLatestImageId] = useState<string | null>(null);
+  if (seenLatestImageId !== latestImageId) {
+    setSeenLatestImageId(latestImageId);
+    setActiveKey(null);
+    setLightboxActiveKey(null);
+  }
 
   const lightboxIndex = useMemo(() => {
     const found = tiles.findIndex((t) => t.key === lightboxActiveKey);

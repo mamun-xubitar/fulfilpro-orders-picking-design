@@ -109,7 +109,7 @@ function TextField({
           value={value}
           onChange={onChange}
           placeholder={placeholder}
-          className={`h-[24px] w-full rounded-[7px] border px-[6px] text-[11px] leading-none outline-none transition-colors duration-150 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 ${
+          className={`h-[24px] w-full rounded-[7px] border px-[6px] text-[11px] uppercase leading-none outline-none transition-colors duration-150 placeholder:normal-case focus:border-blue-500 focus:ring-2 focus:ring-blue-100 ${
             adornment ? 'pr-[22px]' : ''
           } ${error ? 'border-red-300 bg-red-50/50 focus:border-red-500 focus:ring-red-100' : 'border-gray-300 bg-white hover:border-gray-400'}`}
         />

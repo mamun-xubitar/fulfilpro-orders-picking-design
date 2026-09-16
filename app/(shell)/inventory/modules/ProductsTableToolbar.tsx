@@ -50,6 +50,16 @@ export default function ProductsTableToolbar({ table, onRefresh, loading }: Prod
         ))}
       </select>
 
+      <label className="flex cursor-pointer items-center gap-[4px] whitespace-nowrap text-[10.5px] font-medium leading-none text-gray-700">
+        <input
+          type="checkbox"
+          checked={table.includeOmitted}
+          onChange={(e) => table.setIncludeOmitted(e.target.checked)}
+          className="h-3 w-3 cursor-pointer accent-blue-600"
+        />
+        Show omitted
+      </label>
+
       {table.hasActiveFilters && (
         <button
           type="button"

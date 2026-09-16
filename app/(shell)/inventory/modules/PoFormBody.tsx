@@ -4,11 +4,13 @@ import PoItemsTable from './PoItemsTable';
 import type { usePurchaseOrder } from './hooks/usePurchaseOrder';
 import type { VariantRow } from './types';
 
-type PoFormBodyProps = { po: ReturnType<typeof usePurchaseOrder>; variants: VariantRow[] };
+type PoFormBodyProps = { po: ReturnType<typeof usePurchaseOrder>; variants: VariantRow[]; compact?: boolean };
 
 /** The Create purchase order form's fields — shared by the standalone Create PO modal
- * (PoModals.tsx) and the New Product wizard's Purchase order step. */
-export default function PoFormBody({ po, variants }: PoFormBodyProps) {
+ * (PoModals.tsx) and the New Product wizard's Purchase order step. Pass `compact` in the
+ * narrow wizard (max-w-2xl) so the items table tightens its fixed columns; the wide Create
+ * PO modal (max-w-5xl) uses the comfortable density by default. */
+export default function PoFormBody({ po, variants, compact }: PoFormBodyProps) {
   const rows = variants.filter((v) => v.id in po.quantities);
   const selectedSupplier = po.supplierOptions.find((s) => s.id === po.supplierId) ?? null;
 
@@ -37,7 +39,7 @@ export default function PoFormBody({ po, variants }: PoFormBodyProps) {
             value={po.referenceNumber}
             onChange={(e) => po.setReferenceNumber(e.target.value)}
             placeholder="Supplier or internal reference"
-            className="h-[24px] w-full rounded-[7px] border border-gray-300 px-[6px] text-[11px] leading-none outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            className="h-[24px] w-full rounded-[7px] border border-gray-300 px-[6px] text-[11px] uppercase leading-none outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 placeholder:normal-case"
           />
         </Field>
 
@@ -51,14 +53,34 @@ export default function PoFormBody({ po, variants }: PoFormBodyProps) {
         </Field>
       </div>
 
-      <Field label="Remark">
+      <Field label="PO Remark">
         <textarea
           rows={2}
-          value={po.remark}
-          onChange={(e) => po.setRemark(e.target.value)}
+          value={po.poRemark}
+          onChange={(e) => po.setPoRemark(e.target.value)}
           placeholder="Optional notes"
-          className="w-full resize-none rounded-[7px] border border-gray-300 px-[6px] py-[4px] text-[11px] leading-tight outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+          className="w-full resize-none rounded-[7px] border border-gray-300 px-[6px] py-[4px] text-[11px] uppercase leading-tight outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 placeholder:normal-case"
         />
+      </Field>
+
+      <Field label="Shipping Remark">
+        <textarea
+          rows={2}
+          value={po.shippingRemark}
+          onChange={(e) => po.setShippingRemark(e.target.value)}
+          placeholder="NF.{orderNumber}, color: , size: , quantity: , made in china."
+          className="w-full resize-none rounded-[7px] border border-gray-300 px-[6px] py-[4px] text-[11px] uppercase leading-tight outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 placeholder:normal-case"
+        />
+        <p className="mt-1 text-[10px] leading-tight text-gray-400">
+          <button
+            type="button"
+            onClick={() => po.setShippingRemark('{orderNumber}')}
+            className="mr-1 rounded-[5px] border border-blue-200 bg-blue-50 px-[5px] py-[1px] text-[10px] font-bold leading-none text-blue-700 transition-colors duration-150 hover:bg-blue-100 cursor-pointer"
+          >
+            Use
+          </button>
+          {'{orderNumber}'} — replaced with the PO number when the order is created.
+        </p>
       </Field>
 
       <Field label="Items" error={po.createErrors.items}>
@@ -70,6 +92,8 @@ export default function PoFormBody({ po, variants }: PoFormBodyProps) {
           onQuantityChange={po.setQuantity}
           onSkuChange={po.setSku}
           onCostChange={po.setCost}
+          onFillQuantities={po.setAllQuantities}
+          compact={compact}
         />
       </Field>
 

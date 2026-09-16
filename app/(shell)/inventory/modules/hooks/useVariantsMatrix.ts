@@ -165,6 +165,13 @@ export function useVariantsMatrix({ product, sizes, colours, quickFilter, onVari
     });
   };
 
+  /** Bulk column fill (item 9) — writes `value` onto the given field for every currently
+   * *visible* row (respecting the colour/size/status/zero-stock filters), same as if each row
+   * had been edited by hand. Each row keeps its own per-row Save; this only stages the drafts. */
+  const fillColumn = (field: 'stockOnHand' | 'allocated' | 'sellPrice', value: number) => {
+    for (const row of rows) setVariantEdit(row.id, { [field]: value });
+  };
+
   /** Drops one row's draft — used both after a successful save (the fresh server value is now
    * current) and as the row's own Revert action while dirty. */
   const clearRowDraft = (variantId: string) => {
@@ -261,6 +268,7 @@ export function useVariantsMatrix({ product, sizes, colours, quickFilter, onVari
     saveRow,
     revertRow,
     setVariantEdit,
+    fillColumn,
     deleteTarget,
     deleting,
     requestDeleteRow,

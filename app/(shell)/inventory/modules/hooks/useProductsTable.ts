@@ -9,6 +9,7 @@ import type { CataloguePagination, ProductRecord, ProductStatusValue, ProductsRe
 export type ProductsSortKey = 'name' | 'brand' | 'category' | 'sku' | 'status' | 'variants' | 'stock' | 'stockValue' | 'createdAt';
 
 const EMPTY_PAGINATION: CataloguePagination = { page: 1, pageSize: PAGE_SIZE_OPTIONS[0], total: 0, totalPages: 1, hasPrev: false, hasNext: false };
+const EMPTY_TOTALS = { stockOnHand: 0, stockValue: 0 };
 
 type DeleteTarget = { kind: 'selection' } | { kind: 'single'; id: string; name: string };
 type ApiEnvelope<T> = { success: boolean; message: string; data?: T; errors?: string[] };
@@ -44,6 +45,7 @@ export function stockValueOf(p: ProductRecord): number {
 export function useProductsTable({ enabled, verifiedOnly, quickFilter, onView, onCounts, onDeleted }: UseProductsTableArgs) {
   const [rows, setRows] = useState<ProductRecord[]>([]);
   const [pagination, setPagination] = useState<CataloguePagination>(EMPTY_PAGINATION);
+  const [totals, setTotals] = useState<{ stockOnHand: number; stockValue: number }>(EMPTY_TOTALS);
   const [supplierOptions, setSupplierOptions] = useState<{ id: string; name: string }[]>([]);
   // Named distinctly from the exposed `loading` below — see useCatalogData's `fetching` for why.
   const [fetching, setFetching] = useState(false);
@@ -51,7 +53,7 @@ export function useProductsTable({ enabled, verifiedOnly, quickFilter, onView, o
   const abortRef = useRef<AbortController | null>(null);
 
   const filters = useProductsFilters({ verifiedOnly, quickFilter });
-  const { page, setPage, pageSize, search, status, supplierId, sort, dir } = filters;
+  const { page, setPage, pageSize, search, status, supplierId, includeOmitted, sort, dir } = filters;
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectAllFilters, setSelectAllFilters] = useState(false);
@@ -73,6 +75,7 @@ export function useProductsTable({ enabled, verifiedOnly, quickFilter, onView, o
     if (search.trim()) params.set('search', search.trim());
     if (status) params.set('status', status);
     if (supplierId) params.set('supplier', supplierId);
+    if (includeOmitted) params.set('includeOmitted', '1');
     return params;
   };
 
@@ -93,6 +96,7 @@ export function useProductsTable({ enabled, verifiedOnly, quickFilter, onView, o
         setRows(json.data.products);
         setPagination(json.data.pagination);
         setSupplierOptions(json.data.supplierOptions);
+        setTotals(json.data.totals ?? EMPTY_TOTALS);
         if (json.data.stepperTotal !== undefined) {
           onCounts?.({ totalAll: json.data.totalAll, filteredCount: json.data.stepperTotal });
         }
@@ -113,7 +117,7 @@ export function useProductsTable({ enabled, verifiedOnly, quickFilter, onView, o
 
     return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, verifiedOnly, quickFilter, search, status, supplierId, sort, dir, page, pageSize, refreshTick]);
+  }, [enabled, verifiedOnly, quickFilter, search, status, supplierId, includeOmitted, sort, dir, page, pageSize, refreshTick]);
 
   const refresh = () => setRefreshTick((n) => n + 1);
   const pageNumbers = buildPageNumbers(pagination.page, pagination.totalPages);
@@ -216,6 +220,28 @@ export function useProductsTable({ enabled, verifiedOnly, quickFilter, onView, o
 
   const setVerified = (verified: boolean) => void runBulk({ action: 'set_verified', verified });
 
+  /** Bulk omit/restore for the selection bar — goes through the same bulk endpoint (and its
+   * "select all matching filters" resolution) as Set status / Mark verified above. */
+  const bulkSetOmitted = (omitted: boolean) => void runBulk({ action: 'set_omitted', omitted });
+
+  /** Item 19 — per-row omit switch. A direct PATCH like any other product-details field, not a
+   * bulk action: omitting one product at a time doesn't need "select all matching filters". */
+  const toggleOmitted = async (id: string, omitted: boolean) => {
+    try {
+      const res = await fetch(`/api/inventory/catalog/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ omitted }),
+      });
+      const json = (await res.json()) as { success: boolean; message: string };
+      if (!res.ok || !json.success) throw new Error(json.message || 'Failed to update product');
+      toast.success(omitted ? 'Product omitted' : 'Product restored');
+      refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to update product');
+    }
+  };
+
   return {
     searchInput: filters.searchInput,
     setSearch: filters.setSearchInput,
@@ -223,6 +249,9 @@ export function useProductsTable({ enabled, verifiedOnly, quickFilter, onView, o
     setStatus: filters.setStatus,
     supplierId,
     setSupplierId: filters.setSupplierId,
+    includeOmitted: filters.includeOmitted,
+    setIncludeOmitted: filters.setIncludeOmitted,
+    toggleOmitted,
     supplierOptions,
     hasActiveFilters: filters.hasActiveFilters,
     handleClearFilters: filters.handleClearFilters,
@@ -232,6 +261,7 @@ export function useProductsTable({ enabled, verifiedOnly, quickFilter, onView, o
     products: rows,
     loading,
     pagination,
+    totals,
     pageNumbers,
     goToPage: setPage,
     pageSize,
@@ -252,6 +282,7 @@ export function useProductsTable({ enabled, verifiedOnly, quickFilter, onView, o
     setStatusModal,
     applyStatus,
     setVerified,
+    bulkSetOmitted,
     onView,
     refresh,
   };

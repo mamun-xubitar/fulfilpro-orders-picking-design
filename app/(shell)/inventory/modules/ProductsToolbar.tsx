@@ -21,7 +21,7 @@ export default function ProductsToolbar(p: InventoryPage) {
 
   return (
     <div className="flex flex-wrap items-center gap-[6px] rounded-[10px] border border-gray-200 bg-white px-[8px] py-[4px] shadow-[0_1px_2px_0_rgb(0_0_0/0.05)]">
-      <Toggle label="All records" checked={nav.allRecords} onChange={nav.setAllRecords} />
+      <Toggle label="See List" checked={nav.allRecords} onChange={nav.setAllRecords} />
       <Toggle label="Verified" checked={nav.verifiedOnly} onChange={nav.setVerifiedOnly} />
 
       <div className="flex items-center gap-[2px]">

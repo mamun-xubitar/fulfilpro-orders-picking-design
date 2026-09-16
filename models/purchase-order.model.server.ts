@@ -1,4 +1,5 @@
 import prisma from '@/lib/prisma.server';
+import { formatPoNumber } from '@/lib/inventory/po-number';
 import { Prisma, PurchaseOrderStatus } from '@prisma/client';
 
 export type PurchaseOrderItemRow = {
@@ -25,7 +26,8 @@ export type PurchaseOrderRow = {
   productTitle: string;
   status: PurchaseOrderStatus;
   deliveryDate: string | null;
-  remark: string | null;
+  poRemark: string | null;
+  shippingRemark: string | null;
   createdById: string;
   createdByName: string;
   statusUpdatedById: string | null;
@@ -95,12 +97,15 @@ export class PurchaseOrderModel {
     productTitle: string;
     referenceNumber: string | null;
     deliveryDate: Date | null;
-    remark: string | null;
+    poRemark: string | null;
+    /** May contain the literal token "{orderNumber}" — replaced with this PO's own formatted
+     * display number ("PO-00074") once the row exists and its autoincrement number is known. */
+    shippingRemark: string | null;
     createdById: string;
     createdByName: string;
     items: Array<{ variantId: string; variantTitle: string; sku: string | null; quantity: number; unitCost?: number }>;
   }) {
-    const row = await prisma.purchaseOrder.create({
+    const created = await prisma.purchaseOrder.create({
       data: {
         supplierId: data.supplierId,
         supplierName: data.supplierName,
@@ -110,13 +115,25 @@ export class PurchaseOrderModel {
         referenceNumber: data.referenceNumber,
         status: 'REQUESTED',
         deliveryDate: data.deliveryDate,
-        remark: data.remark,
+        poRemark: data.poRemark,
+        shippingRemark: data.shippingRemark,
         createdById: data.createdById,
         createdByName: data.createdByName,
         items: { create: data.items },
       },
       include: itemsInclude,
     });
+
+    // {orderNumber} can only resolve once the row exists and its autoincrement `number` is known
+    // — a second, targeted update rather than folding into the create above. Matched
+    // case-insensitively: the controller upper-cases every free-text field before it gets here
+    // (item 3), so the token itself normally arrives as "{ORDERNUMBER}".
+    const resolvedShippingRemark = data.shippingRemark && /\{orderNumber\}/i.test(data.shippingRemark)
+      ? data.shippingRemark.replace(/\{orderNumber\}/gi, formatPoNumber(created.number))
+      : null;
+    const row = resolvedShippingRemark
+      ? await prisma.purchaseOrder.update({ where: { id: created.id }, data: { shippingRemark: resolvedShippingRemark }, include: itemsInclude })
+      : created;
     return toPurchaseOrderRow(row);
   }
 
@@ -218,7 +235,7 @@ export class PurchaseOrderModel {
   }
 
   /** PO-level field patch for PO CSV import — blank/omitted fields leave the existing value untouched. */
-  async updateFields(id: string, data: Partial<{ status: PurchaseOrderStatus; referenceNumber: string | null; deliveryDate: Date | null; remark: string | null }>): Promise<void> {
+  async updateFields(id: string, data: Partial<{ status: PurchaseOrderStatus; referenceNumber: string | null; deliveryDate: Date | null; poRemark: string | null }>): Promise<void> {
     await prisma.purchaseOrder.update({ where: { id }, data });
   }
 
@@ -269,7 +286,8 @@ function toPurchaseOrderRow(row: PurchaseOrderWithItems): PurchaseOrderRow {
     productTitle: row.productTitle,
     status: row.status,
     deliveryDate: row.deliveryDate?.toISOString() ?? null,
-    remark: row.remark,
+    poRemark: row.poRemark,
+    shippingRemark: row.shippingRemark,
     createdById: row.createdById,
     createdByName: row.createdByName,
     statusUpdatedById: row.statusUpdatedById,

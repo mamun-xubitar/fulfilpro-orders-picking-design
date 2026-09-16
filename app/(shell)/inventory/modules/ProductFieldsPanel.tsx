@@ -148,21 +148,36 @@ export default function ProductFieldsPanel({ details: d, supplierOptions, preset
             {d.errors?.colours && <p className="mt-[2px] text-[10px] leading-tight text-red-600">{d.errors.colours}</p>}
           </div>
 
-          <div className="min-w-0">
-            <FieldLabel>Status</FieldLabel>
-            <ProductStatusSelect value={d.form.status} onChange={d.setStatus} className={FIELD_VISUAL_CLASS} />
-          </div>
-          <div className="min-w-0">
-            <FieldLabel>Verified</FieldLabel>
-            <label className="inline-flex h-[24px] max-w-full cursor-pointer items-center gap-[5px] text-[11px] font-medium leading-none text-gray-700" aria-label="Verified">
+          <div className="col-span-2 grid grid-cols-3 gap-x-[7px]">
+            <div className="min-w-0">
+              <FieldLabel>PO Quantity</FieldLabel>
               <input
-                type="checkbox"
-                checked={d.form.verified}
-                onChange={(e) => d.setVerified(e.target.checked)}
-                className="h-3 w-3 cursor-pointer accent-blue-600"
+                type="number"
+                min={1}
+                value={d.form.poQuantity}
+                onChange={d.set('poQuantity')}
+                aria-label="PO Quantity"
+                title="Default quantity seeded onto every variant when creating a purchase order"
+                className={FIELD_VISUAL_CLASS + ' w-full'}
               />
-              <span className="cursor-pointer select-none">Verified</span>
-            </label>
+              {d.errors?.poQuantity && <p className="mt-[2px] text-[10px] leading-tight text-red-600">{d.errors.poQuantity}</p>}
+            </div>
+            <div className="min-w-0">
+              <FieldLabel>Status</FieldLabel>
+              <ProductStatusSelect value={d.form.status} onChange={d.setStatus} className={FIELD_VISUAL_CLASS} />
+            </div>
+            <div className="min-w-0">
+              <FieldLabel>Verified</FieldLabel>
+              <label className="inline-flex h-[24px] max-w-full cursor-pointer items-center gap-[5px] text-[11px] font-medium leading-none text-gray-700" aria-label="Verified">
+                <input
+                  type="checkbox"
+                  checked={d.form.verified}
+                  onChange={(e) => d.setVerified(e.target.checked)}
+                  className="h-3 w-3 cursor-pointer accent-blue-600"
+                />
+                <span className="cursor-pointer select-none">Verified</span>
+              </label>
+            </div>
           </div>
 
           <div className="col-span-2">
@@ -170,7 +185,7 @@ export default function ProductFieldsPanel({ details: d, supplierOptions, preset
           </div>
 
           <div className="col-span-2">
-            <TextField label="Remarks" value={d.form.remarks} onChange={d.set('remarks')} placeholder="Add remarks…" />
+            <TextField label="Product Remark" value={d.form.productRemark} onChange={d.set('productRemark')} placeholder="Add remarks…" />
           </div>
         </div>
       </div>

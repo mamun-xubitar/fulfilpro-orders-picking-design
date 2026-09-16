@@ -14,6 +14,8 @@ export type IncomingLot = {
   quantity: number;
   /** ISO 8601, or null when the PO has no delivery date yet ("TBC"). */
   date: string | null;
+  poNumber: number;
+  status: PurchaseOrderStatusValue;
 };
 
 /** One row of the variants / stock matrix. */
@@ -212,8 +214,12 @@ export type ProductRecord = {
   /** Sanitized HTML — edited via a rich-text field, imported straight from Shopify's
    * `Body (HTML)` CSV column, and rendered rather than escaped. */
   description: string;
-  /** Free-text supplier delivery note. */
-  remarks: string;
+  /** Free-text internal note about the product itself (distinct from a PO's own remark). */
+  productRemark: string;
+  /** Default quantity seeded onto every variant row when creating a purchase order. */
+  poQuantity: number;
+  /** Hidden from the product list and record stepper until "Show omitted" is on. */
+  omitted: boolean;
   status: ProductStatusValue;
   /** Whether a human has signed off on the record. */
   verified: boolean;
@@ -257,6 +263,9 @@ export type ProductsResponse = {
   /** Table mode only: count under the Verified filter only — the "n / X" half of the record
    * stepper, kept in sync with the table's own mutations (delete, bulk actions, import). */
   stepperTotal?: number;
+  /** Table mode only: stock on hand / stock value summed over every row matching the current
+   * filters and search (not just the current page) — the table's bottom totals row (item 21). */
+  totals?: { stockOnHand: number; stockValue: number };
   globals: InventoryGlobals;
   supplierOptions: { id: string; name: string }[];
 };
@@ -319,7 +328,9 @@ export type ProductDetailsForm = {
   categoryId: string | null;
   sku: string;
   description: string;
-  remarks: string;
+  productRemark: string;
+  /** Default quantity seeded onto every variant row when creating a purchase order. */
+  poQuantity: string;
   /** Comma-separated, e.g. "50, 52, 54, 56, 58, 60". */
   sizes: string;
   /** Comma-separated, e.g. "Red, Blue, Hot Pink". */
@@ -356,7 +367,8 @@ export type PurchaseOrderRecord = {
   productTitle: string;
   status: PurchaseOrderStatusValue;
   deliveryDate: string | null;
-  remark: string | null;
+  poRemark: string | null;
+  shippingRemark: string | null;
   createdAt: string;
   items: PurchaseOrderItemRecord[];
 };

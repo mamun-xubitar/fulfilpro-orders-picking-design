@@ -214,7 +214,7 @@ export class InventoryCsvImportController {
       referenceNumber?: string;
       status?: PurchaseOrderStatus;
       deliveryDate?: Date;
-      remark?: string;
+      poRemark?: string;
       items: ResolvedItem[];
     };
 
@@ -273,7 +273,7 @@ export class InventoryCsvImportController {
         });
       }
 
-      groups.push({ poNumber, existingId, referenceNumber: first.referenceNumber, status, deliveryDate, remark: first.remark, items });
+      groups.push({ poNumber, existingId, referenceNumber: first.referenceNumber, status, deliveryDate, poRemark: first.poRemark, items });
     }
 
     if (errors.length > 0) return { error: { message: 'Validation failed', errors, status: 400 } };
@@ -282,7 +282,7 @@ export class InventoryCsvImportController {
       return {
         data: {
           type: 'po' as const,
-          groups: groups.map((g) => ({ poNumber: g.poNumber, isNew: !g.existingId, referenceNumber: g.referenceNumber, status: g.status, deliveryDate: g.deliveryDate?.toISOString(), remark: g.remark, items: g.items })),
+          groups: groups.map((g) => ({ poNumber: g.poNumber, isNew: !g.existingId, referenceNumber: g.referenceNumber, status: g.status, deliveryDate: g.deliveryDate?.toISOString(), poRemark: g.poRemark, items: g.items })),
         },
         message: 'Preview ready',
       };
@@ -317,7 +317,8 @@ export class InventoryCsvImportController {
           productTitle: product.name,
           referenceNumber: group.referenceNumber ?? null,
           deliveryDate: group.deliveryDate ?? null,
-          remark: group.remark ?? null,
+          poRemark: group.poRemark ?? null,
+          shippingRemark: null,
           createdById: actor.id ?? '',
           createdByName: actor.name,
           items: [],
@@ -330,7 +331,7 @@ export class InventoryCsvImportController {
         ...(group.referenceNumber !== undefined && { referenceNumber: group.referenceNumber }),
         ...(group.status && { status: group.status }),
         ...(group.deliveryDate !== undefined && { deliveryDate: group.deliveryDate }),
-        ...(group.remark !== undefined && { remark: group.remark }),
+        ...(group.poRemark !== undefined && { poRemark: group.poRemark }),
       });
       await poModel.upsertItems(poId, group.items);
     }

@@ -50,7 +50,7 @@ export function ColourChips({ colours }: { colours: ColourOption[] }) {
         return (
           <span
             key={`${colour.name}-${index}`}
-            className="inline-flex items-center gap-[3px] rounded-full border border-gray-200 bg-white px-[5px] py-[1px] text-[9px] font-semibold leading-none text-gray-700"
+            className="inline-flex items-center gap-[3px] rounded-full border border-gray-200 bg-white px-[5px] py-[1px] text-[9px] font-semibold uppercase leading-none text-gray-700"
           >
             <span
               className={`h-[6px] w-[6px] rounded-full ${recognized ? 'ring-1 ring-black/10' : 'border border-dashed border-amber-400'}`}

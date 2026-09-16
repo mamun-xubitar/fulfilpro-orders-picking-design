@@ -85,7 +85,7 @@ export default function OnlineStoresPanel({
         </div>
       )}
 
-      <div className="flex-1 space-y-[6px] overflow-y-auto p-[6px] min-h-0">
+      <div className="max-h-80 space-y-[6px] overflow-y-auto p-[6px]">
         {loading ? (
           <StoreCardSkeletons />
         ) : listings.length === 0 ? (

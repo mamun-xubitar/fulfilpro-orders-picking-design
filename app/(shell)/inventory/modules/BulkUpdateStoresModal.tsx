@@ -89,7 +89,7 @@ export default function BulkUpdateStoresModal({ product, storeOptions, publish: 
             <p className="text-[11px] text-gray-400">No published stores yet — publish first before bulk-updating.</p>
           )}
           {publishableStores.map((store) => (
-            <label key={store.storeId} className="flex cursor-pointer items-start gap-2 rounded-[6px] px-2 py-1 hover:bg-gray-50">
+            <label key={store.storeId} className="flex cursor-pointer items-start gap-2 rounded-[6px] border-b border-gray-100 px-2 py-1 last:border-0 hover:bg-gray-50">
               <input
                 type="checkbox"
                 checked={p.selectedStoreIds.has(store.storeId)}

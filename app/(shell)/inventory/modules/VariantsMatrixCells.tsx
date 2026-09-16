@@ -4,10 +4,20 @@
  * `.t-sm` table density literally: 4px cell padding, 10px cell text, 15px-tall cell inputs. */
 
 import { formatColourName } from '@/lib/inventory/colour';
+import { formatPoNumber } from '@/lib/inventory/po-number';
 import { formatIncomingLot } from './utils';
-import type { ColourOption, IncomingLot } from './types';
+import type { IncomingLot } from './types';
 
 const CELL_CLASS = 'px-[4px] py-0';
+
+/** Cycled by position so several open POs on one row stay visually distinct from each other —
+ * not tied to a specific PO's identity, just "a different colour per badge in this cell". */
+const INCOMING_BADGE_COLORS = [
+  'border-amber-200 bg-amber-50 text-amber-800',
+  'border-indigo-200 bg-indigo-50 text-indigo-700',
+  'border-sky-200 bg-sky-50 text-sky-700',
+  'border-violet-200 bg-violet-50 text-violet-700',
+];
 const INPUT_BASE =
   'h-[15px] rounded-[5px] border border-gray-300 bg-white px-[3px] text-[9.5px] leading-none outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100';
 
@@ -52,71 +62,47 @@ export function NumCell({
   );
 }
 
-/** Incoming: one "qty · date" line per open PO, read-only. */
+/** Incoming: one "qty (date)" line per open PO — the original layout, with each line now a
+ * colour-coded badge (cycled per position) so several open POs on one row stay visually
+ * distinct, and a title tooltip carrying the PO number and status. */
 export function IncomingCell({ lots }: { lots: IncomingLot[] }) {
   if (lots.length === 0) {
     return <td className={`${CELL_CLASS} text-right text-[10px] leading-none text-gray-400`}>—</td>;
   }
   return (
-    <td className={`${CELL_CLASS} text-right text-[10px] leading-tight text-gray-500`}>
-      {lots.map((lot, i) => (
-        <div key={i} className="tabular-nums whitespace-nowrap">
-          {formatIncomingLot(lot)}
-        </div>
-      ))}
+    <td className={`${CELL_CLASS} text-right`}>
+      <div className="flex flex-col items-end gap-[2px]">
+        {lots.map((lot, i) => (
+          <span
+            key={i}
+            title={`${formatPoNumber(lot.poNumber)} · ${lot.status.replace('_', ' ')}`}
+            className={`inline-flex items-center whitespace-nowrap rounded-[4px] border px-[3px] text-[9px] font-semibold leading-[13px] tabular-nums ${
+              INCOMING_BADGE_COLORS[i % INCOMING_BADGE_COLORS.length]
+            }`}
+          >
+            {formatIncomingLot(lot)}
+          </span>
+        ))}
+      </div>
     </td>
   );
 }
 
-export function ColourCell({
-  value,
-  colours,
-  swatch,
-  label,
-  onChange,
-}: {
-  value: string;
-  colours: ColourOption[];
-  swatch: string;
-  label: string;
-  onChange: (value: string) => void;
-}) {
+/** Colour/size are text, not editable selects — the colour and size axes are owned by Product
+ * details (they drive variant reconciliation there), so the matrix only ever displays them. */
+export function ColourCell({ value, swatch }: { value: string; swatch: string }) {
   return (
     <div className="flex items-center gap-[4px]">
       <span className="h-[7px] w-[7px] shrink-0 rounded-full ring-1 ring-black/10" style={{ backgroundColor: swatch }} />
-      <select value={value} onChange={(e) => onChange(e.target.value)} aria-label={label} className={`w-[58px] cursor-pointer ${INPUT_BASE}`}>
-        {value === '' ? <option value="">—</option> : colours.every((c) => c.name !== value) && <option value={value}>{formatColourName(value)}</option>}
-        {colours.map((colour) => (
-          <option key={colour.name} value={colour.name}>
-            {formatColourName(colour.name)}
-          </option>
-        ))}
-      </select>
+      <span className="truncate text-[10px] leading-none text-gray-700">{value ? formatColourName(value) : '—'}</span>
     </div>
   );
 }
 
-export function SizeCell({
-  value,
-  sizes,
-  label,
-  onChange,
-}: {
-  value: string;
-  sizes: string[];
-  label: string;
-  onChange: (value: string) => void;
-}) {
+export function SizeCell({ value }: { value: string }) {
   return (
     <td className={CELL_CLASS}>
-      <select value={value} onChange={(e) => onChange(e.target.value)} aria-label={label} className={`w-[52px] cursor-pointer ${INPUT_BASE}`}>
-        {value === '' ? <option value="">—</option> : !sizes.includes(value) && <option value={value}>{value}</option>}
-        {sizes.map((size) => (
-          <option key={size} value={size}>
-            {size}
-          </option>
-        ))}
-      </select>
+      <span className="truncate text-[10px] leading-none text-gray-700">{value || '—'}</span>
     </td>
   );
 }

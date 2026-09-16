@@ -62,7 +62,7 @@ export function TextField({
   return (
     <div className="min-w-0">
       <FieldLabel>{label}</FieldLabel>
-      <input type="text" value={value} onChange={onChange} aria-label={label} placeholder={placeholder} className={`${INPUT_CLASS} placeholder:text-gray-400`} />
+      <input type="text" value={value} onChange={onChange} aria-label={label} placeholder={placeholder} className={`${INPUT_CLASS} uppercase placeholder:text-gray-400 placeholder:normal-case`} />
       {error && <p className="mt-1 text-[10px] leading-tight text-red-600">{error}</p>}
     </div>
   );

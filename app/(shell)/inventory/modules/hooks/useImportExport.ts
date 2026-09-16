@@ -14,7 +14,7 @@ export type ProductImportPreviewFields = { name?: string; description?: string; 
 export type ProductImportPreviewImage = { url: string; altText: string | null };
 
 export type PoImportPreviewItem = { variantId: string; variantTitle: string; sku: string | null; quantity: number; receivedQuantity: number; unitCost: number | null };
-export type PoImportPreviewGroup = { poNumber: string; isNew: boolean; status?: string; deliveryDate?: string; remark?: string; items: PoImportPreviewItem[] };
+export type PoImportPreviewGroup = { poNumber: string; isNew: boolean; status?: string; deliveryDate?: string; poRemark?: string; items: PoImportPreviewItem[] };
 
 export type ImportPreview =
   | { type: 'product'; rows: ProductImportPreviewRow[]; product: ProductImportPreviewFields; images: ProductImportPreviewImage[]; handleMatches: boolean }

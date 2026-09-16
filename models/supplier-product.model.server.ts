@@ -4,7 +4,7 @@ import { Prisma, SupplierProductStatus } from '@prisma/client';
 
 export type ColourOptionData = { name: string; color: string };
 
-export type IncomingLotRow = { quantity: number; date: string | null };
+export type IncomingLotRow = { quantity: number; date: string | null; poNumber: number; status: string };
 
 export type SupplierProductVariantRow = {
   id: string;
@@ -59,11 +59,17 @@ export type CatalogueListParams = {
   quickFilter?: QuickFilterId | null;
   sort?: ProductsSortKey;
   dir?: 'asc' | 'desc';
+  /** Omitted products are excluded from every catalogue query by default (list, listIds,
+   * findPosition, detail mode) — set true to include them, for the "Show omitted" toggle. */
+  includeOmitted?: boolean;
 };
 
 export type CatalogueListResult = {
   products: SupplierProductRow[];
   total: number;
+  /** Sums over every row matching the current filter set (not just the current page) — for the
+   * product list's bottom totals row. Undefined when the filter set is empty. */
+  totals: { stockOnHand: number; stockValue: number };
 };
 
 export type SupplierProductSupplierRow = { id: string; name: string; poEmail: string };
@@ -81,7 +87,9 @@ export type SupplierProductRow = {
   categoryId: string | null;
   sku: string;
   description: string;
-  remarks: string;
+  productRemark: string;
+  poQuantity: number;
+  omitted: boolean;
   status: SupplierProductStatus;
   verified: boolean;
   createdAt: string;
@@ -127,24 +135,27 @@ export class SupplierProductModel {
     const orderSql = buildCatalogueOrderSql(params.sort ?? 'createdAt', params.dir ?? 'desc');
     const skip = (params.page - 1) * params.pageSize;
 
-    const rows = await prisma.$queryRaw<{ total: number; ids: string[] }[]>(Prisma.sql`
+    const rows = await prisma.$queryRaw<{ total: number; ids: string[]; totalStock: number; totalStockValue: number }[]>(Prisma.sql`
       ${CATALOGUE_CTE_SQL},
       filtered AS (${buildCatalogueFilteredSql(whereSql)})
       SELECT
         (SELECT COUNT(*)::integer FROM filtered) AS total,
+        COALESCE((SELECT SUM(total_stock) FROM filtered), 0)::float AS "totalStock",
+        COALESCE((SELECT SUM(stock_value) FROM filtered), 0)::float AS "totalStockValue",
         COALESCE(
           (SELECT array_agg(id) FROM (SELECT id FROM filtered ORDER BY ${orderSql} OFFSET ${skip} LIMIT ${params.pageSize}) paged),
           ARRAY[]::text[]
         ) AS ids
     `);
 
-    const { total, ids } = rows[0] ?? { total: 0, ids: [] };
-    if (ids.length === 0) return { products: [], total };
+    const { total, ids, totalStock, totalStockValue } = rows[0] ?? { total: 0, ids: [], totalStock: 0, totalStockValue: 0 };
+    const totals = { stockOnHand: totalStock, stockValue: totalStockValue };
+    if (ids.length === 0) return { products: [], total, totals };
 
     const catalogueRows = await prisma.supplierProduct.findMany({ where: { id: { in: ids } }, include: catalogueInclude });
     const hydrated = await this.hydrate(catalogueRows);
     const byId = new Map(hydrated.map((p) => [p.id, p]));
-    return { products: ids.map((id) => byId.get(id)!).filter(Boolean), total };
+    return { products: ids.map((id) => byId.get(id)!).filter(Boolean), total, totals };
   }
 
   /** Every id matching the current filters, in the same order `list()` would page through them —
@@ -271,7 +282,9 @@ export class SupplierProductModel {
       categoryId: string | null;
       sku: string;
       description: string;
-      remarks: string;
+      productRemark: string;
+      poQuantity: number;
+      omitted: boolean;
       status: SupplierProductStatus;
       verified: boolean;
       sizes: string[];
@@ -300,7 +313,9 @@ export class SupplierProductModel {
           ...(data.categoryId !== undefined ? { categoryId: data.categoryId } : {}),
           ...(data.sku !== undefined ? { sku: data.sku } : {}),
           ...(data.description !== undefined ? { description: data.description } : {}),
-          ...(data.remarks !== undefined ? { remarks: data.remarks } : {}),
+          ...(data.productRemark !== undefined ? { productRemark: data.productRemark } : {}),
+          ...(data.poQuantity !== undefined ? { poQuantity: data.poQuantity } : {}),
+          ...(data.omitted !== undefined ? { omitted: data.omitted } : {}),
           ...(data.status !== undefined ? { status: data.status } : {}),
           ...(data.verified !== undefined ? { verified: data.verified } : {}),
           ...(data.sizes !== undefined ? { sizes: data.sizes } : {}),
@@ -564,6 +579,11 @@ export class SupplierProductModel {
     return result.count;
   }
 
+  async setOmittedMany(ids: string[], omitted: boolean): Promise<number> {
+    const result = await prisma.supplierProduct.updateMany({ where: { id: { in: ids } }, data: { omitted } });
+    return result.count;
+  }
+
   /** `colours: null` means "every variant of this product" — no colour filter at all. Pass an
    * array only when the caller is explicitly scoping the update to a set of colourways. */
   async applyPriceToColours(supplierProductId: string, colours: string[] | null, sellPrice: number, buyPrice: number): Promise<number> {
@@ -666,7 +686,7 @@ export class SupplierProductModel {
       variantIds.length
         ? prisma.purchaseOrderItem.findMany({
             where: { variantId: { in: variantIds }, purchaseOrder: { status: { in: [...OPEN_PO_STATUSES] } } },
-            select: { variantId: true, quantity: true, receivedQuantity: true, purchaseOrder: { select: { deliveryDate: true } } },
+            select: { variantId: true, quantity: true, receivedQuantity: true, purchaseOrder: { select: { deliveryDate: true, number: true, status: true } } },
           })
         : Promise.resolve([]),
       // Weighted average buy price = Σ(unitCost × receivedQuantity) / Σ(receivedQuantity), over every
@@ -709,7 +729,12 @@ export class SupplierProductModel {
       const remaining = item.quantity - item.receivedQuantity;
       if (remaining <= 0) continue;
       const lots = incomingLotsByVariant.get(item.variantId!) ?? [];
-      lots.push({ quantity: remaining, date: item.purchaseOrder.deliveryDate?.toISOString() ?? null });
+      lots.push({
+        quantity: remaining,
+        date: item.purchaseOrder.deliveryDate?.toISOString() ?? null,
+        poNumber: item.purchaseOrder.number,
+        status: item.purchaseOrder.status,
+      });
       incomingLotsByVariant.set(item.variantId!, lots);
     }
     for (const lots of incomingLotsByVariant.values()) {
@@ -755,7 +780,9 @@ export class SupplierProductModel {
       categoryId: row.categoryId,
       sku: row.sku,
       description: row.description ?? '',
-      remarks: row.remarks ?? '',
+      productRemark: row.productRemark ?? '',
+      poQuantity: row.poQuantity,
+      omitted: row.omitted,
       status: row.status,
       verified: row.verified,
       createdAt: row.createdAt.toISOString(),
@@ -892,8 +919,13 @@ function buildCatalogueWhereSql(params: {
   status?: SupplierProductStatus;
   supplierId?: string;
   quickFilter?: QuickFilterId | null;
+  includeOmitted?: boolean;
 }): Prisma.Sql {
   const whereParts: Prisma.Sql[] = [Prisma.sql`1 = 1`];
+
+  if (!params.includeOmitted) {
+    whereParts.push(Prisma.sql`sp.omitted = false`);
+  }
 
   if (params.verified !== undefined) {
     whereParts.push(Prisma.sql`sp.verified = ${params.verified}`);

@@ -8,6 +8,7 @@ export function ModalShell({
   allowOverflow,
   wide,
   extraWide,
+  maxWidthClass,
   fullScreen,
   elevated,
   bodyClassName,
@@ -22,6 +23,9 @@ export function ModalShell({
   wide?: boolean;
   /** For content that needs more than `wide`'s max-w-2xl — e.g. a table of rows. */
   extraWide?: boolean;
+  /** Exact max-width override (e.g. "max-w-[712px]") — wins over `wide`/`extraWide`/`fullScreen`
+   * when a modal needs just a little more room than a preset gives. */
+  maxWidthClass?: string;
   /** Near-viewport-filling — for editable, full-product-detail forms like the store publish and
    * bulk-update modals, which need more room than even `extraWide`. */
   fullScreen?: boolean;
@@ -48,7 +52,7 @@ export function ModalShell({
       onClick={disableBackdropClose ? undefined : onClose}
     >
       <div
-        className={`w-full ${fullScreen ? 'max-w-[95vw]' : extraWide ? 'max-w-5xl' : wide ? 'max-w-2xl' : 'max-w-md'} rounded-lg border border-gray-200 bg-white shadow-xl ${allowOverflow ? 'overflow-visible' : `overflow-hidden flex flex-col ${fullScreen ? 'h-[92dvh]' : 'max-h-[calc(100dvh-2rem)]'}`}`}
+        className={`w-full ${maxWidthClass ?? (fullScreen ? 'max-w-[95vw]' : extraWide ? 'max-w-5xl' : wide ? 'max-w-2xl' : 'max-w-md')} rounded-lg border border-gray-200 bg-white shadow-xl ${allowOverflow ? 'overflow-visible' : `overflow-hidden flex flex-col ${fullScreen ? 'h-[92dvh]' : 'max-h-[calc(100dvh-2rem)]'}`}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className={`flex shrink-0 items-center justify-between gap-4 border-b border-gray-200 ${compact ? 'px-4 py-2' : 'px-5 py-4'}`}>

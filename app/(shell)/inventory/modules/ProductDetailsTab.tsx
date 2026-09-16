@@ -21,7 +21,13 @@ export default function ProductDetailsTab({ p }: { p: InventoryPage }) {
         <StockSummaryPanel summary={p.summary} variantCount={p.product?.variants.length ?? 0} />
       </div>
       <ProductFieldsPanel details={p.details} supplierOptions={p.supplierOptions} presets={p.presets} suppliers={p.suppliers} />
-      <PricingMarginPanel pricing={p.pricing} storeListings={p.storeListings} onEditStorePrice={p.setStorePriceTarget} />
+      <PricingMarginPanel
+        pricing={p.pricing}
+        storeListings={p.storeListings}
+        onEditStorePrice={p.setStorePriceTarget}
+        purchaseOrders={p.po.purchaseOrders}
+        onReceive={p.po.openReceive}
+      />
       <OnlineStoresPanel
         storeListings={p.storeListings}
         selectedStoreIds={p.storePublish.selectedStoreIds}

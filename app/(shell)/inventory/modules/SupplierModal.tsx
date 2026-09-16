@@ -39,7 +39,7 @@ export default function SupplierModal({ suppliers: s }: SupplierModalProps) {
       }
     >
       <div className="space-y-2">
-        <TextField label="Name" value={s.form.name} onChange={s.set('name')} placeholder="Acme Apparel Co." error={s.saveErrors.name} />
+        <TextField label="Name" value={s.form.name} onChange={s.set('name')} placeholder="Acme Apparel Co." error={s.saveErrors.name} uppercase />
         <TextField label="PO email" value={s.form.poEmail} onChange={s.set('poEmail')} placeholder="orders@acme.example" error={s.saveErrors.poEmail} />
         <TextField label="Contact email" value={s.form.contactEmail} onChange={s.set('contactEmail')} placeholder="Optional" error={s.saveErrors.contactEmail} />
         <div>
@@ -64,12 +64,14 @@ function TextField({
   onChange,
   placeholder,
   error,
+  uppercase,
 }: {
   label: string;
   value: string;
   onChange: React.ChangeEventHandler<HTMLInputElement>;
   placeholder: string;
   error?: string;
+  uppercase?: boolean;
 }) {
   return (
     <div>
@@ -79,7 +81,7 @@ function TextField({
         value={value}
         onChange={onChange}
         placeholder={placeholder}
-        className="h-[24px] w-full rounded-[7px] border border-gray-300 px-[6px] text-[11px] leading-none outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 placeholder:text-gray-400"
+        className={`h-[24px] w-full rounded-[7px] border border-gray-300 px-[6px] text-[11px] leading-none outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 placeholder:text-gray-400 placeholder:normal-case ${uppercase ? 'uppercase' : ''}`}
       />
       {error && <p className="mt-1 text-[10px] leading-tight text-red-600">{error}</p>}
     </div>

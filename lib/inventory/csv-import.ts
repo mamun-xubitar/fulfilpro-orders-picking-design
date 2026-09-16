@@ -233,7 +233,7 @@ export type ParsedPoRow = {
   referenceNumber?: string;
   status?: string;
   deliveryDate?: string;
-  remark?: string;
+  poRemark?: string;
   colour: string;
   size: string;
   sku: string;
@@ -268,7 +268,9 @@ export function parsePoCsv(text: string): ParsedPoImport {
       referenceNumber: get('reference') || undefined,
       status: get('status') || undefined,
       deliveryDate: get('delivery date') || undefined,
-      remark: get('remark') || undefined,
+      // Accepts the current "PO Remark" header and the legacy "Remark" header so operator
+      // spreadsheets exported before the item 6 rename keep importing.
+      poRemark: get('po remark') || get('remark') || undefined,
       colour,
       size,
       sku,

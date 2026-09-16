@@ -1,9 +1,9 @@
 'use client';
 
-import { PanelHeading } from './MainImagePanel';
-import { formatDate, formatPoNumber } from './utils';
-import { Clipboard } from './icons';
 import type { usePurchaseOrder } from './hooks/usePurchaseOrder';
+import { Clipboard } from './icons';
+import { PanelHeading } from './MainImagePanel';
+import { formatDate, formatMoney, formatPoNumber, poAveragePrice } from './utils';
 
 export const STATUS_BADGES: Record<string, string> = {
   REQUESTED: 'bg-amber-50 text-amber-800 border-amber-200',
@@ -29,11 +29,12 @@ export default function PurchaseOrdersPanel({ po }: PurchaseOrdersPanelProps) {
         ) : po.purchaseOrders.length === 0 ? (
           <p className="py-3 text-center text-[10px] text-gray-400">No purchase orders yet.</p>
         ) : (
-          <ul className="space-y-[4px]">
+          <ul className="divide-y divide-gray-100">
             {po.purchaseOrders.map((row) => {
               const outstanding = row.items.some((item) => item.receivedQuantity < item.quantity);
+              const avgPrice = poAveragePrice(row.items);
               return (
-                <li key={row.id} className="flex items-center justify-between gap-[6px]">
+                <li key={row.id} className="flex items-center justify-between gap-[6px] py-[4px]">
                   <div className="min-w-0">
                     <div className="flex items-center gap-[4px]">
                       <span className="text-[10px] font-bold leading-none text-gray-900">{formatPoNumber(row.number)}</span>
@@ -42,6 +43,7 @@ export default function PurchaseOrdersPanel({ po }: PurchaseOrdersPanelProps) {
                       >
                         {row.status.replace('_', ' ')}
                       </span>
+                      {avgPrice !== null && <span className="text-[9px] font-semibold leading-none text-gray-500">Avg ${formatMoney(avgPrice)}</span>}
                     </div>
                     <p className="truncate text-[9px] leading-tight text-gray-400">
                       {row.items.length} variant{row.items.length === 1 ? '' : 's'} · {formatDate(row.createdAt)}

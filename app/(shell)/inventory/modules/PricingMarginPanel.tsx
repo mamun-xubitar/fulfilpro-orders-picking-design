@@ -1,17 +1,19 @@
 'use client';
 
+import { useState } from 'react';
 import { toast } from 'react-toastify';
+import BuyingHistoryModal from './BuyingHistoryModal';
 import { PanelHeading } from './MainImagePanel';
 import PerStoreMarginRows from './PerStoreMarginRows';
 import StoreMarginPriceChips from './StoreMarginPriceChips';
 // Re-enable: StorePriceChips showed each store's *live* Shopify price — swap back in for
 // StoreMarginPriceChips (below) to restore that instead of the margin-derived price badge.
 // import StorePriceChips from './StorePriceChips';
-import { Check, Tag } from './icons';
-import { formatMoney } from './utils';
 import type { useProductPricing } from './hooks/useProductPricing';
 import type { StoreListingsState } from './hooks/useStoreListings';
-import type { StoreListingResult } from './types';
+import { Check, Clipboard, Tag } from './icons';
+import type { PurchaseOrderRecord, StoreListingResult } from './types';
+import { formatMoney } from './utils';
 
 type PricingMarginPanelInner = ReturnType<typeof useProductPricing>;
 
@@ -19,6 +21,12 @@ type PricingMarginPanelProps = {
   pricing: PricingMarginPanelInner;
   storeListings: StoreListingsState;
   onEditStorePrice: (listing: StoreListingResult) => void;
+  /** For the "Buying history" button — reuses whatever `usePurchaseOrder` already has loaded
+   * (empty in the New Product wizard, where there's no PO history to show yet). */
+  purchaseOrders: PurchaseOrderRecord[];
+  /** Wired to `p.po.openReceive` — Buying history's "Receive" action opens the Receive PO
+   * modal on top while the history stays open behind it. */
+  onReceive: (po: PurchaseOrderRecord) => void;
   /** For the New Product wizard's Pricing step — hides the panel heading and the Edit/Cancel/Save
    * row (the wizard's own footer drives saving and advancing; the panel is expected to already be
    * in edit mode when embedded), but keeps "Use price" — applying the computed price to every
@@ -26,15 +34,16 @@ type PricingMarginPanelProps = {
   embedded?: boolean;
 };
 
-export default function PricingMarginPanel({ pricing: p, storeListings, onEditStorePrice, embedded }: PricingMarginPanelProps) {
+export default function PricingMarginPanel({ pricing: p, storeListings, onEditStorePrice, purchaseOrders, onReceive, embedded }: PricingMarginPanelProps) {
   const foreign = p.form.currencyCode;
   const base = p.baseCurrency;
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   return (
     <section className={embedded ? 'flex min-w-0 flex-col' : 'flex min-w-0 flex-col rounded-[10px] border border-gray-200 bg-white shadow-[0_1px_2px_0_rgb(0_0_0/0.05)] xl:min-h-0'}>
       {!embedded && <PanelHeading icon={<Tag className="h-3 w-3" />} title={`Pricing & margin (${base})`} meta={foreign} />}
 
-      <div className={embedded ? 'flex flex-1 flex-col gap-[3px]' : 'flex flex-1 flex-col gap-[3px] p-[6px] xl:min-h-0 xl:overflow-y-auto'}>
+      <div className={embedded ? 'flex flex-col gap-[3px]' : 'flex flex-col gap-[3px] p-[6px] xl:min-h-0 xl:overflow-y-auto'}>
         <Row label="Currency">
           <div className="flex gap-[4px]">
             <select
@@ -102,20 +111,22 @@ export default function PricingMarginPanel({ pricing: p, storeListings, onEditSt
           </div>
         )}
 
-        <div className="mt-auto flex items-center justify-between rounded-[9px] border border-blue-100 bg-blue-50 px-[9px] py-[6px]">
+        <div className="flex items-center justify-between rounded-[9px] border border-blue-100 bg-blue-50 px-[9px] py-[6px]">
           <span className="text-[9.5px] font-bold uppercase leading-none tracking-[0.4px] text-blue-700">Sell price (inc tax)</span>
           <span className="text-[14px] font-bold leading-none text-blue-900 tabular-nums">
             {formatMoney(p.computed.sellingIncTax)} <Unit>{base}</Unit>
           </span>
         </div>
 
-        <PricingActions p={p} embedded={embedded} />
+        <PricingActions p={p} embedded={embedded} onOpenHistory={() => setHistoryOpen(true)} />
       </div>
+
+      {historyOpen && <BuyingHistoryModal purchaseOrders={purchaseOrders} onClose={() => setHistoryOpen(false)} onReceive={onReceive} />}
     </section>
   );
 }
 
-function PricingActions({ p, embedded }: { p: PricingMarginPanelInner; embedded?: boolean }) {
+function PricingActions({ p, embedded, onOpenHistory }: { p: PricingMarginPanelInner; embedded?: boolean; onOpenHistory: () => void }) {
   // Embedded (the New Product wizard's Pricing step): the wizard's own footer already drives
   // Save/Next, so only "Use price" belongs here — applying the computed price to every variant
   // is a distinct, one-off action neither Save nor Next performs.
@@ -130,6 +141,7 @@ function PricingActions({ p, embedded }: { p: PricingMarginPanelInner; embedded?
     <div className="flex gap-[6px]">
       <ActionButton onClick={() => p.savePricing()} icon={<Check className="h-3 w-3" />} label="Save" primary disabled={!p.dirty} />
       <ActionButton onClick={p.requestUsePrice} icon={<Tag className="h-3 w-3" />} label="Use price" />
+      <ActionButton onClick={onOpenHistory} icon={<Clipboard className="h-3 w-3" />} label="PO history" />
     </div>
   );
 }

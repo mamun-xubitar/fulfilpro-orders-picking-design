@@ -28,7 +28,7 @@ export class AiDescriptionController {
     const name = typeof value.name === 'string' ? value.name : product.name;
     const brand = typeof value.brand === 'string' ? value.brand : product.brand;
     const category = typeof value.category === 'string' ? value.category : product.category;
-    const remarks = typeof value.remarks === 'string' ? value.remarks : product.remarks;
+    const productRemark = typeof value.productRemark === 'string' ? value.productRemark : product.productRemark;
     const currentDescription = typeof value.description === 'string' ? value.description : product.description;
     const sizes = Array.isArray(value.sizes)
       ? (value.sizes as unknown[]).filter((s): s is string => typeof s === 'string')
@@ -40,7 +40,7 @@ export class AiDescriptionController {
           .filter(Boolean)
       : product.colours.map((c) => c.name);
 
-    const { system, prompt } = buildProductDescriptionPrompt({ name, brand, category, sizes, colours, currentDescription, remarks });
+    const { system, prompt } = buildProductDescriptionPrompt({ name, brand, category, sizes, colours, currentDescription, productRemark });
 
     let generated: string;
     try {

@@ -26,7 +26,7 @@ export default function DescriptionField({ details: d, showDetailsButton }: Desc
         name: d.form.name,
         brand: d.form.brand,
         category: d.form.category,
-        remarks: d.form.remarks,
+        productRemark: d.form.productRemark,
         sizes: parseSizesInput(d.form.sizes),
         colours: parseColoursInput(d.form.colours),
       })}

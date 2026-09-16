@@ -134,8 +134,8 @@ export default function CategoryPicker({ value, onChange }: CategoryPickerProps)
           }}
           className="flex h-[24px] w-full items-center justify-between rounded-[7px] border border-gray-300 px-[6px] text-left text-[11px] leading-none outline-none hover:bg-gray-50 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 cursor-pointer"
         >
-          <span className={`truncate ${value.name ? 'text-gray-900' : 'text-gray-400'}`} title={value.name || undefined}>
-            {value.name || 'Select category…'}
+          <span className={`truncate ${value.name ? 'uppercase text-gray-900' : 'text-gray-400'}`} title={value.name || undefined}>
+            {value.name || 'Unassigned'}
           </span>
         </button>
 

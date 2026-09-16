@@ -14,13 +14,14 @@ type ProductsTableRowProps = {
   onToggleSelect: (id: string) => void;
   onView: (id: string) => void;
   onRequestDelete: (id: string, name: string) => void;
+  onToggleOmit: (id: string, omitted: boolean) => void;
 };
 
-export default function ProductsTableRow({ product, selected, onToggleSelect, onView, onRequestDelete }: ProductsTableRowProps) {
+export default function ProductsTableRow({ product, selected, onToggleSelect, onView, onRequestDelete, onToggleOmit }: ProductsTableRowProps) {
   const badge = PRODUCT_STATUS_BADGES[product.status] ?? PRODUCT_STATUS_BADGES.DRAFT;
 
   return (
-    <tr className={`border-b border-gray-100 last:border-0 hover:bg-gray-50 ${selected ? 'bg-blue-50/50' : ''}`}>
+    <tr className={`border-b border-gray-100 last:border-0 hover:bg-gray-50 ${product.omitted ? 'opacity-50' : ''} ${selected ? 'bg-blue-50/50' : ''}`}>
       <td className="px-2 py-1">
         <input
           type="checkbox"
@@ -87,9 +88,26 @@ export default function ProductsTableRow({ product, selected, onToggleSelect, on
           >
             <Trash className="h-3 w-3" />
           </button>
+          <OmitSwitch omitted={product.omitted} onChange={(next) => onToggleOmit(product.id, next)} />
         </div>
       </td>
     </tr>
+  );
+}
+
+/** Item 19 — hides a product from the list (and the record stepper) without deleting it. */
+function OmitSwitch({ omitted, onChange }: { omitted: boolean; onChange: (next: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={omitted}
+      title={omitted ? 'Restore to list' : 'Omit from list'}
+      onClick={() => onChange(!omitted)}
+      className={`relative flex h-[14px] w-[24px] shrink-0 items-center rounded-full transition-colors duration-150 cursor-pointer ${omitted ? 'bg-amber-500' : 'bg-gray-300'}`}
+    >
+      <span className={`h-[10px] w-[10px] rounded-full bg-white shadow-sm transition-transform duration-150 ${omitted ? 'translate-x-[12px]' : 'translate-x-[2px]'}`} />
+    </button>
   );
 }
 

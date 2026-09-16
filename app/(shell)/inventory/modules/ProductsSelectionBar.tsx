@@ -56,6 +56,22 @@ export default function ProductsSelectionBar({ table }: ProductsSelectionBarProp
         </button>
         <button
           type="button"
+          onClick={() => table.bulkSetOmitted(true)}
+          disabled={table.bulkRunning}
+          className="h-[22px] rounded-[6px] border border-gray-300 px-[6px] text-[10px] font-bold leading-none text-gray-600 transition-colors duration-150 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+        >
+          Omit
+        </button>
+        <button
+          type="button"
+          onClick={() => table.bulkSetOmitted(false)}
+          disabled={table.bulkRunning}
+          className="h-[22px] rounded-[6px] border border-gray-300 px-[6px] text-[10px] font-bold leading-none text-gray-600 transition-colors duration-150 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+        >
+          Un-omit
+        </button>
+        <button
+          type="button"
           onClick={() => table.setDeleteConfirm({ kind: 'selection' })}
           disabled={table.bulkRunning}
           className="h-[22px] rounded-[6px] border border-red-200 px-[6px] text-[10px] font-bold leading-none text-red-600 transition-colors duration-150 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"

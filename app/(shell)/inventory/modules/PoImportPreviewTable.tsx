@@ -1,7 +1,7 @@
 'use client';
 
-import { formatDate } from './utils';
 import type { ImportPreview } from './hooks/useImportExport';
+import { formatDate } from './utils';
 
 type PoPreview = Extract<ImportPreview, { type: 'po' }>;
 
@@ -10,7 +10,7 @@ export default function PoImportPreviewTable({ preview }: { preview: PoPreview }
     <div className="max-h-80 space-y-2 overflow-y-auto">
       {preview.groups.map((group) => (
         <div key={group.poNumber} className="rounded-lg border border-gray-200">
-          <div className="flex items-center justify-between gap-2 border-b border-gray-100 bg-gray-50 px-2 py-1">
+          <div className="flex items-center justify-between gap-2 border-b border-gray-200 bg-gray-50 px-2 py-1">
             <span className="text-[11px] font-semibold text-gray-800">
               {group.poNumber}{' '}
               {group.isNew && (
@@ -24,7 +24,7 @@ export default function PoImportPreviewTable({ preview }: { preview: PoPreview }
           </div>
           <table className="w-full border-collapse text-[11px] leading-none">
             <thead>
-              <tr className="border-b border-gray-100 text-left text-[10px] font-bold uppercase tracking-[0.4px] text-gray-500">
+              <tr className="border-b border-gray-200 text-left text-[10px] font-bold uppercase tracking-[0.4px] text-gray-500">
                 <th className="px-2 py-1">Variant</th>
                 <th className="px-2 py-1">SKU</th>
                 <th className="px-2 py-1 text-right">Qty</th>
@@ -34,7 +34,7 @@ export default function PoImportPreviewTable({ preview }: { preview: PoPreview }
             </thead>
             <tbody>
               {group.items.map((item, i) => (
-                <tr key={i} className="border-b border-gray-50 last:border-0">
+                <tr key={i} className="border-b border-gray-100 last:border-0">
                   <td className="px-2 py-1">{item.variantTitle}</td>
                   <td className="px-2 py-1 text-gray-500">{item.sku || '—'}</td>
                   <td className="px-2 py-1 text-right tabular-nums">{item.quantity}</td>

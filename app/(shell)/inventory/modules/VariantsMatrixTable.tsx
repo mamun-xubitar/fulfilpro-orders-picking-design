@@ -1,5 +1,6 @@
 'use client';
 
+import ColumnFillInput from './ColumnFillInput';
 import VariantsMatrixRow from './VariantsMatrixRow';
 import type { useVariantsMatrix } from './hooks/useVariantsMatrix';
 import { formatCurrencyValue, formatNumber } from './utils';
@@ -64,12 +65,33 @@ export default function VariantsMatrixTable({ matrix, fillHeight, showAllColumns
             {showAllColumns && <Th align="left">SKU / Barcode</Th>}
             {numericHeaders.map((h) => (
               <Th key={h.key} align="right">
-                {h.label}
+                <span className="flex items-center justify-end gap-[4px]">
+                  <span>{h.label}</span>
+                  {(h.key === 'stockOnHand' || h.key === 'allocated') && (
+                    <span className="inline-block w-[64px] min-w-0">
+                      <ColumnFillInput
+                        label={h.label}
+                        rowCount={rows.length}
+                        step="1"
+                        min={0}
+                        integerOnly
+                        onApply={(value) => matrix.fillColumn(h.key as 'stockOnHand' | 'allocated', value)}
+                      />
+                    </span>
+                  )}
+                </span>
               </Th>
             ))}
             <Th align="center">Status</Th>
             <Th align="right">Buy price</Th>
-            <Th align="right">Sell price</Th>
+            <Th align="right">
+              <span className="flex items-center justify-end gap-[4px]">
+                <span>Sell price</span>
+                <span className="inline-block w-[64px] min-w-0">
+                  <ColumnFillInput label="Sell price" rowCount={rows.length} step="0.01" min={0} onApply={(value) => matrix.fillColumn('sellPrice', value)} />
+                </span>
+              </span>
+            </Th>
             <Th align="right">Stock value</Th>
             <th scope="col" className={`${STICKY_HEADER_TH} py-[3px] pl-[4px] pr-[6px] text-right text-[8px] font-bold uppercase leading-none tracking-[0.4px] text-gray-500`}>
               Actions
@@ -87,8 +109,6 @@ export default function VariantsMatrixTable({ matrix, fillHeight, showAllColumns
               saving={matrix.savingRowId === variant.id}
               showAllColumns={!!showAllColumns}
               swatch={matrix.swatchOf(variant.colour)}
-              colours={matrix.colours}
-              sizes={matrix.sizes}
               onToggleSelect={matrix.toggleRow}
               onFieldChange={matrix.setVariantEdit}
               onSave={matrix.saveRow}

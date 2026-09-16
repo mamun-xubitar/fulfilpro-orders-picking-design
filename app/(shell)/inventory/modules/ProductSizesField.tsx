@@ -45,7 +45,7 @@ export function SizeChips({ sizes }: { sizes: string[] }) {
   return (
     <>
       {sorted.map((size, index) => (
-        <span key={`${size}-${index}`} className="rounded-full border border-gray-200 bg-white px-[5px] py-[1px] text-[9px] font-semibold leading-none text-gray-700">
+        <span key={`${size}-${index}`} className="rounded-full border border-gray-200 bg-white px-[5px] py-[1px] text-[9px] font-semibold uppercase leading-none text-gray-700">
           {capitaliseFirst(size)}
         </span>
       ))}

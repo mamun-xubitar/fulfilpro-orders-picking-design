@@ -32,7 +32,9 @@ type ImageCardsGridProps = {
 export default function ImageCardsGrid({ images, colours, imageMutations }: ImageCardsGridProps) {
   const swatchOf = makeSwatchResolver(colours);
   const assigned = images.filter((i) => i.colour);
-  const unassigned = images.filter((i) => !i.colour);
+  // Newest first (matches the Main image gallery) — `images` itself stays position-ascending
+  // since Assigned above, and the product-list thumbnail, still want oldest-first.
+  const unassigned = images.filter((i) => !i.colour).reverse();
   const takenByOtherImages = new Set(assigned.map((i) => i.colour!.toLowerCase()));
 
   const availableColoursFor = (image: ProductImage) =>

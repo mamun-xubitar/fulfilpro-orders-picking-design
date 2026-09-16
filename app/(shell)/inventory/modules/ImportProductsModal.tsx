@@ -1,8 +1,10 @@
 'use client';
 
-import { MODAL_FOOTER_BTN_PRIMARY, MODAL_FOOTER_BTN_SECONDARY, ModalShell } from '@/components/ModalShell';
+import { ModalShell } from '@/components/ModalShell';
+import AnimatedStepBody from './newProduct/AnimatedStepBody';
 import FilePicker from './FilePicker';
 import type { ProductImportPreviewGroup, useImportProducts } from './hooks/useImportProducts';
+import { SPINNER, WIZARD_BODY_CLASS, WIZARD_BTN_PRIMARY, WIZARD_BTN_SECONDARY, WIZARD_CARD_CLASS } from './modalStyles';
 import type { SupplierOption } from './types';
 
 type ImportProductsModalProps = {
@@ -30,14 +32,15 @@ export default function ImportProductsModal({ importProducts: ip, suppliers }: I
       title="Import products"
       compact
       onClose={ip.closeModal}
-      extraWide
+      wide
+      bodyClassName={WIZARD_BODY_CLASS}
       footer={
         ip.preview ? (
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={ip.closeModal}
-              className={`flex-1 ${MODAL_FOOTER_BTN_SECONDARY}`}
+              className={`flex-1 ${WIZARD_BTN_SECONDARY}`}
             >
               Cancel
             </button>
@@ -45,70 +48,81 @@ export default function ImportProductsModal({ importProducts: ip, suppliers }: I
               type="button"
               onClick={ip.commitImport}
               disabled={ip.importing || actionableCount === 0}
-              className={`flex-1 ${MODAL_FOOTER_BTN_PRIMARY}`}
+              className={`flex-1 ${WIZARD_BTN_PRIMARY}`}
             >
-              {ip.importing ? 'Importing...' : `Import ${actionableCount} product${actionableCount === 1 ? '' : 's'}`}
+              {ip.importing ? (
+                <>
+                  {SPINNER}
+                  Importing…
+                </>
+              ) : (
+                `Import ${actionableCount} product${actionableCount === 1 ? '' : 's'}`
+              )}
             </button>
           </div>
         ) : undefined
       }
     >
-      <div className="space-y-2">
-        <p className="text-[12px] text-gray-600">
-          Upload a Shopify product CSV — one product is created per Handle in the file, all under the supplier below.
-        </p>
+      <div className={WIZARD_CARD_CLASS}>
+        <AnimatedStepBody minHeightClassName="min-h-0">
+          <div className="space-y-2">
+            <p className="text-[12px] text-gray-600">
+              Upload a Shopify product CSV — one product is created per Handle in the file, all under the supplier below.
+            </p>
 
-        <div>
-          <label className="mb-[2px] block text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-gray-500">Supplier</label>
-          <select
-            value={ip.supplierId}
-            onChange={(e) => ip.setSupplierId(e.target.value)}
-            className="h-[24px] w-full max-w-xs rounded-[7px] border border-gray-300 px-[6px] text-[11px] leading-none outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 cursor-pointer"
-          >
-            <option value="">Select a supplier</option>
-            {suppliers.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-        </div>
+            <div>
+              <label className="mb-[2px] block text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-gray-500">Supplier</label>
+              <select
+                value={ip.supplierId}
+                onChange={(e) => ip.setSupplierId(e.target.value)}
+                className="h-[24px] w-full max-w-xs rounded-[7px] border border-gray-300 px-[6px] text-[11px] leading-none outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 cursor-pointer"
+              >
+                <option value="">Select a supplier</option>
+                {suppliers.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-        <div className="space-y-1.5 rounded-[7px] border border-gray-200 bg-gray-50 p-2">
-          <label className="flex items-start gap-2 text-[11px] leading-snug text-gray-700">
-            <input
-              type="checkbox"
-              checked={ip.overwrite}
-              onChange={(e) => ip.setOverwrite(e.target.checked)}
-              className="mt-0.5 h-3 w-3 cursor-pointer accent-blue-600"
-            />
-            <span>
-              <span className="font-medium">Overwrite products with matching handles.</span> Existing values will be replaced for all columns
-              included in the CSV. Unchecked, a matching handle is skipped instead.
-            </span>
-          </label>
-          <label className="flex items-start gap-2 text-[11px] leading-snug text-gray-700">
-            <input
-              type="checkbox"
-              checked={ip.markVerified}
-              onChange={(e) => ip.setMarkVerified(e.target.checked)}
-              className="mt-0.5 h-3 w-3 cursor-pointer accent-blue-600"
-            />
-            <span className="font-medium">Mark every product as verified.</span>
-          </label>
-        </div>
+            <div className="space-y-1.5 rounded-[7px] border border-gray-200 bg-gray-50 p-2">
+              <label className="flex items-start gap-2 text-[11px] leading-snug text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={ip.overwrite}
+                  onChange={(e) => ip.setOverwrite(e.target.checked)}
+                  className="mt-0.5 h-3 w-3 cursor-pointer accent-blue-600"
+                />
+                <span>
+                  <span className="font-medium">Overwrite products with matching handles.</span> Existing values will be replaced for all columns
+                  included in the CSV. Unchecked, a matching handle is skipped instead.
+                </span>
+              </label>
+              <label className="flex items-start gap-2 text-[11px] leading-snug text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={ip.markVerified}
+                  onChange={(e) => ip.setMarkVerified(e.target.checked)}
+                  className="mt-0.5 h-3 w-3 cursor-pointer accent-blue-600"
+                />
+                <span className="font-medium">Mark every product as verified.</span>
+              </label>
+            </div>
 
-        <FilePicker onSelect={(file) => void ip.handleFile(file)} disabled={!ip.supplierId} fileName={ip.pendingFile?.name} />
+            <FilePicker onSelect={(file) => void ip.handleFile(file)} disabled={!ip.supplierId} fileName={ip.pendingFile?.name} />
 
-        {ip.previewing && <p className="text-[11px] text-gray-400">Reading file…</p>}
+            {ip.previewing && <p className="text-[11px] text-gray-400">Reading file…</p>}
 
-        {allSkipped && (
-          <p className="text-[11px] text-red-600">
-            Every product in this file already exists — tick &quot;Overwrite products with matching handles&quot; to replace their values.
-          </p>
-        )}
+            {allSkipped && (
+              <p className="text-[11px] text-red-600">
+                Every product in this file already exists — tick &quot;Overwrite products with matching handles&quot; to replace their values.
+              </p>
+            )}
 
-        {ip.preview && <ImportProductsPreviewTable groups={ip.preview} overwrite={ip.overwrite} />}
+            {ip.preview && <ImportProductsPreviewTable groups={ip.preview} overwrite={ip.overwrite} />}
+          </div>
+        </AnimatedStepBody>
       </div>
     </ModalShell>
   );
@@ -116,8 +130,8 @@ export default function ImportProductsModal({ importProducts: ip, suppliers }: I
 
 function ImportProductsPreviewTable({ groups, overwrite }: { groups: ProductImportPreviewGroup[]; overwrite: boolean }) {
   return (
-    <div className="max-h-96 overflow-y-auto rounded-lg border border-gray-200">
-      <table className="w-full border-collapse text-[11px] leading-none">
+    <div className="max-h-96 overflow-x-auto overflow-y-auto rounded-lg border border-gray-200">
+      <table className="w-full min-w-[420px] border-collapse text-[11px] leading-none">
         <thead className="sticky top-0 bg-gray-50">
           <tr className="border-b border-gray-200 text-left text-[10px] font-bold uppercase tracking-[0.4px] text-gray-500">
             <th className="px-2 py-1">Handle</th>

@@ -2,6 +2,7 @@
 
 import ProductsTableRow from './ProductsTableRow';
 import type { ProductsSortKey, useProductsTable } from './hooks/useProductsTable';
+import { formatCurrencyValue, formatNumber } from './utils';
 
 type ProductsTableProps = {
   table: ReturnType<typeof useProductsTable>;
@@ -64,9 +65,32 @@ export default function ProductsTable({ table, loading }: ProductsTableProps) {
                 onToggleSelect={table.toggleSelect}
                 onView={table.onView}
                 onRequestDelete={(id, name) => table.setDeleteConfirm({ kind: 'single', id, name })}
+                onToggleOmit={table.toggleOmitted}
               />
             ))}
         </tbody>
+        {!loading && table.products.length > 0 && (
+          <tfoot>
+            <tr className="border-t-2 border-gray-200 bg-gray-50 font-bold text-gray-900">
+              <td className="px-2 py-1.5" />
+              <td className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-[0.4px] text-gray-500">
+                Total <span className="normal-case text-gray-400">({formatNumber(table.pagination.total)} matching)</span>
+              </td>
+              <td className="px-2 py-1.5" />
+              <td className="px-2 py-1.5" />
+              <td className="px-2 py-1.5" />
+              <td className="px-2 py-1.5" />
+              <td className="px-2 py-1.5" />
+              <td className="px-2 py-1.5" />
+              <td className="px-2 py-1.5" />
+              <td className="px-2 py-1.5 text-right tabular-nums">{formatNumber(table.totals.stockOnHand)}</td>
+              <td className="px-2 py-1.5" />
+              <td className="px-2 py-1.5 text-right tabular-nums text-emerald-800">{formatCurrencyValue(table.totals.stockValue)}</td>
+              <td className="px-2 py-1.5" />
+              <td className="px-2 py-1.5" />
+            </tr>
+          </tfoot>
+        )}
       </table>
     </div>
   );
