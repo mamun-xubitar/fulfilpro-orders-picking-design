@@ -1,15 +1,18 @@
 import moment from 'moment-timezone';
 import prisma from '@/lib/prisma.server';
 import { TaskModel, type TaskState2 } from '@/models/task.model.server';
+import { RecurringTaskModel } from '@/models/recurring-task.model.server';
+import { RecurringTaskController } from '@/controllers/recurring-task.controller.server';
 import { fireTaskEvent, fireMessageEvent } from '@/lib/task-events.server';
-import { resolveDueDate } from '@/lib/task-due-date.server';
+import { resolveDueDate, getSettingsTimezone } from '@/lib/task-due-date.server';
 import { computeUrgentDueDate } from '@/lib/auth-policy.server';
-import { computeNextOccurrenceAt } from '@/lib/task-recurrence.server';
 import { getTaskVisibleUserIds, getTaskVisibleUsers } from '@/lib/task-visibility.server';
 import type { SavedFile } from '@/lib/uploads.server';
 import type { TaskDueType, TaskRecurrenceType } from '@prisma/client';
 
 const taskModel = new TaskModel();
+const recurringTaskModel = new RecurringTaskModel();
+const recurringTaskController = new RecurringTaskController();
 const DUE_TYPES: TaskDueType[] = ['STANDARD', 'URGENT', 'CUSTOM'];
 const RECURRENCE_TYPES: TaskRecurrenceType[] = ['DAILY', 'WEEKLY'];
 
@@ -29,11 +32,6 @@ function isAdmin(session: Session) {
 
 function userName(session: Session) {
   return session.user.name ?? session.user.email ?? 'Unknown';
-}
-
-async function getSettingsTimezone(): Promise<string> {
-  const settings = await prisma.appSettings.findUnique({ where: { id: 'default' }, select: { timezone: true } });
-  return settings?.timezone ?? 'Australia/Sydney';
 }
 
 type CreateBody = {
@@ -152,9 +150,22 @@ export class TaskController {
       }
     }
 
-    const recurrenceEndDate = recurrenceType
-      ? moment.tz(parsed.recurrenceEndDateStr, 'YYYY-MM-DD', timezone).endOf('day').toDate()
-      : undefined;
+    const assignerFields = { id: assigner.id, name: assigner.name ?? assigner.email ?? '', email: assigner.email ?? '' };
+    const assigneeFields = assignees.map((a) => ({ id: a.id, name: a.name ?? a.email ?? '', email: a.email ?? '' }));
+
+    if (recurrenceType) {
+      const recurrenceEndDate = moment.tz(parsed.recurrenceEndDateStr, 'YYYY-MM-DD', timezone).endOf('day').toDate();
+      const tasks = await recurringTaskController.createFromParsed({
+        parsed,
+        dueType,
+        recurrenceType,
+        recurrenceEndDate,
+        assigner: assignerFields,
+        assignees: assigneeFields,
+        timezone,
+      });
+      return { data: tasks, message: tasks.length > 1 ? 'Tasks created' : 'Task created' };
+    }
 
     const entries = await Promise.all(
       assignees.map(async (assignee) => ({
@@ -162,11 +173,8 @@ export class TaskController {
         description: parsed.perAssigneeDescription ? parsed.descriptions[assignee.id]!.trim() : parsed.description,
         dueDate: await resolveDueDate(dueType, assignee.id, parsed.dueDateStr),
         dueType,
-        assigner: { id: assigner.id, name: assigner.name ?? assigner.email ?? '', email: assigner.email ?? '' },
+        assigner: assignerFields,
         assignee: { id: assignee.id, name: assignee.name ?? assignee.email ?? '', email: assignee.email ?? '' },
-        ...(recurrenceType && recurrenceEndDate
-          ? { recurrence: { type: recurrenceType, endDate: recurrenceEndDate, nextOccurrenceAt: computeNextOccurrenceAt(new Date(), timezone, recurrenceType) } }
-          : {}),
       })),
     );
 
@@ -331,8 +339,11 @@ export class TaskController {
     const admin = isAdmin(session);
     const filterUserId = searchParams.get('assigneeId') ?? undefined;
     const scopeUserId = admin ? undefined : session.user.id;
-    const counts = await taskModel.tabCounts(filterUserId, scopeUserId);
-    return { data: counts, message: 'Tab counts retrieved' };
+    const [counts, recurring] = await Promise.all([
+      taskModel.tabCounts(filterUserId, scopeUserId),
+      recurringTaskModel.count({ assigneeId: filterUserId, scopeUserId }),
+    ]);
+    return { data: { ...counts, recurring }, message: 'Tab counts retrieved' };
   }
 
   async assignableUsers(session: Session) {
@@ -346,40 +357,4 @@ export class TaskController {
     return { data: users };
   }
 
-  async listRecurringParents(searchParams: URLSearchParams, session: Session) {
-    const admin = isAdmin(session);
-    const page = Math.max(1, parseInt(searchParams.get('page') ?? '1'));
-    const pageSize = Math.min(50, Math.max(1, parseInt(searchParams.get('pageSize') ?? '20')));
-    const search = searchParams.get('search') ?? undefined;
-    const assigneeId = searchParams.get('assigneeId') ?? undefined;
-    const scopeUserId = admin ? undefined : session.user.id;
-    const dueTypeParam = searchParams.get('dueType') ?? undefined;
-    const dueType = dueTypeParam && isTaskDueType(dueTypeParam) ? dueTypeParam : undefined;
-
-    const result = await taskModel.findRecurringParents({ assigneeId, scopeUserId, search, dueType, page, pageSize, viewerId: session.user.id });
-    return { data: result, message: 'Recurring tasks retrieved' };
-  }
-
-  async listChildren(parentTaskId: string, session: Session) {
-    const parent = await taskModel.findById(parentTaskId);
-    if (!parent) return { error: { message: 'Task not found', status: 404 } };
-
-    const uid = session.user.id;
-    if (!isAdmin(session) && parent.assigneeId !== uid && parent.assignerId !== uid) {
-      return { error: { message: 'Forbidden', status: 403 } };
-    }
-
-    const children = await taskModel.findChildren(parentTaskId, uid);
-    return { data: children, message: 'Child tasks retrieved' };
-  }
-
-  async stopRecurring(parentTaskId: string, session: Session) {
-    if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
-    const parent = await taskModel.findById(parentTaskId);
-    if (!parent) return { error: { message: 'Task not found', status: 404 } };
-    if (parent.assignerId !== session.user.id) return { error: { message: 'Only the assigner can stop this recurring task', status: 403 } };
-
-    await taskModel.stopRecurring(parentTaskId);
-    return { data: null, message: 'Recurring task stopped' };
-  }
 }

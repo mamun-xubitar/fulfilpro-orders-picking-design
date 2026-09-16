@@ -16,6 +16,9 @@ type RichTextFieldProps = {
   /** Extra control pinned to the right end of the formatting toolbar — e.g. the AI
    * generate/Original/Generated group, which lives in the toolbar rather than a header row. */
   toolbarEnd?: React.ReactNode;
+  /** Caps the editable body at its current min height with an inner scrollbar instead of
+   * growing the panel — only for Product details (not the New Product wizard / store drafts). */
+  fixedHeight?: boolean;
 };
 
 type ActiveState = { bold: boolean; italic: boolean; underline: boolean; ul: boolean; ol: boolean };
@@ -37,7 +40,7 @@ const TEXT_COLORS = ['#111827', '#6b7280', '#dc2626', '#ea580c', '#ca8a04', '#16
  * it immediately before applying the command, so "insert link" / "apply colour" affects whatever
  * was selected when the toolbar button was pressed, not wherever focus happens to land after.
  */
-export default function RichTextField({ label, value, onChange, hideLabel, toolbarEnd }: RichTextFieldProps) {
+export default function RichTextField({ label, value, onChange, hideLabel, toolbarEnd, fixedHeight }: RichTextFieldProps) {
   const ref = useRef<HTMLDivElement>(null);
   const focused = useRef(false);
   const savedRange = useRef<Range | null>(null);
@@ -305,7 +308,7 @@ export default function RichTextField({ label, value, onChange, hideLabel, toolb
             }
           }}
           aria-label={label}
-          className="min-h-16 w-full px-2.5 py-2 text-[13px] text-gray-900 outline-none [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-4 [&_ol]:pl-4 [&_a]:text-blue-600 [&_a]:underline"
+          className={`min-h-16 w-full px-2.5 py-2 text-[13px] text-gray-900 outline-none [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-4 [&_ol]:pl-4 [&_a]:text-blue-600 [&_a]:underline ${fixedHeight ? 'max-h-16 overflow-y-auto' : ''}`}
         />
       </div>
 

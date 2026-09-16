@@ -196,7 +196,7 @@ function CreateModeFields({
       )}
 
       <p className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
-        Recurring tasks are created automatically by a daily background check, using the recurrence option and end date above. Turning off recurrence just creates a one-off task.
+        A recurring task creates one recurring task shared by all selected assignees, and a new task for each of them on the schedule above. Turning off recurrence just creates a one-off task. Assignees can be added or removed later from the Recurring tab.
       </p>
     </>
   );

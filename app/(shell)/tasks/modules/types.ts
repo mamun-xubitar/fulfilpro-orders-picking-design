@@ -28,12 +28,33 @@ export type TaskRow = {
   assigneeEmail: string;
   unreadCount: number;
   messageCount: number;
-  isRecurringParent: boolean;
-  recurrenceType: TaskRecurrenceType | null;
-  recurrenceEndDate: string | null;
-  recurrenceStoppedAt: string | null;
-  parentTaskId: string | null;
-  childCount?: number;
+  recurringTaskId: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type RecurringTaskAssignee = {
+  id: string;
+  assigneeId: string;
+  assigneeName: string;
+  assigneeEmail: string;
+  description: string;
+  createdAt: string;
+};
+
+export type RecurringTaskRow = {
+  id: string;
+  title: string;
+  description: string;
+  dueType: TaskDueType;
+  recurrenceType: TaskRecurrenceType;
+  recurrenceEndDate: string;
+  stoppedAt: string | null;
+  assignerId: string;
+  assignerName: string;
+  assignerEmail: string;
+  assignees: RecurringTaskAssignee[];
+  taskCount: number;
   createdAt: string;
   updatedAt: string;
 };

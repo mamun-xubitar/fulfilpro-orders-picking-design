@@ -166,7 +166,7 @@ export default function ProductFieldsPanel({ details: d, supplierOptions, preset
           </div>
 
           <div className="col-span-2">
-            <DescriptionField details={d} />
+            <DescriptionField details={d} showDetailsButton={!embedded} />
           </div>
 
           <div className="col-span-2">

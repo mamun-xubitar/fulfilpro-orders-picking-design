@@ -4,11 +4,13 @@ import { Suspense } from 'react';
 import { useTasksPage } from './hooks/useTasksPage';
 import TasksToolbar from './TasksToolbar';
 import TasksTable from './TasksTable';
+import RecurringTasksTable from './RecurringTasksTable';
 import AddEditTaskModal from './AddEditTaskModal';
 import CompleteTaskModal from './CompleteTaskModal';
 import ProofFilesModal from './ProofFilesModal';
 import TaskDetailsModal from './TaskDetailsModal';
 import TaskMessagesModal from './TaskMessagesModal';
+import ManageAssigneesModal from './ManageAssigneesModal';
 import TaskReportTab from './TaskReportTab';
 import ChatModal from '@/components/ChatModal';
 import { DEFAULT_PAGE_SIZE } from './constants';
@@ -39,7 +41,7 @@ function TasksPageInner() {
       ) : null}
 
       {p.tab === 'recurring' ? (
-        <TasksTable
+        <RecurringTasksTable
           tasks={p.recurringParents}
           loading={p.recurringLoading}
           total={p.recurringTotal}
@@ -54,12 +56,14 @@ function TasksPageInner() {
           onMessages={p.openMessages}
           onViewProofs={p.openProofs}
           onView={p.openView}
-          expandable
           expandedIds={p.expandedIds}
           childrenByParent={p.childrenByParent}
           childrenLoading={p.childrenLoading}
           onToggleExpand={(task) => p.toggleExpand(task.id)}
-          onStopRecurring={p.stopRecurring}
+          onManageAssignees={p.openManageAssignees}
+          onStopRecurring={(task) => p.stopRecurring(task.id)}
+          onResumeRecurring={(task) => p.resumeRecurring(task.id)}
+          onDeleteRecurring={(task) => p.deleteRecurring(task.id)}
         />
       ) : (
         <TasksTable
@@ -108,6 +112,16 @@ function TasksPageInner() {
 
       <ProofFilesModal task={p.proofViewTask} onClose={p.closeProofs} />
       <TaskDetailsModal task={p.viewTask} onClose={p.closeView} />
+
+      <ManageAssigneesModal
+        task={p.manageTask}
+        users={p.users}
+        loading={p.manageLoading}
+        errors={p.manageErrors}
+        onAdd={p.addAssignee}
+        onRemove={p.removeAssignee}
+        onClose={p.closeManageAssignees}
+      />
 
       <TaskMessagesModal
         task={p.messagesTask}

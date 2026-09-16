@@ -2,12 +2,12 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import useRequest from '@/hooks/useRequest';
-import type { TaskRow } from '../types';
+import type { RecurringTaskRow, TaskRow } from '../types';
 
-type ListResponse = { tasks: TaskRow[]; total: number };
+type ListResponse = { tasks: RecurringTaskRow[]; total: number };
 
 export function useRecurringTasks(params: { active: boolean; queryString: string }) {
-  const [parents, setParents] = useState<TaskRow[]>([]);
+  const [parents, setParents] = useState<RecurringTaskRow[]>([]);
   const [total, setTotal] = useState(0);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [childrenByParent, setChildrenByParent] = useState<Record<string, TaskRow[]>>({});
@@ -54,8 +54,8 @@ export function useRecurringTasks(params: { active: boolean; queryString: string
 
   useEffect(() => {
     if (fetchedForRefreshKey.current !== refreshKey) {
-      // A mutation happened (create/edit/delete/complete/stop) — the cached children are
-      // stale, so drop them and let any still-expanded groups refetch below.
+      // A mutation happened (create/edit/delete/complete/stop/manage assignees) — the cached
+      // children are stale, so drop them and let any still-expanded groups refetch below.
       fetchedForRefreshKey.current = refreshKey;
       fetchedParentIds.current.clear();
       setChildrenByParent({});
@@ -90,6 +90,73 @@ export function useRecurringTasks(params: { active: boolean; queryString: string
     });
   }
 
+  const { request: requestResume } = useRequest();
+
+  function resumeRecurring(parentId: string) {
+    void requestResume({
+      url: `/api/tasks/recurring/${parentId}/resume`,
+      method: 'POST',
+      showToast: true,
+      successMessage: 'Recurring task resumed',
+      onSuccess: () => bumpRefresh(),
+    });
+  }
+
+  const { request: requestDeleteRecurring } = useRequest();
+
+  function deleteRecurring(parentId: string) {
+    void requestDeleteRecurring({
+      url: `/api/tasks/recurring/${parentId}`,
+      method: 'DELETE',
+      showToast: true,
+      successMessage: 'Recurring task deleted',
+      onSuccess: () => bumpRefresh(),
+    });
+  }
+
+  // Manage assignees modal
+  const [manageTask, setManageTask] = useState<RecurringTaskRow | null>(null);
+  const { request: requestManage, loading: manageLoading, errors: manageErrors, setErrors: setManageErrors } = useRequest<RecurringTaskRow>();
+
+  const openManageAssignees = useCallback((task: RecurringTaskRow) => {
+    setManageErrors({});
+    setManageTask(task);
+  }, [setManageErrors]);
+
+  const closeManageAssignees = useCallback(() => {
+    setManageTask(null);
+    setManageErrors({});
+  }, [setManageErrors]);
+
+  function addAssignee(assigneeId: string, description: string) {
+    if (!manageTask) return;
+    void requestManage({
+      url: `/api/tasks/recurring/${manageTask.id}/assignees`,
+      method: 'POST',
+      data: { assigneeId, description },
+      showToast: true,
+      successMessage: 'Assignee added',
+      onSuccess: (res) => {
+        setManageTask(res.data);
+        bumpRefresh();
+      },
+    });
+  }
+
+  function removeAssignee(assigneeId: string) {
+    if (!manageTask) return;
+    void requestManage({
+      url: `/api/tasks/recurring/${manageTask.id}/assignees/${assigneeId}`,
+      method: 'DELETE',
+      showToast: true,
+      successMessage: 'Assignee removed',
+      onSuccess: (res) => {
+        setManageTask(res.data);
+        bumpRefresh();
+      },
+    });
+  }
+
   return {
     recurringParents: parents,
     recurringTotal: total,
@@ -99,6 +166,15 @@ export function useRecurringTasks(params: { active: boolean; queryString: string
     childrenLoading,
     toggleExpand,
     stopRecurring,
+    resumeRecurring,
+    deleteRecurring,
     bumpRecurringRefresh: bumpRefresh,
+    manageTask,
+    manageLoading,
+    manageErrors,
+    openManageAssignees,
+    closeManageAssignees,
+    addAssignee,
+    removeAssignee,
   };
 }

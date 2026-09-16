@@ -735,14 +735,8 @@ model Task {
   assigneeEmail        String
   lastReadByAssignerAt DateTime?
   lastReadByAssigneeAt DateTime?
-  recurrenceType       TaskRecurrenceType?
-  recurrenceEndDate    DateTime?
-  isRecurringParent    Boolean             @default(false)
-  recurrenceStoppedAt  DateTime?
-  nextOccurrenceAt     DateTime?
-  parentTaskId         String?
-  parent               Task?               @relation("TaskRecurrence", fields: [parentTaskId], references: [id], onDelete: SetNull)
-  children             Task[]              @relation("TaskRecurrence")
+  recurringTaskId      String?
+  recurringTask        RecurringTask?      @relation(fields: [recurringTaskId], references: [id], onDelete: SetNull)
   createdAt            DateTime            @default(now())
   updatedAt            DateTime            @updatedAt
   messages             TaskMessage[]
@@ -751,8 +745,43 @@ model Task {
   @@index([assignerId])
   @@index([status, dueDate])
   @@index([createdAt])
-  @@index([isRecurringParent, recurrenceStoppedAt, nextOccurrenceAt])
-  @@index([parentTaskId])
+  @@index([recurringTaskId])
+}
+
+model RecurringTask {
+  id                String                  @id @default(uuid())
+  title             String
+  description       String
+  dueType           TaskDueType
+  dueDate           DateTime
+  recurrenceType    TaskRecurrenceType
+  recurrenceEndDate DateTime
+  nextOccurrenceAt  DateTime
+  stoppedAt         DateTime?
+  assignerId        String
+  assignerName      String
+  assignerEmail     String
+  assignees         RecurringTaskAssignee[]
+  tasks             Task[]
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+
+  @@index([stoppedAt, nextOccurrenceAt])
+  @@index([assignerId])
+}
+
+model RecurringTaskAssignee {
+  id              String        @id @default(uuid())
+  recurringTaskId String
+  assigneeId      String
+  assigneeName    String
+  assigneeEmail   String
+  description     String
+  createdAt       DateTime      @default(now())
+  recurringTask   RecurringTask @relation(fields: [recurringTaskId], references: [id], onDelete: Cascade)
+
+  @@unique([recurringTaskId, assigneeId])
+  @@index([assigneeId])
 }
 
 model TaskMessage {

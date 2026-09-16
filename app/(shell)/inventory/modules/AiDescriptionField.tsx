@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'react-toastify';
 import useRequest from '@/hooks/useRequest';
+import { ModalShell } from '@/components/ModalShell';
+import { sanitizeHtml } from '@/lib/sanitize-html';
 import { FieldLabel } from './ProductFieldRows';
 import RichTextField from './RichTextField';
 import { Refresh, Sparkles } from './icons';
@@ -32,6 +34,9 @@ type AiDescriptionFieldProps = {
    * (see saved/draft there), so switching subjects — product navigation, or simply which store's
    * block this instance belongs to — never leaks one subject's AI draft onto another's field. */
   subjectKey: string;
+  /** Shows the "Show Details" button in the header and fixes the editor height with an inner
+   * scroll. Only for the Product details panel — never the New Product wizard or per-store drafts. */
+  showDetailsButton?: boolean;
 };
 
 /**
@@ -42,7 +47,7 @@ type AiDescriptionFieldProps = {
  * (Online stores & prices / Bulk update) — each mounted instance is independent, so several store
  * blocks can generate concurrently without interfering with each other.
  */
-export default function AiDescriptionField({ value, onChange, buildRequestData, subjectKey }: AiDescriptionFieldProps) {
+export default function AiDescriptionField({ value, onChange, buildRequestData, subjectKey, showDetailsButton }: AiDescriptionFieldProps) {
   const { request: requestAi, loading: aiGenerating } = useRequest<{ description: string }>();
   // Original/Generated are two independent drafts of the description, tagged with the subject
   // they belong to so switching subjects drops them without an effect having to reset anything —
@@ -123,6 +128,8 @@ export default function AiDescriptionField({ value, onChange, buildRequestData, 
     });
   };
 
+  const [detailsOpen, setDetailsOpen] = useState(false);
+
   const toolbarEnd = !effectiveAi ? (
     <button
       type="button"
@@ -165,11 +172,20 @@ export default function AiDescriptionField({ value, onChange, buildRequestData, 
 
   return (
     <div className="min-w-0">
-      <div className="mb-1">
+      <div className="mb-1 flex items-center justify-between gap-2">
         <FieldLabel>Description</FieldLabel>
+        {showDetailsButton && (
+          <button
+            type="button"
+            onClick={() => setDetailsOpen(true)}
+            className="shrink-0 text-[11px] font-semibold leading-none text-blue-600 hover:text-blue-700 cursor-pointer"
+          >
+            Show Details
+          </button>
+        )}
       </div>
       <div className="relative">
-        <RichTextField label="Description" value={value} onChange={onChange} hideLabel toolbarEnd={toolbarEnd} />
+        <RichTextField label="Description" value={value} onChange={onChange} hideLabel toolbarEnd={toolbarEnd} fixedHeight={showDetailsButton} />
         {aiGenerating && (
           <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-white/60">
             <div className="flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-[12px] font-semibold text-gray-600 shadow-sm">
@@ -179,6 +195,18 @@ export default function AiDescriptionField({ value, onChange, buildRequestData, 
           </div>
         )}
       </div>
+      {detailsOpen && (
+        <ModalShell title="Description" compact wide onClose={() => setDetailsOpen(false)}>
+          {value ? (
+            <div
+              className="text-[13px] text-gray-900 [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-4 [&_ol]:pl-4 [&_a]:text-blue-600 [&_a]:underline"
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(value) }}
+            />
+          ) : (
+            <p className="text-[13px] text-gray-400">—</p>
+          )}
+        </ModalShell>
+      )}
     </div>
   );
 }

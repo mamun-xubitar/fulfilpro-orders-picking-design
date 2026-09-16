@@ -14,11 +14,12 @@ type Props = {
   onDelete: (taskId: string) => void;
   onComplete: (task: TaskRow) => void;
   onMessages: (task: TaskRow) => void;
+  onViewProofs: (task: TaskRow) => void;
   onView: (task: TaskRow) => void;
 };
 
 export default function RecurringChildRow({
-  task, currentUserId, isAdmin, onEdit, onDelete, onComplete, onMessages, onView,
+  task, currentUserId, isAdmin, onEdit, onDelete, onComplete, onMessages, onViewProofs, onView,
 }: Props) {
   const style = STATE_STYLES[task.state];
   return (
@@ -33,15 +34,13 @@ export default function RecurringChildRow({
         <p className="text-xs text-gray-500">{task.assigneeEmail}</p>
       </td>
       <td className="px-4 py-3 whitespace-nowrap text-gray-700">
-        {formatDueDate(task.dueDate)}
+        <p>{formatDueDate(task.dueDate)}</p>
+        {task.completedAt && <p className="text-xs text-gray-500 mt-0.5">Completed {formatDueDate(task.completedAt)}</p>}
       </td>
       <td className="px-4 py-3">
         <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-full ${DUE_TYPE_STYLES[task.dueType].badge}`}>
           {DUE_TYPE_STYLES[task.dueType].label}
         </span>
-      </td>
-      <td className="px-4 py-3 whitespace-nowrap text-gray-700">
-        {task.completedAt ? formatDueDate(task.completedAt) : '—'}
       </td>
       <td className="px-4 py-3">
         <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-full ${style.badge}`}>
@@ -57,9 +56,8 @@ export default function RecurringChildRow({
           onDelete={onDelete}
           onComplete={onComplete}
           onMessages={onMessages}
-          onViewProofs={() => {}}
+          onViewProofs={onViewProofs}
           onView={onView}
-          rowKind="recurringChild"
         />
       </td>
     </tr>

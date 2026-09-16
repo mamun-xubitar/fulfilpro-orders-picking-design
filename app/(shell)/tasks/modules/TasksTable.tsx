@@ -1,12 +1,10 @@
 'use client';
 
-import { Fragment } from 'react';
 import type { TaskRow } from './types';
 import { DUE_TYPE_STYLES, STATE_STYLES } from './constants';
 import { formatDueDate, taskRowKey } from './utils';
 import { truncate } from '@/lib/utils/common';
 import TaskRowActions from './TaskRowActions';
-import RecurringChildRow from './RecurringChildRow';
 
 type Props = {
   tasks: TaskRow[];
@@ -23,12 +21,6 @@ type Props = {
   onMessages: (task: TaskRow) => void;
   onViewProofs: (task: TaskRow) => void;
   onView: (task: TaskRow) => void;
-  expandable?: boolean;
-  expandedIds?: Set<string>;
-  childrenByParent?: Record<string, TaskRow[]>;
-  childrenLoading?: Record<string, boolean>;
-  onToggleExpand?: (task: TaskRow) => void;
-  onStopRecurring?: (parentId: string) => void;
 };
 
 const SKELETON_ROWS = Array.from({ length: 5 });
@@ -37,7 +29,6 @@ const COLUMN_COUNT = 8;
 export default function TasksTable({
   tasks, loading, total, page, pageSize, onPageChange,
   currentUserId, isAdmin, onEdit, onDelete, onComplete, onMessages, onViewProofs, onView,
-  expandable = false, expandedIds, childrenByParent, childrenLoading, onToggleExpand, onStopRecurring,
 }: Props) {
   const totalPages = Math.ceil(total / pageSize);
 
@@ -80,81 +71,47 @@ export default function TasksTable({
               : tasks.map((task, i) => {
                   const style = STATE_STYLES[task.state];
                   const serial = (page - 1) * pageSize + i + 1;
-                  const expanded = expandable && Boolean(expandedIds?.has(task.id));
                   return (
-                    <Fragment key={taskRowKey(task.id)}>
-                      <tr className={`border-b border-gray-200 last:border-0 ${expandable ? '' : style.row}`}>
-                        <td className="px-4 py-3 text-gray-500">{serial}</td>
-                        <td className="px-4 py-3">
-                          <p className="font-medium text-gray-900 leading-snug">{task.title}</p>
-                          <p className="text-xs text-gray-500 mt-0.5">{truncate(task.description, 50)}</p>
-                        </td>
-                        <td className="px-4 py-3">
-                          <p className="text-gray-800">{task.assigneeName}</p>
-                          <p className="text-xs text-gray-500">{task.assigneeEmail}</p>
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-gray-700">
-                          {expandable ? '—' : formatDueDate(task.dueDate)}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-full ${DUE_TYPE_STYLES[task.dueType].badge}`}>
-                            {DUE_TYPE_STYLES[task.dueType].label}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-gray-700">
-                          {expandable ? '—' : task.completedAt ? formatDueDate(task.completedAt) : '—'}
-                        </td>
-                        <td className="px-4 py-3">
-                          {expandable ? (
-                            <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-full ${task.recurrenceStoppedAt ? 'bg-gray-200 text-gray-600' : 'bg-green-100 text-green-700'}`}>
-                              {task.recurrenceStoppedAt ? 'Stopped' : 'Active'}
-                            </span>
-                          ) : (
-                            <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-full ${style.badge}`}>
-                              {style.label}
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3">
-                          <TaskRowActions
-                            task={task}
-                            currentUserId={currentUserId}
-                            isAdmin={isAdmin}
-                            onEdit={onEdit}
-                            onDelete={onDelete}
-                            onComplete={onComplete}
-                            onMessages={onMessages}
-                            onViewProofs={onViewProofs}
-                            onView={onView}
-                            rowKind={expandable ? 'recurringParent' : 'normal'}
-                            expanded={expanded}
-                            onToggleExpand={onToggleExpand}
-                            onStopRecurring={() => onStopRecurring?.(task.id)}
-                          />
-                        </td>
-                      </tr>
-                      {expandable && expanded && (
-                        childrenLoading?.[task.id] ? (
-                          <tr key={`${task.id}-loading`} className="border-b border-gray-200 bg-gray-50/60">
-                            <td colSpan={COLUMN_COUNT} className="px-4 py-3 text-center text-xs text-gray-400">Loading…</td>
-                          </tr>
-                        ) : (
-                          childrenByParent?.[task.id]?.map((child) => (
-                            <RecurringChildRow
-                              key={child.id}
-                              task={child}
-                              currentUserId={currentUserId}
-                              isAdmin={isAdmin}
-                              onEdit={onEdit}
-                              onDelete={onDelete}
-                              onComplete={onComplete}
-                              onMessages={onMessages}
-                              onView={onView}
-                            />
-                          ))
-                        )
-                      )}
-                    </Fragment>
+                    <tr key={taskRowKey(task.id)} className={`border-b border-gray-200 last:border-0 ${style.row}`}>
+                      <td className="px-4 py-3 text-gray-500">{serial}</td>
+                      <td className="px-4 py-3">
+                        <p className="font-medium text-gray-900 leading-snug">{task.title}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">{truncate(task.description, 50)}</p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <p className="text-gray-800">{task.assigneeName}</p>
+                        <p className="text-xs text-gray-500">{task.assigneeEmail}</p>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-gray-700">
+                        {formatDueDate(task.dueDate)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-full ${DUE_TYPE_STYLES[task.dueType].badge}`}>
+                          {DUE_TYPE_STYLES[task.dueType].label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-gray-700">
+                        {task.completedAt ? formatDueDate(task.completedAt) : '—'}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-full ${style.badge}`}>
+                          {style.label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <TaskRowActions
+                          task={task}
+                          currentUserId={currentUserId}
+                          isAdmin={isAdmin}
+                          onEdit={onEdit}
+                          onDelete={onDelete}
+                          onComplete={onComplete}
+                          onMessages={onMessages}
+                          onViewProofs={onViewProofs}
+                          onView={onView}
+                        />
+                      </td>
+                    </tr>
                   );
                 })}
           </tbody>
