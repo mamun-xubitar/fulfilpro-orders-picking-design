@@ -8,6 +8,7 @@ import BottomPanels from './BottomPanels';
 import ComingSoon from './ComingSoon';
 import InventoryGlobals from './InventoryGlobals';
 import InventoryModals from './InventoryModals';
+import { panelBorderClass } from './MainImagePanel';
 import ModuleTabs from './ModuleTabs';
 import ProductDetailsTab from './ProductDetailsTab';
 import ProductSubTabs from './ProductSubTabs';
@@ -20,6 +21,7 @@ import SuppliersTab from './SuppliersTab';
 import VariantsMatrixSection from './VariantsMatrixSection';
 import { MODULE_TABS, PRODUCT_STATUS_BADGES, PRODUCT_TABS, productStatusLabel } from './constants';
 import { useInventoryPage } from './hooks/useInventoryPage';
+import './inventory-theme.css';
 
 export default function InventoryPage() {
   const p = useInventoryPage();
@@ -40,7 +42,7 @@ export default function InventoryPage() {
 
   return (
     <main
-      className="flex-1 space-y-2 p-2 xl:flex xl:h-[calc(100vh-60px)] xl:min-h-0 xl:flex-col xl:space-y-0 xl:overflow-hidden xl:gap-2"
+      className="inventory-theme flex-1 space-y-2 bg-inventory-bg p-2 xl:flex xl:h-[calc(100vh-60px)] xl:min-h-0 xl:flex-col xl:space-y-0 xl:overflow-hidden xl:gap-2"
       style={{ zoom: `${zoomPercent}%` }}
     >
       <ModuleTabs active={p.moduleTab} onChange={p.setModuleTab} right={p.moduleTab === 'products' ? <InventoryGlobals p={p} /> : undefined} />
@@ -54,7 +56,7 @@ export default function InventoryPage() {
           <ProductsToolbar {...p} />
 
           {p.nav.allRecords ? (
-            <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm xl:min-h-0 xl:flex-1 xl:overflow-y-auto">
+            <div className="overflow-hidden rounded-xl border border-inventory-border bg-inventory-surface shadow-inventory xl:min-h-0 xl:flex-1 xl:overflow-y-auto">
               <ProductsTableToolbar table={p.productsTable} onRefresh={p.productsTable.refresh} loading={p.productsTable.loading} />
               {hasSelection && <ProductsSelectionBar table={p.productsTable} />}
               <ProductsTable table={p.productsTable} loading={p.productsTable.loading} />
@@ -74,9 +76,9 @@ export default function InventoryPage() {
             <EmptyState />
           ) : (
             <div className="space-y-2 xl:flex xl:min-h-0 xl:flex-1 xl:flex-col xl:space-y-0 xl:gap-2 xl:overflow-hidden">
-              <div className="flex items-center gap-[8px] rounded-[10px] border border-gray-200 bg-white px-[8px] shadow-[0_1px_2px_0_rgb(0_0_0/0.05)] xl:flex-none">
+              <div className={`flex items-center gap-[8px] rounded-[10px] border ${panelBorderClass('subtabs')} bg-inventory-surface px-[8px] shadow-inventory xl:flex-none`}>
                 <ProductSubTabs active={p.productTab} onChange={p.setProductTab} />
-                <span className="ml-auto min-w-0 truncate text-[9px] leading-none text-gray-400">
+                <span className="ml-auto min-w-0 truncate text-[9px] leading-none text-inventory-text-subtle">
                   {p.product.name} · {p.product.brand}
                 </span>
                 <span
@@ -86,7 +88,9 @@ export default function InventoryPage() {
                 </span>
                 <span
                   className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-full border px-[6px] py-[1px] text-[9px] font-bold uppercase leading-none tracking-[0.4px] ${
-                    p.product.verified ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-red-200 bg-red-50 text-red-700'
+                    p.product.verified
+                      ? 'border-inventory-secondary/30 bg-inventory-secondary/10 text-inventory-secondary'
+                      : 'border-inventory-danger/30 bg-inventory-danger/10 text-inventory-danger'
                   }`}
                 >
                   {p.product.verified ? 'Verified' : 'Unverified'}
@@ -116,26 +120,26 @@ export default function InventoryPage() {
 function LoadingState() {
   return (
     <div className="space-y-2">
-      <div className="h-8 animate-pulse rounded-[10px] border border-gray-200 bg-gray-100" />
+      <div className="h-8 animate-pulse rounded-[10px] border border-inventory-border bg-inventory-surface-muted" />
 
       <div className="grid grid-cols-1 gap-[5px] md:grid-cols-2 xl:grid-cols-[172px_minmax(0,2fr)_minmax(0,1.32fr)_206px]">
         <div className="flex flex-col gap-[5px]">
-          <div className="h-40 animate-pulse rounded-xl border border-gray-200 bg-gray-100" />
-          <div className="h-32 animate-pulse rounded-xl border border-gray-200 bg-gray-100" />
+          <div className="h-40 animate-pulse rounded-xl border border-inventory-border bg-inventory-surface-muted" />
+          <div className="h-32 animate-pulse rounded-xl border border-inventory-border bg-inventory-surface-muted" />
         </div>
-        <div className="h-80 animate-pulse rounded-xl border border-gray-200 bg-gray-100" />
-        <div className="h-80 animate-pulse rounded-xl border border-gray-200 bg-gray-100" />
-        <div className="h-80 animate-pulse rounded-xl border border-gray-200 bg-gray-100" />
+        <div className="h-80 animate-pulse rounded-xl border border-inventory-border bg-inventory-surface-muted" />
+        <div className="h-80 animate-pulse rounded-xl border border-inventory-border bg-inventory-surface-muted" />
+        <div className="h-80 animate-pulse rounded-xl border border-inventory-border bg-inventory-surface-muted" />
       </div>
 
-      <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-        <div className="m-2 h-6 animate-pulse rounded bg-gray-100" />
-        <div className="m-2 h-40 animate-pulse rounded bg-gray-100" />
+      <div className="rounded-xl border border-inventory-border bg-inventory-surface shadow-inventory">
+        <div className="m-2 h-6 animate-pulse rounded bg-inventory-surface-muted" />
+        <div className="m-2 h-40 animate-pulse rounded bg-inventory-surface-muted" />
       </div>
 
       <div className="grid grid-cols-1 gap-[5px] md:grid-cols-2 xl:h-24 xl:grid-cols-5">
         {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} className="h-24 animate-pulse rounded-[10px] border border-gray-200 bg-gray-100 xl:h-full" />
+          <div key={i} className="h-24 animate-pulse rounded-[10px] border border-inventory-border bg-inventory-surface-muted xl:h-full" />
         ))}
       </div>
     </div>
@@ -144,9 +148,9 @@ function LoadingState() {
 
 function EmptyState() {
   return (
-    <div className="rounded-xl border border-dashed border-gray-300 bg-white px-6 py-20 text-center">
-      <h2 className="text-base font-semibold text-gray-900">No products match the current filters</h2>
-      <p className="mt-1 text-sm text-gray-500">Tick “All records” or clear the price shortcut to see the full catalogue.</p>
+    <div className="rounded-xl border border-dashed border-inventory-border-strong bg-inventory-surface px-6 py-20 text-center">
+      <h2 className="text-base font-semibold text-inventory-text">No products match the current filters</h2>
+      <p className="mt-1 text-sm text-inventory-text-subtle">Tick &quot;All records&quot; or clear the price shortcut to see the full catalogue.</p>
     </div>
   );
 }

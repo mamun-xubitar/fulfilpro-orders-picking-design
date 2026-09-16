@@ -1,6 +1,6 @@
 'use client';
 
-import { PanelHeading } from './MainImagePanel';
+import { PanelHeading, panelBorderClass } from './MainImagePanel';
 import { Cube } from './icons';
 import type { StockSummary } from './types';
 import { formatCurrencyValue, formatNumber } from './utils';
@@ -15,8 +15,9 @@ export default function StockSummaryPanel({ summary, variantCount }: { summary: 
   ];
 
   return (
-    <section className="flex min-w-0 flex-col rounded-[10px] border border-gray-200 bg-white shadow-[0_1px_2px_0_rgb(0_0_0/0.05)] xl:flex-none xl:min-h-0">
+    <section className={`flex min-w-0 flex-col rounded-[10px] border ${panelBorderClass('stock')} bg-inventory-surface shadow-inventory xl:flex-none xl:min-h-0`}>
       <PanelHeading
+        tone="stock"
         icon={<Cube className="h-3 w-3" />}
         title="Stock summary"
         meta={`${variantCount} variant${variantCount === 1 ? '' : 's'}`}
@@ -25,11 +26,15 @@ export default function StockSummaryPanel({ summary, variantCount }: { summary: 
       <div className="flex flex-1 flex-col gap-[4px] p-[6px]">
         <dl>
           {rows.map((row) => (
-            <div key={row.label} className="flex items-center justify-between gap-2 border-b border-gray-100 py-[4px] leading-none last:border-0">
-              <dt className="text-[11px] font-medium text-gray-600">{row.label}</dt>
+            <div key={row.label} className="flex items-center justify-between gap-2 border-b border-inventory-divider py-[4px] leading-none last:border-0">
+              <dt className="text-[11px] font-medium text-inventory-text-muted">{row.label}</dt>
               <dd
                 className={`text-[11px] tabular-nums ${
-                  row.emphasis === 'muted' ? 'font-semibold text-gray-500' : row.emphasis === 'blue' ? 'font-bold text-blue-700' : 'font-bold text-gray-900'
+                  row.emphasis === 'muted'
+                    ? 'font-semibold text-inventory-text-subtle'
+                    : row.emphasis === 'blue'
+                      ? 'font-bold text-inventory-secondary'
+                      : 'font-bold text-inventory-text'
                 }`}
               >
                 {row.value}
@@ -38,9 +43,9 @@ export default function StockSummaryPanel({ summary, variantCount }: { summary: 
           ))}
         </dl>
 
-        <div className="flex items-center justify-between rounded-[9px] border border-emerald-100 bg-emerald-50 px-[9px] py-[6px]">
-          <span className="text-[9.5px] font-bold uppercase leading-none tracking-[0.4px] text-emerald-700">Stock value</span>
-          <span className="text-[14px] font-bold leading-none text-emerald-800 tabular-nums">{formatCurrencyValue(summary.stockValue)}</span>
+        <div className="flex items-center justify-between rounded-[9px] border border-inventory-success/25 bg-inventory-success/10 px-[9px] py-[6px]">
+          <span className="text-[9.5px] font-bold uppercase leading-none tracking-[0.4px] text-inventory-success-hover">Stock value</span>
+          <span className="text-[14px] font-bold leading-none text-inventory-success-hover tabular-nums">{formatCurrencyValue(summary.stockValue)}</span>
         </div>
       </div>
     </section>

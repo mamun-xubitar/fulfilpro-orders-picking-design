@@ -8,22 +8,22 @@ import { formatDate } from './utils';
 
 export default function SuppliersTab({ suppliers: s }: { suppliers: ReturnType<typeof useSuppliers> }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-      <div className="flex flex-wrap items-center gap-[6px] border-b border-gray-200 px-2 py-1.5">
+    <div className="overflow-hidden rounded-xl border border-inventory-border bg-inventory-surface shadow-sm">
+      <div className="flex flex-wrap items-center gap-[6px] border-b border-inventory-border px-2 py-1.5">
         <div className="relative min-w-44 flex-1 sm:flex-none sm:w-56">
-          <Search className="pointer-events-none absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-gray-400" />
+          <Search className="pointer-events-none absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-inventory-text-subtle" />
           <input
             type="text"
             value={s.searchInput}
             onChange={(e) => s.setSearchInput(e.target.value)}
             placeholder="Search suppliers by name…"
-            className="h-[24px] w-full rounded-[7px] border border-gray-300 pl-7 pr-2 text-[11px] leading-none outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            className="h-[24px] w-full rounded-[7px] border border-inventory-border-strong pl-7 pr-2 text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring"
           />
         </div>
         <button
           type="button"
           onClick={() => s.openCreate()}
-          className="flex h-[22px] items-center gap-1 whitespace-nowrap rounded-[6px] bg-emerald-600 px-[6px] text-[10px] font-bold leading-none text-white shadow-sm transition-colors duration-150 hover:bg-emerald-700 cursor-pointer"
+          className="flex h-[22px] items-center gap-1 whitespace-nowrap rounded-[6px] bg-inventory-success px-[6px] text-[10px] font-bold leading-none text-white shadow-sm transition-colors duration-150 hover:bg-inventory-success-hover cursor-pointer"
         >
           <Plus className="h-3 w-3" />
           Add supplier
@@ -33,7 +33,7 @@ export default function SuppliersTab({ suppliers: s }: { suppliers: ReturnType<t
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-[11px] leading-none">
           <thead>
-            <tr className="border-b border-gray-200 text-left text-[10px] font-bold uppercase tracking-[0.4px] text-gray-500">
+            <tr className="border-b border-inventory-border text-left text-[10px] font-bold uppercase tracking-[0.4px] text-inventory-text-subtle">
               <th className="px-2 py-1">Name</th>
               <th className="px-2 py-1">PO email</th>
               <th className="px-2 py-1">Contact email</th>
@@ -47,26 +47,26 @@ export default function SuppliersTab({ suppliers: s }: { suppliers: ReturnType<t
               <SkeletonRows />
             ) : s.rows.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-2 py-8 text-center text-[11px] text-gray-400">
-                  <Users className="mx-auto mb-1.5 h-5 w-5 text-gray-300" />
+                <td colSpan={6} className="px-2 py-8 text-center text-[11px] text-inventory-text-subtle">
+                  <Users className="mx-auto mb-1.5 h-5 w-5 text-inventory-border-strong" />
                   {s.searchInput ? 'No suppliers match your search.' : 'No suppliers yet — add one to get started.'}
                 </td>
               </tr>
             ) : (
               s.rows.map((row) => (
-                <tr key={row.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
-                  <td className="px-2 py-1 font-medium text-gray-900">{row.name}</td>
-                  <td className="px-2 py-1 text-gray-600">{row.poEmail}</td>
-                  <td className="px-2 py-1 text-gray-500">{row.contactEmail || '—'}</td>
-                  <td className="px-2 py-1 text-right tabular-nums text-gray-500">{row.productCount}</td>
-                  <td className="px-2 py-1 text-gray-500">{formatDate(row.createdAt)}</td>
+                <tr key={row.id} className="border-b border-inventory-divider last:border-0 transition-colors duration-150 hover:bg-inventory-surface-hover">
+                  <td className="px-2 py-1 font-medium text-inventory-text">{row.name}</td>
+                  <td className="px-2 py-1 text-inventory-text-muted">{row.poEmail}</td>
+                  <td className="px-2 py-1 text-inventory-text-subtle">{row.contactEmail || '—'}</td>
+                  <td className="px-2 py-1 text-right tabular-nums text-inventory-text-subtle">{row.productCount}</td>
+                  <td className="px-2 py-1 text-inventory-text-subtle">{formatDate(row.createdAt)}</td>
                   <td className="px-2 py-1">
                     <div className="flex items-center justify-end gap-1">
                       <button
                         type="button"
                         onClick={() => s.openEdit(row)}
                         aria-label={`Edit ${row.name}`}
-                        className="flex h-[22px] w-[22px] items-center justify-center rounded-[6px] text-gray-400 transition-colors duration-150 hover:bg-gray-100 hover:text-gray-600 cursor-pointer"
+                        className="flex h-[22px] w-[22px] items-center justify-center rounded-[6px] text-inventory-text-subtle transition-colors duration-150 hover:bg-inventory-surface-hover hover:text-inventory-text-muted cursor-pointer"
                       >
                         <Pencil className="h-3 w-3" />
                       </button>
@@ -74,7 +74,7 @@ export default function SuppliersTab({ suppliers: s }: { suppliers: ReturnType<t
                         type="button"
                         onClick={() => s.setDeleteTarget(row)}
                         aria-label={`Delete ${row.name}`}
-                        className="flex h-[22px] w-[22px] items-center justify-center rounded-[6px] text-gray-400 transition-colors duration-150 hover:bg-red-50 hover:text-red-600 cursor-pointer"
+                        className="flex h-[22px] w-[22px] items-center justify-center rounded-[6px] text-inventory-text-subtle transition-colors duration-150 hover:bg-inventory-danger/10 hover:text-inventory-danger-hover cursor-pointer"
                       >
                         <Trash className="h-3 w-3" />
                       </button>
@@ -114,10 +114,10 @@ export default function SuppliersTab({ suppliers: s }: { suppliers: ReturnType<t
             </div>
           }
         >
-          <p className="text-[12px] text-gray-600">
-            This removes <strong className="font-semibold text-gray-900">{s.deleteTarget.name}</strong>. This can&apos;t be undone.
+          <p className="text-[12px] text-inventory-text-muted">
+            This removes <strong className="font-semibold text-inventory-text">{s.deleteTarget.name}</strong>. This can&apos;t be undone.
             {s.deleteTarget.productCount > 0 && (
-              <span className="mt-2 block text-amber-700">
+              <span className="mt-2 block text-inventory-warning-ink">
                 This supplier is linked to {s.deleteTarget.productCount} product{s.deleteTarget.productCount === 1 ? '' : 's'} — the link is simply removed, unless
                 it&apos;s the only supplier on one of them, in which case the delete is refused.
               </span>
@@ -133,10 +133,10 @@ function SkeletonRows() {
   return (
     <>
       {Array.from({ length: 5 }).map((_, i) => (
-        <tr key={i} className="border-b border-gray-100 last:border-0">
+        <tr key={i} className="border-b border-inventory-divider last:border-0">
           {Array.from({ length: 6 }).map((__, j) => (
             <td key={j} className="px-2 py-1.5">
-              <div className="h-3 animate-pulse rounded bg-gray-100" />
+              <div className="h-3 animate-pulse rounded bg-inventory-surface-muted" />
             </td>
           ))}
         </tr>

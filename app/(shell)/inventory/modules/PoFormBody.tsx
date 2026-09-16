@@ -20,7 +20,7 @@ export default function PoFormBody({ po, variants, compact }: PoFormBodyProps) {
         <select
           value={po.supplierId}
           onChange={(e) => po.setSupplierId(e.target.value)}
-          className="h-[24px] w-full rounded-[7px] border border-gray-300 px-[6px] text-[11px] leading-none outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 cursor-pointer"
+          className="h-[24px] w-full rounded-[7px] border border-inventory-border-strong px-[6px] text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring cursor-pointer"
         >
           <option value="">Select a supplier</option>
           {po.supplierOptions.map((s) => (
@@ -29,7 +29,7 @@ export default function PoFormBody({ po, variants, compact }: PoFormBodyProps) {
             </option>
           ))}
         </select>
-        {selectedSupplier && <p className="mt-1 text-[10px] leading-tight text-gray-400">{selectedSupplier.poEmail}</p>}
+        {selectedSupplier && <p className="mt-1 text-[10px] leading-tight text-inventory-text-subtle">{selectedSupplier.poEmail}</p>}
       </Field>
 
       <div className="grid gap-x-[7px] gap-y-[8px] sm:grid-cols-2">
@@ -39,7 +39,7 @@ export default function PoFormBody({ po, variants, compact }: PoFormBodyProps) {
             value={po.referenceNumber}
             onChange={(e) => po.setReferenceNumber(e.target.value)}
             placeholder="Supplier or internal reference"
-            className="h-[24px] w-full rounded-[7px] border border-gray-300 px-[6px] text-[11px] uppercase leading-none outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 placeholder:normal-case"
+            className="h-[24px] w-full rounded-[7px] border border-inventory-border-strong px-[6px] text-[11px] uppercase leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring placeholder:normal-case"
           />
         </Field>
 
@@ -48,7 +48,7 @@ export default function PoFormBody({ po, variants, compact }: PoFormBodyProps) {
             type="date"
             value={po.deliveryDate}
             onChange={(e) => po.setDeliveryDate(e.target.value)}
-            className="h-[24px] w-full rounded-[7px] border border-gray-300 px-[6px] text-[11px] leading-none outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            className="h-[24px] w-full rounded-[7px] border border-inventory-border-strong px-[6px] text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring"
           />
         </Field>
       </div>
@@ -59,7 +59,7 @@ export default function PoFormBody({ po, variants, compact }: PoFormBodyProps) {
           value={po.poRemark}
           onChange={(e) => po.setPoRemark(e.target.value)}
           placeholder="Optional notes"
-          className="w-full resize-none rounded-[7px] border border-gray-300 px-[6px] py-[4px] text-[11px] uppercase leading-tight outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 placeholder:normal-case"
+          className="w-full resize-none rounded-[7px] border border-inventory-border-strong px-[6px] py-[4px] text-[11px] uppercase leading-tight outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring placeholder:normal-case"
         />
       </Field>
 
@@ -68,18 +68,18 @@ export default function PoFormBody({ po, variants, compact }: PoFormBodyProps) {
           rows={2}
           value={po.shippingRemark}
           onChange={(e) => po.setShippingRemark(e.target.value)}
-          placeholder="NF.{orderNumber}, color: , size: , quantity: , made in china."
-          className="w-full resize-none rounded-[7px] border border-gray-300 px-[6px] py-[4px] text-[11px] uppercase leading-tight outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 placeholder:normal-case"
+          placeholder="NF.{ORDERNUMBER}, color: , size: , quantity: , made in china."
+          className="w-full resize-none rounded-[7px] border border-inventory-border-strong px-[6px] py-[4px] text-[11px] uppercase leading-tight outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring placeholder:normal-case"
         />
-        <p className="mt-1 text-[10px] leading-tight text-gray-400">
+        <p className="mt-1 text-[10px] leading-tight text-inventory-text-subtle">
           <button
             type="button"
             onClick={() => po.setShippingRemark('{orderNumber}')}
-            className="mr-1 rounded-[5px] border border-blue-200 bg-blue-50 px-[5px] py-[1px] text-[10px] font-bold leading-none text-blue-700 transition-colors duration-150 hover:bg-blue-100 cursor-pointer"
+            className="mr-1 rounded-[5px] border border-inventory-secondary/30 bg-inventory-secondary/10 px-[5px] py-[1px] text-[10px] font-bold leading-none text-inventory-secondary transition-colors duration-150 hover:bg-inventory-secondary/15 cursor-pointer"
           >
             Use
           </button>
-          {'{orderNumber}'} — replaced with the PO number when the order is created.
+          {'{ORDERNUMBER}'} — replaced with the PO number when the order is created.
         </p>
       </Field>
 
@@ -97,7 +97,7 @@ export default function PoFormBody({ po, variants, compact }: PoFormBodyProps) {
         />
       </Field>
 
-      {po.createErrors.general && <p className="text-[11px] text-red-600">{po.createErrors.general}</p>}
+      {po.createErrors.general && <p className="text-[11px] text-inventory-danger">{po.createErrors.general}</p>}
     </div>
   );
 }
@@ -105,9 +105,9 @@ export default function PoFormBody({ po, variants, compact }: PoFormBodyProps) {
 function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="mb-[2px] block text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-gray-500">{label}</label>
+      <label className="mb-[2px] block text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-inventory-text-subtle">{label}</label>
       {children}
-      {error && <p className="mt-1 text-[10px] leading-tight text-red-600">{error}</p>}
+      {error && <p className="mt-1 text-[10px] leading-tight text-inventory-danger">{error}</p>}
     </div>
   );
 }

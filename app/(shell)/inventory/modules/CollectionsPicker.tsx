@@ -97,13 +97,13 @@ export default function CollectionsPicker({ storeId, value, onChange }: Collecti
           ref={anchorRef}
           type="button"
           onClick={() => setOpen((prev) => !prev)}
-          className="flex min-h-[24px] w-full flex-wrap items-center gap-[4px] rounded-[7px] border border-gray-300 px-[6px] py-[3px] text-left text-[11px] leading-none outline-none hover:bg-gray-50 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 cursor-pointer"
+          className="flex min-h-[24px] w-full flex-wrap items-center gap-[4px] rounded-[7px] border border-inventory-border-strong px-[6px] py-[3px] text-left text-[11px] leading-none outline-none hover:bg-inventory-surface-hover focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring cursor-pointer"
         >
-          {value.length === 0 && <span className="px-[2px] text-gray-400">Select collections…</span>}
+          {value.length === 0 && <span className="px-[2px] text-inventory-text-subtle">Select collections…</span>}
           {value.map((c) => (
             <span
               key={c.id}
-              className="flex items-center gap-[3px] rounded-full border border-gray-200 bg-gray-50 px-[5px] py-[1px] text-[9px] font-semibold leading-none text-gray-700"
+              className="flex items-center gap-[3px] rounded-full border border-inventory-border bg-inventory-surface-muted px-[5px] py-[1px] text-[9px] font-semibold leading-none text-inventory-text-muted"
             >
               {c.title}
               <span
@@ -114,7 +114,7 @@ export default function CollectionsPicker({ storeId, value, onChange }: Collecti
                   remove(c.id);
                 }}
                 aria-label={`Remove ${c.title}`}
-                className="text-gray-400 hover:text-red-600"
+                className="text-inventory-text-subtle hover:text-inventory-danger-hover"
               >
                 <Close className="h-2.5 w-2.5" />
               </span>
@@ -126,7 +126,7 @@ export default function CollectionsPicker({ storeId, value, onChange }: Collecti
           <div
             ref={dropdownRef}
             style={{ position: 'fixed', top: position.top, left: position.left, width: position.width }}
-            className="z-[70] max-h-72 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+            className="z-[70] max-h-72 overflow-y-auto rounded-lg border border-inventory-border bg-inventory-surface py-1 shadow-lg inventory-dropdown-in"
           >
             <input
               autoFocus
@@ -137,14 +137,14 @@ export default function CollectionsPicker({ storeId, value, onChange }: Collecti
                 if (e.key === 'Escape') setOpen(false);
               }}
               placeholder="Search collections…"
-              className="w-full border-b border-gray-100 px-2 py-1.5 text-[11px] outline-none"
+              className="w-full border-b border-inventory-divider px-2 py-1.5 text-[11px] outline-none"
             />
-            {loading && <div className="px-2 py-1 text-[11px] text-gray-400">Loading…</div>}
+            {loading && <div className="px-2 py-1 text-[11px] text-inventory-text-subtle">Loading…</div>}
             {!loading &&
               results.map((c) => (
-                <label key={c.id} className="flex cursor-pointer items-center gap-2 px-2 py-1 text-[11px] leading-none hover:bg-gray-50">
-                  <input type="checkbox" checked={selectedIds.has(c.id)} onChange={() => toggle(c)} className="h-3 w-3 rounded border-gray-300 text-blue-600" />
-                  <span className="truncate text-gray-900">{c.title}</span>
+                <label key={c.id} className="flex cursor-pointer items-center gap-2 px-2 py-1 text-[11px] leading-none hover:bg-inventory-surface-hover">
+                  <input type="checkbox" checked={selectedIds.has(c.id)} onChange={() => toggle(c)} className="h-3 w-3 rounded border-inventory-border-strong text-inventory-secondary" />
+                  <span className="truncate text-inventory-text">{c.title}</span>
                 </label>
               ))}
             {!loading && results.length === 0 && query.trim() && (
@@ -155,7 +155,7 @@ export default function CollectionsPicker({ storeId, value, onChange }: Collecti
                   void createAndSelect(query);
                 }}
                 disabled={creating}
-                className="flex w-full items-center gap-1.5 border-t border-dashed border-gray-200 px-2 py-1 text-left text-[11px] font-semibold leading-none text-blue-700 hover:bg-blue-50 disabled:opacity-60 cursor-pointer"
+                className="flex w-full items-center gap-1.5 border-t border-dashed border-inventory-border px-2 py-1 text-left text-[11px] font-semibold leading-none text-inventory-secondary hover:bg-inventory-secondary/10 disabled:opacity-60 cursor-pointer"
               >
                 <span aria-hidden>+</span>
                 <span className="truncate">
@@ -163,8 +163,8 @@ export default function CollectionsPicker({ storeId, value, onChange }: Collecti
                 </span>
               </button>
             )}
-            {!loading && results.length === 0 && !query.trim() && <div className="px-2 py-1 text-[11px] text-gray-400">No collections yet</div>}
-            {createError && <div className="px-2 py-1 text-[10px] leading-tight text-red-600">{createError}</div>}
+            {!loading && results.length === 0 && !query.trim() && <div className="px-2 py-1 text-[11px] text-inventory-text-subtle">No collections yet</div>}
+            {createError && <div className="px-2 py-1 text-[10px] leading-tight text-inventory-danger">{createError}</div>}
           </div>,
           document.body
         )}

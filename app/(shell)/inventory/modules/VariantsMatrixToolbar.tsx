@@ -40,9 +40,9 @@ export default function VariantsMatrixToolbar({ p, fullView }: VariantsMatrixToo
   const totalVariants = p.product?.variants.length ?? 0;
 
   return (
-    <div className="flex flex-wrap items-center gap-[4px] border-b border-gray-200 px-[8px] py-[4px]">
-      <h3 className="mr-[2px] text-[9.5px] font-bold uppercase leading-none tracking-[0.5px] text-gray-500">Variants / stock</h3>
-      <span className="mr-[2px] whitespace-nowrap rounded-full bg-gray-100 px-[6px] py-[1px] text-[9.5px] font-bold leading-none text-gray-600">
+    <div className="flex flex-wrap items-center gap-[4px] border-b border-inventory-sec-variants/25 bg-inventory-sec-variants/[7%] px-[8px] py-[4px] shadow-[inset_3px_0_0_0_var(--color-inventory-sec-variants)]">
+      <h3 className="mr-[2px] text-[9.5px] font-bold uppercase leading-none tracking-[0.5px] text-inventory-sec-variants">Variants / stock</h3>
+      <span className="mr-[2px] whitespace-nowrap rounded-full bg-inventory-surface ring-1 ring-inset ring-inventory-sec-variants/30 px-[6px] py-[1px] text-[9.5px] font-bold leading-none text-inventory-sec-variants">
         {totalVariants} variant{totalVariants === 1 ? '' : 's'}
       </span>
 
@@ -55,7 +55,7 @@ export default function VariantsMatrixToolbar({ p, fullView }: VariantsMatrixToo
         </button>
       )}
 
-      <span className="mx-[2px] h-[18px] w-px bg-gray-200" aria-hidden="true" />
+      <span className="mx-[2px] h-[18px] w-px bg-inventory-border" aria-hidden="true" />
 
       {/* Colour filter pills */}
       <div className="flex flex-wrap items-center gap-1.5">
@@ -74,7 +74,7 @@ export default function VariantsMatrixToolbar({ p, fullView }: VariantsMatrixToo
         value={matrix.sizeFilter}
         onChange={(e) => matrix.setSizeFilter(e.target.value)}
         aria-label="Filter by size"
-        className="h-[22px] rounded-[7px] border border-gray-300 bg-white px-[6px] text-[10.5px] leading-none text-gray-700 shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 cursor-pointer"
+        className="h-[22px] rounded-[7px] border border-inventory-border-strong bg-inventory-surface px-[6px] text-[10.5px] leading-none text-inventory-text-muted shadow-sm outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring cursor-pointer"
       >
         <option value="">All sizes</option>
         {matrix.sizes.map((size) => (
@@ -84,12 +84,12 @@ export default function VariantsMatrixToolbar({ p, fullView }: VariantsMatrixToo
         ))}
       </select>
 
-      <label className="flex cursor-pointer items-center gap-[4px] text-[10px] font-medium leading-none text-gray-700">
+      <label className="flex cursor-pointer items-center gap-[4px] text-[10px] font-medium leading-none text-inventory-text-muted">
         <input
           type="checkbox"
           checked={matrix.showZeroStock}
           onChange={(e) => matrix.setShowZeroStock(e.target.checked)}
-          className="h-3 w-3 cursor-pointer accent-blue-600"
+          className="h-3 w-3 cursor-pointer accent-inventory-primary"
         />
         Zero stock
       </label>
@@ -106,7 +106,7 @@ export default function VariantsMatrixToolbar({ p, fullView }: VariantsMatrixToo
               aria-pressed={isActive}
               title={entry.hint}
               className={`whitespace-nowrap rounded-full border px-[6px] py-[1px] text-[9px] font-bold uppercase leading-none tracking-[0.4px] transition-colors duration-150 cursor-pointer ${entry.className} ${
-                isActive ? 'ring-2 ring-blue-400 ring-offset-1' : 'opacity-90 hover:opacity-100'
+                isActive ? 'ring-2 ring-inventory-primary ring-offset-1' : 'opacity-90 hover:opacity-100'
               }`}
             >
               {entry.label}
@@ -127,7 +127,7 @@ export default function VariantsMatrixToolbar({ p, fullView }: VariantsMatrixToo
           onClick={applyToSelected}
           disabled={matrix.selectedIds.size === 0 || p.pricing.applying}
           title="Applies the pricing panel's current sell/buy price to every variant of the selected colours"
-          className="rounded-lg bg-blue-600 px-2.5 py-1.5 text-xs font-semibold text-white transition-colors duration-150 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+          className="rounded-lg bg-inventory-primary px-2.5 py-1.5 text-xs font-semibold text-white transition-colors duration-150 hover:bg-inventory-primary-hover disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
         >
           Apply to selected colours
         </button>
@@ -137,7 +137,7 @@ export default function VariantsMatrixToolbar({ p, fullView }: VariantsMatrixToo
           onClick={adjustSelected}
           disabled={matrix.selectedIds.size === 0}
           title="Opens the stock adjustment modal for the selected variants"
-          className={`flex h-[22px] items-center gap-1 rounded-[6px] bg-amber-600 px-[6px] text-[10px] font-bold leading-none text-white transition-colors duration-150 hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer`}
+          className={`flex h-[22px] items-center gap-1 rounded-[6px] bg-inventory-accent px-[6px] text-[10px] font-bold leading-none text-inventory-accent-ink transition-colors duration-150 hover:bg-inventory-accent-hover disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer`}
         >
           <Adjust className="h-3 w-3" />
           Adjust Stock
@@ -147,7 +147,7 @@ export default function VariantsMatrixToolbar({ p, fullView }: VariantsMatrixToo
           onClick={matrix.requestBulkDelete}
           disabled={matrix.selectedIds.size === 0}
           title="Deletes the selected variants"
-          className="flex h-[22px] items-center gap-1 rounded-[6px] border border-red-200 bg-red-50 px-[6px] text-[10px] font-bold leading-none text-red-600 transition-colors duration-150 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+          className="flex h-[22px] items-center gap-1 rounded-[6px] border border-inventory-danger/30 bg-inventory-danger/10 px-[6px] text-[10px] font-bold leading-none text-inventory-danger transition-colors duration-150 hover:bg-inventory-danger/15 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
         >
           <Trash className="h-3 w-3" />
           Delete{matrix.selectedIds.size > 0 ? ` (${matrix.selectedIds.size})` : ''}
@@ -157,13 +157,13 @@ export default function VariantsMatrixToolbar({ p, fullView }: VariantsMatrixToo
           onClick={createPo}
           disabled={matrix.selectedIds.size === 0 && matrix.rows.length === 0}
           title={matrix.rows.length === 0 ? 'This product has no variants yet' : undefined}
-          className="flex h-[22px] items-center gap-1 rounded-[6px] bg-emerald-600 px-[6px] text-[10px] font-bold leading-none text-white transition-colors duration-150 hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+          className="flex h-[22px] items-center gap-1 rounded-[6px] bg-inventory-success px-[6px] text-[10px] font-bold leading-none text-white transition-colors duration-150 hover:bg-inventory-success-hover disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
         >
           <Plus className="h-3 w-3" />
           Create PO
         </button>
 
-        <span className="mx-[2px] h-[18px] w-px bg-gray-200" aria-hidden="true" />
+        <span className="mx-[2px] h-[18px] w-px bg-inventory-border" aria-hidden="true" />
 
         <SecondaryButton onClick={() => setAddColourOpen(true)}>
           <Plus className="h-3 w-3" />
@@ -332,7 +332,7 @@ function ModalChips({ names, kind }: { names: string[]; kind: 'colour' | 'size' 
       {names.map((name, index) => (
         <span
           key={`${name}-${index}`}
-          className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-gray-700"
+          className="inline-flex items-center gap-1.5 rounded-md border border-inventory-border bg-inventory-surface px-2 py-0.5 text-[11px] font-semibold text-inventory-text-muted"
         >
           {kind === 'colour' && (
             <span
@@ -354,7 +354,7 @@ function Pill({ active, onClick, children }: { active: boolean; onClick: () => v
       onClick={onClick}
       aria-pressed={active}
       className={`flex h-[22px] items-center gap-1 whitespace-nowrap rounded-full border px-[7px] text-[10px] font-semibold leading-none transition-colors duration-150 cursor-pointer ${
-        active ? 'border-blue-600 bg-blue-600 text-white' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+        active ? 'border-inventory-primary bg-inventory-primary text-white' : 'border-inventory-border-strong bg-inventory-surface text-inventory-text-muted hover:bg-inventory-surface-hover'
       }`}
     >
       {children}

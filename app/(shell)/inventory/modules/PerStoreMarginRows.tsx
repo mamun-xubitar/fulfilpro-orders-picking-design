@@ -33,7 +33,7 @@ export default function PerStoreMarginRows({ listings, values, onChange }: PerSt
   return (
     <div className="space-y-0.75">
       <div className="flex items-center justify-between">
-        <span className="text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-gray-500" title="Saved margins reprice that store on Shopify when you save this panel">
+        <span className="text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-inventory-text-subtle" title="Saved margins reprice that store on Shopify when you save this panel">
           Per store margin
         </span>
         {available.length > 0 && (
@@ -41,7 +41,7 @@ export default function PerStoreMarginRows({ listings, values, onChange }: PerSt
             type="button"
             onClick={() => setAdding((v) => !v)}
             aria-label="Add per-store margin"
-            className="flex h-[18px] w-[18px] items-center justify-center rounded-full border border-gray-300 text-gray-500 transition-colors duration-150 hover:bg-gray-50 cursor-pointer"
+            className="flex h-[18px] w-[18px] items-center justify-center rounded-full border border-inventory-border-strong text-inventory-text-subtle transition-colors duration-150 hover:bg-inventory-surface-hover cursor-pointer"
           >
             <Plus className="h-2.5 w-2.5" />
           </button>
@@ -61,7 +61,7 @@ export default function PerStoreMarginRows({ listings, values, onChange }: PerSt
               if (e.key === 'Escape') setAdding(false);
             }}
             aria-label="Select a store to add a margin for"
-            className="h-[22px] w-full rounded-[7px] border border-gray-300 px-[6px] text-[10.5px] leading-none outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 cursor-pointer"
+            className="h-[22px] w-full rounded-[7px] border border-inventory-border-strong px-[6px] text-[10.5px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring cursor-pointer"
           >
             <option value="" disabled>
               Select a store…
@@ -76,7 +76,7 @@ export default function PerStoreMarginRows({ listings, values, onChange }: PerSt
             type="button"
             onClick={() => setAdding(false)}
             aria-label="Cancel adding per-store margin"
-            className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full text-gray-400 transition-colors duration-150 hover:bg-gray-100 hover:text-gray-600 cursor-pointer"
+            className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full text-inventory-text-subtle transition-colors duration-150 hover:bg-inventory-surface-hover hover:text-inventory-text-muted cursor-pointer"
           >
             <Close className="h-2.5 w-2.5" />
           </button>
@@ -85,7 +85,7 @@ export default function PerStoreMarginRows({ listings, values, onChange }: PerSt
 
       {withMargin.map((l) => (
         <div key={l.storeId} className="flex items-center gap-[6px]">
-          <span className="min-w-0 flex-1 truncate text-[11px] leading-none text-gray-700">{l.storeName}</span>
+          <span className="min-w-0 flex-1 truncate text-[11px] leading-none text-inventory-text-muted">{l.storeName}</span>
           <div className="relative">
             <input
               type="number"
@@ -97,15 +97,15 @@ export default function PerStoreMarginRows({ listings, values, onChange }: PerSt
                 if (Number.isFinite(value) && value >= 0) onChange(l.storeId, value);
               }}
               aria-label={`Margin for ${l.storeName}`}
-              className="h-[22px] w-[68px] rounded-[7px] border border-gray-300 pl-[6px] pr-[18px] text-right text-[10.5px] leading-none tabular-nums outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              className="h-[22px] w-[68px] rounded-[7px] border border-inventory-border-strong pl-[6px] pr-[18px] text-right text-[10.5px] leading-none tabular-nums outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring"
             />
-            <span className="pointer-events-none absolute right-[5px] top-1/2 -translate-y-1/2 text-[9px] leading-none text-gray-400">%</span>
+            <span className="pointer-events-none absolute right-[5px] top-1/2 -translate-y-1/2 text-[9px] leading-none text-inventory-text-subtle">%</span>
           </div>
           <button
             type="button"
             onClick={() => onChange(l.storeId, null)}
             aria-label={`Remove margin for ${l.storeName}`}
-            className="flex h-[18px] w-[18px] items-center justify-center rounded-full text-gray-400 transition-colors duration-150 hover:bg-gray-100 hover:text-gray-600 cursor-pointer"
+            className="flex h-[18px] w-[18px] items-center justify-center rounded-full text-inventory-text-subtle transition-colors duration-150 hover:bg-inventory-surface-hover hover:text-inventory-text-muted cursor-pointer"
           >
             <Close className="h-2.5 w-2.5" />
           </button>

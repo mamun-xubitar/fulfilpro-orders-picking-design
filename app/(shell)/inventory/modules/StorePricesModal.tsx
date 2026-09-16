@@ -90,12 +90,12 @@ export default function StorePricesModal({ listing, onClose, onSaveOne, onSaveAl
         </div>
       }
     >
-      <p className="mb-2 text-[12px] font-semibold text-gray-900">{listing.productTitle ?? listing.storeName}</p>
+      <p className="mb-2 text-[12px] font-semibold text-inventory-text">{listing.productTitle ?? listing.storeName}</p>
 
-      <div className="overflow-x-auto rounded-lg border border-gray-200">
+      <div className="overflow-x-auto rounded-lg border border-inventory-border">
         <table className="w-full text-[11px] leading-none">
           <thead>
-            <tr className="border-b border-gray-200 bg-gray-50">
+            <tr className="border-b border-inventory-border bg-inventory-surface-muted">
               <th className="w-10 py-1 pl-2 pr-1">
                 <input
                   ref={headerCheckboxRef}
@@ -103,14 +103,14 @@ export default function StorePricesModal({ listing, onClose, onSaveOne, onSaveAl
                   checked={allSelected}
                   onChange={toggleAll}
                   aria-label="Select all variants"
-                  className="h-3 w-3 rounded border-gray-300 text-blue-600 cursor-pointer"
+                  className="h-3 w-3 rounded border-inventory-border-strong text-inventory-secondary cursor-pointer"
                 />
               </th>
-              <th className="px-2 py-1 text-left text-[10px] font-bold uppercase tracking-[0.4px] text-gray-500">Variant</th>
-              <th className="px-2 py-1 text-left text-[10px] font-bold uppercase tracking-[0.4px] text-gray-500">SKU</th>
-              <th className="px-2 py-1 text-right text-[10px] font-bold uppercase tracking-[0.4px] text-gray-500">Inventory</th>
-              <th className="px-2 py-1 text-right text-[10px] font-bold uppercase tracking-[0.4px] text-gray-500">Price</th>
-              <th className="w-20 py-1 pr-2 text-right text-[10px] font-bold uppercase tracking-[0.4px] text-gray-500">Actions</th>
+              <th className="px-2 py-1 text-left text-[10px] font-bold uppercase tracking-[0.4px] text-inventory-text-subtle">Variant</th>
+              <th className="px-2 py-1 text-left text-[10px] font-bold uppercase tracking-[0.4px] text-inventory-text-subtle">SKU</th>
+              <th className="px-2 py-1 text-right text-[10px] font-bold uppercase tracking-[0.4px] text-inventory-text-subtle">Inventory</th>
+              <th className="px-2 py-1 text-right text-[10px] font-bold uppercase tracking-[0.4px] text-inventory-text-subtle">Price</th>
+              <th className="w-20 py-1 pr-2 text-right text-[10px] font-bold uppercase tracking-[0.4px] text-inventory-text-subtle">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -119,19 +119,19 @@ export default function StorePricesModal({ listing, onClose, onSaveOne, onSaveAl
               const isRowSaving = saving && savingRowId === variant.id;
               const isSelected = selectedIds.has(variant.id);
               return (
-                <tr key={variant.id} className={`border-b border-gray-100 last:border-0 hover:bg-gray-50 ${isSelected ? 'bg-blue-50/50' : ''}`}>
+                <tr key={variant.id} className={`border-b border-inventory-divider last:border-0 transition-colors duration-150 hover:bg-inventory-surface-hover ${isSelected ? 'bg-inventory-secondary/10/50' : ''}`}>
                   <td className="py-1 pl-2 pr-1">
                     <input
                       type="checkbox"
                       checked={isSelected}
                       onChange={() => toggleRow(variant.id)}
                       aria-label={`Select ${variant.title}`}
-                      className="h-3 w-3 rounded border-gray-300 text-blue-600 cursor-pointer"
+                      className="h-3 w-3 rounded border-inventory-border-strong text-inventory-secondary cursor-pointer"
                     />
                   </td>
-                  <td className="min-w-40 px-2 py-1 text-[11px] font-medium text-gray-900">{variant.title}</td>
-                  <td className="px-2 py-1 text-[11px] text-gray-500">{variant.sku ?? '—'}</td>
-                  <td className="px-2 py-1 text-right text-[11px] tabular-nums text-gray-700">
+                  <td className="min-w-40 px-2 py-1 text-[11px] font-medium text-inventory-text">{variant.title}</td>
+                  <td className="px-2 py-1 text-[11px] text-inventory-text-subtle">{variant.sku ?? '—'}</td>
+                  <td className="px-2 py-1 text-right text-[11px] tabular-nums text-inventory-text-muted">
                     {variant.inventoryQuantity !== null ? formatNumber(variant.inventoryQuantity) : '—'}
                   </td>
                   <td className="px-2 py-1 text-right">
@@ -143,7 +143,7 @@ export default function StorePricesModal({ listing, onClose, onSaveOne, onSaveAl
                       onChange={(e) => setDraft(variant.id, e.target.value)}
                       aria-label={`Price for ${variant.title}`}
                       className={`ml-auto h-[22px] w-24 rounded-[6px] border px-[6px] text-right text-[11px] leading-none tabular-nums outline-none focus:ring-2 ${
-                        invalid ? 'border-red-300 focus:border-red-500 focus:ring-red-100' : 'border-gray-300 focus:border-blue-500 focus:ring-blue-100'
+                        invalid ? 'border-inventory-danger/35 focus:border-inventory-danger focus:ring-inventory-danger/20' : 'border-inventory-border-strong focus:border-inventory-primary focus:ring-inventory-primary-ring'
                       }`}
                     />
                   </td>
@@ -152,7 +152,7 @@ export default function StorePricesModal({ listing, onClose, onSaveOne, onSaveAl
                       type="button"
                       onClick={() => saveRow(variant.id)}
                       disabled={saving || invalid}
-                      className="h-[22px] rounded-[6px] border border-gray-300 px-2 text-[10px] font-bold leading-none text-gray-700 transition-colors duration-150 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+                      className="h-[22px] rounded-[6px] border border-inventory-border-strong px-2 text-[10px] font-bold leading-none text-inventory-text-muted transition-colors duration-150 hover:bg-inventory-surface-hover disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
                     >
                       {isRowSaving ? 'Saving…' : 'Save'}
                     </button>

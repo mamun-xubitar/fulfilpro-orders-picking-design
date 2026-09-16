@@ -52,7 +52,7 @@ export default function InventoryModals(p: InventoryPage) {
                   gallery.step(-1);
                 }}
                 aria-label="Previous image"
-                className="absolute left-4 top-1/2 z-10 -translate-y-1/2 rounded-full border border-white/40 bg-white/85 p-2.5 text-gray-900 shadow-lg backdrop-blur-sm transition-colors duration-150 hover:bg-white cursor-pointer"
+                className="absolute left-4 top-1/2 z-10 -translate-y-1/2 rounded-full border border-white/40 bg-inventory-surface/85 p-2.5 text-inventory-text shadow-lg backdrop-blur-sm transition-colors duration-150 hover:bg-inventory-surface cursor-pointer"
               >
                 <ChevronLeft className="h-6 w-6" />
               </button>
@@ -63,7 +63,7 @@ export default function InventoryModals(p: InventoryPage) {
                   gallery.step(1);
                 }}
                 aria-label="Next image"
-                className="absolute right-4 top-1/2 z-10 -translate-y-1/2 rounded-full border border-white/40 bg-white/85 p-2.5 text-gray-900 shadow-lg backdrop-blur-sm transition-colors duration-150 hover:bg-white cursor-pointer"
+                className="absolute right-4 top-1/2 z-10 -translate-y-1/2 rounded-full border border-white/40 bg-inventory-surface/85 p-2.5 text-inventory-text shadow-lg backdrop-blur-sm transition-colors duration-150 hover:bg-inventory-surface cursor-pointer"
               >
                 <ChevronRight className="h-6 w-6" />
               </button>
@@ -128,8 +128,8 @@ export default function InventoryModals(p: InventoryPage) {
             </div>
           }
         >
-          <p className="text-[12px] text-gray-600">
-            This removes <strong className="font-semibold text-gray-900">{variantTitle(matrix.deleteTarget)}</strong>
+          <p className="text-[12px] text-inventory-text-muted">
+            This removes <strong className="font-semibold text-inventory-text">{variantTitle(matrix.deleteTarget)}</strong>
             {matrix.deleteTarget.sku ? ` (${matrix.deleteTarget.sku})` : ''} and its stock history. This can&apos;t be undone.
           </p>
         </ModalShell>
@@ -178,8 +178,8 @@ function BulkDeleteVariantsModal({ p }: { p: InventoryPage }) {
         </div>
       }
     >
-      <p className="text-[12px] text-gray-600">
-        This removes <strong className="font-semibold text-gray-900">{matrix.selectedIds.size}</strong> selected variant
+      <p className="text-[12px] text-inventory-text-muted">
+        This removes <strong className="font-semibold text-inventory-text">{matrix.selectedIds.size}</strong> selected variant
         {matrix.selectedIds.size === 1 ? '' : 's'} and their stock history. This can&apos;t be undone.
       </p>
     </ModalShell>
@@ -213,8 +213,8 @@ function DeleteProductModal({ p }: { p: InventoryPage }) {
         </div>
       }
     >
-      <p className="text-[12px] text-gray-600">
-        This permanently removes <strong className="font-semibold text-gray-900">{p.product.name}</strong>, every variant, image and
+      <p className="text-[12px] text-inventory-text-muted">
+        This permanently removes <strong className="font-semibold text-inventory-text">{p.product.name}</strong>, every variant, image and
         history entry attached to it. This can&apos;t be undone.
       </p>
     </ModalShell>
@@ -249,7 +249,7 @@ function ApplyPriceModal({ p }: { p: InventoryPage }) {
         </div>
       }
     >
-      <p className="text-[12px] text-gray-600">Every variant of this product will be updated to:</p>
+      <p className="text-[12px] text-inventory-text-muted">Every variant of this product will be updated to:</p>
       <dl className="mt-2 space-y-1.5">
         <SummaryRow label="Sell price (inc tax)" value={`${formatMoney(pricing.confirmUse.sellingIncTax)} ${p.globals.baseCurrency}`} />
         <SummaryRow label="Buy price (landed)" value={`${formatMoney(pricing.confirmUse.totalBuying)} ${p.globals.baseCurrency}`} />
@@ -260,9 +260,9 @@ function ApplyPriceModal({ p }: { p: InventoryPage }) {
 
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between rounded-[7px] bg-gray-50 px-2 py-1.5">
-      <dt className="text-[11px] font-medium text-gray-600">{label}</dt>
-      <dd className="text-[11px] font-bold text-gray-900 tabular-nums">{value}</dd>
+    <div className="flex items-center justify-between rounded-[7px] bg-inventory-surface-muted px-2 py-1.5">
+      <dt className="text-[11px] font-medium text-inventory-text-muted">{label}</dt>
+      <dd className="text-[11px] font-bold text-inventory-text tabular-nums">{value}</dd>
     </div>
   );
 }

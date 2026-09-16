@@ -10,7 +10,7 @@ export default function StockWarningBanner({ warnings }: { warnings: StockWarnin
   if (warnings.length === 0) return null;
 
   return (
-    <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-[12px] text-amber-800">
+    <div className="rounded-xl border border-inventory-warning/30 bg-inventory-warning/10 p-3 text-[12px] text-inventory-warning-ink">
       <p className="font-semibold">Stock split exceeds hub availability</p>
       <ul className="mt-1 space-y-0.5">
         {warnings.map((w) => (

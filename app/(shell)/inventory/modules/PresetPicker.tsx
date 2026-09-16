@@ -107,16 +107,16 @@ export default function PresetPicker({ kind, groups, selectedKeys, onApplyGroup,
   return (
     <div
       ref={pickerRef}
-      className={`absolute z-30 ${openUp ? 'bottom-full mb-1' : 'top-full mt-1'} left-0 w-[min(30rem,90vw)] max-h-72 overflow-y-auto rounded-lg border border-gray-200 bg-white py-2 shadow-lg`}
+      className={`absolute z-30 ${openUp ? 'bottom-full mb-1' : 'top-full mt-1'} left-0 w-[min(30rem,90vw)] max-h-72 overflow-y-auto rounded-lg border border-inventory-border bg-inventory-surface py-2 shadow-lg`}
       onMouseDown={(e) => e.stopPropagation()}
     >
       <div className="flex items-center justify-between gap-2 px-3 pb-1.5">
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{kind === 'colour' ? 'Colour presets' : 'Size presets'}</span>
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-inventory-text-subtle">{kind === 'colour' ? 'Colour presets' : 'Size presets'}</span>
         {groups.length > 0 && (
           <button
             type="button"
             onClick={() => setUpdating((v) => !v)}
-            className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-semibold text-gray-500 hover:bg-gray-50 cursor-pointer"
+            className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-semibold text-inventory-text-subtle hover:bg-inventory-surface-hover cursor-pointer"
           >
             {updating ? (
               <>
@@ -132,7 +132,7 @@ export default function PresetPicker({ kind, groups, selectedKeys, onApplyGroup,
       </div>
 
       {groups.length === 0 ? (
-        <div className="px-3 py-2 text-xs text-gray-400">No presets yet.</div>
+        <div className="px-3 py-2 text-xs text-inventory-text-subtle">No presets yet.</div>
       ) : (
         <div className="flex flex-wrap gap-1.5 px-3 pb-2">
           {groups.map((group) => {
@@ -144,10 +144,10 @@ export default function PresetPicker({ kind, groups, selectedKeys, onApplyGroup,
                 key={group.id}
                 className={`inline-flex items-center gap-1 whitespace-normal rounded-full border px-2 py-1 text-[12px] font-semibold transition-colors duration-150 ${
                   state === 'all'
-                    ? 'border-blue-600 bg-blue-50 text-blue-700'
+                    ? 'border-inventory-primary bg-inventory-secondary/10 text-inventory-secondary'
                     : state === 'some'
-                      ? 'border-blue-300 bg-white text-blue-700'
-                      : 'border-gray-200 bg-white text-gray-700'
+                      ? 'border-inventory-secondary/35 bg-inventory-surface text-inventory-secondary'
+                      : 'border-inventory-border bg-inventory-surface text-inventory-text-muted'
                 } ${deleting ? 'opacity-40' : ''}`}
               >
                 <button
@@ -160,7 +160,7 @@ export default function PresetPicker({ kind, groups, selectedKeys, onApplyGroup,
                 >
                   <GroupBadgeContent kind={kind} items={group.items} />
                   {state === 'some' && (
-                    <span className="text-[10px] text-blue-500">
+                    <span className="text-[10px] text-inventory-secondary">
                       {present}/{group.items.length}
                     </span>
                   )}
@@ -172,7 +172,7 @@ export default function PresetPicker({ kind, groups, selectedKeys, onApplyGroup,
                     disabled={deleting}
                     aria-label={`Delete preset group ${group.items.join(', ')}`}
                     title="Delete preset group"
-                    className="flex h-3.5 w-3.5 items-center justify-center rounded-full text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed cursor-pointer"
+                    className="flex h-3.5 w-3.5 items-center justify-center rounded-full text-inventory-text-subtle hover:bg-inventory-danger/10 hover:text-inventory-danger-hover disabled:cursor-not-allowed cursor-pointer"
                   >
                     <Close className="h-2.5 w-2.5" />
                   </button>
@@ -183,10 +183,10 @@ export default function PresetPicker({ kind, groups, selectedKeys, onApplyGroup,
         </div>
       )}
 
-      <div className="border-t border-gray-100 px-3 pt-1.5">
+      <div className="border-t border-inventory-divider px-3 pt-1.5">
         {adding ? (
           <div className="space-y-1.5">
-            <label className="block text-[11px] font-semibold text-gray-500">New group members (comma separated)</label>
+            <label className="block text-[11px] font-semibold text-inventory-text-subtle">New group members (comma separated)</label>
             <input
               autoFocus
               type="text"
@@ -196,21 +196,21 @@ export default function PresetPicker({ kind, groups, selectedKeys, onApplyGroup,
                 setCreateError(null);
               }}
               placeholder={kind === 'colour' ? 'e.g. Red, Green, Blue' : 'e.g. S, M, L, XL'}
-              className="w-full rounded-md border border-gray-300 px-2 py-1 text-[13px] outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              className="w-full rounded-md border border-inventory-border-strong px-2 py-1 text-[13px] outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring"
             />
             {parsedNames.length > 0 && !displayError && (
               <div className="flex flex-wrap gap-1.5">
-                <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-2 py-1 text-[12px] font-semibold text-gray-700">
+                <span className="inline-flex items-center gap-1 rounded-full border border-inventory-border bg-inventory-surface-muted px-2 py-1 text-[12px] font-semibold text-inventory-text-muted">
                   <GroupBadgeContent kind={kind} items={parsedNames} />
                 </span>
               </div>
             )}
-            {displayError && <p className="text-xs text-red-600">{displayError}</p>}
+            {displayError && <p className="text-xs text-inventory-danger">{displayError}</p>}
             <div className="flex gap-1.5">
               <button
                 type="button"
                 onClick={resetAddForm}
-                className="flex-1 rounded-md border border-gray-300 bg-white px-2 py-1 text-[12px] font-semibold text-gray-600 hover:bg-gray-50 cursor-pointer"
+                className="flex-1 rounded-md border border-inventory-border-strong bg-inventory-surface px-2 py-1 text-[12px] font-semibold text-inventory-text-muted hover:bg-inventory-surface-hover cursor-pointer"
               >
                 Cancel
               </button>
@@ -218,7 +218,7 @@ export default function PresetPicker({ kind, groups, selectedKeys, onApplyGroup,
                 type="button"
                 onClick={() => void submitCreate()}
                 disabled={parsedNames.length === 0 || !!validationError || saving || submitting}
-                className="flex-1 rounded-md bg-blue-600 px-2 py-1 text-[12px] font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+                className="flex-1 rounded-md bg-inventory-primary px-2 py-1 text-[12px] font-semibold text-white hover:bg-inventory-primary-hover disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
               >
                 {saving || submitting ? 'Adding…' : `Add group${parsedNames.length > 1 ? ` (${parsedNames.length})` : ''}`}
               </button>
@@ -228,7 +228,7 @@ export default function PresetPicker({ kind, groups, selectedKeys, onApplyGroup,
           <button
             type="button"
             onClick={() => setAdding(true)}
-            className="flex w-full items-center gap-1.5 rounded-md px-1 py-1 text-[13px] font-semibold text-blue-600 hover:bg-blue-50 cursor-pointer"
+            className="flex w-full items-center gap-1.5 rounded-md px-1 py-1 text-[13px] font-semibold text-inventory-secondary hover:bg-inventory-secondary/10 cursor-pointer"
           >
             <Plus className="h-3.5 w-3.5" />
             Add group
@@ -257,7 +257,7 @@ function GroupBadgeContent({ kind, items }: { kind: 'colour' | 'size'; items: st
               style={{ backgroundColor: resolveSwatch(deriveColorFromName(name)) }}
             />
           ))}
-          {extra > 0 && <span className="ml-1 text-[10px] text-gray-400">+{extra}</span>}
+          {extra > 0 && <span className="ml-1 text-[10px] text-inventory-text-subtle">+{extra}</span>}
         </span>
       )}
       {label}

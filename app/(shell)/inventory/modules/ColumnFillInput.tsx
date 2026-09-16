@@ -75,9 +75,9 @@ export default function ColumnFillInput({ label, rowCount, step, min, integerOnl
         aria-label={`Set ${label} for every row`}
         aria-invalid={error !== null}
         title={disabled ? 'Fix row errors first' : (error ?? `Set ${label} for every visible row`)}
-        className={`h-[16px] w-full min-w-0 rounded-[4px] border bg-white px-[3px] text-right text-[9px] font-normal normal-case leading-none tracking-normal text-gray-700 outline-none focus:ring-1 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400 ${error ? 'border-red-400 bg-red-50/50 focus:border-red-500 focus:ring-red-100' : 'border-gray-300 focus:border-blue-500 focus:ring-blue-100'}`}
+        className={`h-[16px] w-full min-w-0 rounded-[4px] border bg-inventory-surface px-[3px] text-right text-[9px] font-normal normal-case leading-none tracking-normal text-inventory-text-muted outline-none focus:ring-1 disabled:cursor-not-allowed disabled:bg-inventory-surface-muted disabled:text-inventory-text-subtle ${error ? 'border-inventory-danger/45 bg-inventory-danger/8 focus:border-inventory-danger focus:ring-inventory-danger/20' : 'border-inventory-border-strong focus:border-inventory-primary focus:ring-inventory-primary-ring'}`}
       />
-      {error && <p className="mt-[2px] whitespace-normal break-words text-right text-[9px] font-normal normal-case leading-tight text-red-600">{error}</p>}
+      {error && <p className="mt-[2px] whitespace-normal break-words text-right text-[9px] font-normal normal-case leading-tight text-inventory-danger">{error}</p>}
       {typeof document !== 'undefined' &&
         pending !== null &&
         createPortal(
@@ -116,12 +116,12 @@ export default function ColumnFillInput({ label, rowCount, step, min, integerOnl
                     />
                   }
                 >
-                  <p className="text-left text-[12px] text-gray-600 whitespace-normal break-words">
-                    Set <span className="font-semibold text-gray-900">{label}</span> to <span className="font-semibold text-gray-900">{pending}</span> for all{' '}
+                  <p className="text-left text-[12px] text-inventory-text-muted whitespace-normal break-words">
+                    Set <span className="font-semibold text-inventory-text">{label}</span> to <span className="font-semibold text-inventory-text">{pending}</span> for all{' '}
                     {rowCount} row{rowCount === 1 ? '' : 's'}?
                   </p>
                   {warning && (
-                    <p className="mt-2 max-w-full rounded-[6px] border border-red-200 bg-red-50 px-2 py-1.5 text-left text-[11px] leading-snug whitespace-normal break-words text-red-700">
+                    <p className="mt-2 max-w-full rounded-[6px] border border-inventory-danger/30 bg-inventory-danger/10 px-2 py-1.5 text-left text-[11px] leading-snug whitespace-normal break-words text-inventory-danger-hover">
                       {warning}
                     </p>
                   )}

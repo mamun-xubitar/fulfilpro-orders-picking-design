@@ -119,16 +119,16 @@ export default function StoreDraftBlock({
   };
 
   return (
-    <div className="overflow-hidden rounded-xl border-2 border-gray-300 bg-white shadow-sm">
-      <div className="sticky top-0 z-10 flex items-baseline justify-between gap-2 border-b border-gray-200 bg-gray-50/95 px-3 py-1.5 backdrop-blur">
+    <div className="overflow-hidden rounded-xl border-2 border-inventory-border-strong bg-inventory-surface shadow-sm">
+      <div className="sticky top-0 z-10 flex items-baseline justify-between gap-2 border-b border-inventory-border bg-inventory-surface/95 px-3 py-1.5 backdrop-blur">
         <span className="flex items-baseline gap-2">
-          <span className="text-[10px] font-semibold text-gray-400">
+          <span className="text-[10px] font-semibold text-inventory-text-subtle">
             Store {index} of {total}
           </span>
-          <h4 className="text-[12px] font-semibold text-gray-900">{storeName}</h4>
+          <h4 className="text-[12px] font-semibold text-inventory-text">{storeName}</h4>
         </span>
-        <span className="flex items-center gap-2 text-[10px] text-gray-400">
-          {listingStatus && <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 font-semibold uppercase">{listingStatus.replace('_', ' ')}</span>}
+        <span className="flex items-center gap-2 text-[10px] text-inventory-text-subtle">
+          {listingStatus && <span className="rounded-full border border-inventory-border bg-inventory-surface-muted px-2 py-0.5 font-semibold uppercase">{listingStatus.replace('_', ' ')}</span>}
           <span className="truncate">{storeDomain}</span>
         </span>
       </div>
@@ -160,7 +160,7 @@ export default function StoreDraftBlock({
         )}
 
         {!showDetails && !showPricing && !showVariants && !showImages && (
-          <p className="text-[11px] text-gray-400">Select what to update above — nothing will be touched on {storeName}.</p>
+          <p className="text-[11px] text-inventory-text-subtle">Select what to update above — nothing will be touched on {storeName}.</p>
         )}
       </div>
     </div>

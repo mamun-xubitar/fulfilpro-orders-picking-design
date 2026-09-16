@@ -1,5 +1,6 @@
 'use client';
 
+import { panelBorderClass } from './MainImagePanel';
 import ProductSearchBox from './ProductSearchBox';
 import { QUICK_FILTERS } from './constants';
 import type { InventoryPage } from './hooks/useInventoryPage';
@@ -20,7 +21,7 @@ export default function ProductsToolbar(p: InventoryPage) {
     : `${nav.position} / ${formatNumber(nav.filteredCount)} of ${formatNumber(nav.totalCount)}`;
 
   return (
-    <div className="flex flex-wrap items-center gap-[6px] rounded-[10px] border border-gray-200 bg-white px-[8px] py-[4px] shadow-[0_1px_2px_0_rgb(0_0_0/0.05)]">
+    <div className={`flex flex-wrap items-center gap-[6px] rounded-[10px] border ${panelBorderClass('toolbar')} bg-inventory-surface px-[8px] py-[4px] shadow-inventory`}>
       <Toggle label="See List" checked={nav.allRecords} onChange={nav.setAllRecords} />
       <Toggle label="Verified" checked={nav.verifiedOnly} onChange={nav.setVerifiedOnly} />
 
@@ -31,7 +32,7 @@ export default function ProductsToolbar(p: InventoryPage) {
         <PagerButton label="Previous product" onClick={nav.goPrev} disabled={!nav.canPrev || nav.allRecords}>
           <ChevronLeft className="h-3 w-3" />
         </PagerButton>
-        <span className="min-w-20 whitespace-nowrap px-[4px] text-center text-[11.5px] font-bold leading-none text-gray-900 tabular-nums" aria-live="polite">
+        <span className="min-w-20 whitespace-nowrap px-[4px] text-center text-[11.5px] font-bold leading-none text-inventory-text tabular-nums" aria-live="polite">
           {countLabel}
         </span>
         <PagerButton label="Next product" onClick={nav.goNext} disabled={!nav.canNext || nav.allRecords}>
@@ -42,7 +43,7 @@ export default function ProductsToolbar(p: InventoryPage) {
         </PagerButton>
       </div>
 
-      <span className="h-[18px] w-px bg-gray-200" aria-hidden="true" />
+      <span className="h-[18px] w-px bg-inventory-border" aria-hidden="true" />
 
       <ProductSearchBox
         value={nav.searchInput}
@@ -64,7 +65,7 @@ export default function ProductsToolbar(p: InventoryPage) {
               onClick={() => nav.toggleQuickFilter(filter.id)}
               aria-pressed={isActive}
               className={`whitespace-nowrap rounded-full border px-[7px] py-[2px] text-[10px] font-semibold leading-none transition-colors duration-150 cursor-pointer ${
-                isActive ? 'border-amber-500 bg-amber-500 text-white' : 'border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100'
+                isActive ? 'border-inventory-accent bg-inventory-accent text-inventory-accent-ink shadow-inventory' : 'border-inventory-warning/30 bg-inventory-warning/10 text-inventory-warning-ink hover:bg-inventory-warning/15'
               }`}
             >
               {filter.label}
@@ -78,7 +79,7 @@ export default function ProductsToolbar(p: InventoryPage) {
       <button
         type="button"
         onClick={p.importProducts.openModal}
-        className="flex h-[22px] items-center gap-1 whitespace-nowrap rounded-[6px] border border-emerald-300 bg-emerald-50 px-[6px] text-[10px] font-bold leading-none text-emerald-700 shadow-sm transition-colors duration-150 hover:bg-emerald-100 cursor-pointer"
+        className="flex h-[22px] items-center gap-1 whitespace-nowrap rounded-[6px] border border-inventory-success/35 bg-inventory-success/10 px-[6px] text-[10px] font-bold leading-none text-inventory-success-hover shadow-sm transition-colors duration-150 hover:bg-inventory-success/15 cursor-pointer"
       >
         <Upload className="h-3 w-3" />
         Import
@@ -86,7 +87,7 @@ export default function ProductsToolbar(p: InventoryPage) {
       <button
         type="button"
         onClick={p.openNewProduct}
-        className="flex h-[22px] items-center gap-1 whitespace-nowrap rounded-[6px] bg-emerald-600 px-[6px] text-[10px] font-bold leading-none text-white shadow-sm transition-colors duration-150 hover:bg-emerald-700 cursor-pointer"
+        className="flex h-[22px] items-center gap-1 whitespace-nowrap rounded-[6px] bg-inventory-success px-[6px] text-[10px] font-bold leading-none text-white shadow-sm transition-colors duration-150 hover:bg-inventory-success-hover cursor-pointer"
       >
         <Plus className="h-3 w-3" />
         New Product
@@ -97,7 +98,7 @@ export default function ProductsToolbar(p: InventoryPage) {
         disabled={!nav.product || nav.allRecords}
         title="Delete this product"
         aria-label="Delete this product"
-        className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-[6px] border border-red-200 bg-red-50 text-red-600 shadow-sm transition-colors duration-150 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+        className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-[6px] border border-inventory-danger/30 bg-inventory-danger/10 text-inventory-danger shadow-sm transition-colors duration-150 hover:bg-inventory-danger/15 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
       >
         <Trash className="h-3 w-3" />
       </button>
@@ -108,14 +109,14 @@ export default function ProductsToolbar(p: InventoryPage) {
 function Toggle({ label, checked, onChange, disabled }: { label: string; checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
   return (
     <label
-      className={`flex items-center gap-[4px] whitespace-nowrap text-[10.5px] font-medium leading-none ${disabled ? 'cursor-not-allowed text-gray-400' : 'cursor-pointer text-gray-700'}`}
+      className={`flex items-center gap-[4px] whitespace-nowrap text-[10.5px] font-medium leading-none ${disabled ? 'cursor-not-allowed text-inventory-text-subtle' : 'cursor-pointer text-inventory-text-muted'}`}
     >
       <input
         type="checkbox"
         checked={checked}
         disabled={disabled}
         onChange={(e) => onChange(e.target.checked)}
-        className="h-3 w-3 cursor-pointer accent-blue-600 disabled:cursor-not-allowed"
+        className="h-3 w-3 cursor-pointer accent-inventory-primary disabled:cursor-not-allowed"
       />
       {label}
     </label>
@@ -129,7 +130,7 @@ function PagerButton({ label, onClick, disabled, children }: { label: string; on
       onClick={onClick}
       disabled={disabled}
       aria-label={label}
-      className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-[6px] border border-gray-300 bg-white text-gray-600 transition-colors duration-150 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+      className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-[6px] border border-inventory-border-strong bg-inventory-surface text-inventory-text-muted transition-colors duration-150 hover:bg-inventory-surface-hover disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
     >
       {children}
     </button>

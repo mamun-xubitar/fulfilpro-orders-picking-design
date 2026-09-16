@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { BTN_XS, BTN_ROW, PanelHeading } from './MainImagePanel';
+import { BTN_XS, BTN_ROW, PanelHeading, panelBorderClass } from './MainImagePanel';
 import { LISTING_STATUS_BADGES } from './constants';
 import type { StoreListingsState } from './hooks/useStoreListings';
 import { External, Plus, Refresh, Store } from './icons';
@@ -42,8 +42,9 @@ export default function OnlineStoresPanel({
   }, [someSelected]);
 
   return (
-    <section className="flex min-w-0 flex-col rounded-[10px] border border-gray-200 bg-white shadow-[0_1px_2px_0_rgb(0_0_0/0.05)] xl:min-h-0">
+    <section className={`flex min-w-0 flex-col rounded-[10px] border ${panelBorderClass('stores')} bg-inventory-surface shadow-inventory xl:min-h-0`}>
       <PanelHeading
+        tone="stores"
         icon={<Store className="h-3 w-3" />}
         title="Online stores"
         meta={`${listed.length}`}
@@ -53,7 +54,7 @@ export default function OnlineStoresPanel({
             onClick={onOpenPublish}
             aria-label="Publish to a store"
             title="Publish to a store"
-            className="flex h-[20px] w-[20px] items-center justify-center rounded-full bg-blue-600 text-white transition-colors duration-150 hover:bg-blue-700 cursor-pointer"
+            className="flex h-[20px] w-[20px] items-center justify-center rounded-full bg-inventory-primary text-white transition-colors duration-150 hover:bg-inventory-primary-hover cursor-pointer"
           >
             <Plus className="h-3 w-3" />
           </button>
@@ -61,15 +62,15 @@ export default function OnlineStoresPanel({
       />
 
       {listed.length > 0 && (
-        <div className="flex items-center justify-between gap-2 border-b border-gray-100 px-[8px] py-[4px]">
-          <label className="flex cursor-pointer items-center gap-[5px] text-[10px] font-medium leading-none text-gray-600">
+        <div className="flex items-center justify-between gap-2 border-b border-inventory-divider px-[8px] py-[4px]">
+          <label className="flex cursor-pointer items-center gap-[5px] text-[10px] font-medium leading-none text-inventory-text-muted">
             <input
               ref={headerCheckboxRef}
               type="checkbox"
               checked={allSelected}
               onChange={() => onToggleAll(listedIds)}
               aria-label="Select all stores"
-              className="h-3 w-3 rounded border-gray-300 text-blue-600 cursor-pointer"
+              className="h-3 w-3 rounded border-inventory-border-strong text-inventory-secondary cursor-pointer"
             />
             Select all
           </label>
@@ -77,7 +78,7 @@ export default function OnlineStoresPanel({
             <button
               type="button"
               onClick={onOpenBulkUpdate}
-              className="rounded-md bg-blue-600 px-1.5 py-[3px] text-[9.5px] font-semibold text-white transition-colors duration-150 hover:bg-blue-700 cursor-pointer"
+              className="rounded-md bg-inventory-primary px-1.5 py-[3px] text-[9.5px] font-semibold text-white transition-colors duration-150 hover:bg-inventory-primary-hover cursor-pointer"
             >
               Bulk Update ({selectedListedCount})
             </button>
@@ -89,9 +90,9 @@ export default function OnlineStoresPanel({
         {loading ? (
           <StoreCardSkeletons />
         ) : listings.length === 0 ? (
-          <p className="px-1 py-6 text-center text-[11px] text-gray-400">No connected stores.</p>
+          <p className="px-1 py-6 text-center text-[11px] text-inventory-text-subtle">No connected stores.</p>
         ) : listed.length === 0 ? (
-          <p className="px-1 py-6 text-center text-[11px] text-gray-400">Not listed in any connected store.</p>
+          <p className="px-1 py-6 text-center text-[11px] text-inventory-text-subtle">Not listed in any connected store.</p>
         ) : (
           listed.map((listing) => (
             <StoreCard key={listing.storeId} listing={listing} selected={selectedStoreIds.has(listing.storeId)} onToggle={() => onToggleStore(listing.storeId)} />
@@ -111,7 +112,7 @@ export default function OnlineStoresPanel({
 
 function StoreCard({ listing, selected, onToggle }: { listing: StoreListingResult; selected: boolean; onToggle: () => void }) {
   return (
-    <article className={`rounded-[8px] border p-[6px] ${selected ? 'border-blue-300 bg-blue-50/40' : 'border-gray-200 bg-white'}`}>
+    <article className={`rounded-[8px] border p-[6px] ${selected ? 'border-inventory-secondary/35 bg-inventory-secondary/10/40' : 'border-inventory-border bg-inventory-surface'}`}>
       <div className="flex items-start justify-between gap-2">
         <label className="flex min-w-0 items-start gap-[5px]">
           <input
@@ -119,15 +120,15 @@ function StoreCard({ listing, selected, onToggle }: { listing: StoreListingResul
             checked={selected}
             onChange={onToggle}
             aria-label={`Select ${listing.storeName}`}
-            className="mt-[2px] h-3 w-3 shrink-0 rounded border-gray-300 text-blue-600 cursor-pointer"
+            className="mt-[2px] h-3 w-3 shrink-0 rounded border-inventory-border-strong text-inventory-secondary cursor-pointer"
           />
           <span className="min-w-0">
-            <h4 className="truncate text-[10.5px] font-bold leading-tight text-gray-900">{listing.storeName}</h4>
-            <p className="truncate text-[9px] leading-tight text-gray-500">{listing.storeDomain}</p>
+            <h4 className="truncate text-[10.5px] font-bold leading-tight text-inventory-text">{listing.storeName}</h4>
+            <p className="truncate text-[9px] leading-tight text-inventory-text-subtle">{listing.storeDomain}</p>
           </span>
         </label>
-        <span className="shrink-0 text-[11.5px] font-bold leading-none text-gray-900 tabular-nums">
-          {listing.found && listing.variants.length > 0 ? priceLabel(listing.variants) : <span className="text-gray-400">—</span>}
+        <span className="shrink-0 text-[11.5px] font-bold leading-none text-inventory-text tabular-nums">
+          {listing.found && listing.variants.length > 0 ? priceLabel(listing.variants) : <span className="text-inventory-text-subtle">—</span>}
         </span>
       </div>
 
@@ -140,22 +141,22 @@ function StoreCard({ listing, selected, onToggle }: { listing: StoreListingResul
           {listing.listingStatus.replace('_', ' ')}
         </span>
         {!listing.found && !listing.error && listing.listingStatus === 'LISTED' && (
-          <span className="inline-flex items-center whitespace-nowrap rounded-full border border-amber-200 bg-amber-50 px-[6px] py-[1px] text-[9px] font-bold uppercase leading-none tracking-[0.4px] text-amber-700">
+          <span className="inline-flex items-center whitespace-nowrap rounded-full border border-inventory-warning/30 bg-inventory-warning/10 px-[6px] py-[1px] text-[9px] font-bold uppercase leading-none tracking-[0.4px] text-inventory-warning-ink">
             Missing on Shopify
           </span>
         )}
         {listing.error ? (
-          <span className="inline-flex items-center whitespace-nowrap rounded-full border border-red-200 bg-red-50 px-[6px] py-[1px] text-[9px] font-bold uppercase leading-none tracking-[0.4px] text-red-700">
+          <span className="inline-flex items-center whitespace-nowrap rounded-full border border-inventory-danger/30 bg-inventory-danger/10 px-[6px] py-[1px] text-[9px] font-bold uppercase leading-none tracking-[0.4px] text-inventory-danger-hover">
             Lookup failed
           </span>
         ) : (
-          listing.found && listing.externalId && <span className="truncate text-[9px] leading-none text-gray-400">ID {listing.externalId}</span>
+          listing.found && listing.externalId && <span className="truncate text-[9px] leading-none text-inventory-text-subtle">ID {listing.externalId}</span>
         )}
       </div>
 
-      {(listing.error || listing.lastError) && <p className="mt-[6px] text-[10px] leading-tight text-red-600">{listing.error ?? listing.lastError}</p>}
+      {(listing.error || listing.lastError) && <p className="mt-[6px] text-[10px] leading-tight text-inventory-danger">{listing.error ?? listing.lastError}</p>}
       {listing.found && listing.productTitle && (
-        <p className="mt-[4px] truncate text-[10px] leading-tight text-gray-500" title={listing.productTitle}>
+        <p className="mt-[4px] truncate text-[10px] leading-tight text-inventory-text-subtle" title={listing.productTitle}>
           {listing.productTitle}
           {listing.status ? ` · ${listing.status}` : ''}
         </p>
@@ -168,7 +169,7 @@ function StoreCard({ listing, selected, onToggle }: { listing: StoreListingResul
             <External className="h-3 w-3" />
           </a>
         ) : (
-          <span className="flex h-[22px] flex-1 items-center justify-center rounded-[6px] border border-gray-200 text-[10px] font-bold leading-none text-gray-300">
+          <span className="flex h-[22px] flex-1 items-center justify-center rounded-[6px] border border-inventory-border text-[10px] font-bold leading-none text-inventory-border-strong">
             Open
           </span>
         )}
@@ -181,10 +182,10 @@ function StoreCardSkeletons() {
   return (
     <>
       {Array.from({ length: 2 }).map((_, i) => (
-        <div key={i} className="animate-pulse rounded-xl border border-gray-200 bg-gray-50 p-3">
-          <div className="h-3.5 w-2/3 rounded bg-gray-200" />
-          <div className="mt-2 h-2.5 w-1/2 rounded bg-gray-200" />
-          <div className="mt-3 h-6 w-full rounded bg-gray-200" />
+        <div key={i} className="animate-pulse rounded-xl border border-inventory-border bg-inventory-surface-muted p-3">
+          <div className="h-3.5 w-2/3 rounded bg-inventory-border" />
+          <div className="mt-2 h-2.5 w-1/2 rounded bg-inventory-border" />
+          <div className="mt-3 h-6 w-full rounded bg-inventory-border" />
         </div>
       ))}
     </>

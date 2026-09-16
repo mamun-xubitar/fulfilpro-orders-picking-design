@@ -31,8 +31,8 @@ export default function ProductSizesField({ value, sizes, editing, onChange, onV
       parse={(v) => parseSizesInput(v).map((name) => ({ name }))}
       format={(entries) => formatSizesInput(entries.map((e) => e.name))}
       renderReadOnly={() => (
-        <div className="flex flex-wrap gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-2">
-          {sizes.length === 0 ? <span className="text-[13px] text-gray-400">—</span> : <SizeChips sizes={sizes} />}
+        <div className="flex flex-wrap gap-1.5 rounded-lg border border-inventory-border bg-inventory-surface-muted px-2.5 py-2">
+          {sizes.length === 0 ? <span className="text-[13px] text-inventory-text-subtle">—</span> : <SizeChips sizes={sizes} />}
         </div>
       )}
       renderChips={(entries) => <SizeChips sizes={entries.map((e) => e.name)} />}
@@ -45,7 +45,7 @@ export function SizeChips({ sizes }: { sizes: string[] }) {
   return (
     <>
       {sorted.map((size, index) => (
-        <span key={`${size}-${index}`} className="rounded-full border border-gray-200 bg-white px-[5px] py-[1px] text-[9px] font-semibold uppercase leading-none text-gray-700">
+        <span key={`${size}-${index}`} className="rounded-full border border-inventory-border bg-inventory-surface px-[5px] py-[1px] text-[9px] font-semibold uppercase leading-none text-inventory-text-muted">
           {capitaliseFirst(size)}
         </span>
       ))}

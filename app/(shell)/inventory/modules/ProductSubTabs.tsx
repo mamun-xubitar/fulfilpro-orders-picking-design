@@ -20,8 +20,10 @@ export default function ProductSubTabs({ active, onChange }: ProductSubTabsProps
               type="button"
               onClick={() => onChange(tab.id)}
               aria-current={isActive ? 'page' : undefined}
-              className={`-mb-px whitespace-nowrap border-b-2 px-[7px] py-[5px] text-[9.5px] font-bold uppercase leading-none tracking-[0.4px] transition-colors duration-150 cursor-pointer ${
-                isActive ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-800'
+              className={`-mb-px whitespace-nowrap rounded-t-[6px] border-b-2 px-[7px] py-[5px] text-[9.5px] font-bold uppercase leading-none tracking-[0.4px] transition-[color,background-color,border-color] duration-200 ease-out cursor-pointer ${
+                isActive
+                  ? 'border-inventory-primary bg-inventory-primary/[8%] text-inventory-primary'
+                  : 'border-transparent text-inventory-text-subtle hover:border-inventory-border-strong hover:bg-inventory-surface-muted hover:text-inventory-text'
               }`}
             >
               {tab.label}

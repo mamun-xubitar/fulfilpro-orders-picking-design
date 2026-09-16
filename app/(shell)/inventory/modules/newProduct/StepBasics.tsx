@@ -35,19 +35,19 @@ export default function StepBasics({ p, basics: form }: StepBasicsProps) {
         adornment={
           form.form.itemNo.trim() !== '' ? (
             form.itemNoAvailability.checking ? (
-              <span className="h-3 w-3 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600" />
+              <span className="h-3 w-3 animate-spin rounded-full border-2 border-inventory-border-strong border-t-inventory-primary" />
             ) : form.itemNoAvailability.taken || p.createErrors.itemNo ? (
-              <Close className="h-3 w-3 text-red-500" />
+              <Close className="h-3 w-3 text-inventory-danger" />
             ) : (
-              <Check className="h-3 w-3 text-emerald-500" />
+              <Check className="h-3 w-3 text-inventory-success" />
             )
           ) : undefined
         }
       />
       <TextField label="Product name" required value={form.form.name} onChange={form.setName} placeholder="FLEX KINDY WIDE BRIM HAT" error={p.createErrors.name} />
       <div>
-        <label className="mb-[2px] block text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-gray-600">
-          Handle <span className="text-red-500">*</span>
+        <label className="mb-[2px] block text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-inventory-text-muted">
+          Handle <span className="text-inventory-danger">*</span>
         </label>
         <div className="flex items-center gap-[5px]">
           <input
@@ -56,10 +56,10 @@ export default function StepBasics({ p, basics: form }: StepBasicsProps) {
             onChange={form.setHandle}
             disabled={form.handleLocked}
             placeholder="flex-kindy-wide-brim-hat"
-            className={`h-[24px] w-full min-w-0 rounded-[7px] border px-[6px] text-[11px] leading-none outline-none transition-colors duration-150 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed ${
+            className={`h-[24px] w-full min-w-0 rounded-[7px] border px-[6px] text-[11px] leading-none outline-none transition-colors duration-150 focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring disabled:cursor-not-allowed ${
               p.createErrors.handle
-                ? 'border-red-300 bg-red-50/50 focus:border-red-500 focus:ring-red-100'
-                : 'border-gray-300 bg-white hover:border-gray-400 disabled:border-gray-200 disabled:bg-blue-50/40 disabled:text-gray-600'
+                ? 'border-inventory-danger/35 bg-inventory-danger/8 focus:border-inventory-danger focus:ring-inventory-danger/20'
+                : 'border-inventory-border-strong bg-inventory-surface hover:border-inventory-primary/40 disabled:border-inventory-border disabled:bg-inventory-primary/10 disabled:text-inventory-text-subtle'
             }`}
           />
           <button
@@ -68,13 +68,13 @@ export default function StepBasics({ p, basics: form }: StepBasicsProps) {
             aria-label={form.handleLocked ? 'Edit handle' : 'Auto-generate handle'}
             title={form.handleLocked ? 'Edit handle' : 'Auto-generate handle'}
             className={`flex h-[24px] w-[24px] shrink-0 items-center justify-center rounded-[7px] border transition-colors duration-150 cursor-pointer ${
-              form.handleLocked ? 'border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100' : 'border-gray-300 bg-white text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+              form.handleLocked ? 'border-inventory-secondary/30 bg-inventory-secondary/10 text-inventory-secondary hover:bg-inventory-secondary/15' : 'border-inventory-border-strong bg-inventory-surface text-inventory-text-subtle hover:bg-inventory-surface-hover hover:text-inventory-text-muted'
             }`}
           >
             {form.handleLocked ? <Lock className="h-3 w-3" /> : <Unlock className="h-3 w-3" />}
           </button>
         </div>
-        {p.createErrors.handle && <p className="mt-1 text-[10px] leading-tight text-red-600">{p.createErrors.handle}</p>}
+        {p.createErrors.handle && <p className="mt-1 text-[10px] leading-tight text-inventory-danger">{p.createErrors.handle}</p>}
       </div>
       <TextField label="Brand" value={form.form.brand} onChange={form.set('brand')} placeholder="FLEX KINDY" />
     </div>
@@ -100,8 +100,8 @@ function TextField({
 }) {
   return (
     <div>
-      <label className="mb-[2px] block text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-gray-600">
-        {label} {required && <span className="text-red-500">*</span>}
+      <label className="mb-[2px] block text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-inventory-text-muted">
+        {label} {required && <span className="text-inventory-danger">*</span>}
       </label>
       <div className="relative">
         <input
@@ -109,13 +109,13 @@ function TextField({
           value={value}
           onChange={onChange}
           placeholder={placeholder}
-          className={`h-[24px] w-full rounded-[7px] border px-[6px] text-[11px] uppercase leading-none outline-none transition-colors duration-150 placeholder:normal-case focus:border-blue-500 focus:ring-2 focus:ring-blue-100 ${
+          className={`h-[24px] w-full rounded-[7px] border px-[6px] text-[11px] uppercase leading-none outline-none transition-colors duration-150 placeholder:normal-case focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring ${
             adornment ? 'pr-[22px]' : ''
-          } ${error ? 'border-red-300 bg-red-50/50 focus:border-red-500 focus:ring-red-100' : 'border-gray-300 bg-white hover:border-gray-400'}`}
+          } ${error ? 'border-inventory-danger/35 bg-inventory-danger/8 focus:border-inventory-danger focus:ring-inventory-danger/20' : 'border-inventory-border-strong bg-inventory-surface hover:border-inventory-primary/40'}`}
         />
         {adornment && <span className="pointer-events-none absolute inset-y-0 right-[6px] flex items-center">{adornment}</span>}
       </div>
-      {error && <p className="mt-1 text-[10px] leading-tight text-red-600">{error}</p>}
+      {error && <p className="mt-1 text-[10px] leading-tight text-inventory-danger">{error}</p>}
     </div>
   );
 }

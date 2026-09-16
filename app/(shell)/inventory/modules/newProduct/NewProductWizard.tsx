@@ -52,8 +52,8 @@ export default function NewProductWizard({ p }: NewProductWizardProps) {
           {w.step === 1 && <StepBasics p={p} basics={w.basics} />}
 
           {w.step > 1 && w.awaitingProduct && (
-            <div className="flex flex-1 items-center justify-center gap-2 text-sm font-medium text-blue-700">
-              <span className="h-4 w-4 animate-spin rounded-full border-2 border-blue-100 border-t-blue-600" />
+            <div className="flex flex-1 items-center justify-center gap-2 text-sm font-medium text-inventory-secondary">
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-inventory-secondary/20 border-t-inventory-primary" />
               Setting up product…
             </div>
           )}

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { toast } from 'react-toastify';
 import BuyingHistoryModal from './BuyingHistoryModal';
-import { PanelHeading } from './MainImagePanel';
+import { PanelHeading, panelBorderClass } from './MainImagePanel';
 import PerStoreMarginRows from './PerStoreMarginRows';
 import StoreMarginPriceChips from './StoreMarginPriceChips';
 // Re-enable: StorePriceChips showed each store's *live* Shopify price — swap back in for
@@ -40,8 +40,8 @@ export default function PricingMarginPanel({ pricing: p, storeListings, onEditSt
   const [historyOpen, setHistoryOpen] = useState(false);
 
   return (
-    <section className={embedded ? 'flex min-w-0 flex-col' : 'flex min-w-0 flex-col rounded-[10px] border border-gray-200 bg-white shadow-[0_1px_2px_0_rgb(0_0_0/0.05)] xl:min-h-0'}>
-      {!embedded && <PanelHeading icon={<Tag className="h-3 w-3" />} title={`Pricing & margin (${base})`} meta={foreign} />}
+    <section className={embedded ? 'flex min-w-0 flex-col' : `flex min-w-0 flex-col rounded-[10px] border ${panelBorderClass('pricing')} bg-inventory-surface shadow-inventory xl:min-h-0`}>
+      {!embedded && <PanelHeading tone="pricing" icon={<Tag className="h-3 w-3" />} title={`Pricing & margin (${base})`} meta={foreign} />}
 
       <div className={embedded ? 'flex flex-col gap-[3px]' : 'flex flex-col gap-[3px] p-[6px] xl:min-h-0 xl:overflow-y-auto'}>
         <Row label="Currency">
@@ -50,7 +50,7 @@ export default function PricingMarginPanel({ pricing: p, storeListings, onEditSt
               value={p.form.currencyCode}
               onChange={p.set('currencyCode')}
               aria-label="Currency"
-              className="h-[22px] w-[58px] rounded-[7px] border border-gray-300 px-[4px] text-right text-[10.5px] leading-none outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 cursor-pointer"
+              className="h-[22px] w-[58px] rounded-[7px] border border-inventory-border-strong px-[4px] text-right text-[10.5px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring cursor-pointer"
             >
               {p.currencies.map((c) => (
                 <option key={c.code} value={c.code}>
@@ -73,9 +73,9 @@ export default function PricingMarginPanel({ pricing: p, storeListings, onEditSt
           </div>
         </Row>
 
-        <div className="flex items-center justify-between rounded-[9px] bg-gray-100 px-[9px] py-[6px]">
-          <span className="text-[9.5px] font-bold uppercase leading-none tracking-[0.4px] text-red-600">Total buying (landed)</span>
-          <span className="text-[11.5px] font-bold leading-none text-red-700 tabular-nums">
+        <div className="flex items-center justify-between rounded-[9px] bg-inventory-surface-muted px-[9px] py-[6px]">
+          <span className="text-[9.5px] font-bold uppercase leading-none tracking-[0.4px] text-inventory-danger">Total buying (landed)</span>
+          <span className="text-[11.5px] font-bold leading-none text-inventory-danger-hover tabular-nums">
             {formatMoney(p.computed.totalBuying)} <Unit>{base}</Unit>
           </span>
         </div>
@@ -96,7 +96,7 @@ export default function PricingMarginPanel({ pricing: p, storeListings, onEditSt
         {/* Per-store overrides — kept visually separate from the product-level calculation
            above, since neither of these ever feeds computePricing. */}
         {storeListings.listings.length > 0 && (
-          <div className="space-y-[6px] border-t border-gray-100 pt-[6px]">
+          <div className="space-y-[6px] border-t border-inventory-divider pt-[6px]">
             <PerStoreMarginRows listings={storeListings.listings} values={p.marginDraft} onChange={p.setPendingMargin} />
             {/* Re-enable: uncomment to restore the live-Shopify-price chips (see the parked import above).
             <StorePriceChips listings={storeListings.listings} onEditPrice={onEditStorePrice} />
@@ -111,9 +111,9 @@ export default function PricingMarginPanel({ pricing: p, storeListings, onEditSt
           </div>
         )}
 
-        <div className="flex items-center justify-between rounded-[9px] border border-blue-100 bg-blue-50 px-[9px] py-[6px]">
-          <span className="text-[9.5px] font-bold uppercase leading-none tracking-[0.4px] text-blue-700">Sell price (inc tax)</span>
-          <span className="text-[14px] font-bold leading-none text-blue-900 tabular-nums">
+        <div className="flex items-center justify-between rounded-[9px] border border-inventory-secondary/20 bg-inventory-secondary/10 px-[9px] py-[6px]">
+          <span className="text-[9.5px] font-bold uppercase leading-none tracking-[0.4px] text-inventory-secondary">Sell price (inc tax)</span>
+          <span className="text-[14px] font-bold leading-none text-inventory-secondary tabular-nums">
             {formatMoney(p.computed.sellingIncTax)} <Unit>{base}</Unit>
           </span>
         </div>
@@ -171,7 +171,7 @@ export function ActionButton({
       className={`flex items-center justify-center gap-1 rounded-[6px] text-[10px] font-bold leading-none transition-colors duration-150 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
         compact ? 'h-[20px] flex-none px-2' : 'h-[22px] flex-1 px-[6px]'
       } ${
-        primary ? 'bg-blue-600 text-white hover:bg-blue-700' : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
+        primary ? 'bg-inventory-primary text-white hover:bg-inventory-primary-hover' : 'border border-inventory-border-strong text-inventory-text-muted hover:bg-inventory-surface-hover'
       }`}
     >
       {icon}
@@ -183,18 +183,18 @@ export function ActionButton({
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-2">
-      <span className="text-[11.5px] font-medium leading-none text-gray-700">{label}</span>
+      <span className="text-[11.5px] font-medium leading-none text-inventory-text-muted">{label}</span>
       {children}
     </div>
   );
 }
 
 function Value({ children }: { children: React.ReactNode }) {
-  return <span className="text-[11.5px] font-bold leading-none text-gray-900 tabular-nums">{children}</span>;
+  return <span className="text-[11.5px] font-bold leading-none text-inventory-text tabular-nums">{children}</span>;
 }
 
 function Unit({ children }: { children: React.ReactNode }) {
-  return <span className="text-[10px] font-medium leading-none text-gray-400">{children}</span>;
+  return <span className="text-[10px] font-medium leading-none text-inventory-text-subtle">{children}</span>;
 }
 
 function NumberInput({
@@ -222,9 +222,9 @@ function NumberInput({
         value={value}
         onChange={onChange}
         aria-label={suffix}
-        className={`h-[22px] ${width ?? 'w-[62px]'} rounded-[7px] border border-gray-300 pl-[6px] ${gutter} text-right text-[10.5px] leading-none tabular-nums outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100`}
+        className={`h-[22px] ${width ?? 'w-[62px]'} rounded-[7px] border border-inventory-border-strong pl-[6px] ${gutter} text-right text-[10.5px] leading-none tabular-nums outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring`}
       />
-      <span className="pointer-events-none absolute right-[6px] top-1/2 -translate-y-1/2 text-[9px] leading-none text-gray-400">{suffix}</span>
+      <span className="pointer-events-none absolute right-[6px] top-1/2 -translate-y-1/2 text-[9px] leading-none text-inventory-text-subtle">{suffix}</span>
     </div>
   );
 }

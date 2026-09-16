@@ -22,10 +22,10 @@ export default function StorePriceChips({ listings, onEditPrice }: StorePriceChi
           key={l.storeId}
           type="button"
           onClick={() => onEditPrice(l)}
-          className="flex items-center gap-1.5 rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-[11px] font-semibold text-gray-700 transition-colors duration-150 hover:bg-gray-100 cursor-pointer"
+          className="flex items-center gap-1.5 rounded-full border border-inventory-border bg-inventory-surface-muted px-2.5 py-1 text-[11px] font-semibold text-inventory-text-muted transition-colors duration-150 hover:bg-inventory-surface-hover cursor-pointer"
         >
           <span className="max-w-20 truncate">{l.storeName}</span>
-          <span className="tabular-nums text-gray-500">{priceLabel(l.variants)}</span>
+          <span className="tabular-nums text-inventory-text-subtle">{priceLabel(l.variants)}</span>
         </button>
       ))}
     </div>

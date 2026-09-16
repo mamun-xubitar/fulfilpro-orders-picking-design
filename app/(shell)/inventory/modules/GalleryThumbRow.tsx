@@ -137,7 +137,7 @@ export default function GalleryThumbRow({ tiles, activeKey, onSelect }: GalleryT
           onClick={() => scrollByStep(-1)}
           disabled={scrollState.atStart}
           aria-label="Scroll thumbnails left"
-          className="flex h-[26px] w-[22px] shrink-0 items-center justify-center rounded-full border border-white/40 bg-white/85 text-gray-900 shadow-md backdrop-blur-sm transition-colors duration-150 hover:bg-white disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+          className="flex h-[26px] w-[22px] shrink-0 items-center justify-center rounded-full border border-white/40 bg-inventory-surface/85 text-inventory-text shadow-md backdrop-blur-sm transition-colors duration-150 hover:bg-inventory-surface disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
         >
           <ChevronLeft className="h-3.5 w-3.5" />
         </button>
@@ -166,7 +166,7 @@ export default function GalleryThumbRow({ tiles, activeKey, onSelect }: GalleryT
                 aria-label={`Show ${tile.label}`}
                 aria-pressed={isActive}
                 className={`h-[26px] w-[26px] shrink-0 overflow-hidden rounded-[5px] border-2 transition-colors duration-150 cursor-pointer ${
-                  isActive ? 'border-blue-600' : 'border-transparent hover:border-gray-300'
+                  isActive ? 'border-inventory-primary' : 'border-transparent hover:border-inventory-border-strong'
                 }`}
               >
                 {tile.kind === 'photo' ? (
@@ -189,7 +189,7 @@ export default function GalleryThumbRow({ tiles, activeKey, onSelect }: GalleryT
           onClick={() => scrollByStep(1)}
           disabled={scrollState.atEnd}
           aria-label="Scroll thumbnails right"
-          className="flex h-[26px] w-[22px] shrink-0 items-center justify-center rounded-full border border-white/40 bg-white/85 text-gray-900 shadow-md backdrop-blur-sm transition-colors duration-150 hover:bg-white disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+          className="flex h-[26px] w-[22px] shrink-0 items-center justify-center rounded-full border border-white/40 bg-inventory-surface/85 text-inventory-text shadow-md backdrop-blur-sm transition-colors duration-150 hover:bg-inventory-surface disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
         >
           <ChevronRight className="h-3.5 w-3.5" />
         </button>
@@ -206,7 +206,7 @@ export default function GalleryThumbRow({ tiles, activeKey, onSelect }: GalleryT
           aria-valuetext={`${Math.round(scrollState.trackLeft)} percent scrolled`}
           aria-label="Scroll thumbnails"
           onPointerDown={onTrackPointerDown}
-          className="relative h-[4px] cursor-pointer rounded-full bg-gray-100"
+          className="relative h-[4px] cursor-pointer rounded-full bg-inventory-surface-muted"
         >
           <div
             role="presentation"
@@ -214,7 +214,7 @@ export default function GalleryThumbRow({ tiles, activeKey, onSelect }: GalleryT
             onPointerMove={onThumbPointerMove}
             onPointerUp={endThumbDrag}
             onPointerCancel={endThumbDrag}
-            className="absolute inset-y-0 min-w-[16px] cursor-grab touch-none rounded-full bg-gray-300 transition-colors hover:bg-gray-400 active:cursor-grabbing"
+            className="absolute inset-y-0 min-w-[16px] cursor-grab touch-none rounded-full bg-inventory-border-strong transition-colors hover:bg-inventory-border-strong active:cursor-grabbing"
             style={{ left: `${scrollState.trackLeft}%`, width: `${scrollState.trackWidth}%` }}
           />
         </div>

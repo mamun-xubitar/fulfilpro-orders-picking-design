@@ -28,10 +28,10 @@ export default function BuyingHistoryModal({ purchaseOrders, onClose, onReceive 
     <ModalShell disableBackdropClose title="Buying history" compact onClose={onClose} wide bodyClassName={WIZARD_BODY_CLASS}>
       <div className={WIZARD_CARD_CLASS}>
         <AnimatedStepBody minHeightClassName="min-h-0">
-          <div className="max-h-[28rem] overflow-x-auto overflow-y-auto rounded-lg border border-gray-200">
+          <div className="max-h-[28rem] overflow-x-auto overflow-y-auto rounded-lg border border-inventory-border">
             <table className="w-full min-w-[560px] text-[11px] leading-none">
               <thead>
-                <tr className="border-b border-gray-200 bg-gray-50">
+                <tr className="border-b border-inventory-border bg-inventory-surface-muted">
                   <Th align="left">Date</Th>
                   <Th align="left">PO</Th>
                   <Th align="left">Supplier</Th>
@@ -45,7 +45,7 @@ export default function BuyingHistoryModal({ purchaseOrders, onClose, onReceive 
               <tbody>
                 {purchaseOrders.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="py-8 text-center text-gray-400">
+                    <td colSpan={8} className="py-8 text-center text-inventory-text-subtle">
                       No purchase orders yet.
                     </td>
                   </tr>
@@ -56,24 +56,24 @@ export default function BuyingHistoryModal({ purchaseOrders, onClose, onReceive 
                   const totalValue = po.items.reduce((sum, item) => sum + item.quantity * (item.unitCost ?? 0), 0);
                   const outstanding = po.items.some((item) => item.receivedQuantity < item.quantity);
                   return (
-                    <tr key={po.id} className="border-b border-gray-100 last:border-0">
-                      <td className="whitespace-nowrap px-2 py-1.5 text-gray-500">{formatDate(po.createdAt)}</td>
-                      <td className="whitespace-nowrap px-2 py-1.5 font-medium text-gray-900">{formatPoNumber(po.number)}</td>
-                      <td className="px-2 py-1.5 text-gray-700">{po.supplierName}</td>
+                    <tr key={po.id} className="border-b border-inventory-divider last:border-0 transition-colors duration-150 hover:bg-inventory-surface-hover">
+                      <td className="whitespace-nowrap px-2 py-1.5 text-inventory-text-subtle">{formatDate(po.createdAt)}</td>
+                      <td className="whitespace-nowrap px-2 py-1.5 font-medium text-inventory-text">{formatPoNumber(po.number)}</td>
+                      <td className="px-2 py-1.5 text-inventory-text-muted">{po.supplierName}</td>
                       <td className="px-2 py-1.5 text-center">
                         <span className={`inline-flex items-center whitespace-nowrap rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${STATUS_BADGES[po.status]}`}>
                           {po.status.replace('_', ' ')}
                         </span>
                       </td>
-                      <td className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums text-gray-700">{totalQty}</td>
-                      <td className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums text-gray-700">{avgPrice !== null ? `$${formatMoney(avgPrice)}` : '—'}</td>
-                      <td className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums font-semibold text-gray-900">{formatCurrencyValue(totalValue)}</td>
+                      <td className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums text-inventory-text-muted">{totalQty}</td>
+                      <td className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums text-inventory-text-muted">{avgPrice !== null ? `$${formatMoney(avgPrice)}` : '—'}</td>
+                      <td className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums font-semibold text-inventory-text">{formatCurrencyValue(totalValue)}</td>
                       <td className="px-2 py-1.5">
                         <div className="flex items-center justify-end gap-[4px]">
                           <button
                             type="button"
                             onClick={() => setViewTarget(po)}
-                            className="h-[20px] shrink-0 rounded-[6px] border border-gray-300 bg-white px-[6px] text-[9px] font-bold leading-none text-gray-600 transition-colors duration-150 hover:bg-gray-50 cursor-pointer"
+                            className="h-[20px] shrink-0 rounded-[6px] border border-inventory-border-strong bg-inventory-surface px-[6px] text-[9px] font-bold leading-none text-inventory-text-muted transition-colors duration-150 hover:bg-inventory-surface-hover cursor-pointer"
                           >
                             View
                           </button>
@@ -81,7 +81,7 @@ export default function BuyingHistoryModal({ purchaseOrders, onClose, onReceive 
                             <button
                               type="button"
                               onClick={() => onReceive(po)}
-                              className="h-[20px] shrink-0 rounded-[6px] bg-emerald-600 px-[6px] text-[9px] font-bold leading-none text-white transition-colors duration-150 hover:bg-emerald-700 cursor-pointer"
+                              className="h-[20px] shrink-0 rounded-[6px] bg-inventory-success px-[6px] text-[9px] font-bold leading-none text-white transition-colors duration-150 hover:bg-inventory-success-hover cursor-pointer"
                             >
                               Receive
                             </button>
@@ -104,5 +104,5 @@ export default function BuyingHistoryModal({ purchaseOrders, onClose, onReceive 
 
 function Th({ align, children }: { align: 'left' | 'right' | 'center'; children: React.ReactNode }) {
   const alignment = align === 'left' ? 'text-left' : align === 'right' ? 'text-right' : 'text-center';
-  return <th className={`px-2 py-1 text-[10px] font-bold uppercase tracking-[0.4px] text-gray-500 ${alignment}`}>{children}</th>;
+  return <th className={`px-2 py-1 text-[10px] font-bold uppercase tracking-[0.4px] text-inventory-text-subtle ${alignment}`}>{children}</th>;
 }

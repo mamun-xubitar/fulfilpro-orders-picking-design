@@ -6,7 +6,7 @@ export default function NoVariantsWarningBanner({ storeNames }: { storeNames: st
   if (storeNames.length === 0) return null;
 
   return (
-    <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-[12px] text-red-800">
+    <div className="rounded-xl border border-inventory-danger/30 bg-inventory-danger/10 p-3 text-[12px] text-inventory-danger-hover">
       <p className="font-semibold">Select at least one variant to publish</p>
       <p className="mt-1">
         Every variant is excluded for {storeNames.join(', ')} — Shopify needs at least one to publish or update the listing.

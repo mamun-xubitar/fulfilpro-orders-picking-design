@@ -1,5 +1,6 @@
 'use client';
 
+import { panelBorderClass } from './MainImagePanel';
 import VariantsMatrixTable from './VariantsMatrixTable';
 import VariantsMatrixToolbar from './VariantsMatrixToolbar';
 import type { InventoryPage } from './hooks/useInventoryPage';
@@ -15,7 +16,7 @@ type VariantsMatrixSectionProps = {
  * view) or inside the full-screen "Full view" modal — see InventoryModals. */
 export default function VariantsMatrixSection({ p, fullView }: VariantsMatrixSectionProps) {
   return (
-    <section className={fullView ? 'flex h-full min-h-0 flex-col' : 'rounded-xl border border-gray-200 bg-white shadow-sm'}>
+    <section className={fullView ? 'flex h-full min-h-0 flex-col' : `rounded-xl border ${panelBorderClass('variants')} bg-inventory-surface shadow-sm`}>
       <VariantsMatrixToolbar p={p} fullView={fullView} />
       <div className={fullView ? 'min-h-0 flex-1' : undefined}>
         <VariantsMatrixTable matrix={p.matrix} fillHeight={fullView} showAllColumns={!!fullView} />

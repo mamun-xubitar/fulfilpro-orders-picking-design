@@ -13,7 +13,7 @@ type ModuleTabsProps = {
 
 export default function ModuleTabs({ active, onChange, right }: ModuleTabsProps) {
   return (
-    <div className="flex items-center gap-1.5 rounded-[10px] border border-gray-200 bg-white px-1 py-0.5 shadow-[0_1px_2px_0_rgb(0_0_0/0.05)]">
+    <div className="flex items-center gap-1.5 rounded-[10px] border border-inventory-primary/25 bg-inventory-primary/[6%] px-1 py-0.5 shadow-inventory">
       {/* `thin-scroll` (app/globals.css) makes this a visibly scrollable strip instead of
           hard-clipping tab labels when the shared shell's sidebar is expanded and there isn't
           enough width for every tab — the prototype assumes a collapsed ~56px sidebar, which
@@ -27,8 +27,10 @@ export default function ModuleTabs({ active, onChange, right }: ModuleTabsProps)
               type="button"
               onClick={() => onChange(tab.id)}
               aria-current={isActive ? 'page' : undefined}
-              className={`shrink-0 whitespace-nowrap rounded-md px-[5px] py-[3px] text-[9px] font-bold uppercase leading-none tracking-[0.3px] transition-colors duration-150 cursor-pointer ${
-                isActive ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+              className={`shrink-0 whitespace-nowrap rounded-md px-1.5 py-1.5 text-[9px] font-bold uppercase leading-none tracking-[0.3px] transition-[color,background-color,box-shadow] duration-200 ease-out cursor-pointer ${
+                isActive
+                  ? 'bg-inventory-primary text-white shadow-inventory'
+                  : 'text-inventory-primary hover:bg-inventory-surface hover:text-inventory-primary-hover hover:shadow-inventory'
               }`}
             >
               {tab.label}

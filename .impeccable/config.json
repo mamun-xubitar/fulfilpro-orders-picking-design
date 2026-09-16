@@ -17,6 +17,15 @@
         "value": "arial",
         "createdAt": "2026-09-14T04:19:08.536Z",
         "reason": "print-only stylesheet for the stocktake count sheet (buildCountSheetDocument), not app UI chrome; pre-existing, unrelated to this session's inventory filter/loading fix"
+      },
+      {
+        "rule": "layout-transition",
+        "value": "*",
+        "files": [
+          "app/globals.css"
+        ],
+        "createdAt": "2026-09-16T13:44:24.990Z",
+        "reason": "pre-existing #sidebar/#main-content collapse transition and .strength-bar width transition predate this session; only shifted in the file by the new inventory token block above them, not introduced or touched by the inventory redesign — out of scope to rewrite here"
       }
     ]
   }

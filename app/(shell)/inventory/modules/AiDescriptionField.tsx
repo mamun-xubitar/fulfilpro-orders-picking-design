@@ -13,10 +13,10 @@ import { Refresh, Sparkles } from './icons';
  * (same 24px footprint as the formatting buttons) — neutral deep gray so it matches
  * the prototype's monochrome toolbar. */
 const AI_BUTTON =
-  'flex h-6 w-6 items-center justify-center rounded-md border border-gray-300 bg-white text-gray-700 shadow-sm transition-colors duration-150 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer';
-const AI_GROUP = 'flex items-center gap-0.5 rounded-lg border border-gray-300 bg-gray-50 p-0.5';
+  'flex h-6 w-6 items-center justify-center rounded-md border border-inventory-border-strong bg-inventory-surface text-inventory-text-muted shadow-sm transition-colors duration-150 hover:bg-inventory-surface-hover disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer';
+const AI_GROUP = 'flex items-center gap-0.5 rounded-lg border border-inventory-border-strong bg-inventory-surface-muted p-0.5';
 const AI_GROUP_ICON_BUTTON =
-  'flex h-6 w-6 items-center justify-center rounded-md text-gray-700 transition-colors duration-150 hover:bg-white disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer';
+  'flex h-6 w-6 items-center justify-center rounded-md text-inventory-text-muted transition-colors duration-150 hover:bg-inventory-surface disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer';
 
 type AiDescriptionFieldProps = {
   /** The live HTML value this field edits — the caller's own draft/form field. */
@@ -140,7 +140,7 @@ export default function AiDescriptionField({ value, onChange, buildRequestData, 
       className={AI_BUTTON}
     >
       {aiGenerating ? (
-        <span className="h-3 w-3 animate-spin rounded-full border-2 border-gray-300 border-t-gray-700" />
+        <span className="h-3 w-3 animate-spin rounded-full border-2 border-inventory-border-strong border-t-inventory-text-muted" />
       ) : (
         <Sparkles className="h-3.5 w-3.5" />
       )}
@@ -162,7 +162,7 @@ export default function AiDescriptionField({ value, onChange, buildRequestData, 
         className={AI_GROUP_ICON_BUTTON}
       >
         {aiGenerating ? (
-          <span className="h-3 w-3 animate-spin rounded-full border-2 border-gray-300 border-t-gray-700" />
+          <span className="h-3 w-3 animate-spin rounded-full border-2 border-inventory-border-strong border-t-inventory-text-muted" />
         ) : (
           <Refresh className="h-3.5 w-3.5" />
         )}
@@ -178,7 +178,7 @@ export default function AiDescriptionField({ value, onChange, buildRequestData, 
           <button
             type="button"
             onClick={() => setDetailsOpen(true)}
-            className="shrink-0 text-[11px] font-semibold leading-none text-blue-600 hover:text-blue-700 cursor-pointer"
+            className="shrink-0 text-[11px] font-semibold leading-none text-inventory-secondary hover:text-inventory-secondary-hover cursor-pointer"
           >
             Show Details
           </button>
@@ -187,9 +187,9 @@ export default function AiDescriptionField({ value, onChange, buildRequestData, 
       <div className="relative">
         <RichTextField label="Description" value={value} onChange={onChange} hideLabel toolbarEnd={toolbarEnd} fixedHeight={showDetailsButton} />
         {aiGenerating && (
-          <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-white/60">
-            <div className="flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-[12px] font-semibold text-gray-600 shadow-sm">
-              <span className="h-3 w-3 animate-pulse rounded-full bg-gray-500" />
+          <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-inventory-surface/60">
+            <div className="flex items-center gap-2 rounded-full bg-inventory-surface px-3 py-1.5 text-[12px] font-semibold text-inventory-text-muted shadow-sm">
+              <span className="h-3 w-3 animate-pulse rounded-full bg-inventory-text-subtle" />
               Generating…
             </div>
           </div>
@@ -199,11 +199,11 @@ export default function AiDescriptionField({ value, onChange, buildRequestData, 
         <ModalShell title="Description" compact wide onClose={() => setDetailsOpen(false)}>
           {value ? (
             <div
-              className="text-[13px] text-gray-900 [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-4 [&_ol]:pl-4 [&_a]:text-blue-600 [&_a]:underline"
+              className="text-[13px] text-inventory-text [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-4 [&_ol]:pl-4 [&_a]:text-inventory-secondary [&_a]:underline"
               dangerouslySetInnerHTML={{ __html: sanitizeHtml(value) }}
             />
           ) : (
-            <p className="text-[13px] text-gray-400">—</p>
+            <p className="text-[13px] text-inventory-text-subtle">—</p>
           )}
         </ModalShell>
       )}
@@ -229,7 +229,7 @@ function SegmentButton({
       disabled={disabled}
       aria-pressed={active}
       className={`rounded-md px-2 py-1 text-[11px] font-semibold transition-colors duration-150 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
-        active ? 'bg-gray-900 text-white shadow-sm' : 'text-gray-600 hover:bg-white hover:text-gray-900'
+        active ? 'bg-inventory-text text-white shadow-sm' : 'text-inventory-text-muted hover:bg-inventory-surface hover:text-inventory-text'
       }`}
     >
       {children}

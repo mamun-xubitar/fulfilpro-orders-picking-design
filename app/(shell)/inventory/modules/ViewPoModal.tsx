@@ -24,7 +24,7 @@ export default function ViewPoModal({ po, onClose }: ViewPoModalProps) {
       title={`Purchase order — ${po.productTitle}`}
       compact
       onClose={onClose}
-      extraWide
+      maxWidthClass="max-w-4xl"
       footer={
         <button type="button" onClick={onClose} className={`w-full ${MODAL_FOOTER_BTN_SECONDARY}`}>
           Close
@@ -32,51 +32,51 @@ export default function ViewPoModal({ po, onClose }: ViewPoModalProps) {
       }
     >
       <div className="space-y-2">
-        <div className="rounded-[7px] border border-gray-200 bg-gray-50 p-2">
+        <div className="rounded-[7px] border border-inventory-border bg-inventory-surface-muted p-2">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[12px] font-semibold text-gray-900">{formatPoNumber(po.number)}</span>
+            <span className="text-[12px] font-semibold text-inventory-text">{formatPoNumber(po.number)}</span>
             <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${STATUS_BADGES[po.status]}`}>
               {po.status.replace('_', ' ')}
             </span>
           </div>
-          <dl className="mt-1.5 grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-gray-600 sm:grid-cols-3">
+          <dl className="mt-1.5 grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-inventory-text-muted sm:grid-cols-3">
             <div>
-              <dt className="inline text-gray-400">Reference: </dt>
+              <dt className="inline text-inventory-text-subtle">Reference: </dt>
               <dd className="inline">{po.referenceNumber || '—'}</dd>
             </div>
             <div>
-              <dt className="inline text-gray-400">Supplier: </dt>
+              <dt className="inline text-inventory-text-subtle">Supplier: </dt>
               <dd className="inline">{po.supplierName}</dd>
             </div>
             <div>
-              <dt className="inline text-gray-400">PO email: </dt>
+              <dt className="inline text-inventory-text-subtle">PO email: </dt>
               <dd className="inline">{po.poEmail}</dd>
             </div>
             <div>
-              <dt className="inline text-gray-400">Delivery date: </dt>
+              <dt className="inline text-inventory-text-subtle">Delivery date: </dt>
               <dd className="inline">{po.deliveryDate ? formatDate(po.deliveryDate) : '—'}</dd>
             </div>
             <div>
-              <dt className="inline text-gray-400">Created: </dt>
+              <dt className="inline text-inventory-text-subtle">Created: </dt>
               <dd className="inline">{formatDate(po.createdAt)}</dd>
             </div>
             <div>
-              <dt className="inline text-gray-400">Avg unit cost: </dt>
+              <dt className="inline text-inventory-text-subtle">Avg unit cost: </dt>
               <dd className="inline">{avgPrice !== null ? `$${formatMoney(avgPrice)}` : '—'}</dd>
             </div>
             <div>
-              <dt className="inline text-gray-400">PO Remark: </dt>
+              <dt className="inline text-inventory-text-subtle">PO Remark: </dt>
               <dd className="inline">{po.poRemark || '—'}</dd>
             </div>
             <div className="col-span-1 sm:col-span-2">
-              <dt className="inline text-gray-400">Shipping remark: </dt>
+              <dt className="inline text-inventory-text-subtle">Shipping remark: </dt>
               <dd className="inline">{po.shippingRemark || '—'}</dd>
             </div>
           </dl>
         </div>
 
-        <div className="max-h-80 overflow-y-auto rounded-lg border border-gray-200">
-          <div className={`grid ${GRID_COLS} items-center gap-2 border-b border-gray-200 bg-gray-50 px-2 py-1 text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-gray-500`}>
+        <div className="max-h-80 overflow-y-auto rounded-lg border border-inventory-border">
+          <div className={`grid ${GRID_COLS} items-center gap-2 border-b border-inventory-border bg-inventory-surface-muted px-2 py-1 text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-inventory-text-subtle`}>
             <span className="flex min-h-[16px] items-center">Variant</span>
             <span className="flex min-h-[16px] items-center">Supplier SKU</span>
             <span className="flex min-h-[16px] items-center">Colour</span>
@@ -86,19 +86,19 @@ export default function ViewPoModal({ po, onClose }: ViewPoModalProps) {
             <span className="flex min-h-[16px] items-center justify-end text-right">Outstanding</span>
             <span className="flex min-h-[16px] items-center justify-end text-right">Unit cost</span>
           </div>
-          <div className="divide-y divide-gray-200">
+          <div className="divide-y divide-inventory-border">
             {po.items.map((item) => {
               const remaining = Math.max(0, item.quantity - item.receivedQuantity);
               return (
-                <div key={item.id} className={`grid ${GRID_COLS} items-center gap-2 px-2 py-1 text-[11px] leading-none`}>
-                  <span title={item.variantTitle} className="min-w-0 truncate whitespace-nowrap text-gray-700">{item.variantTitle}</span>
-                  <span className="truncate text-gray-500">{item.sku ?? '—'}</span>
-                  <span className="truncate text-gray-500">{item.colour ? formatColourName(item.colour) : '—'}</span>
-                  <span className="truncate text-gray-500">{item.size || '—'}</span>
-                  <span className="text-right tabular-nums text-gray-500">{item.quantity}</span>
-                  <span className="text-right tabular-nums text-gray-500">{item.receivedQuantity}</span>
-                  <span className="text-right tabular-nums font-medium text-gray-700">{remaining}</span>
-                  <span className="text-right tabular-nums text-gray-700">{item.unitCost !== null ? `$${formatMoney(item.unitCost)}` : '—'}</span>
+                <div key={item.id} className={`grid ${GRID_COLS} items-center gap-2 px-2 py-1 text-[11px] leading-none transition-colors duration-150 hover:bg-inventory-surface-hover`}>
+                  <span title={item.variantTitle} className="min-w-0 truncate whitespace-nowrap text-inventory-text-muted">{item.variantTitle}</span>
+                  <span className="truncate text-inventory-text-subtle">{item.sku ?? '—'}</span>
+                  <span className="truncate text-inventory-text-subtle">{item.colour ? formatColourName(item.colour) : '—'}</span>
+                  <span className="truncate text-inventory-text-subtle">{item.size || '—'}</span>
+                  <span className="text-right tabular-nums text-inventory-text-subtle">{item.quantity}</span>
+                  <span className="text-right tabular-nums text-inventory-text-subtle">{item.receivedQuantity}</span>
+                  <span className="text-right tabular-nums font-medium text-inventory-text-muted">{remaining}</span>
+                  <span className="text-right tabular-nums text-inventory-text-muted">{item.unitCost !== null ? `$${formatMoney(item.unitCost)}` : '—'}</span>
                 </div>
               );
             })}

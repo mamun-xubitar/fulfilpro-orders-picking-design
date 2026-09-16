@@ -32,8 +32,8 @@ export default function ProductColoursField({ value, colours, editing, onChange,
       parse={parseColoursInput}
       format={formatColoursInput}
       renderReadOnly={() => (
-        <div className="flex flex-wrap gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-2">
-          {colours.length === 0 ? <span className="text-[13px] text-gray-400">—</span> : <ColourChips colours={colours} />}
+        <div className="flex flex-wrap gap-1.5 rounded-lg border border-inventory-border bg-inventory-surface-muted px-2.5 py-2">
+          {colours.length === 0 ? <span className="text-[13px] text-inventory-text-subtle">—</span> : <ColourChips colours={colours} />}
         </div>
       )}
       renderChips={(entries) => <ColourChips colours={entries.map((e) => ({ name: e.name, color: e.color ?? '' }))} />}
@@ -50,10 +50,10 @@ export function ColourChips({ colours }: { colours: ColourOption[] }) {
         return (
           <span
             key={`${colour.name}-${index}`}
-            className="inline-flex items-center gap-[3px] rounded-full border border-gray-200 bg-white px-[5px] py-[1px] text-[9px] font-semibold uppercase leading-none text-gray-700"
+            className="inline-flex items-center gap-[3px] rounded-full border border-inventory-border bg-inventory-surface px-[5px] py-[1px] text-[9px] font-semibold uppercase leading-none text-inventory-text-muted"
           >
             <span
-              className={`h-[6px] w-[6px] rounded-full ${recognized ? 'ring-1 ring-black/10' : 'border border-dashed border-amber-400'}`}
+              className={`h-[6px] w-[6px] rounded-full ${recognized ? 'ring-1 ring-black/10' : 'border border-dashed border-inventory-warning/60'}`}
               style={{ backgroundColor: resolveSwatch(colour.color) }}
               title={recognized ? undefined : `"${colour.color}" isn't a recognized colour — showing a placeholder swatch`}
             />

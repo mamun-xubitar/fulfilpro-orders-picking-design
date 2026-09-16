@@ -72,16 +72,16 @@ export default function StoreDraftVariantImage({ variantLabel, storeName, images
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={`Image for ${variantLabel} at ${storeName}`}
-        className="flex h-[24px] w-full items-center gap-1.5 rounded-[7px] border border-gray-300 px-[6px] text-left text-[11px] leading-none outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+        className="flex h-[24px] w-full items-center gap-1.5 rounded-[7px] border border-inventory-border-strong px-[6px] text-left text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring disabled:cursor-not-allowed disabled:opacity-50"
       >
         {selected ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={selected.url} alt="" className="h-5 w-5 shrink-0 rounded object-cover" />
         ) : (
-          <div className="h-5 w-5 shrink-0 rounded border border-dashed border-gray-300" />
+          <div className="h-5 w-5 shrink-0 rounded border border-dashed border-inventory-border-strong" />
         )}
-        <span className="min-w-0 flex-1 truncate text-gray-700">{selected ? imageLabel(selected) : images.length === 0 ? 'No images' : '— none —'}</span>
-        <ChevronDown className="h-3 w-3 shrink-0 text-gray-400" />
+        <span className="min-w-0 flex-1 truncate text-inventory-text-muted">{selected ? imageLabel(selected) : images.length === 0 ? 'No images' : '— none —'}</span>
+        <ChevronDown className="h-3 w-3 shrink-0 text-inventory-text-subtle" />
       </button>
 
       {open && menuStyle && (
@@ -90,18 +90,18 @@ export default function StoreDraftVariantImage({ variantLabel, storeName, images
           role="listbox"
           aria-label={`Choose an image for ${variantLabel}`}
           style={{ position: 'fixed', top: menuStyle.top, left: menuStyle.left, width: menuStyle.width }}
-          className="z-50 max-h-64 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+          className="z-50 max-h-64 overflow-y-auto rounded-lg border border-inventory-border bg-inventory-surface py-1 shadow-lg"
         >
           <button
             type="button"
             role="option"
             aria-selected={selectedImageId === null}
             onClick={() => pick(null)}
-            className={`flex w-full items-center gap-2 px-2 py-1 text-left text-[11px] leading-none hover:bg-gray-50 cursor-pointer ${
-              selectedImageId === null ? 'bg-blue-50 font-semibold text-blue-700' : 'text-gray-700'
+            className={`flex w-full items-center gap-2 px-2 py-1 text-left text-[11px] leading-none hover:bg-inventory-surface-hover cursor-pointer ${
+              selectedImageId === null ? 'bg-inventory-secondary/10 font-semibold text-inventory-secondary' : 'text-inventory-text-muted'
             }`}
           >
-            <div className="h-5 w-5 shrink-0 rounded border border-dashed border-gray-300" />
+            <div className="h-5 w-5 shrink-0 rounded border border-dashed border-inventory-border-strong" />
             — none —
           </button>
           {images.map((img) => (
@@ -111,8 +111,8 @@ export default function StoreDraftVariantImage({ variantLabel, storeName, images
               role="option"
               aria-selected={selectedImageId === img.id}
               onClick={() => pick(img.id)}
-              className={`flex w-full items-center gap-2 px-2 py-1 text-left text-[11px] leading-none hover:bg-gray-50 cursor-pointer ${
-                selectedImageId === img.id ? 'bg-blue-50 font-semibold text-blue-700' : 'text-gray-700'
+              className={`flex w-full items-center gap-2 px-2 py-1 text-left text-[11px] leading-none hover:bg-inventory-surface-hover cursor-pointer ${
+                selectedImageId === img.id ? 'bg-inventory-secondary/10 font-semibold text-inventory-secondary' : 'text-inventory-text-muted'
               }`}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}

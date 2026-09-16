@@ -29,7 +29,7 @@ export default function GalleryPreview({ active, productName }: GalleryPreviewPr
             </div>
           )
         ) : (
-          <span className="flex flex-col items-center gap-1 text-gray-400">
+          <span className="flex flex-col items-center gap-1 text-inventory-text-subtle">
             <ImageIcon className="h-6 w-6" />
             <span className="text-xs">No images</span>
           </span>

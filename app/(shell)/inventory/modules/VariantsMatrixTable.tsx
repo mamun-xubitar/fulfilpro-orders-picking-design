@@ -31,8 +31,8 @@ const SCROLL_THRESHOLD = 8;
 
 // `border-collapse` means a sticky cell's own border doesn't paint (the border lives on the
 // adjacent cell instead), so the header/footer's separating line is an inset box-shadow instead.
-const STICKY_HEADER_TH = 'sticky top-0 z-10 bg-gray-50 shadow-[inset_0_-1px_0_theme(colors.gray.200)]';
-const STICKY_FOOTER_TD = 'sticky bottom-0 z-10 bg-gray-50 shadow-[inset_0_1px_0_theme(colors.gray.200)]';
+const STICKY_HEADER_TH = 'sticky top-0 z-10 bg-inventory-surface-muted shadow-[inset_0_-1px_0_theme(colors.gray.200)]';
+const STICKY_FOOTER_TD = 'sticky bottom-0 z-10 bg-inventory-surface-muted shadow-[inset_0_1px_0_theme(colors.gray.200)]';
 
 export default function VariantsMatrixTable({ matrix, fillHeight, showAllColumns }: VariantsMatrixTableProps) {
   const { rows, totals } = matrix;
@@ -48,15 +48,15 @@ export default function VariantsMatrixTable({ matrix, fillHeight, showAllColumns
     <div className={fillHeight ? 'h-full overflow-y-auto overflow-x-auto' : scrollable ? 'max-h-[12.5rem] overflow-y-auto overflow-x-auto' : 'overflow-x-auto'}>
       <table className="w-full min-w-5xl border-collapse">
         <thead>
-          <tr className="border-b border-gray-200 bg-gray-50">
-            <th scope="col" className={`${STICKY_HEADER_TH} py-[3px] pl-[6px] pr-[4px] text-left text-[8px] font-bold uppercase leading-none tracking-[0.4px] text-gray-500`}>
+          <tr className="border-b border-inventory-border bg-inventory-surface-muted">
+            <th scope="col" className={`${STICKY_HEADER_TH} py-[3px] pl-[6px] pr-[4px] text-left text-[8px] font-bold uppercase leading-none tracking-[0.4px] text-inventory-text-subtle`}>
               <label className="flex cursor-pointer items-center gap-[5px]">
                 <input
                   type="checkbox"
                   checked={matrix.allRowsSelected}
                   onChange={matrix.toggleAllRows}
                   aria-label="Select all rows"
-                  className="h-3 w-3 cursor-pointer accent-blue-600"
+                  className="h-3 w-3 cursor-pointer accent-inventory-primary"
                 />
                 Colour
               </label>
@@ -93,7 +93,7 @@ export default function VariantsMatrixTable({ matrix, fillHeight, showAllColumns
               </span>
             </Th>
             <Th align="right">Stock value</Th>
-            <th scope="col" className={`${STICKY_HEADER_TH} py-[3px] pl-[4px] pr-[6px] text-right text-[8px] font-bold uppercase leading-none tracking-[0.4px] text-gray-500`}>
+            <th scope="col" className={`${STICKY_HEADER_TH} py-[3px] pl-[4px] pr-[6px] text-right text-[8px] font-bold uppercase leading-none tracking-[0.4px] text-inventory-text-subtle`}>
               Actions
             </th>
           </tr>
@@ -118,7 +118,7 @@ export default function VariantsMatrixTable({ matrix, fillHeight, showAllColumns
           ))}
           {rows.length === 0 && (
             <tr>
-              <td colSpan={columnCount} className="px-4 py-6 text-center text-[10px] text-gray-400">
+              <td colSpan={columnCount} className="px-4 py-6 text-center text-[10px] text-inventory-text-subtle">
                 No variants match the current filters
               </td>
             </tr>
@@ -127,22 +127,22 @@ export default function VariantsMatrixTable({ matrix, fillHeight, showAllColumns
 
         {rows.length > 0 && (
           <tfoot>
-            <tr className="font-bold text-gray-900">
-              <td className={`${STICKY_FOOTER_TD} py-[2px] pl-[6px] pr-[4px] text-[9px] font-bold uppercase leading-none tracking-[0.4px] text-gray-500`}>Total</td>
-              <td className={`${STICKY_FOOTER_TD} px-[4px] py-[2px] text-[9.5px] font-semibold leading-none text-gray-500`}>
+            <tr className="font-bold text-inventory-text">
+              <td className={`${STICKY_FOOTER_TD} py-[2px] pl-[6px] pr-[4px] text-[9px] font-bold uppercase leading-none tracking-[0.4px] text-inventory-text-subtle`}>Total</td>
+              <td className={`${STICKY_FOOTER_TD} px-[4px] py-[2px] text-[9.5px] font-semibold leading-none text-inventory-text-subtle`}>
                 {rows.length} row{rows.length === 1 ? '' : 's'}
-                {matrix.hiddenCount > 0 && <span className="text-gray-400"> · {matrix.hiddenCount} hidden</span>}
+                {matrix.hiddenCount > 0 && <span className="text-inventory-text-subtle"> · {matrix.hiddenCount} hidden</span>}
               </td>
               {showAllColumns && <td className={STICKY_FOOTER_TD} />}
               <TotalCell value={formatNumber(totals.totalStock)} />
               <TotalCell value={formatNumber(totals.allocated)} />
-              <TotalCell value={formatNumber(totals.availableStock)} className="text-emerald-700" />
+              <TotalCell value={formatNumber(totals.availableStock)} className="text-inventory-success-hover" />
               <TotalCell value={formatNumber(totals.incoming)} />
               {showAllColumns && <TotalCell value={formatNumber(totals.trigger)} />}
               <td className={STICKY_FOOTER_TD} />
               <td className={STICKY_FOOTER_TD} />
               <td className={STICKY_FOOTER_TD} />
-              <TotalCell value={formatCurrencyValue(totals.stockValue)} className="text-emerald-800" />
+              <TotalCell value={formatCurrencyValue(totals.stockValue)} className="text-inventory-success-hover" />
               <td className={STICKY_FOOTER_TD} />
             </tr>
           </tfoot>
@@ -157,7 +157,7 @@ function Th({ align, children }: { align: 'left' | 'right' | 'center'; children:
   return (
     <th
       scope="col"
-      className={`${STICKY_HEADER_TH} whitespace-nowrap px-[4px] py-[3px] text-[8px] font-bold uppercase leading-none tracking-[0.4px] text-gray-500 ${alignment}`}
+      className={`${STICKY_HEADER_TH} whitespace-nowrap px-[4px] py-[3px] text-[8px] font-bold uppercase leading-none tracking-[0.4px] text-inventory-text-subtle ${alignment}`}
     >
       {children}
     </th>
@@ -165,5 +165,5 @@ function Th({ align, children }: { align: 'left' | 'right' | 'center'; children:
 }
 
 function TotalCell({ value, className }: { value: string; className?: string }) {
-  return <td className={`${STICKY_FOOTER_TD} px-[4px] py-[2px] text-right text-[9.5px] font-bold leading-none tabular-nums ${className ?? 'text-gray-900'}`}>{value}</td>;
+  return <td className={`${STICKY_FOOTER_TD} px-[4px] py-[2px] text-right text-[9.5px] font-bold leading-none tabular-nums ${className ?? 'text-inventory-text'}`}>{value}</td>;
 }

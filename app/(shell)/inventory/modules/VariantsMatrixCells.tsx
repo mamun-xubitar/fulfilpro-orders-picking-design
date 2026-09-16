@@ -13,20 +13,20 @@ const CELL_CLASS = 'px-[4px] py-0';
 /** Cycled by position so several open POs on one row stay visually distinct from each other —
  * not tied to a specific PO's identity, just "a different colour per badge in this cell". */
 const INCOMING_BADGE_COLORS = [
-  'border-amber-200 bg-amber-50 text-amber-800',
-  'border-indigo-200 bg-indigo-50 text-indigo-700',
-  'border-sky-200 bg-sky-50 text-sky-700',
-  'border-violet-200 bg-violet-50 text-violet-700',
+  'border-inventory-warning/30 bg-inventory-warning/10 text-inventory-warning-ink',
+  'border-inventory-primary/30 bg-inventory-primary/10 text-inventory-primary',
+  'border-inventory-sec-stocktake/30 bg-inventory-sec-stocktake/10 text-inventory-sec-stocktake',
+  'border-inventory-sec-details/30 bg-inventory-sec-details/10 text-inventory-sec-details',
 ];
 const INPUT_BASE =
-  'h-[15px] rounded-[5px] border border-gray-300 bg-white px-[3px] text-[9.5px] leading-none outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100';
+  'h-[15px] rounded-[5px] border border-inventory-border-strong bg-inventory-surface px-[3px] text-[9.5px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring';
 
 export function Num({ value, bold, muted, className, title }: { value: string; bold?: boolean; muted?: boolean; className?: string; title?: string }) {
   return (
     <td
       title={title}
       className={`${CELL_CLASS} text-right text-[10px] leading-none tabular-nums ${className ?? ''} ${
-        className ? '' : bold ? 'font-bold text-gray-900' : muted ? 'text-gray-500' : 'text-gray-700'
+        className ? '' : bold ? 'font-bold text-inventory-text' : muted ? 'text-inventory-text-subtle' : 'text-inventory-text-muted'
       }`}
     >
       {value}
@@ -67,7 +67,7 @@ export function NumCell({
  * distinct, and a title tooltip carrying the PO number and status. */
 export function IncomingCell({ lots }: { lots: IncomingLot[] }) {
   if (lots.length === 0) {
-    return <td className={`${CELL_CLASS} text-right text-[10px] leading-none text-gray-400`}>—</td>;
+    return <td className={`${CELL_CLASS} text-right text-[10px] leading-none text-inventory-text-subtle`}>—</td>;
   }
   return (
     <td className={`${CELL_CLASS} text-right`}>
@@ -94,7 +94,7 @@ export function ColourCell({ value, swatch }: { value: string; swatch: string })
   return (
     <div className="flex items-center gap-[4px]">
       <span className="h-[7px] w-[7px] shrink-0 rounded-full ring-1 ring-black/10" style={{ backgroundColor: swatch }} />
-      <span className="truncate text-[10px] leading-none text-gray-700">{value ? formatColourName(value) : '—'}</span>
+      <span className="truncate text-[10px] leading-none text-inventory-text-muted">{value ? formatColourName(value) : '—'}</span>
     </div>
   );
 }
@@ -102,7 +102,7 @@ export function ColourCell({ value, swatch }: { value: string; swatch: string })
 export function SizeCell({ value }: { value: string }) {
   return (
     <td className={CELL_CLASS}>
-      <span className="truncate text-[10px] leading-none text-gray-700">{value || '—'}</span>
+      <span className="truncate text-[10px] leading-none text-inventory-text-muted">{value || '—'}</span>
     </td>
   );
 }
@@ -143,10 +143,10 @@ export function RowAction({ label, onClick, danger, primary, disabled, children 
       title={label}
       className={`flex h-[18px] w-[18px] items-center justify-center rounded-[5px] border transition-colors duration-150 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 ${
         primary
-          ? 'border-blue-600 bg-blue-600 text-white hover:bg-blue-700'
+          ? 'border-inventory-primary bg-inventory-primary text-white hover:bg-inventory-primary-hover'
           : danger
-            ? 'border-gray-300 bg-white text-gray-400 hover:border-red-300 hover:bg-red-50 hover:text-red-600'
-            : 'border-gray-300 bg-white text-gray-500 hover:bg-gray-50 hover:text-gray-800'
+            ? 'border-inventory-border-strong bg-inventory-surface text-inventory-text-subtle hover:border-inventory-danger/40 hover:bg-inventory-danger/10 hover:text-inventory-danger-hover'
+            : 'border-inventory-border-strong bg-inventory-surface text-inventory-text-subtle hover:bg-inventory-surface-hover hover:text-inventory-text'
       }`}
     >
       {children}

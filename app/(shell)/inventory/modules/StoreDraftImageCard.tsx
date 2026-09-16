@@ -18,25 +18,25 @@ type StoreDraftImageCardProps = {
  * reads at a glance. */
 export default function StoreDraftImageCard({ image, excluded, altValue, onToggleInclude, onAltChange, onRemove }: StoreDraftImageCardProps) {
   return (
-    <figure className={`overflow-hidden rounded-xl border transition-opacity duration-150 ${excluded ? 'border-gray-200 opacity-50' : 'border-gray-300'}`}>
+    <figure className={`overflow-hidden rounded-xl border transition-opacity duration-150 ${excluded ? 'border-inventory-border opacity-50' : 'border-inventory-border-strong'}`}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={image.url} alt={altValue || image.altText || ''} className="aspect-square w-full object-cover" />
-      <figcaption className="space-y-1.5 bg-gray-50 px-2 py-1.5">
+      <figcaption className="space-y-1.5 bg-inventory-surface-muted px-2 py-1.5">
         <div className="flex items-center justify-end">
           <button
             type="button"
             onClick={onRemove}
             aria-label="Remove image from this store"
             title="Remove from this store"
-            className="shrink-0 rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600 cursor-pointer"
+            className="shrink-0 rounded p-1 text-inventory-text-subtle hover:bg-inventory-danger/10 hover:text-inventory-danger-hover cursor-pointer"
           >
             <Trash className="h-3.5 w-3.5" />
           </button>
         </div>
 
-        <div className="flex items-center gap-1.5 border-t border-gray-200 pt-1.5">
-          <label className="flex shrink-0 cursor-pointer items-center gap-1 text-[11px] font-medium text-gray-600">
-            <input type="checkbox" checked={!excluded} onChange={onToggleInclude} className="rounded border-gray-300 text-blue-600" />
+        <div className="flex items-center gap-1.5 border-t border-inventory-border pt-1.5">
+          <label className="flex shrink-0 cursor-pointer items-center gap-1 text-[11px] font-medium text-inventory-text-muted">
+            <input type="checkbox" checked={!excluded} onChange={onToggleInclude} className="rounded border-inventory-border-strong text-inventory-secondary" />
             Include
           </label>
           <input
@@ -45,7 +45,7 @@ export default function StoreDraftImageCard({ image, excluded, altValue, onToggl
             onChange={(e) => onAltChange(e.target.value)}
             placeholder="Alt text"
             aria-label="Alt text for image"
-            className="min-w-0 flex-1 rounded border border-gray-200 px-1.5 py-1 text-[11px] outline-none focus:border-blue-400"
+            className="min-w-0 flex-1 rounded border border-inventory-border px-1.5 py-1 text-[11px] outline-none focus:border-inventory-primary"
           />
         </div>
       </figcaption>

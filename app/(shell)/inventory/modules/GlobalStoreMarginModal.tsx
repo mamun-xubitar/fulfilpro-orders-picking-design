@@ -56,13 +56,13 @@ export default function GlobalStoreMarginModal({ state, onClose }: GlobalStoreMa
     >
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-2">
-          <p className="text-[11px] leading-snug text-gray-500">Fallback margin used when a product has no store-specific override of its own.</p>
+          <p className="text-[11px] leading-snug text-inventory-text-subtle">Fallback margin used when a product has no store-specific override of its own.</p>
           {state.available.length > 0 && (
             <button
               type="button"
               onClick={() => setAdding((v) => !v)}
               aria-label="Add a store"
-              className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border border-gray-300 text-gray-500 transition-colors duration-150 hover:bg-gray-50 cursor-pointer"
+              className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border border-inventory-border-strong text-inventory-text-subtle transition-colors duration-150 hover:bg-inventory-surface-hover cursor-pointer"
             >
               <Plus className="h-2.5 w-2.5" />
             </button>
@@ -82,7 +82,7 @@ export default function GlobalStoreMarginModal({ state, onClose }: GlobalStoreMa
                 if (e.key === 'Escape') setAdding(false);
               }}
               aria-label="Select a store to add"
-              className="h-[22px] w-full rounded-[7px] border border-gray-300 px-[6px] text-[10.5px] leading-none outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 cursor-pointer"
+              className="h-[22px] w-full rounded-[7px] border border-inventory-border-strong px-[6px] text-[10.5px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring cursor-pointer"
             >
               <option value="" disabled>
                 Select a store…
@@ -97,7 +97,7 @@ export default function GlobalStoreMarginModal({ state, onClose }: GlobalStoreMa
               type="button"
               onClick={() => setAdding(false)}
               aria-label="Cancel adding a store"
-              className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full text-gray-400 transition-colors duration-150 hover:bg-gray-100 hover:text-gray-600 cursor-pointer"
+              className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full text-inventory-text-subtle transition-colors duration-150 hover:bg-inventory-surface-hover hover:text-inventory-text-muted cursor-pointer"
             >
               <Close className="h-2.5 w-2.5" />
             </button>
@@ -105,12 +105,12 @@ export default function GlobalStoreMarginModal({ state, onClose }: GlobalStoreMa
         )}
 
         {added.length === 0 && !adding ? (
-          <p className="py-3 text-center text-[11px] text-gray-400">No store margins set. Use + to add one.</p>
+          <p className="py-3 text-center text-[11px] text-inventory-text-subtle">No store margins set. Use + to add one.</p>
         ) : (
           <div className="space-y-1.5">
             {added.map((s) => (
               <div key={s.storeId} className="flex items-center gap-[4px]">
-                <span className="min-w-0 flex-1 truncate text-[11px] font-medium leading-none text-gray-700" title={s.storeName}>
+                <span className="min-w-0 flex-1 truncate text-[11px] font-medium leading-none text-inventory-text-muted" title={s.storeName}>
                   {s.storeName}
                 </span>
                 <div className="relative">
@@ -124,15 +124,15 @@ export default function GlobalStoreMarginModal({ state, onClose }: GlobalStoreMa
                       if (Number.isFinite(value) && value >= 0) state.setValue(s.storeId, value);
                     }}
                     aria-label={`Margin for ${s.storeName}`}
-                    className="h-[22px] w-[62px] rounded-[7px] border border-gray-300 pl-[6px] pr-[18px] text-right text-[10.5px] leading-none tabular-nums outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    className="h-[22px] w-[62px] rounded-[7px] border border-inventory-border-strong pl-[6px] pr-[18px] text-right text-[10.5px] leading-none tabular-nums outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring"
                   />
-                  <span className="pointer-events-none absolute right-[5px] top-1/2 -translate-y-1/2 text-[9px] leading-none text-gray-400">%</span>
+                  <span className="pointer-events-none absolute right-[5px] top-1/2 -translate-y-1/2 text-[9px] leading-none text-inventory-text-subtle">%</span>
                 </div>
                 <button
                   type="button"
                   onClick={() => state.removeStore(s.storeId)}
                   aria-label={`Remove margin for ${s.storeName}`}
-                  className="flex h-[18px] w-[18px] items-center justify-center rounded-full text-gray-400 transition-colors duration-150 hover:bg-gray-100 hover:text-gray-600 cursor-pointer"
+                  className="flex h-[18px] w-[18px] items-center justify-center rounded-full text-inventory-text-subtle transition-colors duration-150 hover:bg-inventory-surface-hover hover:text-inventory-text-muted cursor-pointer"
                 >
                   <Close className="h-2.5 w-2.5" />
                 </button>
