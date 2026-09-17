@@ -1,11 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useAnchoredDropdown } from './hooks/useAnchoredDropdown';
 import { FieldLabel } from './ProductFieldRows';
 import { Close, Plus } from './icons';
-
-type DropdownPosition = { top: number; left: number; width: number };
 
 type SupplierMultiSelectProps = {
   suppliers: { id: string; name: string }[];
@@ -31,54 +30,11 @@ type SupplierMultiSelectProps = {
 export default function SupplierMultiSelect({ suppliers, selectedIds, onChange, error, onCreateSupplier, onAddSupplier, required }: SupplierMultiSelectProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const containerRef = useRef<HTMLDivElement>(null);
   const anchorRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const [position, setPosition] = useState<DropdownPosition | null>(null);
-
-  useEffect(() => {
-    const onClickOutside = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (containerRef.current?.contains(target) || dropdownRef.current?.contains(target)) return;
-      setOpen(false);
-    };
-    const onEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
-    };
-    document.addEventListener('mousedown', onClickOutside);
-    document.addEventListener('keydown', onEscape);
-    return () => {
-      document.removeEventListener('mousedown', onClickOutside);
-      document.removeEventListener('keydown', onEscape);
-    };
-  }, []);
-
-  // The dropdown is portalled to document.body (fixed position) so the Product
-  // details panel's `overflow-y-auto` scroll container can't clip it or force the
-  // grid row to reflow when it opens — same pattern as OrderPicker.
-  useEffect(() => {
-    if (!open) return;
-    const updatePosition = () => {
-      const rect = anchorRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      const width = Math.min(Math.max(rect.width, 280), window.innerWidth - 16);
-      const left = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8));
-      const below = window.innerHeight - rect.bottom;
-      const top = below < 288 && rect.top > below ? Math.max(8, rect.top - 292) : rect.bottom + 4;
-      setPosition((prev) => (prev && prev.top === top && prev.left === left && prev.width === width ? prev : { top, left, width }));
-    };
-    updatePosition();
-    const panel = containerRef.current?.closest('section');
-    const resizeObserver = panel ? new ResizeObserver(updatePosition) : null;
-    if (panel) resizeObserver?.observe(panel);
-    window.addEventListener('resize', updatePosition);
-    window.addEventListener('scroll', updatePosition, true);
-    return () => {
-      resizeObserver?.disconnect();
-      window.removeEventListener('resize', updatePosition);
-      window.removeEventListener('scroll', updatePosition, true);
-    };
-  }, [open]);
+  // Fixed 320px menu, measured-height above-placement, auto-close off-screen — shared hook,
+  // same mechanics as TagsPicker/CollectionsPicker.
+  const position = useAnchoredDropdown({ anchorRef, dropdownRef, open, onClose: () => setOpen(false), width: 320, maxHeight: 288 });
 
   const results = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -92,7 +48,7 @@ export default function SupplierMultiSelect({ suppliers, selectedIds, onChange, 
   const trimmedQuery = query.trim();
 
   return (
-    <div className="min-w-0" ref={containerRef}>
+    <div className="min-w-0">
       <FieldLabel>
         Suppliers{required && <span className="ml-0.5 text-inventory-danger">*</span>}
       </FieldLabel>

@@ -52,19 +52,24 @@ export function ModalShell({
       onClick={disableBackdropClose ? undefined : onClose}
     >
       <div
-        className={`w-full ${maxWidthClass ?? (fullScreen ? 'max-w-[95vw]' : extraWide ? 'max-w-5xl' : wide ? 'max-w-2xl' : 'max-w-md')} rounded-lg border border-gray-200 bg-white shadow-xl ${allowOverflow ? 'overflow-visible' : `overflow-hidden flex flex-col ${fullScreen ? 'h-[92dvh]' : 'max-h-[calc(100dvh-2rem)]'}`}`}
+        className={`w-full ${maxWidthClass ?? (fullScreen ? 'max-w-[95vw]' : extraWide ? 'max-w-5xl' : wide ? 'max-w-2xl' : 'max-w-md')} rounded-lg border ${compact ? 'border-inventory-border bg-inventory-surface shadow-inventory-md' : 'border-gray-200 bg-white shadow-xl'} ${allowOverflow ? 'overflow-visible' : `overflow-hidden flex flex-col ${fullScreen ? 'h-[92dvh]' : 'max-h-[calc(100dvh-2rem)]'}`}`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className={`flex shrink-0 items-center justify-between gap-4 border-b border-gray-200 ${compact ? 'px-4 py-2' : 'px-5 py-4'}`}>
-          <h3 className={`${compact ? 'text-sm' : 'text-base'} font-semibold text-gray-900`}>{title}</h3>
-          <button type="button" onClick={onClose} className={`rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 cursor-pointer ${compact ? 'p-1' : 'p-1.5'}`} aria-label="Close">
+        <div className={`flex shrink-0 items-center justify-between gap-4 border-b ${compact ? 'border-inventory-border' : 'border-gray-200'} ${compact ? 'px-4 py-2' : 'px-5 py-4'}`}>
+          <h3 className={`${compact ? 'text-sm' : 'text-base'} font-semibold ${compact ? 'text-inventory-text' : 'text-gray-900'}`}>{title}</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className={`rounded-lg cursor-pointer ${compact ? 'text-inventory-text-subtle hover:bg-inventory-surface-hover hover:text-inventory-text-muted' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'} ${compact ? 'p-1' : 'p-1.5'}`}
+            aria-label="Close"
+          >
             <svg className={compact ? 'h-4 w-4' : 'h-5 w-5'} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
         <div className={`${allowOverflow ? 'px-5 py-4' : 'flex-1 overflow-y-auto px-5 py-4'} ${bodyClassName ?? ''}`}>{children}</div>
-        {footer && <div className="shrink-0 border-t border-gray-200 px-5 py-4">{footer}</div>}
+        {footer && <div className={`shrink-0 border-t ${compact ? 'border-inventory-border' : 'border-gray-200'} px-5 py-4`}>{footer}</div>}
       </div>
     </div>
   );
@@ -76,25 +81,39 @@ export function ModalActions({
   confirmLabel,
   disabled,
   danger,
+  compact,
 }: {
   onCancel: () => void;
   onConfirm: () => void;
   confirmLabel: string;
   disabled: boolean;
   danger?: boolean;
+  /** Matches the inventory skin/sizing used by MODAL_FOOTER_BTN_* — for a ModalActions footer
+   * inside a `compact` ModalShell (dense hub surfaces, i.e. inventory). */
+  compact?: boolean;
 }) {
   return (
     <div className="flex items-center gap-2">
-      <button type="button" onClick={onCancel} className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50 cursor-pointer">
+      <button
+        type="button"
+        onClick={onCancel}
+        className={
+          compact
+            ? 'flex-1 h-[28px] rounded-[7px] border border-inventory-border-strong bg-inventory-surface text-[11px] font-bold leading-none text-inventory-text-muted transition-colors duration-150 hover:bg-inventory-surface-hover cursor-pointer'
+            : 'flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50 cursor-pointer'
+        }
+      >
         Cancel
       </button>
       <button
         type="button"
         onClick={onConfirm}
         disabled={disabled}
-        className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer ${
-          danger ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'
-        }`}
+        className={
+          compact
+            ? `flex-1 h-[28px] rounded-[7px] text-[11px] font-bold leading-none text-white transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer ${danger ? 'bg-inventory-danger hover:bg-inventory-danger-hover' : 'bg-inventory-primary hover:bg-inventory-primary-hover'}`
+            : `flex-1 rounded-lg px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer ${danger ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`
+        }
       >
         {confirmLabel}
       </button>
@@ -110,10 +129,10 @@ const MODAL_FOOTER_BTN_BASE =
   'h-[28px] rounded-[7px] px-3 text-[11px] font-bold leading-none transition-colors duration-150 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60';
 
 export const MODAL_FOOTER_BTN_SECONDARY =
-  `${MODAL_FOOTER_BTN_BASE} border border-gray-300 bg-white text-gray-600 hover:bg-gray-50`;
+  `${MODAL_FOOTER_BTN_BASE} border border-inventory-border-strong bg-inventory-surface text-inventory-text-muted hover:bg-inventory-surface-hover`;
 
 export const MODAL_FOOTER_BTN_PRIMARY =
-  `${MODAL_FOOTER_BTN_BASE} bg-blue-600 text-white hover:bg-blue-700`;
+  `${MODAL_FOOTER_BTN_BASE} bg-inventory-primary text-white hover:bg-inventory-primary-hover`;
 
 export const MODAL_FOOTER_BTN_DANGER =
-  `${MODAL_FOOTER_BTN_BASE} bg-red-600 text-white hover:bg-red-700`;
+  `${MODAL_FOOTER_BTN_BASE} bg-inventory-danger text-white hover:bg-inventory-danger-hover`;

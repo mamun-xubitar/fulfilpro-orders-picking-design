@@ -1,7 +1,8 @@
 'use client';
 
-import { MODAL_FOOTER_BTN_PRIMARY, MODAL_FOOTER_BTN_SECONDARY, ModalShell } from '@/components/ModalShell';
+import { ModalShell } from '@/components/ModalShell';
 import type { useSuppliers } from './hooks/useSuppliers';
+import { SPINNER, WIZARD_BODY_CLASS, WIZARD_BTN_PRIMARY, WIZARD_BTN_SECONDARY, WIZARD_CARD_CLASS } from './modalStyles';
 
 type SupplierModalProps = { suppliers: ReturnType<typeof useSuppliers> };
 
@@ -18,12 +19,13 @@ export default function SupplierModal({ suppliers: s }: SupplierModalProps) {
       compact
       onClose={s.closeModal}
       elevated
+      bodyClassName={WIZARD_BODY_CLASS}
       footer={
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={s.closeModal}
-            className={`flex-1 ${MODAL_FOOTER_BTN_SECONDARY}`}
+            className={`flex-1 ${WIZARD_BTN_SECONDARY}`}
           >
             Cancel
           </button>
@@ -31,14 +33,15 @@ export default function SupplierModal({ suppliers: s }: SupplierModalProps) {
             type="button"
             onClick={s.save}
             disabled={disabled || s.saving}
-            className={`flex-1 ${MODAL_FOOTER_BTN_PRIMARY}`}
+            className={`flex-1 ${WIZARD_BTN_PRIMARY}`}
           >
+            {s.saving && SPINNER}
             {s.saving ? 'Saving...' : 'Save'}
           </button>
         </div>
       }
     >
-      <div className="space-y-2">
+      <div className={`${WIZARD_CARD_CLASS} space-y-2`}>
         <TextField label="Name" value={s.form.name} onChange={s.set('name')} placeholder="Acme Apparel Co." error={s.saveErrors.name} uppercase />
         <TextField label="PO email" value={s.form.poEmail} onChange={s.set('poEmail')} placeholder="orders@acme.example" error={s.saveErrors.poEmail} />
         <TextField label="Contact email" value={s.form.contactEmail} onChange={s.set('contactEmail')} placeholder="Optional" error={s.saveErrors.contactEmail} />

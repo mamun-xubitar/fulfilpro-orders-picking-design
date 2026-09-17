@@ -1,6 +1,6 @@
 'use client';
 
-import { MODAL_FOOTER_BTN_DANGER, MODAL_FOOTER_BTN_PRIMARY, MODAL_FOOTER_BTN_SECONDARY, ModalShell } from '@/components/ModalShell';
+import { MODAL_FOOTER_BTN_DANGER, MODAL_FOOTER_BTN_SECONDARY, ModalShell } from '@/components/ModalShell';
 import AdjustmentModals from './AdjustmentModals';
 import BulkUpdateStoresModal from './BulkUpdateStoresModal';
 import EditImagesModal from './EditImagesModal';
@@ -16,6 +16,7 @@ import SupplierModal from './SupplierModal';
 import VariantsMatrixSection from './VariantsMatrixSection';
 import NewProductWizard from './newProduct/NewProductWizard';
 import { ChevronLeft, ChevronRight, Close } from './icons';
+import { SPINNER, WIZARD_BODY_CLASS, WIZARD_BTN_PRIMARY, WIZARD_BTN_SECONDARY, WIZARD_CARD_CLASS } from './modalStyles';
 import { formatMoney, variantTitle } from './utils';
 import type { InventoryPage } from './hooks/useInventoryPage';
 
@@ -229,12 +230,13 @@ function ApplyPriceModal({ p }: { p: InventoryPage }) {
       title="Apply this price?"
       compact
       onClose={pricing.cancelUsePrice}
+      bodyClassName={WIZARD_BODY_CLASS}
       footer={
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={pricing.cancelUsePrice}
-            className={`flex-1 ${MODAL_FOOTER_BTN_SECONDARY}`}
+            className={`flex-1 ${WIZARD_BTN_SECONDARY}`}
           >
             Cancel
           </button>
@@ -242,18 +244,21 @@ function ApplyPriceModal({ p }: { p: InventoryPage }) {
             type="button"
             onClick={pricing.confirmUsePrice}
             disabled={pricing.applying}
-            className={`flex-1 ${MODAL_FOOTER_BTN_PRIMARY}`}
+            className={`flex-1 ${WIZARD_BTN_PRIMARY}`}
           >
+            {pricing.applying && SPINNER}
             Apply to all variants
           </button>
         </div>
       }
     >
-      <p className="text-[12px] text-inventory-text-muted">Every variant of this product will be updated to:</p>
-      <dl className="mt-2 space-y-1.5">
-        <SummaryRow label="Sell price (inc tax)" value={`${formatMoney(pricing.confirmUse.sellingIncTax)} ${p.globals.baseCurrency}`} />
-        <SummaryRow label="Buy price (landed)" value={`${formatMoney(pricing.confirmUse.totalBuying)} ${p.globals.baseCurrency}`} />
-      </dl>
+      <div className={WIZARD_CARD_CLASS}>
+        <p className="text-[12px] text-inventory-text-muted">Every variant of this product will be updated to:</p>
+        <dl className="mt-2 space-y-1.5">
+          <SummaryRow label="Sell price (inc tax)" value={`${formatMoney(pricing.confirmUse.sellingIncTax)} ${p.globals.baseCurrency}`} />
+          <SummaryRow label="Buy price (landed)" value={`${formatMoney(pricing.confirmUse.totalBuying)} ${p.globals.baseCurrency}`} />
+        </dl>
+      </div>
     </ModalShell>
   );
 }

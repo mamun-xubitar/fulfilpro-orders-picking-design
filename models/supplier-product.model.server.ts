@@ -469,6 +469,127 @@ export class SupplierProductModel {
     }
   }
 
+  /**
+   * Applies the Colour & size adjustment modal's checked colours/sizes to the product, in one of
+   * two modes:
+   * - `replace`: the product's colours/sizes become exactly the checked lists; every existing
+   *   variant is deleted (along with its stocktake items, adjustments and store-variant links —
+   *   cascades on SupplierProductVariant) and one row per checked colour x checked size is
+   *   created fresh, seeded from `values`.
+   * - `insert`: the product's colours/sizes become the union of what it already had and the
+   *   checked lists; only the checked colour x checked size combos that don't already exist are
+   *   created (existing variants are left untouched) — mirrors reconcileVariants' sentinel
+   *   promotion so a colour-only or size-only product's placeholder row is promoted in place
+   *   rather than orphaned.
+   * An empty checked axis is represented by the '' sentinel, exactly as reconcileVariants does,
+   * so a colour-only or size-only selection still produces one variant per value on its one axis.
+   */
+  async applyOptions(
+    supplierProductId: string,
+    data: {
+      mode: 'replace' | 'insert';
+      /** Checked colours only. */
+      colours: ColourOptionData[];
+      /** Checked sizes only. */
+      sizes: string[];
+      /** Per-combo stock on hand / trigger typed in the modal — keyed by colour+size, matched
+       * case-insensitively on colour. A combo missing from here falls back to 0 / the store's
+       * low-stock threshold, same as reconcileVariants. */
+      values: { colour: string; size: string; stockOnHand?: number; trigger?: number }[];
+    }
+  ): Promise<void> {
+    const current = await prisma.supplierProduct.findUnique({ where: { id: supplierProductId }, select: { sizes: true, colours: true } });
+    if (!current) throw new Error('Product not found');
+
+    const colourAxis = data.colours.length > 0 ? data.colours.map((c) => c.name) : [''];
+    const sizeAxis = data.sizes.length > 0 ? data.sizes : [''];
+    const valuesByKey = new Map(data.values.map((v) => [`${v.colour.toLowerCase()}::${v.size}`, v]));
+    const lowStockThreshold =
+      (await prisma.appSettings.findUnique({ where: { id: 'default' }, select: { lowStockThreshold: true } }))?.lowStockThreshold ?? 10;
+    // Mirrors reconcileVariants: a colour that already has an image assigned hands it straight to
+    // any newly materialised variant of that colour.
+    const taggedImages = await prisma.supplierProductImage.findMany({
+      where: { supplierProductId, colour: { not: null } },
+      select: { id: true, colour: true },
+    });
+    const imageIdByColour = new Map(taggedImages.map((img) => [img.colour!.toLowerCase(), img.id]));
+
+    const buildRow = (colour: string, size: string, position: number): Prisma.SupplierProductVariantCreateManyInput => {
+      const v = valuesByKey.get(`${colour.toLowerCase()}::${size}`);
+      return {
+        supplierProductId,
+        colour,
+        size,
+        stockOnHand: v?.stockOnHand ?? 0,
+        trigger: v?.trigger ?? lowStockThreshold,
+        position,
+        imageId: imageIdByColour.get(colour.toLowerCase()) ?? null,
+      };
+    };
+
+    if (data.mode === 'replace') {
+      const nextColourKeys = new Set(data.colours.map((c) => c.name.toLowerCase()));
+      const toCreate: Prisma.SupplierProductVariantCreateManyInput[] = [];
+      let position = 0;
+      for (const colour of colourAxis) {
+        for (const size of sizeAxis) toCreate.push(buildRow(colour, size, position++));
+      }
+
+      await prisma.$transaction(async (tx) => {
+        await tx.supplierProduct.update({
+          where: { id: supplierProductId },
+          data: { sizes: data.sizes, colours: data.colours as unknown as Prisma.InputJsonValue },
+        });
+        for (const img of taggedImages) {
+          if (!nextColourKeys.has(img.colour!.toLowerCase())) {
+            await tx.supplierProductImage.update({ where: { id: img.id }, data: { colour: null } });
+          }
+        }
+        await tx.supplierProductVariant.deleteMany({ where: { supplierProductId } });
+        if (toCreate.length > 0) await tx.supplierProductVariant.createMany({ data: toCreate });
+      });
+      return;
+    }
+
+    // insert: the product's lists become the union of what it already had and the checked items.
+    const currentColours = normalizeColours(current.colours);
+    const colourByLower = new Map(currentColours.map((c) => [c.name.toLowerCase(), c]));
+    for (const c of data.colours) if (!colourByLower.has(c.name.toLowerCase())) colourByLower.set(c.name.toLowerCase(), c);
+    const nextColours = [...colourByLower.values()];
+
+    const currentSizes = current.sizes as string[];
+    const sizeSeen = new Set(currentSizes.map((s) => s.toLowerCase()));
+    const nextSizes = [...currentSizes];
+    for (const s of data.sizes) {
+      if (!sizeSeen.has(s.toLowerCase())) {
+        sizeSeen.add(s.toLowerCase());
+        nextSizes.push(s);
+      }
+    }
+
+    await prisma.supplierProduct.update({
+      where: { id: supplierProductId },
+      data: { sizes: nextSizes, colours: nextColours as unknown as Prisma.InputJsonValue },
+    });
+
+    const existing = await prisma.supplierProductVariant.findMany({ where: { supplierProductId }, select: { id: true, colour: true, size: true } });
+    await this.promoteSentinelAxis(existing, 'size', nextSizes);
+    await this.promoteSentinelAxis(existing, 'colour', nextColours.map((c) => c.name));
+
+    const existingKeys = new Set(existing.map((v) => `${v.colour.toLowerCase()}::${v.size}`));
+    const toCreate: Prisma.SupplierProductVariantCreateManyInput[] = [];
+    let position = existing.length;
+    for (const colour of colourAxis) {
+      for (const size of sizeAxis) {
+        const key = `${colour.toLowerCase()}::${size}`;
+        if (existingKeys.has(key)) continue;
+        toCreate.push(buildRow(colour, size, position++));
+        existingKeys.add(key);
+      }
+    }
+    if (toCreate.length > 0) await prisma.supplierProductVariant.createMany({ data: toCreate });
+  }
+
   async upsertPricing(id: string, data: SupplierProductPricingRow): Promise<void> {
     await prisma.supplierProductPricing.upsert({
       where: { supplierProductId: id },

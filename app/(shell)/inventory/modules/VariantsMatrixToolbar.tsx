@@ -1,15 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { MODAL_FOOTER_BTN_PRIMARY, MODAL_FOOTER_BTN_SECONDARY, ModalShell } from '@/components/ModalShell';
-import { deriveColorFromName, formatColourName, formatColoursInput, parseColoursInput, resolveSwatch } from '@/lib/inventory/colour';
-import PresetComboField from './PresetComboField';
+import { formatColourName } from '@/lib/inventory/colour';
+import ColourSizeModal from './colourSize/ColourSizeModal';
 import { STATUS_LEGEND } from './constants';
 import type { InventoryPage } from './hooks/useInventoryPage';
-import type { InventoryPresetsState } from './hooks/useInventoryPresets';
 import { Adjust, Download, Expand, Plus, Trash } from './icons';
 import { BTN_XS } from './MainImagePanel';
-import { capitaliseFirst, formatSizesInput, parseSizesInput } from './utils';
 
 type VariantsMatrixToolbarProps = {
   p: InventoryPage;
@@ -20,8 +17,7 @@ type VariantsMatrixToolbarProps = {
 
 export default function VariantsMatrixToolbar({ p, fullView }: VariantsMatrixToolbarProps) {
   const { matrix } = p;
-  const [addColourOpen, setAddColourOpen] = useState(false);
-  const [addSizeOpen, setAddSizeOpen] = useState(false);
+  const [colourSizeOpen, setColourSizeOpen] = useState(false);
 
   // Always the whole product, not the matrix's active colour/size/status filter — "Export
   // product CSV" means the full product, and filtering the rows here used to also mis-pair
@@ -165,185 +161,21 @@ export default function VariantsMatrixToolbar({ p, fullView }: VariantsMatrixToo
 
         <span className="mx-[2px] h-[18px] w-px bg-inventory-border" aria-hidden="true" />
 
-        <SecondaryButton onClick={() => setAddColourOpen(true)}>
+        <SecondaryButton onClick={() => setColourSizeOpen(true)}>
           <Plus className="h-3 w-3" />
-          Colour
-        </SecondaryButton>
-        <SecondaryButton onClick={() => setAddSizeOpen(true)}>
-          <Plus className="h-3 w-3" />
-          Size
+          Colour / size
         </SecondaryButton>
       </div>
 
-      {addColourOpen && <AddColourModal onClose={() => setAddColourOpen(false)} onAdd={p.details.quickAddColours} presets={p.presets} />}
-      {addSizeOpen && <AddSizeModal onClose={() => setAddSizeOpen(false)} onAdd={p.details.quickAddSizes} presets={p.presets} />}
+      {colourSizeOpen && p.product && (
+        <ColourSizeModal
+          product={p.product}
+          optionLibrary={p.optionLibrary}
+          onApplied={p.onVariantSaved}
+          onClose={() => setColourSizeOpen(false)}
+        />
+      )}
     </div>
-  );
-}
-
-/** Both quick-add modals reuse PresetComboField — same badge dropdown, comma parsing, instant
- * duplicate validation and preset write-back-on-blur as the Colours/Sizes fields in Product
- * details. "Add colour(s)" here is a separate action from that write-back: it appends the parsed
- * names onto *this product's* colour/size list via quickAddColours/quickAddSizes, while the field
- * itself independently persists any brand-new name as a global preset on blur. */
-function AddColourModal({
-  onClose,
-  onAdd,
-  presets,
-}: {
-  onClose: () => void;
-  onAdd: (names: string[]) => string | null;
-  presets: InventoryPresetsState;
-}) {
-  const [value, setValue] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const names = parseColoursInput(value).map((c) => c.name);
-
-  const handleAdd = () => {
-    if (names.length === 0) return;
-    const err = onAdd(names);
-    if (err) setError(err);
-    else onClose();
-  };
-
-  return (
-    <ModalShell disableBackdropClose
-      title="Add colour"
-      compact
-      onClose={onClose}
-      wide
-      allowOverflow
-      footer={
-        <div className="flex gap-2">
-          <button type="button" onClick={onClose} className={`flex-1 ${MODAL_FOOTER_BTN_SECONDARY}`}>
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleAdd}
-            disabled={names.length === 0}
-            className={`flex-1 ${MODAL_FOOTER_BTN_PRIMARY}`}
-          >
-            Add colour{names.length > 1 ? 's' : ''}
-          </button>
-        </div>
-      }
-    >
-      <PresetComboField
-        label="Name"
-        kind="colour"
-        value={value}
-        editing
-        onChange={(e) => {
-          setValue(e.target.value);
-          setError(null);
-        }}
-        onValueChange={(next) => {
-          setValue(next);
-          setError(null);
-        }}
-        error={error ?? undefined}
-        presets={presets}
-        placeholder="e.g. Black, Hot Pink, Navy"
-        parse={parseColoursInput}
-        format={formatColoursInput}
-        renderReadOnly={() => null}
-        renderChips={(entries) => <ModalChips names={entries.map((e) => e.name)} kind="colour" />}
-      />
-    </ModalShell>
-  );
-}
-
-function AddSizeModal({
-  onClose,
-  onAdd,
-  presets,
-}: {
-  onClose: () => void;
-  onAdd: (sizes: string[]) => string | null;
-  presets: InventoryPresetsState;
-}) {
-  const [value, setValue] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const sizes = parseSizesInput(value);
-
-  const handleAdd = () => {
-    if (sizes.length === 0) return;
-    const err = onAdd(sizes);
-    if (err) setError(err);
-    else onClose();
-  };
-
-  return (
-    <ModalShell disableBackdropClose
-      title="Add size"
-      compact
-      onClose={onClose}
-      wide
-      allowOverflow
-      footer={
-        <div className="flex gap-2">
-          <button type="button" onClick={onClose} className={`flex-1 ${MODAL_FOOTER_BTN_SECONDARY}`}>
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleAdd}
-            disabled={sizes.length === 0}
-            className={`flex-1 ${MODAL_FOOTER_BTN_PRIMARY}`}
-          >
-            Add size{sizes.length > 1 ? 's' : ''}
-          </button>
-        </div>
-      }
-    >
-      <PresetComboField
-        label="Size"
-        kind="size"
-        value={value}
-        editing
-        onChange={(e) => {
-          setValue(e.target.value);
-          setError(null);
-        }}
-        onValueChange={(next) => {
-          setValue(next);
-          setError(null);
-        }}
-        error={error ?? undefined}
-        presets={presets}
-        placeholder="e.g. XL, XXL, 54"
-        parse={(v) => parseSizesInput(v).map((name) => ({ name }))}
-        format={(entries) => formatSizesInput(entries.map((e) => e.name))}
-        renderReadOnly={() => null}
-        renderChips={(entries) => <ModalChips names={entries.map((e) => e.name)} kind="size" />}
-      />
-    </ModalShell>
-  );
-}
-
-/** Chip preview inside the quick-add modals — mirrors ColourChips/SizeChips: a swatch dot for a
- * colour (derived from the name, same as PresetPicker's badges — nothing is stored) and
- * first-letter-capitalised display text, consistent with the Colours/Sizes fields in Product
- * details and the New Product wizard. */
-function ModalChips({ names, kind }: { names: string[]; kind: 'colour' | 'size' }) {
-  return (
-    <>
-      {names.map((name, index) => (
-        <span
-          key={`${name}-${index}`}
-          className="inline-flex items-center gap-1.5 rounded-md border border-inventory-border bg-inventory-surface px-2 py-0.5 text-[11px] font-semibold text-inventory-text-muted"
-        >
-          {kind === 'colour' && (
-            <span
-              className="h-2 w-2 shrink-0 rounded-full ring-1 ring-black/10"
-              style={{ backgroundColor: resolveSwatch(deriveColorFromName(name)) }}
-            />
-          )}
-          {kind === 'colour' ? formatColourName(name) : capitaliseFirst(name)}
-        </span>
-      ))}
-    </>
   );
 }
 

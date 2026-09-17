@@ -8,6 +8,7 @@ export type SupplierRow = {
   poEmail: string;
   description: string | null;
   productCount: number;
+  purchaseOrderCount: number;
   createdAt: string;
   updatedAt: string;
 };
@@ -24,7 +25,14 @@ export class SupplierModel {
       prisma.supplier.count({ where }),
       prisma.supplier.findMany({
         where,
-        include: { _count: { select: { productLinks: true } } },
+        include: { 
+          _count: { 
+            select: { 
+              productLinks: true,
+              purchaseOrders: true 
+            } 
+          } 
+        },
         orderBy: { name: 'asc' },
         skip: (params.page - 1) * params.pageSize,
         take: params.pageSize,
@@ -37,7 +45,14 @@ export class SupplierModel {
   async findById(id: string): Promise<SupplierRow | null> {
     const row = await prisma.supplier.findUnique({
       where: { id },
-      include: { _count: { select: { productLinks: true } } },
+      include: { 
+        _count: { 
+          select: { 
+            productLinks: true,
+            purchaseOrders: true 
+          } 
+        } 
+      },
     });
     return row ? toSupplierRow(row) : null;
   }
@@ -45,7 +60,7 @@ export class SupplierModel {
   async create(data: { name: string; contactEmail: string | null; poEmail: string; description: string | null }) {
     const row = await prisma.supplier.create({
       data,
-      include: { _count: { select: { productLinks: true } } },
+      include: { _count: { select: { productLinks: true, purchaseOrders: true } } },
     });
     return toSupplierRow(row);
   }
@@ -54,7 +69,7 @@ export class SupplierModel {
     const row = await prisma.supplier.update({
       where: { id },
       data,
-      include: { _count: { select: { productLinks: true } } },
+      include: { _count: { select: { productLinks: true, purchaseOrders: true } } },
     });
     return toSupplierRow(row);
   }
@@ -83,6 +98,11 @@ export class SupplierModel {
     `);
     return Number(rows[0]?.count ?? 0);
   }
+
+  /** Count of purchase orders for this supplier — deleting is blocked by FK (onDelete: Restrict). */
+  async countPurchaseOrders(id: string): Promise<number> {
+    return prisma.purchaseOrder.count({ where: { supplierId: id } });
+  }
 }
 
 type SupplierWithCount = {
@@ -95,7 +115,7 @@ type SupplierWithCount = {
   updatedAt: Date;
   /** Every product this supplier has ever been linked to — primary (created-under) or picked up
    * later via a Receive PO — not just the ones it's the current primary supplier for. */
-  _count: { productLinks: number };
+  _count: { productLinks: number; purchaseOrders: number };
 };
 
 function toSupplierRow(row: SupplierWithCount): SupplierRow {
@@ -106,6 +126,7 @@ function toSupplierRow(row: SupplierWithCount): SupplierRow {
     poEmail: row.poEmail,
     description: row.description,
     productCount: row._count.productLinks,
+    purchaseOrderCount: row._count.purchaseOrders,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };

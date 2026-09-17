@@ -411,6 +411,76 @@ export class SupplierProductController {
     return { data: product, message: `${count} variant${count === 1 ? '' : 's'} deleted` };
   }
 
+  /** Applies the Colour & size adjustment modal's checked colours/sizes/variant values to a
+   * product — see SupplierProductModel.applyOptions for what `replace` vs `insert` each do. */
+  async applyOptions(id: string, body: unknown, session: Session) {
+    if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
+    if (!(await model.exists(id))) return { error: { message: 'Product not found', status: 404 } };
+
+    const value = (body ?? {}) as Record<string, unknown>;
+    const mode = value.mode === 'replace' || value.mode === 'insert' ? value.mode : null;
+    if (!mode) return { error: { message: 'mode: Must be "replace" or "insert"', status: 400 } };
+
+    const rawColours = Array.isArray(value.colours) ? (value.colours as unknown[]) : [];
+    const seenColours = new Set<string>();
+    const colours: { name: string; color: string }[] = [];
+    for (const raw of rawColours) {
+      const name = typeof raw === 'string' ? upperTrim(raw) : '';
+      if (!name || seenColours.has(name.toLowerCase())) continue;
+      seenColours.add(name.toLowerCase());
+      colours.push({ name, color: deriveColorFromName(name) });
+    }
+
+    const rawSizes = Array.isArray(value.sizes) ? (value.sizes as unknown[]) : [];
+    const seenSizes = new Set<string>();
+    const sizes: string[] = [];
+    for (const raw of rawSizes) {
+      const size = typeof raw === 'string' ? upperTrim(raw) : '';
+      if (!size || seenSizes.has(size.toLowerCase())) continue;
+      seenSizes.add(size.toLowerCase());
+      sizes.push(size);
+    }
+
+    if (colours.length === 0 && sizes.length === 0) {
+      return { error: { message: 'Validation failed', errors: ['colours: Check at least one colour or size'], status: 400 } };
+    }
+
+    const rawValues = Array.isArray(value.values) ? (value.values as unknown[]) : [];
+    const errors: string[] = [];
+    const values: { colour: string; size: string; stockOnHand?: number; trigger?: number }[] = [];
+    for (const raw of rawValues) {
+      if (!raw || typeof raw !== 'object') continue;
+      const v = raw as Record<string, unknown>;
+      const colour = typeof v.colour === 'string' ? v.colour.trim() : '';
+      const size = typeof v.size === 'string' ? v.size.trim() : '';
+      const entry: { colour: string; size: string; stockOnHand?: number; trigger?: number } = { colour, size };
+      if (v.stockOnHand !== undefined) {
+        const n = Number(v.stockOnHand);
+        if (!Number.isFinite(n) || n < 0) errors.push('stockOnHand: Enter a value of 0 or more');
+        else entry.stockOnHand = Math.trunc(n);
+      }
+      if (v.trigger !== undefined) {
+        const n = Number(v.trigger);
+        if (!Number.isFinite(n) || n < 0) errors.push('trigger: Enter a value of 0 or more');
+        else entry.trigger = Math.trunc(n);
+      }
+      values.push(entry);
+    }
+    if (errors.length) return { error: { message: 'Validation failed', errors, status: 400 } };
+
+    await model.applyOptions(id, { mode, colours, sizes, values });
+
+    const variantCount = colours.length > 0 ? colours.length * Math.max(sizes.length, 1) : sizes.length;
+    await model.logActivity(
+      id,
+      mode === 'replace' ? `Variants replaced (${variantCount})` : `${variantCount} variant${variantCount === 1 ? '' : 's'} checked for insert`,
+      mode === 'replace' ? 'variant_deleted' : 'variant_updated',
+      actorFromSession(session)
+    );
+    const product = await model.findById(id);
+    return { data: product, message: mode === 'replace' ? 'Variants replaced' : 'Variants inserted' };
+  }
+
   async addImage(id: string, body: unknown, session: Session) {
     if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
     if (!(await model.exists(id))) return { error: { message: 'Product not found', status: 404 } };

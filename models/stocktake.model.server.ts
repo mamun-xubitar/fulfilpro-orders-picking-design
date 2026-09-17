@@ -37,7 +37,13 @@ export class StocktakeModel {
 
   async start(supplierProductId: string, actor: { id: string; name: string }): Promise<StocktakeRow> {
     const existing = await this.findOpen(supplierProductId);
-    if (existing) return existing;
+    if (existing) {
+      if (existing.items.length > 0) return existing;
+      // Its items were cascade-deleted when the product's variants were replaced while this
+      // stocktake was still open — cancel the orphaned record so a fresh one can start instead
+      // of leaving the product unable to ever complete a stocktake again.
+      await prisma.stocktake.update({ where: { id: existing.id }, data: { status: 'CANCELLED' } });
+    }
 
     const variants = await prisma.supplierProductVariant.findMany({ where: { supplierProductId }, select: { id: true, stockOnHand: true } });
     const row = await prisma.stocktake.create({

@@ -1,11 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { toast } from 'react-toastify';
 import useRequest from '@/hooks/useRequest';
-import { deriveColorFromName } from '@/lib/inventory/colour';
 import { isValidHandle, slugifyHandle } from '@/lib/inventory/handle';
-import { findCaseInsensitiveDuplicate, formatColoursInput, formatSizesInput, parseColoursInput, parseSizesInput } from '../utils';
+import { formatColoursInput, formatSizesInput, parseColoursInput, parseSizesInput } from '../utils';
 import type { ProductDetailsForm, ProductRecord, ProductStatusValue } from '../types';
 
 const EMPTY_FORM: ProductDetailsForm = {
@@ -76,15 +74,9 @@ type TextField = Exclude<keyof ProductDetailsForm, 'verified' | 'status' | 'cate
 type UseProductDetailsArgs = {
   product: ProductRecord | null;
   onSaved: (product: ProductRecord) => void;
-  /** Persists the typed colour/size lists as global preset groups — called once per *successful*
-   * save (Save, wizard Next, Add colour, Add sizes), never on a rejected one. Non-blocking: a
-   * preset write that fails never fails the product save that triggered it, and is never surfaced
-   * inline — see useInventoryPresets.ensureGroup. Optional so this hook still composes on its own
-   * (e.g. in tests) without a presets hook wired up. */
-  ensureGroup?: (kind: 'colour' | 'size', items: string[]) => Promise<{ ok: boolean; error: string | null }>;
 };
 
-export function useProductDetails({ product, onSaved, ensureGroup }: UseProductDetailsArgs) {
+export function useProductDetails({ product, onSaved }: UseProductDetailsArgs) {
   // Draft is tagged with the product it belongs to, so changing product discards it without an
   // effect having to reset anything.
   const [draft, setDraft] = useState<{ productId: string; form: ProductDetailsForm } | null>(null);
@@ -134,7 +126,10 @@ export function useProductDetails({ product, onSaved, ensureGroup }: UseProductD
   const setDescription = (description: string) => write({ ...form, description });
 
   /** `after` fires once the save succeeds — used by the New Product wizard to advance to the
-   * next step only on a confirmed save, without duplicating this request. */
+   * next step only on a confirmed save, without duplicating this request. Colours/sizes are no
+   * longer sent here — they (and the variants they generate) are now owned by the Colour & size
+   * adjustment modal's own Replace/Insert (`useColourSizeModal.apply`), so a details Save can't
+   * clobber a change that modal just made. */
   const saveDetails = (after?: () => void) => {
     if (!product) return;
     request({
@@ -152,8 +147,6 @@ export function useProductDetails({ product, onSaved, ensureGroup }: UseProductD
         description: form.description,
         productRemark: form.productRemark,
         poQuantity: Number(form.poQuantity) || 1,
-        sizes: parseSizesInput(form.sizes),
-        colours: parseColoursInput(form.colours),
         status: form.status,
         verified: form.verified,
       },
@@ -161,17 +154,11 @@ export function useProductDetails({ product, onSaved, ensureGroup }: UseProductD
         const validationErrors: Record<string, string> = {};
         if (!isValidHandle(form.handle.trim())) validationErrors.handle = 'Enter a valid handle (lowercase letters, numbers and dashes)';
         if (form.supplierIds.length === 0) validationErrors.supplierId = 'At least one supplier is required';
-        const dupColour = findCaseInsensitiveDuplicate(parseColoursInput(form.colours).map((c) => c.name));
-        if (dupColour) validationErrors.colours = `"${dupColour}" is listed more than once`;
-        const dupSize = findCaseInsensitiveDuplicate(parseSizesInput(form.sizes));
-        if (dupSize) validationErrors.sizes = `"${dupSize}" is listed more than once`;
         if (!Number.isFinite(Number(form.poQuantity)) || Number(form.poQuantity) < 1) validationErrors.poQuantity = 'Enter a quantity of at least 1';
         return validationErrors;
       },
       successMessage: 'Product details saved',
       onSuccess: ({ data }) => {
-        void ensureGroup?.('colour', parseColoursInput(form.colours).map((c) => c.name));
-        void ensureGroup?.('size', parseSizesInput(form.sizes));
         onSaved(data);
         setDraft(null);
         setStoredHandleLocked({ productId: data.id, locked: true });
@@ -193,88 +180,6 @@ export function useProductDetails({ product, onSaved, ensureGroup }: UseProductD
     });
   };
 
-  /** Appends one or more comma-separated sizes and saves in one PATCH — for the matrix
-   * toolbar's "Add size" modal, which shouldn't require opening the Product Details edit form.
-   * Dedupes case-insensitively against both the current list and the input itself: a duplicate
-   * is toasted and skipped rather than blocking the rest, unless every value in the input turns
-   * out to be a duplicate, in which case nothing is saved and the first one is returned as an
-   * inline error (so the modal doesn't close having silently done nothing). */
-  const quickAddSizes = (values: string[]): string | null => {
-    if (!product) return null;
-    const currentSizes = parseSizesInput(form.sizes);
-    const seen = new Set(currentSizes.map((s) => s.toLowerCase()));
-    const toAdd: string[] = [];
-    const duplicates: string[] = [];
-    for (const raw of values) {
-      const trimmed = raw.trim();
-      if (!trimmed) continue;
-      const key = trimmed.toLowerCase();
-      if (seen.has(key)) {
-        duplicates.push(trimmed);
-        continue;
-      }
-      seen.add(key);
-      toAdd.push(trimmed);
-    }
-    if (toAdd.length === 0) return duplicates.length > 0 ? `"${duplicates[0]}" already exists` : null;
-    if (duplicates.length > 0) toast.warning(`Skipped ${duplicates.length} duplicate size${duplicates.length === 1 ? '' : 's'}: ${duplicates.join(', ')}`);
-    const nextSizes = [...currentSizes, ...toAdd];
-    write({ ...form, sizes: formatSizesInput(nextSizes) });
-    request({
-      url: `/api/inventory/catalog/${product.id}`,
-      method: 'PATCH',
-      data: { sizes: nextSizes },
-      successMessage: toAdd.length === 1 ? 'Size added' : `${toAdd.length} sizes added`,
-      onSuccess: ({ data }) => {
-        // The group the admin meant is the full typed list, not just the survivors of the
-        // dedupe above — captured from `values` (this function's own argument), not `toAdd`.
-        void ensureGroup?.('size', values);
-        onSaved(data);
-        syncListsFromProduct(data);
-      },
-    });
-    return null;
-  };
-
-  /** Appends one or more comma-separated colours and saves in one PATCH — mirrors
-   * quickAddSizes. */
-  const quickAddColours = (names: string[]): string | null => {
-    if (!product) return null;
-    const currentColours = parseColoursInput(form.colours);
-    const seen = new Set(currentColours.map((c) => c.name.toLowerCase()));
-    const toAdd: { name: string; color: string }[] = [];
-    const duplicates: string[] = [];
-    for (const raw of names) {
-      const trimmed = raw.trim();
-      if (!trimmed) continue;
-      const key = trimmed.toLowerCase();
-      if (seen.has(key)) {
-        duplicates.push(trimmed);
-        continue;
-      }
-      seen.add(key);
-      toAdd.push({ name: trimmed, color: deriveColorFromName(trimmed) });
-    }
-    if (toAdd.length === 0) return duplicates.length > 0 ? `"${duplicates[0]}" already exists` : null;
-    if (duplicates.length > 0) toast.warning(`Skipped ${duplicates.length} duplicate colour${duplicates.length === 1 ? '' : 's'}: ${duplicates.join(', ')}`);
-    const nextColours = [...currentColours, ...toAdd];
-    write({ ...form, colours: formatColoursInput(nextColours) });
-    request({
-      url: `/api/inventory/catalog/${product.id}`,
-      method: 'PATCH',
-      data: { colours: nextColours },
-      successMessage: toAdd.length === 1 ? 'Colour added' : `${toAdd.length} colours added`,
-      onSuccess: ({ data }) => {
-        // The group the admin meant is the full typed list, not just the survivors of the
-        // dedupe above — captured from `names` (this function's own argument), not `toAdd`.
-        void ensureGroup?.('colour', names);
-        onSaved(data);
-        syncListsFromProduct(data);
-      },
-    });
-    return null;
-  };
-
   return {
     editing,
     dirty,
@@ -293,8 +198,6 @@ export function useProductDetails({ product, onSaved, ensureGroup }: UseProductD
     setStatus: (status: ProductStatusValue) => write({ ...form, status }),
     setVerified: (verified: boolean) => write({ ...form, verified }),
     setSupplierIds: (supplierIds: string[]) => write({ ...form, supplierIds }),
-    setSizesValue: (sizes: string) => write({ ...form, sizes }),
-    setColoursValue: (colours: string) => write({ ...form, colours }),
     /** Discards the in-progress draft — the panel itself no longer has a Cancel button (always
      * editable, Save-only), but the New Product wizard's "Skip" still uses this to back out of
      * step 2 without saving. */
@@ -304,8 +207,6 @@ export function useProductDetails({ product, onSaved, ensureGroup }: UseProductD
       setErrors({});
     },
     saveDetails,
-    quickAddSizes,
-    quickAddColours,
     syncListsFromProduct,
     // Effective lists, so the variants matrix reflects an in-progress edit.
     sizes: parseSizesInput(form.sizes),

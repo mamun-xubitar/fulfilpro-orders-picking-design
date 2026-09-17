@@ -109,6 +109,16 @@ export class SupplierController {
         },
       };
     }
+    // Purchase orders reference this supplier with onDelete: Restrict — refuse if any exist.
+    const poCount = await model.countPurchaseOrders(id);
+    if (poCount > 0) {
+      return {
+        error: {
+          message: `This supplier has ${poCount} purchase order${poCount === 1 ? '' : 's'} — delete or reassign them first`,
+          status: 409,
+        },
+      };
+    }
     await model.delete(id);
     return { data: null, message: 'Supplier deleted' };
   }

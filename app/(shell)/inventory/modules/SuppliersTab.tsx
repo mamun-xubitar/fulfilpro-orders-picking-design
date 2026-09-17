@@ -38,6 +38,7 @@ export default function SuppliersTab({ suppliers: s }: { suppliers: ReturnType<t
               <th className="px-2 py-1">PO email</th>
               <th className="px-2 py-1">Contact email</th>
               <th className="px-2 py-1 text-right">Products</th>
+              <th className="px-2 py-1 text-right">PO&apos;s</th>
               <th className="px-2 py-1">Created</th>
               <th className="px-2 py-1" />
             </tr>
@@ -59,6 +60,7 @@ export default function SuppliersTab({ suppliers: s }: { suppliers: ReturnType<t
                   <td className="px-2 py-1 text-inventory-text-muted">{row.poEmail}</td>
                   <td className="px-2 py-1 text-inventory-text-subtle">{row.contactEmail || '—'}</td>
                   <td className="px-2 py-1 text-right tabular-nums text-inventory-text-subtle">{row.productCount}</td>
+                  <td className="px-2 py-1 text-right tabular-nums text-inventory-text-subtle">{row.purchaseOrderCount}</td>
                   <td className="px-2 py-1 text-inventory-text-subtle">{formatDate(row.createdAt)}</td>
                   <td className="px-2 py-1">
                     <div className="flex items-center justify-end gap-1">
@@ -120,6 +122,11 @@ export default function SuppliersTab({ suppliers: s }: { suppliers: ReturnType<t
               <span className="mt-2 block text-inventory-warning-ink">
                 This supplier is linked to {s.deleteTarget.productCount} product{s.deleteTarget.productCount === 1 ? '' : 's'} — the link is simply removed, unless
                 it&apos;s the only supplier on one of them, in which case the delete is refused.
+              </span>
+            )}
+            {s.deleteTarget.purchaseOrderCount > 0 && (
+              <span className="mt-2 block text-inventory-danger">
+                This supplier has {s.deleteTarget.purchaseOrderCount} purchase order{s.deleteTarget.purchaseOrderCount === 1 ? '' : 's'} — delete or reassign them first.
               </span>
             )}
           </p>

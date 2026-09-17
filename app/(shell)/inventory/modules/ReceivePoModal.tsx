@@ -1,10 +1,11 @@
 'use client';
 
-import { MODAL_FOOTER_BTN_PRIMARY, MODAL_FOOTER_BTN_SECONDARY, ModalShell } from '@/components/ModalShell';
+import { ModalShell } from '@/components/ModalShell';
 import { formatColourName } from '@/lib/inventory/colour';
 import ColumnFillInput from './ColumnFillInput';
 import { STATUS_BADGES } from './PurchaseOrdersPanel';
 import type { usePurchaseOrder } from './hooks/usePurchaseOrder';
+import { SPINNER, WIZARD_BODY_CLASS, WIZARD_BTN_FINISH, WIZARD_BTN_SECONDARY, WIZARD_CARD_CLASS } from './modalStyles';
 import { formatDate, formatMoney, formatPoNumber, poAveragePrice } from './utils';
 
 const GRID_COLS = 'grid-cols-[minmax(0,1fr)_6rem_4.5rem_4rem_4rem_4rem_4.5rem_5.5rem_7rem]';
@@ -20,12 +21,13 @@ export default function ReceivePoModal({ po }: { po: ReturnType<typeof usePurcha
       compact
       onClose={po.closeReceive}
       maxWidthClass="max-w-4xl"
+      bodyClassName={WIZARD_BODY_CLASS}
       footer={
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={po.closeReceive}
-            className={`flex-1 ${MODAL_FOOTER_BTN_SECONDARY}`}
+            className={`flex-1 ${WIZARD_BTN_SECONDARY}`}
           >
             Cancel
           </button>
@@ -33,14 +35,15 @@ export default function ReceivePoModal({ po }: { po: ReturnType<typeof usePurcha
             type="button"
             onClick={po.submitReceive}
             disabled={po.receiving || hasQtyError}
-            className={`flex-1 ${MODAL_FOOTER_BTN_PRIMARY}`}
+            className={`flex-1 ${WIZARD_BTN_FINISH}`}
           >
+            {po.receiving && SPINNER}
             {po.receiving ? 'Receiving...' : 'Receive'}
           </button>
         </div>
       }
     >
-      <div className="space-y-2">
+      <div className={`${WIZARD_CARD_CLASS} space-y-2`}>
         <div className="rounded-[7px] border border-inventory-border bg-inventory-surface-muted p-2">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-[12px] font-semibold text-inventory-text">{formatPoNumber(target.number)}</span>
@@ -140,7 +143,7 @@ export default function ReceivePoModal({ po }: { po: ReturnType<typeof usePurcha
                         value={po.receiveCost[item.id] ?? ''}
                         onChange={(e) => po.setReceiveItemCost(item.id, e.target.value)}
                         aria-label={`Unit cost for ${item.variantTitle}`}
-                        className="h-[22px] w-full rounded-[6px] border border-inventory-border-strong pl-[14px] pr-[6px] text-right text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring"
+                        className="h-[22px] w-full rounded-[7px] border border-inventory-border-strong pl-[14px] pr-[6px] text-right text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring"
                       />
                     </div>
                     <div className="w-full min-w-0">
@@ -154,7 +157,7 @@ export default function ReceivePoModal({ po }: { po: ReturnType<typeof usePurcha
                         aria-label={`Receive quantity for ${item.variantTitle}`}
                         aria-invalid={qtyError !== null}
                         title={qtyError ?? `0 to ${remaining}`}
-                        className={`h-[22px] w-full rounded-[6px] border px-[6px] text-right text-[11px] leading-none outline-none focus:ring-2 ${qtyError ? 'border-inventory-danger/45 bg-inventory-danger/8 focus:border-inventory-danger focus:ring-inventory-danger/20' : 'border-inventory-border-strong focus:border-inventory-primary focus:ring-inventory-primary-ring'}`}
+                        className={`h-[22px] w-full rounded-[7px] border px-[6px] text-right text-[11px] leading-none outline-none focus:ring-2 ${qtyError ? 'border-inventory-danger/45 bg-inventory-danger/8 focus:border-inventory-danger focus:ring-inventory-danger/20' : 'border-inventory-border-strong focus:border-inventory-primary focus:ring-inventory-primary-ring'}`}
                       />
                     </div>
                   </div>

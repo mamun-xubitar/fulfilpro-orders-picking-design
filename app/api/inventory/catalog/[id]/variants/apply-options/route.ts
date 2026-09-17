@@ -1,15 +1,16 @@
 import { NextRequest } from 'next/server';
-import { InventoryPresetController } from '@/controllers/inventory-preset.controller.server';
+import { SupplierProductController } from '@/controllers/supplier-product.controller.server';
 import { apiSuccess, apiError } from '@/lib/api-response.server';
 import { auth } from '@/auth';
 
-const controller = new InventoryPresetController();
+const controller = new SupplierProductController();
 type ErrResult = { error: { message: string; errors?: string[]; status: number } };
 
-export async function POST(request: NextRequest) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
+  const { id } = await params;
   const body = await request.json().catch(() => ({}));
-  const result = await controller.bulkDelete(body, session);
+  const result = await controller.applyOptions(id, body, session);
   if ('error' in result) {
     const { error } = result as ErrResult;
     return apiError({ message: error.message, errors: error.errors, status: error.status });

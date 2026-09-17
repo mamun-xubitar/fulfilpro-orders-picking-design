@@ -59,7 +59,15 @@ export default function NewProductWizard({ p }: NewProductWizardProps) {
           )}
 
           {w.step === 2 && !w.awaitingProduct && (
-            <ProductFieldsPanel details={p.details} supplierOptions={p.supplierOptions} presets={p.presets} suppliers={p.suppliers} embedded />
+            <ProductFieldsPanel
+              details={p.details}
+              supplierOptions={p.supplierOptions}
+              optionLibrary={p.optionLibrary}
+              suppliers={p.suppliers}
+              product={p.product}
+              onOptionsApplied={p.onVariantSaved}
+              embedded
+            />
           )}
 
           {w.step === 3 && !w.awaitingProduct && (
