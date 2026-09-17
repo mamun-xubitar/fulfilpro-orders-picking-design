@@ -67,10 +67,12 @@ export function useAnchoredDropdown({
       const w = Math.min(width, window.innerWidth - 16);
       const left = Math.max(8, Math.min(rect.left, window.innerWidth - w - 8));
       const below = window.innerHeight - rect.bottom;
-      if (below < maxHeight && rect.top > below) {
-        const measured = dropdownRef.current instanceof HTMLElement ? dropdownRef.current.offsetHeight : 0;
-        const height = measured > 0 ? measured : maxHeight;
-        const top = Math.max(8, rect.top - height - 4);
+      // Only flip to above-placement once the menu is actually mounted and its real height is
+      // known — before that, `measured` is 0 and we fall through to below-placement, which is
+      // height-independent and therefore never overshoots on the first, unmeasured pass.
+      const measured = dropdownRef.current instanceof HTMLElement ? dropdownRef.current.offsetHeight : 0;
+      if (measured > 0 && below < maxHeight && rect.top > below) {
+        const top = Math.max(8, rect.top - measured - 4);
         setPosition((prev) => (prev && prev.top === top && prev.left === left && prev.width === w ? prev : { top, left, width: w }));
       } else {
         const top = rect.bottom + 4;

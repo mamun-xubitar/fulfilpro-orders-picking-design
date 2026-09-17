@@ -20,7 +20,6 @@ type OptionColumnProps = {
   onAdd: () => void;
   onRemove: (name: string) => void;
   onSave: () => void;
-  onDeleteFromLibrary: (id: string) => void;
 };
 
 /** One column of the Colour & size adjustment modal — the same component renders both the Colour
@@ -41,7 +40,6 @@ export default function OptionColumn({
   onAdd,
   onRemove,
   onSave,
-  onDeleteFromLibrary,
 }: OptionColumnProps) {
   const [findOpen, setFindOpen] = useState(false);
   const allChecked = items.length > 0 && items.every((i) => i.checked);
@@ -80,16 +78,7 @@ export default function OptionColumn({
             Find
           </button>
           {findOpen && (
-            <OptionFindPanel
-              kind={kind}
-              items={items}
-              onClose={() => setFindOpen(false)}
-              onSelect={(name) => {
-                onToggle(name);
-                setFindOpen(false);
-              }}
-              onDelete={onDeleteFromLibrary}
-            />
+            <OptionFindPanel kind={kind} items={items} onClose={() => setFindOpen(false)} onSelect={onToggle} onRemove={onRemove} />
           )}
         </div>
       </div>

@@ -14,11 +14,11 @@ import StocktakeModal from './StocktakeModal';
 import StorePricesModal from './StorePricesModal';
 import SupplierModal from './SupplierModal';
 import VariantsMatrixSection from './VariantsMatrixSection';
-import NewProductWizard from './newProduct/NewProductWizard';
+import type { InventoryPage } from './hooks/useInventoryPage';
 import { ChevronLeft, ChevronRight, Close } from './icons';
 import { SPINNER, WIZARD_BODY_CLASS, WIZARD_BTN_PRIMARY, WIZARD_BTN_SECONDARY, WIZARD_CARD_CLASS } from './modalStyles';
+import NewProductWizard from './newProduct/NewProductWizard';
 import { formatMoney, variantTitle } from './utils';
-import type { InventoryPage } from './hooks/useInventoryPage';
 
 export default function InventoryModals(p: InventoryPage) {
   const { gallery, pricing, imageMutations, matrix } = p;
@@ -130,8 +130,8 @@ export default function InventoryModals(p: InventoryPage) {
           }
         >
           <p className="text-[12px] text-inventory-text-muted">
-            This removes <strong className="font-semibold text-inventory-text">{variantTitle(matrix.deleteTarget)}</strong>
-            {matrix.deleteTarget.sku ? ` (${matrix.deleteTarget.sku})` : ''} and its stock history. This can&apos;t be undone.
+            This removes <strong className="font-semibold text-inventory-text">{variantTitle(matrix.deleteTarget)} </strong>
+            {matrix.deleteTarget.sku ? ` (${matrix.deleteTarget.sku}) ` : ''} and its stock history. This can&apos;t be undone.
           </p>
         </ModalShell>
       )}

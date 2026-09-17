@@ -175,15 +175,6 @@ export function useColourSizeModal({ product, optionLibrary, onApplied, onClose 
     }
   };
 
-  /** Deletes a name from the global library (Find panel). The name stays in this column if it's
-   * currently in use — it just loses its library backing and reverts to a NEW badge, mirroring
-   * how a freshly-typed name looks before it's ever saved. */
-  const deleteFromLibrary = async (kind: OptionKind, id: string) => {
-    const ok = await optionLibrary.deleteItem(kind, id);
-    if (!ok) return;
-    setItemsFor(kind)((prev) => prev.map((i) => (i.id === id ? { ...i, id: null, isNew: true } : i)));
-  };
-
   const checkedColours = useMemo(() => colourItems.filter((i) => i.checked).map((i) => i.name), [colourItems]);
   const checkedSizes = useMemo(() => sizeItems.filter((i) => i.checked).map((i) => i.name), [sizeItems]);
 
@@ -229,7 +220,16 @@ export function useColourSizeModal({ product, optionLibrary, onApplied, onClose 
     });
   };
 
-  const apply = (mode: 'replace' | 'insert') => {
+  /** Replace/Insert only ever wrote variants — any not-yet-saved colour/size names (or pending
+   * library deletes) sat unsaved unless the user separately hit each column's own Save first. Run
+   * the same save each Save button uses for whichever column has unsaved state before applying,
+   * so Replace/Insert always leaves the shared library consistent with what's checked. */
+  const apply = async (mode: 'replace' | 'insert') => {
+    const colourHasNew = colourItems.some((i) => i.isNew) || colourPendingDeletes.length > 0;
+    const sizeHasNew = sizeItems.some((i) => i.isNew) || sizePendingDeletes.length > 0;
+    if (colourHasNew) await saveToLibrary('colour');
+    if (sizeHasNew) await saveToLibrary('size');
+
     requestApply({
       url: `/api/inventory/catalog/${product.id}/variants/apply-options`,
       method: 'POST',
@@ -289,7 +289,6 @@ export function useColourSizeModal({ product, optionLibrary, onApplied, onClose 
       remove: (name: string) => remove('colour', name),
       save: () => saveToLibrary('colour'),
       saving: colourSaving || optionLibrary.saving,
-      deleteFromLibrary: (id: string) => deleteFromLibrary('colour', id),
     },
     size: {
       items: sizeItems,
@@ -303,7 +302,6 @@ export function useColourSizeModal({ product, optionLibrary, onApplied, onClose 
       remove: (name: string) => remove('size', name),
       save: () => saveToLibrary('size'),
       saving: sizeSaving || optionLibrary.saving,
-      deleteFromLibrary: (id: string) => deleteFromLibrary('size', id),
     },
     variants,
     setVariantValue,
@@ -313,8 +311,8 @@ export function useColourSizeModal({ product, optionLibrary, onApplied, onClose 
     newVariantCount,
     removedVariantCount,
     valuesChanged,
-    canInsert: !applying && insertDisabledReason === null,
-    canReplace: !applying && replaceDisabledReason === null,
+    canInsert: !applying && !colourSaving && !sizeSaving && insertDisabledReason === null,
+    canReplace: !applying && !colourSaving && !sizeSaving && replaceDisabledReason === null,
     insertDisabledReason,
     replaceDisabledReason,
     replaceConfirmOpen,

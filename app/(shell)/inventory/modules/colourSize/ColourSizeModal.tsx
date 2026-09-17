@@ -90,7 +90,6 @@ export default function ColourSizeModal({ product, optionLibrary, onApplied, onC
           onAdd={m.colour.add}
           onRemove={m.colour.remove}
           onSave={m.colour.save}
-          onDeleteFromLibrary={m.colour.deleteFromLibrary}
         />
         <OptionColumn
           kind="size"
@@ -106,7 +105,6 @@ export default function ColourSizeModal({ product, optionLibrary, onApplied, onC
           onAdd={m.size.add}
           onRemove={m.size.remove}
           onSave={m.size.save}
-          onDeleteFromLibrary={m.size.deleteFromLibrary}
         />
         <VariantListColumn variants={m.variants} onChange={m.setVariantValue} onFillAll={m.fillAll} />
       </div>
