@@ -244,51 +244,8 @@ export function formatSizesInput(sizes: string[]): string {
   return sizes.join(', ');
 }
 
-/** Returns the first value that appears more than once (case-insensitive), or null if none. */
-export function findCaseInsensitiveDuplicate(values: string[]): string | null {
-  const seen = new Set<string>();
-  for (const value of values) {
-    const lower = value.trim().toLowerCase();
-    if (seen.has(lower)) return value.trim();
-    seen.add(lower);
-  }
-  return null;
-}
-
-/** Splits a comma-separated input into trimmed, non-empty values — the generic form of
- * parseSizesInput, for callers (preset add forms, quick-add modals) that aren't parsing a
- * product's own sizes/colours field. */
-export function splitCommaList(value: string): string[] {
-  return value
-    .split(',')
-    .map((v) => v.trim())
-    .filter(Boolean);
-}
-
-/** Case-insensitive, whitespace-stripped uniqueness key for a preset/colour/size name — mirrors
- * the server's `presetKeyOf` (models/inventory-preset.model.server.ts). */
-export function keyOf(name: string): string {
-  return name.trim().toLowerCase().replace(/\s+/g, '');
-}
-
-/** Order-insensitive identity of a whole preset *group* — de-duped, sorted, "|"-joined member
- * keys, so typing "Blue, Red" still matches an existing "(Red, Blue)" group. Mirrors the server's
- * `groupKeyOf` (models/inventory-preset.model.server.ts) so the client can tell whether a typed
- * list already matches a loaded group without a round trip. */
-export function groupKeyOf(items: string[]): string {
-  return [...new Set(items.map(keyOf).filter(Boolean))].sort().join('|');
-}
-
-/** A group's display label — members in the order they were typed, never re-sorted, so
- * "(S, M, L, XL)" doesn't read as "(L, M, S, XL)". Used for the A→Z sort among groups below. */
-export function groupLabel(items: string[]): string {
-  return items.join(', ');
-}
-
 /** Display-only: capitalises the first character, leaving the rest exactly as typed — "xl" reads
- * as "Xl" but "XL" stays "XL". Mirrors the server's storage-time capitalisation in
- * InventoryPresetController.create, applied here purely for chips rendered from a live draft
- * (not yet a saved preset), which the server hasn't touched yet. */
+ * as "Xl" but "XL" stays "XL". */
 export function capitaliseFirst(name: string): string {
   return name.length === 0 ? name : name.charAt(0).toUpperCase() + name.slice(1);
 }

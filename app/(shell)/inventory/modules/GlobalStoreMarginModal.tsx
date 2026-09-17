@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { MODAL_FOOTER_BTN_PRIMARY, MODAL_FOOTER_BTN_SECONDARY, ModalShell } from '@/components/ModalShell';
+import { ModalShell } from '@/components/ModalShell';
 import type { GlobalStoreMarginsState } from './hooks/useGlobalStoreMargins';
 import { Close, Plus } from './icons';
+import { SPINNER, WIZARD_BODY_CLASS, WIZARD_BTN_PRIMARY, WIZARD_BTN_SECONDARY, WIZARD_CARD_CLASS } from './modalStyles';
 
 type GlobalStoreMarginModalProps = {
   state: GlobalStoreMarginsState;
@@ -34,12 +35,13 @@ export default function GlobalStoreMarginModal({ state, onClose }: GlobalStoreMa
       title="Per store margin defaults"
       compact
       onClose={handleCancel}
+      bodyClassName={WIZARD_BODY_CLASS}
       footer={
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={handleCancel}
-            className={`flex-1 ${MODAL_FOOTER_BTN_SECONDARY}`}
+            className={`flex-1 ${WIZARD_BTN_SECONDARY}`}
           >
             Cancel
           </button>
@@ -47,14 +49,15 @@ export default function GlobalStoreMarginModal({ state, onClose }: GlobalStoreMa
             type="button"
             onClick={handleSave}
             disabled={state.saving}
-            className={`flex-1 ${MODAL_FOOTER_BTN_PRIMARY}`}
+            className={`flex-1 ${WIZARD_BTN_PRIMARY}`}
           >
-            Save
+            {state.saving && SPINNER}
+            {state.saving ? 'Saving...' : 'Save'}
           </button>
         </div>
       }
     >
-      <div className="space-y-2">
+      <div className={`${WIZARD_CARD_CLASS} space-y-2`}>
         <div className="flex items-center justify-between gap-2">
           <p className="text-[11px] leading-snug text-inventory-text-subtle">Fallback margin used when a product has no store-specific override of its own.</p>
           {state.available.length > 0 && (

@@ -1,9 +1,9 @@
 import { NextRequest } from 'next/server';
-import { InventoryPresetController } from '@/controllers/inventory-preset.controller.server';
+import { InventoryOptionLibraryController } from '@/controllers/inventory-option-library.controller.server';
 import { apiSuccess, apiError } from '@/lib/api-response.server';
 import { auth } from '@/auth';
 
-const controller = new InventoryPresetController();
+const controller = new InventoryOptionLibraryController();
 type ErrResult = { error: { message: string; errors?: string[]; status: number } };
 
 export async function GET() {
@@ -13,18 +13,16 @@ export async function GET() {
     const { error } = result as ErrResult;
     return apiError({ message: error.message, errors: error.errors, status: error.status });
   }
-  return apiSuccess({ message: 'Presets retrieved', data: result.data });
+  return apiSuccess({ message: 'Library retrieved', data: result.data });
 }
 
 export async function POST(request: NextRequest) {
   const session = await auth();
   const body = await request.json().catch(() => ({}));
-  const result = await controller.ensure(body, session);
+  const result = await controller.add(body, session);
   if ('error' in result) {
     const { error } = result as ErrResult;
     return apiError({ message: error.message, errors: error.errors, status: error.status });
   }
-  // 201 when a new group was created, 200 when the typed list already matched an existing one —
-  // see InventoryPresetController.ensure, which is idempotent by design.
-  return apiSuccess({ message: result.message, data: result.data, status: result.status ?? 200 });
+  return apiSuccess({ message: result.message, data: result.data, status: 201 });
 }

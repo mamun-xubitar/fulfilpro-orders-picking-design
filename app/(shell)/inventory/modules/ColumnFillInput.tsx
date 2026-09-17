@@ -90,7 +90,7 @@ export default function ColumnFillInput({ label, rowCount, step, min, integerOnl
               // through this modal since it used to be a DOM descendant (now portalled, kept as
               // defence). Portal escapes sticky/overflow stacking contexts (table header/footer
               // z-10, inventory header z-30) so overlay + modal always sit on top.
-              <div className="normal-case whitespace-normal break-words text-left">
+              <div className="inventory-theme normal-case whitespace-normal break-words text-left">
                 <ModalShell
                   disableBackdropClose
                   elevated
@@ -113,6 +113,7 @@ export default function ColumnFillInput({ label, rowCount, step, min, integerOnl
                       }}
                       confirmLabel="Set all"
                       disabled={warning !== null}
+                      compact
                     />
                   }
                 >

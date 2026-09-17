@@ -842,27 +842,23 @@ model CurrencyRate {
 }
 
 /**
- * Global colour preset *groups* for the inventory hub, shared across every product — e.g.
- * (Red, Green, Blue). Clicking a group in the picker inserts every member at once. `items` keeps
- * the members in the order they were typed (what the badge renders); `key` is the group's
- * order-insensitive identity — each member normalised (lowercased, whitespace-stripped),
- * de-duplicated, sorted, and joined with "|" — so (Red, Blue) and (Blue, Red) collide as the same
- * group. Name-only, exactly like SizePresetGroup — a swatch is derived from each member's name at
- * render time (resolveSwatch), and the product's own colours carry their own `color` on
- * SupplierProduct.colours.
+ * Global colour library for the inventory hub's Colour & size adjustment modal, shared across
+ * every product — one flat, alphabetically-displayed name list (a swatch is derived from each
+ * name at render time via resolveSwatch; nothing is stored). Replaces the old
+ * ColourPresetGroup/SizePresetGroup preset-group system.
  */
-model ColourPresetGroup {
+model GlobalColour {
   id        String   @id @default(uuid())
-  items     String[] @default([])
-  key       String   @unique
+  name      String   @unique
   createdAt DateTime @default(now())
 }
 
-/** Global size preset groups for the inventory hub, shared across every product. Mirrors ColourPresetGroup. */
-model SizePresetGroup {
+/** Global size library, mirrors GlobalColour. `position` preserves insertion order (sizes read
+ * naturally in the order they were added, unlike colours which sort A→Z). */
+model GlobalSize {
   id        String   @id @default(uuid())
-  items     String[] @default([])
-  key       String   @unique
+  name      String   @unique
+  position  Int      @default(0)
   createdAt DateTime @default(now())
 }
 

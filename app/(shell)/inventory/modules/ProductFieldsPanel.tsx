@@ -1,12 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import ColourSizeModal from './colourSize/ColourSizeModal';
 import CategoryPicker from './CategoryPicker';
 import { PanelHeading, panelBorderClass } from './MainImagePanel';
 import { ActionButton } from './PricingMarginPanel';
 import { ColourChips } from './ProductColoursField';
 import { FieldLabel, TextField } from './ProductFieldRows';
-import { EditColoursModal, EditSizesModal } from './ProductOptionModals';
 import ProductStatusSelect from './ProductStatusSelect';
 import { SizeChips } from './ProductSizesField';
 import DescriptionField from './DescriptionField';
@@ -14,15 +14,19 @@ import SupplierMultiSelect from './SupplierMultiSelect';
 import { Check, Document, Lock, Plus, Unlock } from './icons';
 import type { useProductDetails } from './hooks/useProductDetails';
 import type { useSuppliers } from './hooks/useSuppliers';
-import type { InventoryPresetsState } from './hooks/useInventoryPresets';
+import type { OptionLibraryState } from './hooks/useOptionLibrary';
 import { useItemNoAvailability } from './hooks/useItemNoAvailability';
-import type { SupplierOption } from './types';
+import type { ProductRecord, SupplierOption } from './types';
 
 type ProductFieldsPanelProps = {
   details: ReturnType<typeof useProductDetails>;
   supplierOptions: SupplierOption[];
-  presets: InventoryPresetsState;
+  optionLibrary: OptionLibraryState;
   suppliers: ReturnType<typeof useSuppliers>;
+  /** The Colour & size adjustment modal (opened from the Sizes/Colours "+" buttons) needs the
+   * full product record and a way to hand its result back to the page. */
+  product: ProductRecord | null;
+  onOptionsApplied: (product: ProductRecord) => void;
   /** For the New Product wizard's Details step — hides the panel chrome (heading, Save row)
    * since the wizard's own footer drives saving and advancing. */
   embedded?: boolean;
@@ -34,10 +38,9 @@ const FIELD_VISUAL_CLASS =
 /** Always editable — every field is a live input; Save is the only action, disabled until the
  * draft differs from what's saved (see useProductDetails' `dirty`). Two-column field grid
  * (design 6), with Category forced full width regardless of the prototype's own pairing. */
-export default function ProductFieldsPanel({ details: d, supplierOptions, presets, suppliers, embedded }: ProductFieldsPanelProps) {
+export default function ProductFieldsPanel({ details: d, supplierOptions, optionLibrary, suppliers, product, onOptionsApplied, embedded }: ProductFieldsPanelProps) {
   const itemNoAvailability = useItemNoAvailability(d.form.itemNo, d.productId ?? undefined);
-  const [sizesOpen, setSizesOpen] = useState(false);
-  const [coloursOpen, setColoursOpen] = useState(false);
+  const [colourSizeOpen, setColourSizeOpen] = useState(false);
 
   return (
     <section className={embedded ? 'flex min-w-0 flex-col' : `flex min-w-0 flex-col rounded-[10px] border ${panelBorderClass('details')} bg-inventory-surface shadow-inventory xl:min-h-0`}>
@@ -115,7 +118,7 @@ export default function ProductFieldsPanel({ details: d, supplierOptions, preset
               </div>
               <button
                 type="button"
-                onClick={() => setSizesOpen(true)}
+                onClick={() => setColourSizeOpen(true)}
                 aria-label="Edit sizes"
                 title="Edit sizes"
                 className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-[6px] border border-inventory-border-strong bg-inventory-surface text-inventory-text-subtle transition-colors duration-150 hover:bg-inventory-surface-hover hover:text-inventory-text-muted cursor-pointer"
@@ -138,7 +141,7 @@ export default function ProductFieldsPanel({ details: d, supplierOptions, preset
               </div>
               <button
                 type="button"
-                onClick={() => setColoursOpen(true)}
+                onClick={() => setColourSizeOpen(true)}
                 aria-label="Edit colours"
                 title="Edit colours"
                 className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-[6px] border border-inventory-border-strong bg-inventory-surface text-inventory-text-subtle transition-colors duration-150 hover:bg-inventory-surface-hover hover:text-inventory-text-muted cursor-pointer"
@@ -191,15 +194,12 @@ export default function ProductFieldsPanel({ details: d, supplierOptions, preset
         </div>
       </div>
 
-      {sizesOpen && (
-        <EditSizesModal initialValue={d.form.sizes} presets={presets} onClose={() => setSizesOpen(false)} onSave={d.setSizesValue} />
-      )}
-      {coloursOpen && (
-        <EditColoursModal
-          initialValue={d.form.colours}
-          presets={presets}
-          onClose={() => setColoursOpen(false)}
-          onSave={d.setColoursValue}
+      {colourSizeOpen && product && (
+        <ColourSizeModal
+          product={product}
+          optionLibrary={optionLibrary}
+          onApplied={onOptionsApplied}
+          onClose={() => setColourSizeOpen(false)}
         />
       )}
     </section>

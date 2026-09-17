@@ -8,7 +8,7 @@ import { useAdjustments } from './useAdjustments';
 import { useCatalogData } from './useCatalogData';
 import { useImportExport } from './useImportExport';
 import { useImportProducts } from './useImportProducts';
-import { useInventoryPresets } from './useInventoryPresets';
+import { useOptionLibrary } from './useOptionLibrary';
 import { useProductDetails } from './useProductDetails';
 import { useProductImageMutations } from './useProductImageMutations';
 import { useProductImages } from './useProductImages';
@@ -64,12 +64,11 @@ export function useInventoryPage() {
   const gallery = useProductImages(product);
   const imageMutations = useProductImageMutations({ product, onSaved: onProductSaved });
   const pricing = useProductPricing({ product, globals: data.globals, storeListings, onSaved: onProductSaved });
-  // Created here (rather than lower down with the page's other misc hooks) since `details` below
-  // needs its `ensureGroup` to persist colour/size preset groups on save.
-  const presets = useInventoryPresets();
-  const details = useProductDetails({ product, onSaved: onProductSaved, ensureGroup: presets.ensureGroup });
-  // A variant delete (or edit) can prune a colour/size the details draft doesn't know about yet
-  // — sync the draft's lists from the server's copy so a since-removed value isn't offered back.
+  const optionLibrary = useOptionLibrary();
+  const details = useProductDetails({ product, onSaved: onProductSaved });
+  // A variant delete/edit, or the Colour & size adjustment modal's Replace/Insert, can change a
+  // colour/size the details draft doesn't know about yet — sync the draft's lists from the
+  // server's copy so a since-removed value isn't offered back (and a since-added one is).
   const onVariantSaved = (updated: ProductRecord) => {
     onProductSaved(updated);
     details.syncListsFromProduct(updated);
@@ -183,7 +182,8 @@ export function useInventoryPage() {
     setStorePriceTarget,
     storeListings,
     storePublish,
-    presets,
+    optionLibrary,
+    onVariantSaved,
   };
 }
 

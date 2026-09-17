@@ -11,6 +11,7 @@ export type SupplierRow = {
   poEmail: string;
   description: string | null;
   productCount: number;
+  purchaseOrderCount: number;
   createdAt: string;
   updatedAt: string;
 };

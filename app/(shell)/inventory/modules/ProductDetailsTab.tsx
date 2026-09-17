@@ -20,7 +20,14 @@ export default function ProductDetailsTab({ p }: { p: InventoryPage }) {
         <MainImagePanel gallery={p.gallery} productName={p.product?.name ?? ''} onEditImages={p.openEditImages} />
         <StockSummaryPanel summary={p.summary} variantCount={p.product?.variants.length ?? 0} />
       </div>
-      <ProductFieldsPanel details={p.details} supplierOptions={p.supplierOptions} presets={p.presets} suppliers={p.suppliers} />
+      <ProductFieldsPanel
+        details={p.details}
+        supplierOptions={p.supplierOptions}
+        optionLibrary={p.optionLibrary}
+        suppliers={p.suppliers}
+        product={p.product}
+        onOptionsApplied={p.onVariantSaved}
+      />
       <PricingMarginPanel
         pricing={p.pricing}
         storeListings={p.storeListings}

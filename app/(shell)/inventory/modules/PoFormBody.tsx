@@ -74,12 +74,12 @@ export default function PoFormBody({ po, variants, compact }: PoFormBodyProps) {
         <p className="mt-1 text-[10px] leading-tight text-inventory-text-subtle">
           <button
             type="button"
-            onClick={() => po.setShippingRemark('{orderNumber}')}
+            onClick={() => po.setShippingRemark('NF.{orderNumber}')}
             className="mr-1 rounded-[5px] border border-inventory-secondary/30 bg-inventory-secondary/10 px-[5px] py-[1px] text-[10px] font-bold leading-none text-inventory-secondary transition-colors duration-150 hover:bg-inventory-secondary/15 cursor-pointer"
           >
             Use
           </button>
-          {'{ORDERNUMBER}'} — replaced with the PO number when the order is created.
+          {'NF.{ORDERNUMBER}'} — replaced with the PO number when the order is created.
         </p>
       </Field>
 
