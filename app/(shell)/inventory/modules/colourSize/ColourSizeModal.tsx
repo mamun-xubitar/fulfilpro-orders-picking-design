@@ -42,7 +42,7 @@ export default function ColourSizeModal({ product, optionLibrary, onApplied, onC
             </button>
             <div className="flex items-center gap-3">
               <p className="text-[10px] font-semibold leading-none text-inventory-text-subtle">
-                {m.newVariantCount > 0 && <span className="text-inventory-warning-ink">+{m.newVariantCount} new</span>}
+                {m.newVariantCount > 0 && <span className="text-inventory-success-hover">+{m.newVariantCount} new</span>}
                 {m.newVariantCount > 0 && m.removedVariantCount > 0 && ' · '}
                 {m.removedVariantCount > 0 && <span className="text-inventory-danger">−{m.removedVariantCount} removed</span>}
               </p>

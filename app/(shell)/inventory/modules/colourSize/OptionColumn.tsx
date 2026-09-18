@@ -88,7 +88,7 @@ export default function OptionColumn({
         {items.map((item) => (
           <div
             key={item.name}
-            className={`flex items-center gap-[6px] border-b border-inventory-border px-[4px] py-[5px] last:border-b-0 hover:bg-inventory-surface-hover ${item.isNew ? 'bg-inventory-warning/[6%]' : ''}`}
+            className={`flex items-center gap-[6px] border-b border-inventory-border px-[4px] py-[5px] last:border-b-0 hover:bg-inventory-surface-hover ${item.isNew ? 'bg-inventory-success/[12%]' : ''}`}
           >
             <input
               type="checkbox"
@@ -105,7 +105,7 @@ export default function OptionColumn({
             )}
             <span className="flex-1 truncate text-[11.5px] font-medium uppercase tracking-[0.2px] text-inventory-text">{item.name}</span>
             {item.isNew && (
-              <span className="rounded-full bg-inventory-warning/15 px-[6px] py-[1px] text-[9px] font-bold uppercase leading-none tracking-[0.3px] text-inventory-warning">
+              <span className="rounded-full bg-inventory-success/15 px-[6px] py-[1px] text-[9px] font-bold uppercase leading-none tracking-[0.3px] text-inventory-success-hover">
                 New
               </span>
             )}
