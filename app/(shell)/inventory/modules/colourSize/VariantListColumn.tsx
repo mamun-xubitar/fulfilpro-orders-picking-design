@@ -39,7 +39,7 @@ export default function VariantListColumn({ variants, onChange, onFillAll }: Var
         {variants.map((row) => (
           <div
             key={row.key}
-            className={`grid grid-cols-[minmax(0,1fr)_5.5rem_5.5rem] items-center gap-[6px] px-[8px] py-[5px] hover:bg-inventory-surface-hover ${row.isNew ? 'bg-inventory-warning/[6%]' : ''}`}
+            className={`grid grid-cols-[minmax(0,1fr)_5.5rem_5.5rem] items-center gap-[6px] px-[8px] py-[5px] hover:bg-inventory-surface-hover ${row.isNew ? 'bg-inventory-success/[12%]' : ''}`}
           >
             <span className="flex min-w-0 items-center gap-[6px]">
               {row.colour && (
@@ -52,7 +52,7 @@ export default function VariantListColumn({ variants, onChange, onFillAll }: Var
                 {[row.colour, row.size].filter(Boolean).join(' / ') || 'Default Title'}
               </span>
               {row.isNew && (
-                <span className="shrink-0 rounded-full bg-inventory-warning/15 px-[6px] py-[1px] text-[9px] font-bold uppercase leading-none tracking-[0.3px] text-inventory-warning">
+                <span className="shrink-0 rounded-full bg-inventory-success/15 px-[6px] py-[1px] text-[9px] font-bold uppercase leading-none tracking-[0.3px] text-inventory-success-hover">
                   New
                 </span>
               )}
