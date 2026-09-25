@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import useRequest from '@/hooks/useRequest';
 import { upperTrim } from '@/lib/utils/common';
+import { naturalCompare } from '../utils';
 import type { OptionLibraryState } from '../hooks/useOptionLibrary';
 import type { ProductRecord } from '../types';
 
@@ -198,6 +199,11 @@ export function useColourSizeModal({ product, optionLibrary, onApplied, onClose 
         });
       }
     }
+    // Display order only (item 2) — numbers before letters, then alphabetical. The axis arrays
+    // driving generation (checkedColours/checkedSizes, sent to apply-options as-is below) keep
+    // their own library/insertion order, so this never touches the size positions stored on the
+    // product or the matrix's own size order.
+    rows.sort((a, b) => naturalCompare(a.colour, b.colour) || naturalCompare(a.size, b.size));
     return rows;
   }, [checkedColours, checkedSizes, product.variants, values]);
 
@@ -276,9 +282,14 @@ export function useColourSizeModal({ product, optionLibrary, onApplied, onClose 
       ? 'No changes to replace'
       : null;
 
+  // Display order only (item 2) — the underlying colourItems/sizeItems arrays (and their
+  // indices used by toggle/remove, which match by name rather than position) are untouched.
+  const sortedColourItems = useMemo(() => [...colourItems].sort((a, b) => naturalCompare(a.name, b.name)), [colourItems]);
+  const sortedSizeItems = useMemo(() => [...sizeItems].sort((a, b) => naturalCompare(a.name, b.name)), [sizeItems]);
+
   return {
     colour: {
-      items: colourItems,
+      items: sortedColourItems,
       input: colourInput,
       setInput: setInputFor('colour'),
       error: colourAddError,
@@ -291,7 +302,7 @@ export function useColourSizeModal({ product, optionLibrary, onApplied, onClose 
       saving: colourSaving || optionLibrary.saving,
     },
     size: {
-      items: sizeItems,
+      items: sortedSizeItems,
       input: sizeInput,
       setInput: setInputFor('size'),
       error: sizeAddError,

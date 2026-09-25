@@ -56,6 +56,8 @@ export type CatalogueListParams = {
   verified?: boolean;
   status?: SupplierProductStatus;
   supplierId?: string;
+  /** Filters by the hub-only flat InventoryCategory, distinct from the Shopify taxonomy `category`. */
+  inventoryCategoryId?: string;
   quickFilter?: QuickFilterId | null;
   sort?: ProductsSortKey;
   dir?: 'asc' | 'desc';
@@ -85,6 +87,9 @@ export type SupplierProductRow = {
   name: string;
   category: string;
   categoryId: string | null;
+  /** Hub-only flat category — distinct from the Shopify taxonomy category above. */
+  inventoryCategoryId: string | null;
+  inventoryCategoryName: string | null;
   sku: string;
   description: string;
   productRemark: string;
@@ -117,6 +122,7 @@ const OPEN_PO_STATUSES = ['REQUESTED', 'CONFIRMED', 'PARTIALLY_RECEIVED'] as con
 
 const catalogueInclude = {
   supplierLinks: { include: { supplier: { select: { id: true, name: true, poEmail: true } } }, orderBy: { supplier: { name: 'asc' as const } } },
+  inventoryCategory: { select: { id: true, name: true } },
   variants: { orderBy: { position: 'asc' as const } },
   images: { orderBy: { position: 'asc' as const } },
   pricing: true,
@@ -280,6 +286,7 @@ export class SupplierProductModel {
       name: string;
       category: string;
       categoryId: string | null;
+      inventoryCategoryId: string | null;
       sku: string;
       description: string;
       productRemark: string;
@@ -311,6 +318,7 @@ export class SupplierProductModel {
           ...(data.name !== undefined ? { name: data.name } : {}),
           ...(data.category !== undefined ? { category: data.category } : {}),
           ...(data.categoryId !== undefined ? { categoryId: data.categoryId } : {}),
+          ...(data.inventoryCategoryId !== undefined ? { inventoryCategoryId: data.inventoryCategoryId } : {}),
           ...(data.sku !== undefined ? { sku: data.sku } : {}),
           ...(data.description !== undefined ? { description: data.description } : {}),
           ...(data.productRemark !== undefined ? { productRemark: data.productRemark } : {}),
@@ -899,6 +907,8 @@ export class SupplierProductModel {
       name: row.name,
       category: row.category ?? '',
       categoryId: row.categoryId,
+      inventoryCategoryId: row.inventoryCategoryId,
+      inventoryCategoryName: row.inventoryCategory?.name ?? null,
       sku: row.sku,
       description: row.description ?? '',
       productRemark: row.productRemark ?? '',
@@ -1039,6 +1049,7 @@ function buildCatalogueWhereSql(params: {
   verified?: boolean;
   status?: SupplierProductStatus;
   supplierId?: string;
+  inventoryCategoryId?: string;
   quickFilter?: QuickFilterId | null;
   includeOmitted?: boolean;
 }): Prisma.Sql {
@@ -1056,6 +1067,9 @@ function buildCatalogueWhereSql(params: {
   }
   if (params.supplierId) {
     whereParts.push(Prisma.sql`EXISTS (SELECT 1 FROM "SupplierProductSupplier" sps WHERE sps."supplierProductId" = sp.id AND sps."supplierId" = ${params.supplierId})`);
+  }
+  if (params.inventoryCategoryId) {
+    whereParts.push(Prisma.sql`sp."inventoryCategoryId" = ${params.inventoryCategoryId}`);
   }
 
   const term = params.search?.trim();

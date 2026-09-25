@@ -1,7 +1,7 @@
 'use client';
 
 import { memo } from 'react';
-import { ColourCell, IncomingCell, Num, NumCell, RowAction, SizeCell, SkuCell } from './VariantsMatrixCells';
+import { ColourCell, IncomingCell, Num, NumCell, RowAction, SizeCell, SkuCell, VariantTitleCell } from './VariantsMatrixCells';
 import { STATUS_STYLES } from './constants';
 import { Check, Close, Trash } from './icons';
 import { computeVariant, formatCurrencyValue, formatMoney, formatNumber } from './utils';
@@ -59,6 +59,7 @@ function VariantsMatrixRow({
       </td>
 
       <SizeCell value={variant.size} />
+      <VariantTitleCell colour={variant.colour} size={variant.size} />
 
       {showAllColumns && (
         <SkuCell

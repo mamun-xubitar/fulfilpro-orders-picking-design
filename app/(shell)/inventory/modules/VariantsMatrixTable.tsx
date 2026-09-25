@@ -38,11 +38,11 @@ export default function VariantsMatrixTable({ matrix, fillHeight, showAllColumns
   const { rows, totals } = matrix;
   const scrollable = rows.length > SCROLL_THRESHOLD;
   const numericHeaders = NUMERIC_HEADERS.filter((h) => showAllColumns || h.key !== 'trigger');
-  // Colour, Size, [SKU / Barcode], numeric columns, Status, Buy price, Sell price, Stock value,
-  // Actions — 13 in full view, 11 inline (SKU/Barcode and Trigger dropped). The 7 accounts for
-  // the always-shown non-numeric columns: Colour, Size, Status, Buy price, Sell price, Stock
-  // value, Actions.
-  const columnCount = 7 + numericHeaders.length + (showAllColumns ? 1 : 0);
+  // Colour, Size, Variant, [SKU / Barcode], numeric columns, Status, Buy price, Sell price, Stock
+  // value, Actions — 14 in full view, 12 inline (SKU/Barcode and Trigger dropped). The 8 accounts
+  // for the always-shown non-numeric columns: Colour, Size, Variant, Status, Buy price, Sell
+  // price, Stock value, Actions.
+  const columnCount = 8 + numericHeaders.length + (showAllColumns ? 1 : 0);
 
   return (
     <div className={fillHeight ? 'h-full overflow-y-auto overflow-x-auto' : scrollable ? 'max-h-[12.5rem] overflow-y-auto overflow-x-auto' : 'overflow-x-auto'}>
@@ -62,6 +62,7 @@ export default function VariantsMatrixTable({ matrix, fillHeight, showAllColumns
               </label>
             </th>
             <Th align="left">Size</Th>
+            <Th align="left">Variant</Th>
             {showAllColumns && <Th align="left">SKU / Barcode</Th>}
             {numericHeaders.map((h) => (
               <Th key={h.key} align="right">
@@ -133,6 +134,7 @@ export default function VariantsMatrixTable({ matrix, fillHeight, showAllColumns
                 {rows.length} row{rows.length === 1 ? '' : 's'}
                 {matrix.hiddenCount > 0 && <span className="text-inventory-text-subtle"> · {matrix.hiddenCount} hidden</span>}
               </td>
+              <td className={STICKY_FOOTER_TD} />
               {showAllColumns && <td className={STICKY_FOOTER_TD} />}
               <TotalCell value={formatNumber(totals.totalStock)} />
               <TotalCell value={formatNumber(totals.allocated)} />

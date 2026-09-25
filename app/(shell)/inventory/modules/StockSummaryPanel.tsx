@@ -8,6 +8,7 @@ import { formatCurrencyValue, formatNumber } from './utils';
 /** Every figure here is folded from the variant rows — nothing is stored. */
 export default function StockSummaryPanel({ summary, variantCount }: { summary: StockSummary; variantCount: number }) {
   const rows: { label: string; value: string; emphasis?: 'muted' | 'blue' }[] = [
+    { label: 'Variants', value: formatNumber(variantCount), emphasis: 'muted' },
     { label: 'Total stock', value: formatNumber(summary.totalStock) },
     { label: 'Available stock', value: formatNumber(summary.availableStock) },
     { label: 'Allocated', value: formatNumber(summary.allocated), emphasis: 'muted' },
@@ -20,7 +21,6 @@ export default function StockSummaryPanel({ summary, variantCount }: { summary: 
         tone="stock"
         icon={<Cube className="h-3 w-3" />}
         title="Stock summary"
-        meta={`${variantCount} variant${variantCount === 1 ? '' : 's'}`}
       />
 
       <div className="flex flex-1 flex-col gap-[4px] p-[6px]">

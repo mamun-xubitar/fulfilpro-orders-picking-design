@@ -250,6 +250,14 @@ export function capitaliseFirst(name: string): string {
   return name.length === 0 ? name : name.charAt(0).toUpperCase() + name.slice(1);
 }
 
+/** Alphabetical, but numeric-aware — "2" sorts before "10" (not "10" before "2"), and digits sort
+ * before letters ("30", "36", "L", "XL" rather than "L", "XL", "30", "36"). Used by the Colour &
+ * size adjustment modal (item 2) to order its Colour/Size/Variant columns; display-only, it never
+ * changes the size axis order stored on the product. */
+export function naturalCompare(a: string, b: string): number {
+  return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+}
+
 /** `product.category` stores the full Shopify taxonomy path ("Apparel & Accessories > … >
  * Visors") — this is the compact display form for space-constrained rows (the products table),
  * which show the leaf with the full path as a `title` tooltip instead. */

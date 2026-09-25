@@ -14,6 +14,12 @@ type CategoryPickerProps = {
    * product-CSV `Product Category` column needs, not just the leaf. */
   value: { id: string | null; name: string };
   onChange: (category: { id: string | null; name: string }) => void;
+  /** Overrides the field label — "Shopify Category" everywhere this taxonomy tree is now shown,
+   * to distinguish it from the flat hub-only Category (HubCategoryPicker). */
+  label?: string;
+  /** Suppresses the field's own label row — for a caller (e.g. StoreDiffFieldRow) that renders
+   * its own label alongside the current store value. */
+  hideLabel?: boolean;
 };
 
 /**
@@ -23,7 +29,7 @@ type CategoryPickerProps = {
  * button pinned at the top of the dropdown pops one level of the browse path (or leaves search
  * mode) without an extra request.
  */
-export default function CategoryPicker({ value, onChange }: CategoryPickerProps) {
+export default function CategoryPicker({ value, onChange, label = 'Shopify Category', hideLabel }: CategoryPickerProps) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [path, setPath] = useState<{ id: string; name: string }[]>([]);
@@ -122,7 +128,7 @@ export default function CategoryPicker({ value, onChange }: CategoryPickerProps)
 
   return (
     <div className="min-w-0" ref={containerRef}>
-      <FieldLabel>Category</FieldLabel>
+      {!hideLabel && <FieldLabel>{label}</FieldLabel>}
       <div className="relative">
         <button
           ref={anchorRef}

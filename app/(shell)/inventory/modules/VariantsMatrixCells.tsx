@@ -107,6 +107,19 @@ export function SizeCell({ value }: { value: string }) {
   );
 }
 
+/** Read-only Shopify-style variant title ("Colour / Size") — a convenience column so a row's
+ * full identity is scannable without mentally joining the Colour and Size cells. */
+export function VariantTitleCell({ colour, size }: { colour: string; size: string }) {
+  const title = [colour, size].filter(Boolean).join(' / ') || 'Default';
+  return (
+    <td className={CELL_CLASS}>
+      <span className="truncate text-[10px] font-medium leading-none text-inventory-text" title={title}>
+        {title}
+      </span>
+    </td>
+  );
+}
+
 export function SkuCell({
   sku,
   barcode,

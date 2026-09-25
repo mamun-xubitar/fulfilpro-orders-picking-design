@@ -2,11 +2,11 @@
 
 import { useEffect, useRef } from 'react';
 import { BTN_XS, BTN_ROW, PanelHeading, panelBorderClass } from './MainImagePanel';
-import { LISTING_STATUS_BADGES } from './constants';
+import StoreCard from './StoreCard';
+import StoreConnectCard from './StoreConnectCard';
 import type { StoreListingsState } from './hooks/useStoreListings';
-import { External, Plus, Refresh, Store } from './icons';
-import type { StoreListingResult } from './types';
-import { priceLabel } from './utils';
+import { Plus, Refresh, Store } from './icons';
+import type { ProductRecord } from './types';
 
 type OnlineStoresPanelProps = {
   storeListings: StoreListingsState;
@@ -15,8 +15,16 @@ type OnlineStoresPanelProps = {
   onToggleAll: (ids?: string[]) => void;
   onOpenPublish: () => void;
   onOpenBulkUpdate: () => void;
+  /** Ticks the store then opens Publish with it pre-selected (item 3) — same flow as the header
+   * "+" button, just pre-seeded with one store id. */
+  onConnect: (storeId: string) => void;
+  product: ProductRecord | null;
 };
 
+/** Item 3: every connected store now shows here, not only ones this product is already listed
+ * on — an unlisted store gets a compact StoreConnectCard instead of the full StoreCard. Bulk
+ * select/update still only concerns itself with listed stores, same as before. StoreCard itself
+ * (with item 4's Differences badge) was split into its own file to stay within the size budget. */
 export default function OnlineStoresPanel({
   storeListings,
   selectedStoreIds,
@@ -24,13 +32,12 @@ export default function OnlineStoresPanel({
   onToggleAll,
   onOpenPublish,
   onOpenBulkUpdate,
+  onConnect,
+  product,
 }: OnlineStoresPanelProps) {
   const { listings, loading, syncing, sync } = storeListings;
-  // Only show a card for a store where this product's handle actually matches on Shopify (`found`)
-  // — a store it isn't on yet doesn't belong in this "where it's currently listed" list. Publishing
-  // to a brand-new store still goes through the separate "+" button/modal, which lists every
-  // connected store regardless of match.
   const listed = listings.filter((l) => l.found);
+  const unlisted = listings.filter((l) => !l.found);
   const listedIds = listed.map((l) => l.storeId);
   const selectedListedCount = listed.filter((l) => selectedStoreIds.has(l.storeId)).length;
   const allSelected = listed.length > 0 && selectedListedCount === listed.length;
@@ -47,7 +54,7 @@ export default function OnlineStoresPanel({
         tone="stores"
         icon={<Store className="h-3 w-3" />}
         title="Online stores"
-        meta={`${listed.length}`}
+        meta={`${listed.length}/${listings.length}`}
         action={
           <button
             type="button"
@@ -91,12 +98,24 @@ export default function OnlineStoresPanel({
           <StoreCardSkeletons />
         ) : listings.length === 0 ? (
           <p className="px-1 py-6 text-center text-[11px] text-inventory-text-subtle">No connected stores.</p>
-        ) : listed.length === 0 ? (
-          <p className="px-1 py-6 text-center text-[11px] text-inventory-text-subtle">Not listed in any connected store.</p>
         ) : (
-          listed.map((listing) => (
-            <StoreCard key={listing.storeId} listing={listing} selected={selectedStoreIds.has(listing.storeId)} onToggle={() => onToggleStore(listing.storeId)} />
-          ))
+          <>
+            {listed.map((listing) =>
+              product ? (
+                <StoreCard
+                  key={listing.storeId}
+                  listing={listing}
+                  selected={selectedStoreIds.has(listing.storeId)}
+                  onToggle={() => onToggleStore(listing.storeId)}
+                  product={product}
+                  storeListings={storeListings}
+                />
+              ) : null
+            )}
+            {unlisted.map((listing) => (
+              <StoreConnectCard key={listing.storeId} listing={listing} onConnect={() => onConnect(listing.storeId)} />
+            ))}
+          </>
         )}
       </div>
 
@@ -107,74 +126,6 @@ export default function OnlineStoresPanel({
         </button>
       </div>
     </section>
-  );
-}
-
-function StoreCard({ listing, selected, onToggle }: { listing: StoreListingResult; selected: boolean; onToggle: () => void }) {
-  return (
-    <article className={`rounded-[8px] border p-[6px] ${selected ? 'border-inventory-secondary/35 bg-inventory-secondary/10/40' : 'border-inventory-border bg-inventory-surface'}`}>
-      <div className="flex items-start justify-between gap-2">
-        <label className="flex min-w-0 items-start gap-[5px]">
-          <input
-            type="checkbox"
-            checked={selected}
-            onChange={onToggle}
-            aria-label={`Select ${listing.storeName}`}
-            className="mt-[2px] h-3 w-3 shrink-0 rounded border-inventory-border-strong text-inventory-secondary cursor-pointer"
-          />
-          <span className="min-w-0">
-            <h4 className="truncate text-[10.5px] font-bold leading-tight text-inventory-text">{listing.storeName}</h4>
-            <p className="truncate text-[9px] leading-tight text-inventory-text-subtle">{listing.storeDomain}</p>
-          </span>
-        </label>
-        <span className="shrink-0 text-[11.5px] font-bold leading-none text-inventory-text tabular-nums">
-          {listing.found && listing.variants.length > 0 ? priceLabel(listing.variants) : <span className="text-inventory-text-subtle">—</span>}
-        </span>
-      </div>
-
-      <div className="mt-[6px] flex flex-wrap items-center gap-[6px]">
-        <span
-          className={`inline-flex items-center whitespace-nowrap rounded-full border px-[6px] py-[1px] text-[9px] font-bold uppercase leading-none tracking-[0.4px] ${
-            LISTING_STATUS_BADGES[listing.listingStatus] ?? LISTING_STATUS_BADGES.NOT_LISTED
-          }`}
-        >
-          {listing.listingStatus.replace('_', ' ')}
-        </span>
-        {!listing.found && !listing.error && listing.listingStatus === 'LISTED' && (
-          <span className="inline-flex items-center whitespace-nowrap rounded-full border border-inventory-warning/30 bg-inventory-warning/10 px-[6px] py-[1px] text-[9px] font-bold uppercase leading-none tracking-[0.4px] text-inventory-warning-ink">
-            Missing on Shopify
-          </span>
-        )}
-        {listing.error ? (
-          <span className="inline-flex items-center whitespace-nowrap rounded-full border border-inventory-danger/30 bg-inventory-danger/10 px-[6px] py-[1px] text-[9px] font-bold uppercase leading-none tracking-[0.4px] text-inventory-danger-hover">
-            Lookup failed
-          </span>
-        ) : (
-          listing.found && listing.externalId && <span className="truncate text-[9px] leading-none text-inventory-text-subtle">ID {listing.externalId}</span>
-        )}
-      </div>
-
-      {(listing.error || listing.lastError) && <p className="mt-[6px] text-[10px] leading-tight text-inventory-danger">{listing.error ?? listing.lastError}</p>}
-      {listing.found && listing.productTitle && (
-        <p className="mt-[4px] truncate text-[10px] leading-tight text-inventory-text-subtle" title={listing.productTitle}>
-          {listing.productTitle}
-          {listing.status ? ` · ${listing.status}` : ''}
-        </p>
-      )}
-
-      <div className="mt-[6px] flex gap-[6px]">
-        {listing.url ? (
-          <a href={listing.url} target="_blank" rel="noopener noreferrer" className={`flex-1 ${BTN_XS}`}>
-            Open
-            <External className="h-3 w-3" />
-          </a>
-        ) : (
-          <span className="flex h-[22px] flex-1 items-center justify-center rounded-[6px] border border-inventory-border text-[10px] font-bold leading-none text-inventory-border-strong">
-            Open
-          </span>
-        )}
-      </div>
-    </article>
   );
 }
 

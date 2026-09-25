@@ -66,24 +66,28 @@ export type StoreDraft = {
 };
 
 /** Maps a live Shopify product status (which can be 'ARCHIVED', a state the hub's own
- * three-value vocabulary doesn't have) onto the hub's vocabulary — see the call site's comment. */
-function toHubStatus(status: 'ACTIVE' | 'DRAFT' | 'ARCHIVED' | 'UNLISTED' | null | undefined): ProductStatusValue {
+ * three-value vocabulary doesn't have) onto the hub's vocabulary — see the call site's comment.
+ * Exported for storeDiff.ts (item 4), which compares a live listing's status against the hub's. */
+export function toHubStatus(status: 'ACTIVE' | 'DRAFT' | 'ARCHIVED' | 'UNLISTED' | null | undefined): ProductStatusValue {
   if (status === 'ARCHIVED' || status == null) return 'DRAFT';
   return status;
 }
 
-function suggestedPrice(pricing: PricingInputs, marginPercent: number | null, fallback: number): number {
+/** Exported for storeDiff.ts (item 4) — the same "what price should this store be showing"
+ * resolution used to seed a draft is what the diff compares the live store price against. */
+export function suggestedPrice(pricing: PricingInputs, marginPercent: number | null, fallback: number): number {
   if (marginPercent === null) return fallback;
   return storePriceFromMargin(pricing, marginPercent);
 }
 
 /** Finds the live Shopify variant matching a hub variant — SKU first, then option values — used
  * to source the SKU/barcode/image/stock shown for a published store (never price, see
- * emptyDraft). Mirrors the server's own lookup in shopify-product-publish.server.ts via the same
- * shared candidate-key list, so a simple (no colour/size) or single-axis product — published as
- * Title/"Default Title", or with only one selectedOption — still matches, not just a full
- * Colour+Size product. */
-function matchListingVariant(
+ * emptyDraft), and reused by storeDiff.ts (item 4) to line up which live variant each hub variant
+ * should be compared against. Mirrors the server's own lookup in shopify-product-publish.server.ts
+ * via the same shared candidate-key list, so a simple (no colour/size) or single-axis product —
+ * published as Title/"Default Title", or with only one selectedOption — still matches, not just a
+ * full Colour+Size product. */
+export function matchListingVariant(
   listing: StoreListingsState['listings'][number] | undefined,
   v: { sku: string | null; colour: string; size: string },
   axes: OptionAxes

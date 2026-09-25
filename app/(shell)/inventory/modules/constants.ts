@@ -1,5 +1,8 @@
-import type { ModuleTabId, ProductStatusValue, ProductTabId, QuickFilterId, TabDef, VariantStatus } from './types';
+import type { ModuleTabId, ProductStatusValue, QuickFilterId, TabDef, VariantStatus } from './types';
 
+// Item 5: the child/sub-tab strip (formerly PRODUCT_TABS — Details/Variants/Purchase
+// info/Suppliers/Images/Notes/Documents/History) is gone. Only the primary tabs remain, with
+// History promoted here as its own primary tab (ComingSoon for now).
 export const MODULE_TABS: TabDef<ModuleTabId>[] = [
   { id: 'products', label: 'Products', blurb: 'Browse and maintain the product catalogue.' },
   { id: 'purchase-recommend', label: 'Purchase Recommend', blurb: 'Reorder suggestions rolled up across every product.' },
@@ -11,17 +14,7 @@ export const MODULE_TABS: TabDef<ModuleTabId>[] = [
   { id: 'payments', label: 'Payments', blurb: 'Track supplier invoices and settlements.' },
   { id: 'reports', label: 'Reports', blurb: 'Stock valuation, movement and margin reporting.' },
   { id: 'dashboard', label: 'Dashboard', blurb: 'Headline inventory metrics at a glance.' },
-];
-
-export const PRODUCT_TABS: TabDef<ProductTabId>[] = [
-  { id: 'details', label: 'Product Details', blurb: 'Core product record.' },
-  { id: 'variants', label: 'Variants / Stock', blurb: 'Full-screen variant and stock editor.' },
-  { id: 'purchase-info', label: 'Purchase Info', blurb: 'Lead times, minimum order quantities and pack sizes.' },
-  { id: 'suppliers', label: 'Suppliers', blurb: 'Suppliers who can fulfil this product.' },
-  { id: 'images', label: 'Images', blurb: 'Manage the full image library for this product.' },
-  { id: 'notes', label: 'Notes', blurb: 'Internal notes against this product.' },
-  { id: 'documents', label: 'Documents', blurb: 'Spec sheets, certificates and artwork files.' },
-  { id: 'history', label: 'History', blurb: 'Every change made to this product record.' },
+  { id: 'history', label: 'History', blurb: 'Every change made across the product catalogue.' },
 ];
 
 export const QUICK_FILTERS: { id: QuickFilterId; label: string }[] = [

@@ -37,6 +37,9 @@ type AiDescriptionFieldProps = {
   /** Shows the "Show Details" button in the header and fixes the editor height with an inner
    * scroll. Only for the Product details panel — never the New Product wizard or per-store drafts. */
   showDetailsButton?: boolean;
+  /** Suppresses the field's own "Description" label row — for a caller (e.g. StoreDiffFieldRow)
+   * that already renders its own label alongside the store's current value. */
+  hideLabel?: boolean;
 };
 
 /**
@@ -47,7 +50,7 @@ type AiDescriptionFieldProps = {
  * (Online stores & prices / Bulk update) — each mounted instance is independent, so several store
  * blocks can generate concurrently without interfering with each other.
  */
-export default function AiDescriptionField({ value, onChange, buildRequestData, subjectKey, showDetailsButton }: AiDescriptionFieldProps) {
+export default function AiDescriptionField({ value, onChange, buildRequestData, subjectKey, showDetailsButton, hideLabel }: AiDescriptionFieldProps) {
   const { request: requestAi, loading: aiGenerating } = useRequest<{ description: string }>();
   // Original/Generated are two independent drafts of the description, tagged with the subject
   // they belong to so switching subjects drops them without an effect having to reset anything —
@@ -173,7 +176,7 @@ export default function AiDescriptionField({ value, onChange, buildRequestData, 
   return (
     <div className="min-w-0">
       <div className="mb-1 flex items-center justify-between gap-2">
-        <FieldLabel>Description</FieldLabel>
+        {!hideLabel && <FieldLabel>Description</FieldLabel>}
         {showDetailsButton && (
           <button
             type="button"

@@ -60,9 +60,16 @@ export function useVariantsMatrix({ product, sizes, colours, quickFilter, onVari
   const bulkDeleteOpen = storedBulkDeleteOpen !== null && storedBulkDeleteOpen === product?.id;
   const [bulkDeleting, setBulkDeleting] = useState(false);
 
+  // Functional update (item 6a) — reads the previous *stored* state itself rather than closing
+  // over the `filters` computed for this render, so a filter change made while the inline table
+  // and the full-view modal are both mounted (they share this same hook instance) is never lost
+  // to a stale-closure overwrite between the two renders that follow it.
   const patch = (next: Partial<MatrixFilters>) => {
     if (!product) return;
-    setStored({ productId: product.id, filters: { ...filters, ...next } });
+    setStored((prev) => {
+      const base = prev && prev.productId === product.id ? prev.filters : DEFAULT_FILTERS;
+      return { productId: product.id, filters: { ...base, ...next } };
+    });
   };
 
   // Every row with a draft shows it overlaid; every other row is returned *by reference* —
@@ -141,18 +148,25 @@ export function useVariantsMatrix({ product, sizes, colours, quickFilter, onVari
 
   const totals = useMemo(() => summariseVariants(rows), [rows]);
 
+  // Functional update (item 6a), same reasoning as `patch` above — reads the previous *stored*
+  // colours itself instead of the render-time `filters.colours`/`allColoursSelected`, which is
+  // what let a fast pair of toggles (or one from each of the two mounted views) lose one click.
   const toggleColour = (colour: string) => {
+    if (!product) return;
     const key = colour.toLowerCase();
-    // From "all colours", the first click narrows to just that colour; further
-    // clicks add or remove, and clearing the last one returns to showing all.
-    if (allColoursSelected) {
-      patch({ colours: [colour] });
-      return;
-    }
-    const base = filters.colours ?? [];
-    const has = base.some((c) => c.toLowerCase() === key);
-    const next = has ? base.filter((c) => c.toLowerCase() !== key) : [...base, colour];
-    patch({ colours: next.length === 0 ? null : next });
+    setStored((prev) => {
+      const base = prev && prev.productId === product.id ? prev.filters : DEFAULT_FILTERS;
+      const prevColours = base.colours;
+      // From "all colours" (null, or every name already present), the first click narrows to
+      // just that colour; further clicks add or remove, and clearing the last one returns to
+      // showing all.
+      const isAllSelected = prevColours === null || prevColours.length === colourNames.length;
+      if (isAllSelected) return { productId: product.id, filters: { ...base, colours: [colour] } };
+      const selected = prevColours ?? [];
+      const has = selected.some((c) => c.toLowerCase() === key);
+      const next = has ? selected.filter((c) => c.toLowerCase() !== key) : [...selected, colour];
+      return { productId: product.id, filters: { ...base, colours: next.length === 0 ? null : next } };
+    });
   };
 
   const allRowsSelected = rows.length > 0 && rows.every((r) => selectedIds.has(r.id));

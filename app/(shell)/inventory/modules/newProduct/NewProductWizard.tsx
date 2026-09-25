@@ -63,6 +63,7 @@ export default function NewProductWizard({ p }: NewProductWizardProps) {
               details={p.details}
               supplierOptions={p.supplierOptions}
               optionLibrary={p.optionLibrary}
+              inventoryCategories={p.inventoryCategories}
               suppliers={p.suppliers}
               product={p.product}
               onOptionsApplied={p.onVariantSaved}

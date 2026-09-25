@@ -8,6 +8,7 @@ import { useAdjustments } from './useAdjustments';
 import { useCatalogData } from './useCatalogData';
 import { useImportExport } from './useImportExport';
 import { useImportProducts } from './useImportProducts';
+import { useInventoryCategories } from './useInventoryCategories';
 import { useOptionLibrary } from './useOptionLibrary';
 import { useProductDetails } from './useProductDetails';
 import { useProductImageMutations } from './useProductImageMutations';
@@ -21,13 +22,12 @@ import { useSuppliers } from './useSuppliers';
 import { useStoreListings } from './useStoreListings';
 import { useStorePublish } from './useStorePublish';
 import { useVariantsMatrix } from './useVariantsMatrix';
-import type { ModuleTabId, ProductRecord, ProductTabId, StoreListingResult } from '../types';
+import type { ModuleTabId, ProductRecord, StoreListingResult } from '../types';
 
 export function useInventoryPage() {
   const data = useCatalogData();
   const [now] = useState(() => Date.now());
   const [moduleTab, setModuleTab] = useState<ModuleTabId>('products');
-  const [productTab, setProductTab] = useState<ProductTabId>('details');
   const [newProductOpen, setNewProductOpen] = useState(false);
   const [editImagesOpen, setEditImagesOpen] = useState(false);
   const [deleteProductOpen, setDeleteProductOpen] = useState(false);
@@ -65,6 +65,7 @@ export function useInventoryPage() {
   const imageMutations = useProductImageMutations({ product, onSaved: onProductSaved });
   const pricing = useProductPricing({ product, globals: data.globals, storeListings, onSaved: onProductSaved });
   const optionLibrary = useOptionLibrary();
+  const inventoryCategories = useInventoryCategories();
   const details = useProductDetails({ product, onSaved: onProductSaved });
   // A variant delete/edit, or the Colour & size adjustment modal's Replace/Insert, can change a
   // colour/size the details draft doesn't know about yet — sync the draft's lists from the
@@ -137,8 +138,6 @@ export function useInventoryPage() {
     now,
     moduleTab,
     setModuleTab,
-    productTab,
-    setProductTab,
     nav,
     gallery,
     imageMutations,
@@ -183,6 +182,7 @@ export function useInventoryPage() {
     storeListings,
     storePublish,
     optionLibrary,
+    inventoryCategories,
     onVariantSaved,
   };
 }

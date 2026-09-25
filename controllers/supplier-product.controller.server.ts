@@ -1,6 +1,7 @@
 import prisma from '@/lib/prisma.server';
 import { SupplierProductModel } from '@/models/supplier-product.model.server';
 import { SupplierModel } from '@/models/supplier.model.server';
+import { InventoryCategoryModel } from '@/models/inventory-category.model.server';
 import { CurrencyRateModel } from '@/models/currency-rate.model.server';
 import { saveUploadedFile } from '@/lib/uploads.server';
 import { deriveColorFromName } from '@/lib/inventory/colour';
@@ -13,6 +14,7 @@ import type { CatalogueListParams, ProductsSortKey, QuickFilterId } from '@/mode
 const model = new SupplierProductModel();
 const currencyModel = new CurrencyRateModel();
 const supplierModel = new SupplierModel();
+const categoryModel = new InventoryCategoryModel();
 
 const STATUS_VALUES = new Set<string>(Object.values(SupplierProductStatus));
 const MAX_IMAGES = 250;
@@ -69,13 +71,14 @@ export class SupplierProductController {
     const statusParam = searchParams.get('status');
     const status = statusParam && STATUS_VALUES.has(statusParam) ? (statusParam as SupplierProductStatus) : undefined;
     const supplierId = searchParams.get('supplier')?.trim() || undefined;
+    const inventoryCategoryId = searchParams.get('category')?.trim() || undefined;
     const sortParam = searchParams.get('sort');
     const sort = sortParam && SORT_KEYS.has(sortParam) ? (sortParam as ProductsSortKey) : 'createdAt';
     const dir = searchParams.get('dir') === 'desc' ? 'desc' : searchParams.get('dir') === 'asc' ? 'asc' : sort === 'createdAt' ? 'desc' : 'asc';
     const includeOmitted = searchParams.get('includeOmitted') === '1';
 
     if (mode === 'ids') {
-      const ids = await model.listIds({ search: searchParams.get('search')?.trim() || undefined, verified, status, supplierId, quickFilter, sort, dir, includeOmitted });
+      const ids = await model.listIds({ search: searchParams.get('search')?.trim() || undefined, verified, status, supplierId, inventoryCategoryId, quickFilter, sort, dir, includeOmitted });
       return { data: { ids } };
     }
 
@@ -92,17 +95,18 @@ export class SupplierProductController {
       const page = Math.max(1, Number(searchParams.get('page')) || 1);
       const pageSize = [20, 50, 100].includes(Number(searchParams.get('pageSize'))) ? Number(searchParams.get('pageSize')) : 20;
       const search = searchParams.get('search')?.trim() || undefined;
-      const params: CatalogueListParams = { page, pageSize, search, verified, status, supplierId, quickFilter, sort, dir, includeOmitted };
-      // Every supplier in the system, not just ones with linked products — a supplier with zero
-      // products should still be pickable in the filter dropdown.
-      const [{ products, total, totals }, supplierOptionRows, totalAll, stepperTotal] = await Promise.all([
+      const params: CatalogueListParams = { page, pageSize, search, verified, status, supplierId, inventoryCategoryId, quickFilter, sort, dir, includeOmitted };
+      // Every supplier/category in the system, not just ones with linked products — one with
+      // zero products should still be pickable in the filter dropdown.
+      const [{ products, total, totals }, supplierOptionRows, categoryOptionRows, totalAll, stepperTotal] = await Promise.all([
         model.list(params),
         supplierModel.listOptions(),
+        categoryModel.list(),
         model.countAll(),
         model.countForStepper(verified),
       ]);
       const supplierOptions = supplierOptionRows.map((s) => ({ id: s.id, name: s.name }));
-      return { data: { products, pagination: paginationOf(page, pageSize, total), totalAll, stepperTotal, totals, globals, supplierOptions } };
+      return { data: { products, pagination: paginationOf(page, pageSize, total), totalAll, stepperTotal, totals, globals, supplierOptions, categoryOptions: categoryOptionRows } };
     }
 
     // detail mode — the quick filter deliberately never reaches here: it only narrows the
@@ -228,6 +232,13 @@ export class SupplierProductController {
         if (found.length !== supplierIds.length) errors.push('supplierId: One or more suppliers were not found');
       }
     }
+
+    // Hub-only flat Category — distinct from the Shopify taxonomy category above. An empty
+    // string clears it, same convention as categoryId.
+    if (typeof value.inventoryCategoryId === 'string' && value.inventoryCategoryId.trim()) {
+      const found = await prisma.inventoryCategory.findUnique({ where: { id: value.inventoryCategoryId.trim() }, select: { id: true } });
+      if (!found) errors.push('inventoryCategoryId: Category not found');
+    }
     if (errors.length) return { error: { message: 'Validation failed', errors, status: 400 } };
 
     // itemNo is globally unique — re-check whenever it's about to change, mirroring create.
@@ -256,6 +267,9 @@ export class SupplierProductController {
       ...(typeof value.name === 'string' ? { name: upperTrim(value.name) } : {}),
       ...(typeof value.category === 'string' ? { category: value.category.trim() } : {}),
       ...('categoryId' in value ? { categoryId: typeof value.categoryId === 'string' ? value.categoryId : null } : {}),
+      ...('inventoryCategoryId' in value
+        ? { inventoryCategoryId: typeof value.inventoryCategoryId === 'string' && value.inventoryCategoryId.trim() ? value.inventoryCategoryId.trim() : null }
+        : {}),
       ...(typeof value.sku === 'string' ? { sku: upperTrim(value.sku) } : {}),
       ...(typeof value.description === 'string' ? { description: sanitizeHtml(value.description) } : {}),
       ...(typeof value.productRemark === 'string' ? { productRemark: upperTrim(value.productRemark) } : {}),

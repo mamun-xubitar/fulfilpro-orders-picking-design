@@ -719,14 +719,14 @@ model BackgroundJob {
 }
 
 model Task {
-  id                   String              @id @default(uuid())
+  id                   String         @id @default(uuid())
   title                String
   description          String
-  status               TaskStatus          @default(PENDING)
+  status               TaskStatus     @default(PENDING)
   dueDate              DateTime
-  dueType              TaskDueType         @default(CUSTOM)
+  dueType              TaskDueType    @default(CUSTOM)
   completedAt          DateTime?
-  proofFiles           Json                @default("[]")
+  proofFiles           Json           @default("[]")
   assignerId           String
   assignerName         String
   assignerEmail        String
@@ -736,9 +736,9 @@ model Task {
   lastReadByAssignerAt DateTime?
   lastReadByAssigneeAt DateTime?
   recurringTaskId      String?
-  recurringTask        RecurringTask?      @relation(fields: [recurringTaskId], references: [id], onDelete: SetNull)
-  createdAt            DateTime            @default(now())
-  updatedAt            DateTime            @updatedAt
+  recurringTask        RecurringTask? @relation(fields: [recurringTaskId], references: [id], onDelete: SetNull)
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
   messages             TaskMessage[]
 
   @@index([assigneeId, status])
@@ -853,13 +853,27 @@ model GlobalColour {
   createdAt DateTime @default(now())
 }
 
-/** Global size library, mirrors GlobalColour. `position` preserves insertion order (sizes read
- * naturally in the order they were added, unlike colours which sort A→Z). */
+/**
+ * Global size library, mirrors GlobalColour. `position` preserves insertion order (sizes read
+ * naturally in the order they were added, unlike colours which sort A→Z).
+ */
 model GlobalSize {
   id        String   @id @default(uuid())
   name      String   @unique
   position  Int      @default(0)
   createdAt DateTime @default(now())
+}
+
+/**
+ * Flat hub-only category library (distinct from the nested Shopify taxonomy that
+ * `category`/`categoryId` on SupplierProduct already track) — a searchable, flat, add-as-you-go
+ * list, same shape as GlobalColour. Never pushed to Shopify.
+ */
+model InventoryCategory {
+  id        String            @id @default(uuid())
+  name      String            @unique
+  createdAt DateTime          @default(now())
+  products  SupplierProduct[]
 }
 
 model Supplier {
@@ -943,42 +957,53 @@ enum SupplierProductStatus {
  * The hub catalogue master record — a supplier's product, sold at its own price by any connected store.
  */
 model SupplierProduct {
-  id              String                        @id @default(uuid())
-  /** Globally unique — one product = one item no. across every supplier (see SupplierProductSupplier for the many-to-many supplier relation). */
-  itemNo          String                        @unique
+  id                  String                        @id @default(uuid())
+  /**
+   * Globally unique — one product = one item no. across every supplier (see SupplierProductSupplier for the many-to-many supplier relation).
+   */
+  itemNo              String                        @unique
   /**
    * Unique, URL-safe slug — Shopify's product Handle equivalent.
    */
-  handle          String                        @unique
-  name            String
-  brand           String?
-  category        String?
-  categoryId      String?
-  sku             String
-  description     String?
-  productRemark   String?
-  poQuantity      Int                           @default(1)
-  omitted         Boolean                       @default(false)
-  status          SupplierProductStatus         @default(DRAFT)
-  verified        Boolean                       @default(false)
-  sizes           String[]                      @default([])
-  colours         Json                          @default("[]")
-  nextStocktakeAt DateTime?
-  supplierLinks   SupplierProductSupplier[]
-  variants        SupplierProductVariant[]
-  images          SupplierProductImage[]
-  pricing         SupplierProductPricing?
-  purchaseOrders  PurchaseOrder[]
-  stocktakes      Stocktake[]
-  adjustments     StockAdjustment[]
-  activity        InventoryActivity[]
-  storeListings   SupplierProductStoreListing[]
-  createdAt       DateTime                      @default(now())
-  updatedAt       DateTime                      @updatedAt
+  handle              String                        @unique
+  name                String
+  brand               String?
+  /**
+   * Shopify's nested taxonomy category — drives the productType/categoryGid fallback on publish.
+   */
+  category            String?
+  categoryId          String?
+  /**
+   * Hub-only flat category (InventoryCategory) — never pushed to Shopify, filterable in the catalogue list.
+   */
+  inventoryCategoryId String?
+  inventoryCategory   InventoryCategory?            @relation(fields: [inventoryCategoryId], references: [id], onDelete: SetNull)
+  sku                 String
+  description         String?
+  productRemark       String?
+  poQuantity          Int                           @default(1)
+  omitted             Boolean                       @default(false)
+  status              SupplierProductStatus         @default(DRAFT)
+  verified            Boolean                       @default(false)
+  sizes               String[]                      @default([])
+  colours             Json                          @default("[]")
+  nextStocktakeAt     DateTime?
+  supplierLinks       SupplierProductSupplier[]
+  variants            SupplierProductVariant[]
+  images              SupplierProductImage[]
+  pricing             SupplierProductPricing?
+  purchaseOrders      PurchaseOrder[]
+  stocktakes          Stocktake[]
+  adjustments         StockAdjustment[]
+  activity            InventoryActivity[]
+  storeListings       SupplierProductStoreListing[]
+  createdAt           DateTime                      @default(now())
+  updatedAt           DateTime                      @updatedAt
 
   @@index([createdAt])
   @@index([name])
   @@index([sku])
+  @@index([inventoryCategoryId])
 }
 
 /**
