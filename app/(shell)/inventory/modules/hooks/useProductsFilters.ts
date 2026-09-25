@@ -42,6 +42,13 @@ export function useProductsFilters({ verifiedOnly, quickFilter }: UseProductsFil
     setSupplierIdState(value);
     setPage(1);
   };
+  // Hub-only flat Category filter (distinct from the Shopify taxonomy category) — same shape as
+  // supplierId above.
+  const [categoryId, setCategoryIdState] = useState('');
+  const setCategoryId = (value: string) => {
+    setCategoryIdState(value);
+    setPage(1);
+  };
   // Hidden by default (item 19) — a separate visibility toggle, not a filter "Clear filters"
   // resets, same treatment as the Verified toggle above it in the toolbar.
   const [includeOmitted, setIncludeOmittedState] = useState(false);
@@ -66,12 +73,13 @@ export function useProductsFilters({ verifiedOnly, quickFilter }: UseProductsFil
     if (page !== 1) setPage(1);
   }
 
-  const hasActiveFilters = searchInput.trim() !== '' || status !== '' || supplierId !== '';
+  const hasActiveFilters = searchInput.trim() !== '' || status !== '' || supplierId !== '' || categoryId !== '';
   const handleClearFilters = () => {
     setSearchInput('');
     setSearchState('');
     setStatus('');
     setSupplierId('');
+    setCategoryId('');
   };
 
   const handleSortChange = (key: ProductsSortKey) => {
@@ -97,6 +105,8 @@ export function useProductsFilters({ verifiedOnly, quickFilter }: UseProductsFil
     setStatus,
     supplierId,
     setSupplierId,
+    categoryId,
+    setCategoryId,
     includeOmitted,
     setIncludeOmitted,
     sort,

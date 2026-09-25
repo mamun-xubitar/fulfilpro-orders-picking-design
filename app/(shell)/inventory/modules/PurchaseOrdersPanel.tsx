@@ -40,7 +40,7 @@ export default function PurchaseOrdersPanel({ po }: PurchaseOrdersPanelProps) {
           </button>
         }
       />
-      <div className="min-h-0 flex-1 overflow-y-auto p-[6px]">
+      <div className="thin-scroll min-h-0 flex-1 overflow-y-auto p-[6px]">
         {po.loadingList ? (
           <p className="py-3 text-center text-[10px] text-inventory-text-subtle">Loading…</p>
         ) : po.purchaseOrders.length === 0 ? (

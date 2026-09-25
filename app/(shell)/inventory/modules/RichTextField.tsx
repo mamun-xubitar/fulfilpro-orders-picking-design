@@ -16,9 +16,20 @@ type RichTextFieldProps = {
   /** Extra control pinned to the right end of the formatting toolbar — e.g. the AI
    * generate/Original/Generated group, which lives in the toolbar rather than a header row. */
   toolbarEnd?: React.ReactNode;
-  /** Caps the editable body at its current min height with an inner scrollbar instead of
-   * growing the panel — only for Product details (not the New Product wizard / store drafts). */
-  fixedHeight?: boolean;
+  /** Compact mode only: rendered at the toolbar's start in place of the standalone label row —
+   * the field's label, sized to sit inline with the formatting buttons. */
+  toolbarStart?: React.ReactNode;
+  /** Collapses to a single-line toolbar (20px buttons, no dividers) over a single-line body —
+   * only for the Product details panel (not the New Product wizard / store drafts). The body
+   * stays the same `contentEditable` node in both states, so focus/caret survive expanding. */
+  compact?: boolean;
+  /** Compact mode's expanded state — full-size toolbar plus a scrollable multi-line body that
+   * fills its parent, instead of the panel's fixed collapsed slot. Ignored when `compact` isn't
+   * set. */
+  expanded?: boolean;
+  /** Compact mode only: fired when the collapsed one-line body is clicked, so the caller can
+   * expand — the click's own caret placement still lands normally since it's the same node. */
+  onExpand?: () => void;
 };
 
 type ActiveState = { bold: boolean; italic: boolean; underline: boolean; ul: boolean; ol: boolean };
@@ -40,9 +51,12 @@ const TEXT_COLORS = ['#111827', '#6b7280', '#dc2626', '#ea580c', '#ca8a04', '#16
  * it immediately before applying the command, so "insert link" / "apply colour" affects whatever
  * was selected when the toolbar button was pressed, not wherever focus happens to land after.
  */
-export default function RichTextField({ label, value, onChange, hideLabel, toolbarEnd, fixedHeight }: RichTextFieldProps) {
+export default function RichTextField({ label, value, onChange, hideLabel, toolbarEnd, toolbarStart, compact, expanded, onExpand }: RichTextFieldProps) {
   const ref = useRef<HTMLDivElement>(null);
   const focused = useRef(false);
+  // The collapsed, single-line toolbar/body — full-size (dividers, 24px buttons) once expanded,
+  // exactly like the non-compact editor below.
+  const dense = compact && !expanded;
   const savedRange = useRef<Range | null>(null);
   const [active, setActive] = useState<ActiveState>(NO_ACTIVE);
   const [linkModalOpen, setLinkModalOpen] = useState(false);
@@ -61,6 +75,13 @@ export default function RichTextField({ label, value, onChange, hideLabel, toolb
     const next = sanitizeHtml(value);
     if (el.innerHTML !== next) el.innerHTML = next;
   }, [value]);
+
+  // Focuses the (already-mounted) editor when compact mode expands — covers expanding via the
+  // toolbar's Expand button; expanding by clicking the collapsed body already focuses it and
+  // places the caret itself, so this is a no-op then (focus() on an already-focused element).
+  useEffect(() => {
+    if (compact && expanded) ref.current?.focus();
+  }, [compact, expanded]);
 
   const refreshActiveState = () => {
     if (!focused.current) {
@@ -221,27 +242,43 @@ export default function RichTextField({ label, value, onChange, hideLabel, toolb
     setColorOpen(false);
   };
 
+  const bodyClass = compact
+    ? expanded
+      ? 'thin-scroll w-full flex-1 min-h-0 overflow-y-auto px-2.5 py-2 text-[13px] text-inventory-text outline-none [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-4 [&_ol]:pl-4 [&_a]:text-inventory-secondary [&_a]:underline'
+      : 'h-[24px] w-full cursor-text overflow-hidden px-2.5 py-[4px] text-[11px] leading-[16px] text-inventory-text outline-none [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-4 [&_ol]:pl-4 [&_a]:text-inventory-secondary [&_a]:underline'
+    : 'min-h-16 w-full px-2.5 py-2 text-[13px] text-inventory-text outline-none [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-4 [&_ol]:pl-4 [&_a]:text-inventory-secondary [&_a]:underline';
+
   return (
-    <div className="min-w-0">
+    <div className={compact && expanded ? 'flex min-h-0 min-w-0 flex-1 flex-col' : 'min-w-0'}>
       {!hideLabel && <FieldLabel>{label}</FieldLabel>}
-      <div className="rounded-lg border border-inventory-border-strong focus-within:border-inventory-primary focus-within:ring-2 focus-within:ring-inventory-primary-ring">
-        <div className="flex flex-wrap items-center gap-1 rounded-t-lg border-b border-inventory-border bg-inventory-surface-muted px-1.5 py-0.5">
-          <LetterButton letter="B" title="Bold" bold active={active.bold} onClick={() => runCommand('bold')} />
-          <LetterButton letter="I" title="Italic" italic active={active.italic} onClick={() => runCommand('italic')} />
-          <LetterButton letter="U" title="Underline" underline active={active.underline} onClick={() => runCommand('underline')} />
+      <div
+        className={`rounded-lg border border-inventory-border-strong focus-within:border-inventory-primary focus-within:ring-2 focus-within:ring-inventory-primary-ring ${
+          compact && expanded ? 'flex min-h-0 flex-1 flex-col' : ''
+        }`}
+      >
+        <div
+          className={`flex items-center gap-1 rounded-t-lg border-b border-inventory-border bg-inventory-surface-muted px-1.5 ${
+            dense ? 'h-[22px] flex-nowrap overflow-hidden py-0' : 'flex-wrap py-0.5'
+          }`}
+        >
+          {compact && toolbarStart && <span className="min-w-0 shrink-0 truncate">{toolbarStart}</span>}
 
-          <Divider />
+          <LetterButton letter="B" title="Bold" bold active={active.bold} small={dense} onClick={() => runCommand('bold')} />
+          <LetterButton letter="I" title="Italic" italic active={active.italic} small={dense} onClick={() => runCommand('italic')} />
+          <LetterButton letter="U" title="Underline" underline active={active.underline} small={dense} onClick={() => runCommand('underline')} />
 
-          <IconButton title="Bulleted list" active={active.ul} onClick={() => runCommand('insertUnorderedList')}>
+          {!dense && <Divider />}
+
+          <IconButton title="Bulleted list" active={active.ul} small={dense} onClick={() => runCommand('insertUnorderedList')}>
             <BulletList className="h-3 w-3" />
           </IconButton>
-          <IconButton title="Numbered list" active={active.ol} onClick={() => runCommand('insertOrderedList')}>
+          <IconButton title="Numbered list" active={active.ol} small={dense} onClick={() => runCommand('insertOrderedList')}>
             <NumberedList className="h-3 w-3" />
           </IconButton>
 
-          <Divider />
+          {!dense && <Divider />}
 
-          <IconButton title="Insert link" onMouseDown={openLinkModal} onClick={() => {}}>
+          <IconButton title="Insert link" small={dense} onMouseDown={openLinkModal} onClick={() => {}}>
             <LinkIcon className="h-3 w-3" />
           </IconButton>
 
@@ -249,6 +286,7 @@ export default function RichTextField({ label, value, onChange, hideLabel, toolb
             <IconButton
               title="Text colour"
               active={colorOpen}
+              small={dense}
               onMouseDown={saveSelection}
               onClick={() => setColorOpen((v) => !v)}
             >
@@ -298,7 +336,13 @@ export default function RichTextField({ label, value, onChange, hideLabel, toolb
             focused.current = false;
           }}
           onInput={() => ref.current && onChange(ref.current.innerHTML)}
+          onMouseDown={() => {
+            if (dense) onExpand?.();
+          }}
           onClick={(e) => {
+            // While collapsed, any click's whole job is to expand (handled above by onMouseDown);
+            // skip the link-edit redirect so it can't fire on the same click that expands.
+            if (dense) return;
             // Browsers already block navigation on a plain click inside a contentEditable
             // region, so this only ever needs to redirect the click into "edit this link".
             const anchor = (e.target as HTMLElement).closest('a');
@@ -308,7 +352,7 @@ export default function RichTextField({ label, value, onChange, hideLabel, toolb
             }
           }}
           aria-label={label}
-          className={`min-h-16 w-full px-2.5 py-2 text-[13px] text-inventory-text outline-none [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-4 [&_ol]:pl-4 [&_a]:text-inventory-secondary [&_a]:underline ${fixedHeight ? 'max-h-16 overflow-y-auto' : ''}`}
+          className={bodyClass}
         />
       </div>
 
@@ -385,12 +429,15 @@ function Divider() {
 function IconButton({
   title,
   active,
+  small,
   onClick,
   onMouseDown,
   children,
 }: {
   title: string;
   active?: boolean;
+  /** Shrinks the button to 20px — the compact Description toolbar's collapsed state. */
+  small?: boolean;
   onClick: () => void;
   onMouseDown?: () => void;
   children: React.ReactNode;
@@ -406,7 +453,7 @@ function IconButton({
         onMouseDown?.();
       }}
       onClick={onClick}
-      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded transition-colors duration-150 cursor-pointer ${
+      className={`flex shrink-0 items-center justify-center rounded transition-colors duration-150 cursor-pointer ${small ? 'h-5 w-5' : 'h-6 w-6'} ${
         active ? 'bg-inventory-secondary/15 text-inventory-secondary' : 'text-inventory-text-muted hover:bg-inventory-surface-hover'
       }`}
     >
@@ -425,6 +472,7 @@ function LetterButton({
   bold,
   italic,
   underline,
+  small,
   onClick,
 }: {
   letter: string;
@@ -433,12 +481,13 @@ function LetterButton({
   bold?: boolean;
   italic?: boolean;
   underline?: boolean;
+  small?: boolean;
   onClick: () => void;
 }) {
   return (
-    <IconButton title={title} active={active} onClick={onClick}>
+    <IconButton title={title} active={active} small={small} onClick={onClick}>
       <span
-        className={`font-serif text-[13px] leading-none ${bold ? 'font-bold' : 'font-normal'} ${italic ? 'italic' : ''} ${underline ? 'underline' : ''}`}
+        className={`font-serif leading-none ${small ? 'text-[11px]' : 'text-[13px]'} ${bold ? 'font-bold' : 'font-normal'} ${italic ? 'italic' : ''} ${underline ? 'underline' : ''}`}
       >
         {letter}
       </span>

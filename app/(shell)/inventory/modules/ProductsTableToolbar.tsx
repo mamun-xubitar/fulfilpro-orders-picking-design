@@ -50,6 +50,19 @@ export default function ProductsTableToolbar({ table, onRefresh, loading }: Prod
         ))}
       </select>
 
+      <select
+        value={table.categoryId}
+        onChange={(e) => table.setCategoryId(e.target.value)}
+        className="h-[24px] rounded-[7px] border border-inventory-border-strong bg-inventory-surface px-[6px] text-[11px] leading-none text-inventory-text-muted outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring cursor-pointer"
+      >
+        <option value="">All categories</option>
+        {table.categoryOptions.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.name}
+          </option>
+        ))}
+      </select>
+
       <label className="flex cursor-pointer items-center gap-[4px] whitespace-nowrap text-[10.5px] font-medium leading-none text-inventory-text-muted">
         <input
           type="checkbox"

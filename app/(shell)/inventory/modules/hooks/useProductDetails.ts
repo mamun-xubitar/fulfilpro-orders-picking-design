@@ -14,6 +14,8 @@ const EMPTY_FORM: ProductDetailsForm = {
   name: '',
   category: '',
   categoryId: null,
+  inventoryCategoryId: null,
+  inventoryCategoryName: '',
   sku: '',
   description: '',
   productRemark: '',
@@ -33,6 +35,8 @@ function productToForm(product: ProductRecord): ProductDetailsForm {
     name: product.name,
     category: product.category,
     categoryId: product.categoryId,
+    inventoryCategoryId: product.inventoryCategoryId,
+    inventoryCategoryName: product.inventoryCategoryName ?? '',
     sku: product.sku,
     description: product.description,
     productRemark: product.productRemark,
@@ -55,6 +59,7 @@ function formsEqual(a: ProductDetailsForm, b: ProductDetailsForm): boolean {
     a.name === b.name &&
     a.category === b.category &&
     a.categoryId === b.categoryId &&
+    a.inventoryCategoryId === b.inventoryCategoryId &&
     a.sku === b.sku &&
     a.description === b.description &&
     a.productRemark === b.productRemark &&
@@ -69,7 +74,7 @@ function formsEqual(a: ProductDetailsForm, b: ProductDetailsForm): boolean {
 }
 
 /** Plain string fields the curried `set` helper drives — the rest have their own setters. */
-type TextField = Exclude<keyof ProductDetailsForm, 'verified' | 'status' | 'categoryId' | 'supplierIds'>;
+type TextField = Exclude<keyof ProductDetailsForm, 'verified' | 'status' | 'categoryId' | 'inventoryCategoryId' | 'inventoryCategoryName' | 'supplierIds'>;
 
 type UseProductDetailsArgs = {
   product: ProductRecord | null;
@@ -123,6 +128,10 @@ export function useProductDetails({ product, onSaved }: UseProductDetailsArgs) {
     write({ ...form, category: category.name, categoryId: category.id });
   };
 
+  const setInventoryCategory = (category: { id: string | null; name: string }) => {
+    write({ ...form, inventoryCategoryId: category.id, inventoryCategoryName: category.name });
+  };
+
   const setDescription = (description: string) => write({ ...form, description });
 
   /** `after` fires once the save succeeds — used by the New Product wizard to advance to the
@@ -143,6 +152,7 @@ export function useProductDetails({ product, onSaved }: UseProductDetailsArgs) {
         name: form.name,
         category: form.category,
         categoryId: form.categoryId,
+        inventoryCategoryId: form.inventoryCategoryId,
         sku: form.sku,
         description: form.description,
         productRemark: form.productRemark,
@@ -194,6 +204,7 @@ export function useProductDetails({ product, onSaved }: UseProductDetailsArgs) {
     handleLocked,
     toggleHandleLock,
     setCategory,
+    setInventoryCategory,
     setDescription,
     setStatus: (status: ProductStatusValue) => write({ ...form, status }),
     setVerified: (verified: boolean) => write({ ...form, verified }),

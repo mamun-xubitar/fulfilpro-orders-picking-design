@@ -3,19 +3,16 @@
 import { useMemo, useState } from 'react';
 import { toast } from 'react-toastify';
 import useRequest from '@/hooks/useRequest';
-import { getStatus, makeSwatchResolver, quickFilterMatches, sortVariantsForDisplay, summariseVariants, variantDraftChanges } from '../utils';
-import type { ColourOption, ProductRecord, QuickFilterId, VariantRow, VariantStatus } from '../types';
+import { getStatus, quickFilterMatches, sortVariantsForDisplay, summariseVariants, variantDraftChanges } from '../utils';
+import type { ProductRecord, QuickFilterId, VariantRow, VariantStatus } from '../types';
 
 type MatrixFilters = {
-  /** null means "untouched", which reads as every colour selected. */
-  colours: string[] | null;
-  size: string;
   status: VariantStatus | null;
   showZeroStock: boolean;
   selected: string[];
 };
 
-const DEFAULT_FILTERS: MatrixFilters = { colours: null, size: '', status: null, showZeroStock: false, selected: [] };
+const DEFAULT_FILTERS: MatrixFilters = { status: null, showZeroStock: false, selected: [] };
 
 // Module-level so its identity is stable across renders — a fresh {} every render would defeat
 // the `variants` useMemo below whenever there's no active product draft.
@@ -25,7 +22,6 @@ type UseVariantsMatrixArgs = {
   product: ProductRecord | null;
   /** Product-level lists, draft-aware — owned by the details hook. */
   sizes: string[];
-  colours: ColourOption[];
   /** The active price quick filter (buying/profit/selling) — null shows every variant. Applied
    * entirely client-side against this product's own already-loaded variants, so switching it
    * never triggers a request or moves the record stepper's position. */
@@ -33,7 +29,7 @@ type UseVariantsMatrixArgs = {
   onVariantSaved: (product: ProductRecord) => void;
 };
 
-export function useVariantsMatrix({ product, sizes, colours, quickFilter, onVariantSaved }: UseVariantsMatrixArgs) {
+export function useVariantsMatrix({ product, sizes, quickFilter, onVariantSaved }: UseVariantsMatrixArgs) {
   // Filters are tagged with the product they belong to, so changing product
   // resets them without an effect having to clear five pieces of state.
   const [stored, setStored] = useState<{ productId: string; filters: MatrixFilters } | null>(null);
@@ -60,9 +56,16 @@ export function useVariantsMatrix({ product, sizes, colours, quickFilter, onVari
   const bulkDeleteOpen = storedBulkDeleteOpen !== null && storedBulkDeleteOpen === product?.id;
   const [bulkDeleting, setBulkDeleting] = useState(false);
 
+  // Functional update (item 6a) — reads the previous *stored* state itself rather than closing
+  // over the `filters` computed for this render, so a filter change made while the inline table
+  // and the full-view modal are both mounted (they share this same hook instance) is never lost
+  // to a stale-closure overwrite between the two renders that follow it.
   const patch = (next: Partial<MatrixFilters>) => {
     if (!product) return;
-    setStored({ productId: product.id, filters: { ...filters, ...next } });
+    setStored((prev) => {
+      const base = prev && prev.productId === product.id ? prev.filters : DEFAULT_FILTERS;
+      return { productId: product.id, filters: { ...base, ...next } };
+    });
   };
 
   // Every row with a draft shows it overlaid; every other row is returned *by reference* —
@@ -88,29 +91,6 @@ export function useVariantsMatrix({ product, sizes, colours, quickFilter, onVari
     return map;
   }, [product, drafts]);
 
-  // Union of the product's defined palette and any colour actually present on a variant, so a
-  // variant whose colour isn't in the defined palette (e.g. a migrated "Default Title") still gets
-  // a pill instead of becoming unselectable the moment another pill is clicked.
-  const colourNames = useMemo(() => {
-    const names = colours.map((c) => c.name);
-    const seen = new Set(names.map((n) => n.toLowerCase()));
-    for (const v of product?.variants ?? []) {
-      if (seen.has(v.colour.toLowerCase())) continue;
-      seen.add(v.colour.toLowerCase());
-      names.push(v.colour);
-    }
-    // Sorted A->Z (case-insensitive) so the colour filter pills read the same way as the
-    // matrix rows, which are grouped by colour via sortVariantsForDisplay.
-    return names.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
-  }, [colours, product]);
-
-  const activeColours = filters.colours ?? colourNames;
-  const allColoursSelected = filters.colours === null || filters.colours.length === colourNames.length;
-
-  // Resolved rather than stored, so editing a size out of the list falls back to
-  // "All sizes" instead of leaving the dropdown on a value it no longer offers.
-  const sizeFilter = sizes.includes(filters.size) ? filters.size : '';
-
   const rows = useMemo(() => {
     const filtered = variants.filter((v) => {
       // Unsaved edits must never hide their own row: every filter below reads the
@@ -120,8 +100,6 @@ export function useVariantsMatrix({ product, sizes, colours, quickFilter, onVari
       // unreachable. Pinned dirty rows re-evaluate normally once saved/reverted.
       if (dirtyById[v.id]) return true;
       if (quickFilter && !quickFilterMatches(quickFilter, v)) return false;
-      if (!allColoursSelected && !activeColours.some((c) => c.toLowerCase() === v.colour.toLowerCase())) return false;
-      if (sizeFilter && v.size !== sizeFilter) return false;
       if (filters.status && getStatus(v) !== filters.status) return false;
       // Unchecked (default) shows every variant; checking it narrows to zero-or-below stock only.
       if (filters.showZeroStock && v.stockOnHand > 0) return false;
@@ -131,7 +109,7 @@ export function useVariantsMatrix({ product, sizes, colours, quickFilter, onVari
     // the product's own declared size order — see sortVariantsForDisplay, shared with the
     // publish/bulk-update store draft tables so all three read the same way.
     return sortVariantsForDisplay(filtered, sizes);
-  }, [variants, sizes, quickFilter, allColoursSelected, activeColours, sizeFilter, filters.status, filters.showZeroStock, dirtyById]);
+  }, [variants, sizes, quickFilter, filters.status, filters.showZeroStock, dirtyById]);
 
   // Selection is narrowed to the visible rows here rather than pruned in an effect.
   const selectedIds = useMemo(() => {
@@ -140,20 +118,6 @@ export function useVariantsMatrix({ product, sizes, colours, quickFilter, onVari
   }, [rows, filters.selected]);
 
   const totals = useMemo(() => summariseVariants(rows), [rows]);
-
-  const toggleColour = (colour: string) => {
-    const key = colour.toLowerCase();
-    // From "all colours", the first click narrows to just that colour; further
-    // clicks add or remove, and clearing the last one returns to showing all.
-    if (allColoursSelected) {
-      patch({ colours: [colour] });
-      return;
-    }
-    const base = filters.colours ?? [];
-    const has = base.some((c) => c.toLowerCase() === key);
-    const next = has ? base.filter((c) => c.toLowerCase() !== key) : [...base, colour];
-    patch({ colours: next.length === 0 ? null : next });
-  };
 
   const allRowsSelected = rows.length > 0 && rows.every((r) => selectedIds.has(r.id));
 
@@ -257,8 +221,6 @@ export function useVariantsMatrix({ product, sizes, colours, quickFilter, onVari
   };
 
   return {
-    colours,
-    colourNames,
     sizes,
     rows,
     totals,
@@ -279,14 +241,7 @@ export function useVariantsMatrix({ product, sizes, colours, quickFilter, onVari
     requestBulkDelete,
     cancelBulkDelete,
     confirmBulkDelete,
-    swatchOf: makeSwatchResolver(colours),
     hiddenCount: variants.length - rows.length,
-    allColoursSelected,
-    isColourActive: (colour: string) => activeColours.some((c) => c.toLowerCase() === colour.toLowerCase()),
-    toggleColour,
-    selectAllColours: () => patch({ colours: null }),
-    sizeFilter,
-    setSizeFilter: (size: string) => patch({ size }),
     statusFilter: filters.status,
     setStatusFilter: (status: VariantStatus) => patch({ status: filters.status === status ? null : status }),
     showZeroStock: filters.showZeroStock,

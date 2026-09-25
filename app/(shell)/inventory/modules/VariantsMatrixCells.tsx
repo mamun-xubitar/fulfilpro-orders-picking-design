@@ -3,7 +3,6 @@
 /** Read and edit cells for one variants / stock matrix row. Sizing matches the prototype's
  * `.t-sm` table density literally: 4px cell padding, 10px cell text, 15px-tall cell inputs. */
 
-import { formatColourName } from '@/lib/inventory/colour';
 import { formatPoNumber } from '@/lib/inventory/po-number';
 import { formatIncomingLot } from './utils';
 import type { IncomingLot } from './types';
@@ -88,21 +87,15 @@ export function IncomingCell({ lots }: { lots: IncomingLot[] }) {
   );
 }
 
-/** Colour/size are text, not editable selects — the colour and size axes are owned by Product
- * details (they drive variant reconciliation there), so the matrix only ever displays them. */
-export function ColourCell({ value, swatch }: { value: string; swatch: string }) {
-  return (
-    <div className="flex items-center gap-[4px]">
-      <span className="h-[7px] w-[7px] shrink-0 rounded-full ring-1 ring-black/10" style={{ backgroundColor: swatch }} />
-      <span className="truncate text-[10px] leading-none text-inventory-text-muted">{value ? formatColourName(value) : '—'}</span>
-    </div>
-  );
-}
-
-export function SizeCell({ value }: { value: string }) {
+/** Read-only Shopify-style variant title ("Colour / Size") — a convenience column so a row's
+ * full identity is scannable without mentally joining the Colour and Size cells. */
+export function VariantTitleCell({ colour, size }: { colour: string; size: string }) {
+  const title = [colour, size].filter(Boolean).join(' / ') || 'Default';
   return (
     <td className={CELL_CLASS}>
-      <span className="truncate text-[10px] leading-none text-inventory-text-muted">{value || '—'}</span>
+      <span className="truncate text-[10px] font-medium leading-none text-inventory-text" title={title}>
+        {title}
+      </span>
     </td>
   );
 }

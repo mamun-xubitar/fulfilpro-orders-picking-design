@@ -14,6 +14,12 @@ type CategoryPickerProps = {
    * product-CSV `Product Category` column needs, not just the leaf. */
   value: { id: string | null; name: string };
   onChange: (category: { id: string | null; name: string }) => void;
+  /** Overrides the field label — "Shopify Category" everywhere this taxonomy tree is now shown,
+   * to distinguish it from the flat hub-only Category (HubCategoryPicker). */
+  label?: string;
+  /** Suppresses the field's own label row — for a caller (e.g. StoreDiffFieldRow) that renders
+   * its own label alongside the current store value. */
+  hideLabel?: boolean;
 };
 
 /**
@@ -23,7 +29,7 @@ type CategoryPickerProps = {
  * button pinned at the top of the dropdown pops one level of the browse path (or leaves search
  * mode) without an extra request.
  */
-export default function CategoryPicker({ value, onChange }: CategoryPickerProps) {
+export default function CategoryPicker({ value, onChange, label = 'Shopify Category', hideLabel }: CategoryPickerProps) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [path, setPath] = useState<{ id: string; name: string }[]>([]);
@@ -61,7 +67,7 @@ export default function CategoryPicker({ value, onChange }: CategoryPickerProps)
       const width = Math.min(Math.max(rect.width, 240), window.innerWidth - 16);
       const left = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8));
       const below = window.innerHeight - rect.bottom;
-      const top = below < 288 && rect.top > below ? Math.max(8, rect.top - 292) : rect.bottom + 4;
+      const top = below < 224 && rect.top > below ? Math.max(8, rect.top - 228) : rect.bottom + 4;
       setPosition((prev) => (prev && prev.top === top && prev.left === left && prev.width === width ? prev : { top, left, width }));
     };
     updatePosition();
@@ -122,7 +128,7 @@ export default function CategoryPicker({ value, onChange }: CategoryPickerProps)
 
   return (
     <div className="min-w-0" ref={containerRef}>
-      <FieldLabel>Category</FieldLabel>
+      {!hideLabel && <FieldLabel>{label}</FieldLabel>}
       <div className="relative">
         <button
           ref={anchorRef}
@@ -143,7 +149,7 @@ export default function CategoryPicker({ value, onChange }: CategoryPickerProps)
           <div
             ref={dropdownRef}
             style={{ position: 'fixed', top: position.top, left: position.left, width: position.width }}
-            className="z-[70] flex h-72 flex-col overflow-hidden rounded-lg border border-inventory-border bg-inventory-surface py-1 shadow-lg inventory-dropdown-in"
+            className="z-[70] flex max-h-56 flex-col overflow-hidden rounded-lg border border-inventory-border bg-inventory-surface py-1 shadow-lg inventory-dropdown-in"
           >
             <input
               autoFocus
@@ -151,20 +157,20 @@ export default function CategoryPicker({ value, onChange }: CategoryPickerProps)
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search categories…"
-              className="w-full shrink-0 border-b border-inventory-divider px-3 py-2 text-sm outline-none"
+              className="mx-1 mb-1 h-[24px] shrink-0 rounded-[6px] border border-inventory-border px-[6px] text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring placeholder:text-inventory-text-subtle"
             />
             <div className="min-h-0 flex-1 overflow-y-auto">
             {showBack && (
               <button
                 type="button"
                 onClick={goBack}
-                className="flex w-full items-center gap-1.5 border-b border-inventory-divider px-3 py-2 text-left text-sm font-medium text-inventory-text-muted hover:bg-inventory-surface-hover cursor-pointer"
+                className="flex w-full items-center gap-1.5 border-b border-inventory-divider px-2 py-1 text-left text-[11px] font-medium leading-none text-inventory-text-muted hover:bg-inventory-surface-hover cursor-pointer"
               >
                 ← {backLabel}
               </button>
             )}
             {!searching && path.length > 0 && (
-              <div className="px-3 pt-2 pb-1 text-xs text-inventory-text-subtle truncate" title={path.map((p) => p.name).join(' > ')}>
+              <div className="px-2 py-1 text-[11px] leading-none text-inventory-text-subtle truncate" title={path.map((p) => p.name).join(' > ')}>
                 {path.map((p) => p.name).join(' > ')}
               </div>
             )}
@@ -175,22 +181,22 @@ export default function CategoryPicker({ value, onChange }: CategoryPickerProps)
                   onChange({ id: null, name: '' });
                   setOpen(false);
                 }}
-                className="w-full px-3 py-2 text-left text-sm text-inventory-danger hover:bg-inventory-danger/10 cursor-pointer"
+                className="w-full px-2 py-1 text-left text-[11px] font-medium leading-none text-inventory-text-subtle hover:bg-inventory-surface-hover cursor-pointer"
               >
                 Clear category
               </button>
             )}
-            {loading && <div className="px-3 py-2 text-xs text-inventory-text-subtle">Loading…</div>}
+            {loading && <div className="px-2 py-1 text-[11px] text-inventory-text-subtle">Loading…</div>}
             {!loading &&
               results.map((category) => (
                 <div key={category.id} className="flex items-center">
                   <button
                     type="button"
                     onClick={() => select(category)}
-                    className="min-w-0 flex-1 px-3 py-2 text-left text-sm hover:bg-inventory-surface-hover cursor-pointer"
+                    className="min-w-0 flex-1 px-2 py-1 text-left text-[11px] leading-none hover:bg-inventory-surface-hover cursor-pointer"
                   >
                     <div className="truncate text-inventory-text">{category.name}</div>
-                    {searching && <div className="truncate text-xs text-inventory-text-subtle">{category.fullName}</div>}
+                    {searching && <div className="truncate text-[10px] leading-none text-inventory-text-subtle mt-0.5">{category.fullName}</div>}
                   </button>
                   {!category.isLeaf && (
                     <button
@@ -198,14 +204,14 @@ export default function CategoryPicker({ value, onChange }: CategoryPickerProps)
                       onClick={() => drillInto(category)}
                       aria-label={`Browse ${category.name}`}
                       title={`Browse ${category.name}`}
-                      className="shrink-0 px-2.5 py-2 text-inventory-text-subtle hover:text-inventory-text-muted cursor-pointer"
+                      className="shrink-0 px-2 py-1 text-[11px] leading-none text-inventory-text-subtle hover:bg-inventory-surface-hover hover:text-inventory-text-muted cursor-pointer"
                     >
                       ›
                     </button>
                   )}
                 </div>
               ))}
-            {!loading && results.length === 0 && <div className="px-3 py-2 text-xs text-inventory-text-subtle">No matches</div>}
+            {!loading && results.length === 0 && <div className="px-2 py-1 text-[11px] text-inventory-text-subtle">No matches</div>}
             </div>
           </div>,
           document.body

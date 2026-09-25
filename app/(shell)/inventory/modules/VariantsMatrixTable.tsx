@@ -32,20 +32,26 @@ const SCROLL_THRESHOLD = 8;
 // `border-collapse` means a sticky cell's own border doesn't paint (the border lives on the
 // adjacent cell instead), so the header/footer's separating line is an inset box-shadow instead.
 const STICKY_HEADER_TH = 'sticky top-0 z-10 bg-inventory-surface-muted shadow-[inset_0_-1px_0_theme(colors.gray.200)]';
-const STICKY_FOOTER_TD = 'sticky bottom-0 z-10 bg-inventory-surface-muted shadow-[inset_0_1px_0_theme(colors.gray.200)]';
+// Solid (not alpha-blended) tint of the panel's own accent hue — the sticky footer sits above
+// scrolling body rows, so a semi-transparent bg would let their content bleed through underneath
+// it. #f9f1fa is --inventory-sec-variants (#a21caf) blended 6% over white — light enough to keep
+// the green success-colored total cells above the 4.5:1 text-contrast floor. The top edge is the
+// same hue at 35% (the shadow paints over the now-opaque bg, not the scrolling content, so alpha
+// here is safe) — a light line, but a visibly darker step than the bg fill, not full-saturation.
+const STICKY_FOOTER_TD = 'sticky bottom-0 z-10 bg-[#f9f1fa] shadow-[inset_0_1px_0_rgba(162,28,175,0.35)]';
 
 export default function VariantsMatrixTable({ matrix, fillHeight, showAllColumns }: VariantsMatrixTableProps) {
   const { rows, totals } = matrix;
   const scrollable = rows.length > SCROLL_THRESHOLD;
   const numericHeaders = NUMERIC_HEADERS.filter((h) => showAllColumns || h.key !== 'trigger');
-  // Colour, Size, [SKU / Barcode], numeric columns, Status, Buy price, Sell price, Stock value,
-  // Actions — 13 in full view, 11 inline (SKU/Barcode and Trigger dropped). The 7 accounts for
-  // the always-shown non-numeric columns: Colour, Size, Status, Buy price, Sell price, Stock
-  // value, Actions.
+  // Size, Variant, [SKU / Barcode], numeric columns, Status, Buy price, Sell price, Stock value,
+  // Actions — 13 in full view, 11 inline (SKU/Barcode and Trigger dropped). The 7 accounts for the
+  // always-shown non-numeric columns: Size, Variant, Status, Buy price, Sell price, Stock value,
+  // Actions. Colour is now a separate panel beside the table, not a column.
   const columnCount = 7 + numericHeaders.length + (showAllColumns ? 1 : 0);
 
   return (
-    <div className={fillHeight ? 'h-full overflow-y-auto overflow-x-auto' : scrollable ? 'max-h-[12.5rem] overflow-y-auto overflow-x-auto' : 'overflow-x-auto'}>
+    <div className={`thin-scroll ${fillHeight ? 'h-full overflow-y-auto overflow-x-auto' : scrollable ? 'max-h-[12.5rem] overflow-y-auto overflow-x-auto' : 'overflow-x-auto'}`}>
       <table className="w-full min-w-5xl border-collapse">
         <thead>
           <tr className="border-b border-inventory-border bg-inventory-surface-muted">
@@ -58,10 +64,10 @@ export default function VariantsMatrixTable({ matrix, fillHeight, showAllColumns
                   aria-label="Select all rows"
                   className="h-3 w-3 cursor-pointer accent-inventory-primary"
                 />
-                Colour
+                Size
               </label>
             </th>
-            <Th align="left">Size</Th>
+            <Th align="left">Variant</Th>
             {showAllColumns && <Th align="left">SKU / Barcode</Th>}
             {numericHeaders.map((h) => (
               <Th key={h.key} align="right">
@@ -108,7 +114,6 @@ export default function VariantsMatrixTable({ matrix, fillHeight, showAllColumns
               dirty={matrix.isRowDirty(variant.id)}
               saving={matrix.savingRowId === variant.id}
               showAllColumns={!!showAllColumns}
-              swatch={matrix.swatchOf(variant.colour)}
               onToggleSelect={matrix.toggleRow}
               onFieldChange={matrix.setVariantEdit}
               onSave={matrix.saveRow}

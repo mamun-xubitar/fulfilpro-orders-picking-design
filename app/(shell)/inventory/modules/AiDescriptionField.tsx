@@ -3,20 +3,19 @@
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'react-toastify';
 import useRequest from '@/hooks/useRequest';
-import { ModalShell } from '@/components/ModalShell';
-import { sanitizeHtml } from '@/lib/sanitize-html';
 import { FieldLabel } from './ProductFieldRows';
 import RichTextField from './RichTextField';
-import { Refresh, Sparkles } from './icons';
+import { Collapse, Expand, Refresh, Sparkles } from './icons';
 
 /** Gray-bordered AI control sized to sit at the right end of the editor toolbar
  * (same 24px footprint as the formatting buttons) — neutral deep gray so it matches
- * the prototype's monochrome toolbar. */
+ * the prototype's monochrome toolbar. Compact mode (`compactChrome`) shrinks it to the
+ * toolbar's own 20px buttons so it still fits alongside the formatting controls. */
 const AI_BUTTON =
-  'flex h-6 w-6 items-center justify-center rounded-md border border-inventory-border-strong bg-inventory-surface text-inventory-text-muted shadow-sm transition-colors duration-150 hover:bg-inventory-surface-hover disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer';
+  'flex items-center justify-center rounded-md border border-inventory-border-strong bg-inventory-surface text-inventory-text-muted shadow-sm transition-colors duration-150 hover:bg-inventory-surface-hover disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer';
 const AI_GROUP = 'flex items-center gap-0.5 rounded-lg border border-inventory-border-strong bg-inventory-surface-muted p-0.5';
 const AI_GROUP_ICON_BUTTON =
-  'flex h-6 w-6 items-center justify-center rounded-md text-inventory-text-muted transition-colors duration-150 hover:bg-inventory-surface disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer';
+  'flex items-center justify-center rounded-md text-inventory-text-muted transition-colors duration-150 hover:bg-inventory-surface disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer';
 
 type AiDescriptionFieldProps = {
   /** The live HTML value this field edits — the caller's own draft/form field. */
@@ -34,9 +33,13 @@ type AiDescriptionFieldProps = {
    * (see saved/draft there), so switching subjects — product navigation, or simply which store's
    * block this instance belongs to — never leaks one subject's AI draft onto another's field. */
   subjectKey: string;
-  /** Shows the "Show Details" button in the header and fixes the editor height with an inner
-   * scroll. Only for the Product details panel — never the New Product wizard or per-store drafts. */
-  showDetailsButton?: boolean;
+  /** Collapses to a one-line toolbar + one-line body with an Expand button, which opens the full
+   * editor over the panel. Only for the Product details panel — never the New Product wizard or
+   * per-store drafts. */
+  compact?: boolean;
+  /** Suppresses the field's own "Description" label row — for a caller (e.g. StoreDiffFieldRow)
+   * that already renders its own label alongside the store's current value. */
+  hideLabel?: boolean;
 };
 
 /**
@@ -47,8 +50,38 @@ type AiDescriptionFieldProps = {
  * (Online stores & prices / Bulk update) — each mounted instance is independent, so several store
  * blocks can generate concurrently without interfering with each other.
  */
-export default function AiDescriptionField({ value, onChange, buildRequestData, subjectKey, showDetailsButton }: AiDescriptionFieldProps) {
+export default function AiDescriptionField({ value, onChange, buildRequestData, subjectKey, compact, hideLabel }: AiDescriptionFieldProps) {
   const { request: requestAi, loading: aiGenerating } = useRequest<{ description: string }>();
+  const [expanded, setExpanded] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  // A subject switch (product navigation) always starts collapsed, so an expanded editor never
+  // carries over onto a different product's description — adjusted during render rather than in
+  // an effect, per React's "adjusting state when a prop changes" pattern.
+  const [prevSubjectKey, setPrevSubjectKey] = useState(subjectKey);
+  if (subjectKey !== prevSubjectKey) {
+    setPrevSubjectKey(subjectKey);
+    setExpanded(false);
+  }
+
+  // Collapses back on Escape or a click outside the expanded editor — the link modal and colour
+  // popover render inside this same wrapper, so using them doesn't count as "outside".
+  useEffect(() => {
+    if (!expanded) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setExpanded(false);
+    };
+    const onClickOutside = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) setExpanded(false);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    document.addEventListener('mousedown', onClickOutside);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener('mousedown', onClickOutside);
+    };
+  }, [expanded]);
+
   // Original/Generated are two independent drafts of the description, tagged with the subject
   // they belong to so switching subjects drops them without an effect having to reset anything —
   // same pattern as useProductDetails' own `draft`/`ai` state. Switching the active slot stows the
@@ -128,64 +161,96 @@ export default function AiDescriptionField({ value, onChange, buildRequestData, 
     });
   };
 
-  const [detailsOpen, setDetailsOpen] = useState(false);
+  // Compact's collapsed toolbar has 20px buttons throughout (see RichTextField); the AI control
+  // and the expand toggle match that size so the row lines up.
+  const compactChrome = compact && !expanded;
+  const aiButtonSize = compactChrome ? 'h-5 w-5' : 'h-6 w-6';
 
-  const toolbarEnd = !effectiveAi ? (
-    <button
-      type="button"
-      onClick={generate}
-      disabled={aiGenerating}
-      title="Generate a description with AI"
-      aria-label="Generate a description with AI"
-      className={AI_BUTTON}
-    >
-      {aiGenerating ? (
-        <span className="h-3 w-3 animate-spin rounded-full border-2 border-inventory-border-strong border-t-inventory-text-muted" />
+  const toolbarEnd = (
+    <span className="flex shrink-0 items-center gap-1">
+      {!effectiveAi ? (
+        <button
+          type="button"
+          onClick={generate}
+          disabled={aiGenerating}
+          title="Generate a description with AI"
+          aria-label="Generate a description with AI"
+          className={`${AI_BUTTON} ${aiButtonSize}`}
+        >
+          {aiGenerating ? (
+            <span className="h-3 w-3 animate-spin rounded-full border-2 border-inventory-border-strong border-t-inventory-text-muted" />
+          ) : (
+            <Sparkles className="h-3.5 w-3.5" />
+          )}
+        </button>
       ) : (
-        <Sparkles className="h-3.5 w-3.5" />
+        <div className={AI_GROUP}>
+          <SegmentButton active={effectiveAi.active === 'original'} disabled={aiGenerating} compact={compactChrome} onClick={() => setActive('original')}>
+            Original
+          </SegmentButton>
+          <SegmentButton active={effectiveAi.active === 'generated'} disabled={aiGenerating} compact={compactChrome} onClick={() => setActive('generated')}>
+            Generated
+          </SegmentButton>
+          <button
+            type="button"
+            onClick={regenerate}
+            disabled={aiGenerating}
+            title="Regenerate"
+            aria-label="Regenerate description"
+            className={`${AI_GROUP_ICON_BUTTON} ${aiButtonSize}`}
+          >
+            {aiGenerating ? (
+              <span className="h-3 w-3 animate-spin rounded-full border-2 border-inventory-border-strong border-t-inventory-text-muted" />
+            ) : (
+              <Refresh className="h-3.5 w-3.5" />
+            )}
+          </button>
+        </div>
       )}
-    </button>
-  ) : (
-    <div className={AI_GROUP}>
-      <SegmentButton active={effectiveAi.active === 'original'} disabled={aiGenerating} onClick={() => setActive('original')}>
-        Original
-      </SegmentButton>
-      <SegmentButton active={effectiveAi.active === 'generated'} disabled={aiGenerating} onClick={() => setActive('generated')}>
-        Generated
-      </SegmentButton>
-      <button
-        type="button"
-        onClick={regenerate}
-        disabled={aiGenerating}
-        title="Regenerate"
-        aria-label="Regenerate description"
-        className={AI_GROUP_ICON_BUTTON}
-      >
-        {aiGenerating ? (
-          <span className="h-3 w-3 animate-spin rounded-full border-2 border-inventory-border-strong border-t-inventory-text-muted" />
-        ) : (
-          <Refresh className="h-3.5 w-3.5" />
-        )}
-      </button>
-    </div>
+      {compact && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          title={expanded ? 'Collapse description' : 'Expand description'}
+          aria-label={expanded ? 'Collapse description' : 'Expand description'}
+          className={`${AI_BUTTON} ${aiButtonSize}`}
+        >
+          {expanded ? <Collapse className="h-3 w-3" /> : <Expand className="h-3 w-3" />}
+        </button>
+      )}
+    </span>
   );
 
   return (
-    <div className="min-w-0">
-      <div className="mb-1 flex items-center justify-between gap-2">
-        <FieldLabel>Description</FieldLabel>
-        {showDetailsButton && (
-          <button
-            type="button"
-            onClick={() => setDetailsOpen(true)}
-            className="shrink-0 text-[11px] font-semibold leading-none text-inventory-secondary hover:text-inventory-secondary-hover cursor-pointer"
-          >
-            Show Details
-          </button>
-        )}
-      </div>
-      <div className="relative">
-        <RichTextField label="Description" value={value} onChange={onChange} hideLabel toolbarEnd={toolbarEnd} fixedHeight={showDetailsButton} />
+    <div className={compact ? 'h-[48px] min-w-0' : 'min-w-0'}>
+      {!compact && !hideLabel && (
+        <div className="mb-1">
+          <FieldLabel>Description</FieldLabel>
+        </div>
+      )}
+      <div
+        ref={wrapperRef}
+        className={
+          compact && expanded
+            ? 'absolute inset-[6px] z-20 flex flex-col xl:min-w-[540px] rounded-lg border border-inventory-border-strong bg-inventory-surface shadow-inventory-md'
+            : 'relative'
+        }
+      >
+        <RichTextField
+          label="Description"
+          value={value}
+          onChange={onChange}
+          hideLabel
+          toolbarStart={
+            compact ? (
+              <span className="text-[9.5px] font-bold uppercase leading-[10px] tracking-[0.4px] text-inventory-text-subtle">Description</span>
+            ) : undefined
+          }
+          toolbarEnd={toolbarEnd}
+          compact={compact}
+          expanded={expanded}
+          onExpand={() => setExpanded(true)}
+        />
         {aiGenerating && (
           <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-inventory-surface/60">
             <div className="flex items-center gap-2 rounded-full bg-inventory-surface px-3 py-1.5 text-[12px] font-semibold text-inventory-text-muted shadow-sm">
@@ -195,18 +260,6 @@ export default function AiDescriptionField({ value, onChange, buildRequestData, 
           </div>
         )}
       </div>
-      {detailsOpen && (
-        <ModalShell title="Description" compact wide onClose={() => setDetailsOpen(false)}>
-          {value ? (
-            <div
-              className="text-[13px] text-inventory-text [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-4 [&_ol]:pl-4 [&_a]:text-inventory-secondary [&_a]:underline"
-              dangerouslySetInnerHTML={{ __html: sanitizeHtml(value) }}
-            />
-          ) : (
-            <p className="text-[13px] text-inventory-text-subtle">—</p>
-          )}
-        </ModalShell>
-      )}
     </div>
   );
 }
@@ -214,11 +267,14 @@ export default function AiDescriptionField({ value, onChange, buildRequestData, 
 function SegmentButton({
   active,
   disabled,
+  compact,
   onClick,
   children,
 }: {
   active: boolean;
   disabled?: boolean;
+  /** Shrinks padding/text to fit the collapsed compact toolbar's 20px-button row. */
+  compact?: boolean;
   onClick: () => void;
   children: React.ReactNode;
 }) {
@@ -228,9 +284,9 @@ function SegmentButton({
       onClick={onClick}
       disabled={disabled}
       aria-pressed={active}
-      className={`rounded-md px-2 py-1 text-[11px] font-semibold transition-colors duration-150 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
-        active ? 'bg-inventory-text text-white shadow-sm' : 'text-inventory-text-muted hover:bg-inventory-surface hover:text-inventory-text'
-      }`}
+      className={`rounded-md font-semibold transition-colors duration-150 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
+        compact ? 'px-1.5 py-0.5 text-[10px]' : 'px-2 py-1 text-[11px]'
+      } ${active ? 'bg-inventory-text text-white shadow-sm' : 'text-inventory-text-muted hover:bg-inventory-surface hover:text-inventory-text'}`}
     >
       {children}
     </button>

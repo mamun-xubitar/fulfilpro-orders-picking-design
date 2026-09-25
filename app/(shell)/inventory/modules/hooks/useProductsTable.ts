@@ -47,13 +47,14 @@ export function useProductsTable({ enabled, verifiedOnly, quickFilter, onView, o
   const [pagination, setPagination] = useState<CataloguePagination>(EMPTY_PAGINATION);
   const [totals, setTotals] = useState<{ stockOnHand: number; stockValue: number }>(EMPTY_TOTALS);
   const [supplierOptions, setSupplierOptions] = useState<{ id: string; name: string }[]>([]);
+  const [categoryOptions, setCategoryOptions] = useState<{ id: string; name: string }[]>([]);
   // Named distinctly from the exposed `loading` below — see useCatalogData's `fetching` for why.
   const [fetching, setFetching] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
 
   const filters = useProductsFilters({ verifiedOnly, quickFilter });
-  const { page, setPage, pageSize, search, status, supplierId, includeOmitted, sort, dir } = filters;
+  const { page, setPage, pageSize, search, status, supplierId, categoryId, includeOmitted, sort, dir } = filters;
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectAllFilters, setSelectAllFilters] = useState(false);
@@ -75,6 +76,7 @@ export function useProductsTable({ enabled, verifiedOnly, quickFilter, onView, o
     if (search.trim()) params.set('search', search.trim());
     if (status) params.set('status', status);
     if (supplierId) params.set('supplier', supplierId);
+    if (categoryId) params.set('category', categoryId);
     if (includeOmitted) params.set('includeOmitted', '1');
     return params;
   };
@@ -96,6 +98,7 @@ export function useProductsTable({ enabled, verifiedOnly, quickFilter, onView, o
         setRows(json.data.products);
         setPagination(json.data.pagination);
         setSupplierOptions(json.data.supplierOptions);
+        if (json.data.categoryOptions) setCategoryOptions(json.data.categoryOptions);
         setTotals(json.data.totals ?? EMPTY_TOTALS);
         if (json.data.stepperTotal !== undefined) {
           onCounts?.({ totalAll: json.data.totalAll, filteredCount: json.data.stepperTotal });
@@ -117,7 +120,7 @@ export function useProductsTable({ enabled, verifiedOnly, quickFilter, onView, o
 
     return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, verifiedOnly, quickFilter, search, status, supplierId, includeOmitted, sort, dir, page, pageSize, refreshTick]);
+  }, [enabled, verifiedOnly, quickFilter, search, status, supplierId, categoryId, includeOmitted, sort, dir, page, pageSize, refreshTick]);
 
   const refresh = () => setRefreshTick((n) => n + 1);
   const pageNumbers = buildPageNumbers(pagination.page, pagination.totalPages);
@@ -249,10 +252,13 @@ export function useProductsTable({ enabled, verifiedOnly, quickFilter, onView, o
     setStatus: filters.setStatus,
     supplierId,
     setSupplierId: filters.setSupplierId,
+    categoryId,
+    setCategoryId: filters.setCategoryId,
     includeOmitted: filters.includeOmitted,
     setIncludeOmitted: filters.setIncludeOmitted,
     toggleOmitted,
     supplierOptions,
+    categoryOptions,
     hasActiveFilters: filters.hasActiveFilters,
     handleClearFilters: filters.handleClearFilters,
     sort,

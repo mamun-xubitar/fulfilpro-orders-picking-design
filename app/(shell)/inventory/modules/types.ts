@@ -209,6 +209,10 @@ export type ProductRecord = {
   category: string;
   /** Shopify taxonomy gid backing `category`. */
   categoryId: string | null;
+  /** Hub-only flat InventoryCategory — distinct from the Shopify taxonomy `category` above, never
+   * pushed to Shopify. */
+  inventoryCategoryId: string | null;
+  inventoryCategoryName: string | null;
   /** Parent SKU. Shopify has no such field; derived from the variant prefix. */
   sku: string;
   /** Sanitized HTML — edited via a rich-text field, imported straight from Shopify's
@@ -268,6 +272,8 @@ export type ProductsResponse = {
   totals?: { stockOnHand: number; stockValue: number };
   globals: InventoryGlobals;
   supplierOptions: { id: string; name: string }[];
+  /** Table mode only: every hub-only category, for the Category filter dropdown. */
+  categoryOptions?: { id: string; name: string }[];
 };
 
 // — UI-only types —
@@ -282,16 +288,7 @@ export type ModuleTabId =
   | 'suppliers'
   | 'payments'
   | 'reports'
-  | 'dashboard';
-
-export type ProductTabId =
-  | 'details'
-  | 'variants'
-  | 'purchase-info'
-  | 'suppliers'
-  | 'images'
-  | 'notes'
-  | 'documents'
+  | 'dashboard'
   | 'history';
 
 export type TabDef<T extends string> = {
@@ -326,6 +323,9 @@ export type ProductDetailsForm = {
   name: string;
   category: string;
   categoryId: string | null;
+  /** Hub-only flat InventoryCategory — distinct from the Shopify taxonomy category above. */
+  inventoryCategoryId: string | null;
+  inventoryCategoryName: string;
   sku: string;
   description: string;
   productRemark: string;

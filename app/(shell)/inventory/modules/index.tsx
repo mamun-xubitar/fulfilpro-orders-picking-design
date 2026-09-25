@@ -8,10 +8,8 @@ import BottomPanels from './BottomPanels';
 import ComingSoon from './ComingSoon';
 import InventoryGlobals from './InventoryGlobals';
 import InventoryModals from './InventoryModals';
-import { panelBorderClass } from './MainImagePanel';
 import ModuleTabs from './ModuleTabs';
 import ProductDetailsTab from './ProductDetailsTab';
-import ProductSubTabs from './ProductSubTabs';
 import ProductsBulkModals from './ProductsBulkModals';
 import ProductsSelectionBar from './ProductsSelectionBar';
 import ProductsTable from './ProductsTable';
@@ -19,7 +17,7 @@ import ProductsTableToolbar from './ProductsTableToolbar';
 import ProductsToolbar from './ProductsToolbar';
 import SuppliersTab from './SuppliersTab';
 import VariantsMatrixSection from './VariantsMatrixSection';
-import { MODULE_TABS, PRODUCT_STATUS_BADGES, PRODUCT_TABS, productStatusLabel } from './constants';
+import { MODULE_TABS } from './constants';
 import { useInventoryPage } from './hooks/useInventoryPage';
 import './inventory-theme.css';
 
@@ -27,7 +25,6 @@ export default function InventoryPage() {
   const p = useInventoryPage();
   const { zoomPercent } = useZoom();
   const moduleTab = MODULE_TABS.find((t) => t.id === p.moduleTab)!;
-  const productTab = PRODUCT_TABS.find((t) => t.id === p.productTab)!;
   const hasSelection = p.productsTable.selectAllFilters || p.productsTable.selectedIds.length > 0;
 
   // Contributes the focused product's name to the shell header ("Inventory / <name>") in
@@ -76,35 +73,8 @@ export default function InventoryPage() {
             <EmptyState />
           ) : (
             <div className="space-y-2 xl:flex xl:min-h-0 xl:flex-1 xl:flex-col xl:space-y-0 xl:gap-2 xl:overflow-hidden">
-              <div className={`flex items-center gap-[8px] rounded-[10px] border ${panelBorderClass('subtabs')} bg-inventory-surface px-[8px] shadow-inventory xl:flex-none`}>
-                <ProductSubTabs active={p.productTab} onChange={p.setProductTab} />
-                <span className="ml-auto min-w-0 truncate text-[9px] leading-none text-inventory-text-subtle">
-                  {p.product.name} · {p.product.brand}
-                </span>
-                <span
-                  className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-full border px-[6px] py-[1px] text-[9px] font-bold uppercase leading-none tracking-[0.4px] ${PRODUCT_STATUS_BADGES[p.product.status]}`}
-                >
-                  {productStatusLabel(p.product.status)}
-                </span>
-                <span
-                  className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-full border px-[6px] py-[1px] text-[9px] font-bold uppercase leading-none tracking-[0.4px] ${
-                    p.product.verified
-                      ? 'border-inventory-secondary/30 bg-inventory-secondary/10 text-inventory-secondary'
-                      : 'border-inventory-danger/30 bg-inventory-danger/10 text-inventory-danger'
-                  }`}
-                >
-                  {p.product.verified ? 'Verified' : 'Unverified'}
-                </span>
-              </div>
-
-              {p.productTab === 'details' ? (
-                <ProductDetailsTab p={p} />
-              ) : (
-                <ComingSoon label={productTab.label} blurb={productTab.blurb} />
-              )}
-
-              <VariantsMatrixSection p={p} />
-
+              <ProductDetailsTab p={p} />
+              {!p.matrixFullView && <VariantsMatrixSection p={p} />}
               <BottomPanels p={p} />
             </div>
           )}
@@ -122,14 +92,14 @@ function LoadingState() {
     <div className="space-y-2">
       <div className="h-8 animate-pulse rounded-[10px] border border-inventory-border bg-inventory-surface-muted" />
 
-      <div className="grid grid-cols-1 gap-[5px] md:grid-cols-2 xl:grid-cols-[172px_minmax(0,2fr)_minmax(0,1.32fr)_206px]">
-        <div className="flex flex-col gap-[5px]">
-          <div className="h-40 animate-pulse rounded-xl border border-inventory-border bg-inventory-surface-muted" />
-          <div className="h-32 animate-pulse rounded-xl border border-inventory-border bg-inventory-surface-muted" />
-        </div>
-        <div className="h-80 animate-pulse rounded-xl border border-inventory-border bg-inventory-surface-muted" />
-        <div className="h-80 animate-pulse rounded-xl border border-inventory-border bg-inventory-surface-muted" />
-        <div className="h-80 animate-pulse rounded-xl border border-inventory-border bg-inventory-surface-muted" />
+      {/* Mirrors ProductDetailsTab's item-7 column order: Image, Details, Pricing, Stock
+          summary, Online stores. */}
+      <div className="grid grid-cols-1 gap-[5px] md:grid-cols-2 xl:grid-cols-[150px_minmax(0,1.6fr)_minmax(0,1.15fr)_170px_200px]">
+        <div className="h-[285px] animate-pulse rounded-xl border border-inventory-border bg-inventory-surface-muted" />
+        <div className="h-[285px] animate-pulse rounded-xl border border-inventory-border bg-inventory-surface-muted" />
+        <div className="h-[285px] animate-pulse rounded-xl border border-inventory-border bg-inventory-surface-muted" />
+        <div className="h-[285px] animate-pulse rounded-xl border border-inventory-border bg-inventory-surface-muted" />
+        <div className="h-[285px] animate-pulse rounded-xl border border-inventory-border bg-inventory-surface-muted" />
       </div>
 
       <div className="rounded-xl border border-inventory-border bg-inventory-surface shadow-inventory">

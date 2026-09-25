@@ -18,6 +18,8 @@ export const BTN_XS_PRIMARY =
   "flex h-[22px] items-center justify-center gap-1 rounded-[6px] bg-inventory-primary px-[6px] text-[10px] font-bold leading-none text-white transition-[background-color,box-shadow] duration-200 ease-out hover:bg-inventory-primary-hover hover:shadow-inventory-md disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer";
 /** Shared footer action-row wrapper — border-top strip housing one or more `.btn.xs` buttons. */
 export const BTN_ROW = 'flex gap-[6px] border-t border-inventory-divider p-[6px]';
+/** Height cap shared by the five top-row panels; each scrolls its own body past this. */
+export const PANEL_MAX_H = 'max-h-[285px]';
 /** `.iconbtn.xs` — 22×22 icon-only button. */
 export const ICONBTN_XS =
   "flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-[6px] border border-inventory-border-strong text-inventory-text-muted transition-[color,background-color,border-color] duration-200 ease-out hover:border-inventory-primary/40 hover:bg-inventory-surface-hover hover:text-inventory-primary cursor-pointer";
@@ -30,7 +32,7 @@ export default function MainImagePanel({
   const { images, tiles, active, activeKey, setActiveKey } = gallery;
 
   return (
-    <section className={`flex min-w-0 flex-col rounded-[10px] border ${panelBorderClass("image")} bg-inventory-surface shadow-inventory`}>
+    <section className={`flex min-w-0 flex-col rounded-[10px] border ${panelBorderClass("image")} bg-inventory-surface shadow-inventory ${PANEL_MAX_H}`}>
       <PanelHeading
         tone="image"
         icon={<ImageIcon className="h-3 w-3" />}
@@ -38,7 +40,7 @@ export default function MainImagePanel({
         meta={`${images.length} image${images.length === 1 ? "" : "s"}`}
       />
 
-      <div className="flex flex-col gap-[4px] p-[6px]">
+      <div className="flex min-h-0 flex-1 flex-col gap-[4px] overflow-y-auto thin-scroll p-[6px]">
         <div className="min-w-0">
           <button
             type="button"

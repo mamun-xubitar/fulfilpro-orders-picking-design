@@ -3,18 +3,20 @@
 import { useState } from 'react';
 import ColourSizeModal from './colourSize/ColourSizeModal';
 import CategoryPicker from './CategoryPicker';
-import { PanelHeading, panelBorderClass } from './MainImagePanel';
+import HubCategoryPicker from './HubCategoryPicker';
+import { PANEL_MAX_H, PanelHeading, panelBorderClass } from './MainImagePanel';
 import { ActionButton } from './PricingMarginPanel';
-import { ColourChips } from './ProductColoursField';
-import { FieldLabel, TextField } from './ProductFieldRows';
-import ProductStatusSelect from './ProductStatusSelect';
-import { SizeChips } from './ProductSizesField';
+import ProductIdentityFields from './ProductIdentityFields';
+import ProductMiscFields from './ProductMiscFields';
+import ProductOptionsRow from './ProductOptionsRow';
+import { DenseFieldsContext, TextField } from './ProductFieldRows';
 import DescriptionField from './DescriptionField';
 import SupplierMultiSelect from './SupplierMultiSelect';
-import { Check, Document, Lock, Plus, Unlock } from './icons';
+import { Check, Document } from './icons';
 import type { useProductDetails } from './hooks/useProductDetails';
 import type { useSuppliers } from './hooks/useSuppliers';
 import type { OptionLibraryState } from './hooks/useOptionLibrary';
+import type { InventoryCategoriesState } from './hooks/useInventoryCategories';
 import { useItemNoAvailability } from './hooks/useItemNoAvailability';
 import type { ProductRecord, SupplierOption } from './types';
 
@@ -22,6 +24,7 @@ type ProductFieldsPanelProps = {
   details: ReturnType<typeof useProductDetails>;
   supplierOptions: SupplierOption[];
   optionLibrary: OptionLibraryState;
+  inventoryCategories: InventoryCategoriesState;
   suppliers: ReturnType<typeof useSuppliers>;
   /** The Colour & size adjustment modal (opened from the Sizes/Colours "+" buttons) needs the
    * full product record and a way to hand its result back to the page. */
@@ -32,167 +35,89 @@ type ProductFieldsPanelProps = {
   embedded?: boolean;
 };
 
-const FIELD_VISUAL_CLASS =
-  'h-[24px] rounded-[7px] border border-inventory-border-strong px-[6px] text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring';
-
 /** Always editable — every field is a live input; Save is the only action, disabled until the
  * draft differs from what's saved (see useProductDetails' `dirty`). Two-column field grid
- * (design 6), with Category forced full width regardless of the prototype's own pairing. */
-export default function ProductFieldsPanel({ details: d, supplierOptions, optionLibrary, suppliers, product, onOptionsApplied, embedded }: ProductFieldsPanelProps) {
+ * (design 6), with Shopify Category and the hub Category paired side by side in one row. */
+export default function ProductFieldsPanel({ details: d, supplierOptions, optionLibrary, inventoryCategories, suppliers, product, onOptionsApplied, embedded }: ProductFieldsPanelProps) {
   const itemNoAvailability = useItemNoAvailability(d.form.itemNo, d.productId ?? undefined);
   const [colourSizeOpen, setColourSizeOpen] = useState(false);
 
   return (
-    <section className={embedded ? 'flex min-w-0 flex-col' : `flex min-w-0 flex-col rounded-[10px] border ${panelBorderClass('details')} bg-inventory-surface shadow-inventory xl:min-h-0`}>
+    <section className={embedded ? 'flex min-w-0 flex-col' : `flex min-w-0 flex-col rounded-[10px] border ${panelBorderClass('details')} bg-inventory-surface shadow-inventory ${PANEL_MAX_H}`}>
       {!embedded && (
         <PanelHeading
           tone="details"
           icon={<Document className="h-3 w-3" />}
           title="Product details"
-          action={<ActionButton onClick={() => d.saveDetails()} icon={<Check className="h-3 w-3" />} label="Save" primary disabled={!d.dirty} compact />}
+          action={<ActionButton onClick={() => d.saveDetails()} icon={<Check className="h-2.5 w-2.5" />} label="Save" primary disabled={!d.dirty} compact />}
         />
       )}
 
-      <div className={embedded ? 'flex flex-1 flex-col gap-[4px]' : 'flex flex-1 flex-col gap-[4px] p-[6px] xl:min-h-0 xl:overflow-y-auto'}>
-        <div className="grid grid-cols-2 gap-x-[7px] gap-y-[3px]">
-          <TextField
-            label="Item no."
-            value={d.form.itemNo}
-            onChange={d.set('itemNo')}
-            error={d.errors?.itemNo ?? (itemNoAvailability.taken ? 'A product with this item number already exists' : undefined)}
-          />
-          <div className="min-w-0">
-            <FieldLabel>Handle</FieldLabel>
-            <div className="flex items-center gap-[5px]">
-              <input
-                type="text"
-                value={d.form.handle}
-                onChange={d.set('handle')}
-                disabled={d.handleLocked}
-                aria-label="Handle"
-                className="h-[24px] w-full min-w-0 rounded-[7px] border border-inventory-border-strong px-[6px] text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring disabled:cursor-not-allowed disabled:bg-inventory-surface-muted disabled:text-inventory-text-subtle"
+      <DenseFieldsContext.Provider value={!embedded}>
+        {/* `relative` lives on this non-scrolling outer wrapper (not the scrolling body below) so
+         * the expanded Description editor (Move 5) can grow past the scroll body's own
+         * `overflow-y-auto` — it's positioned against this element, not the viewport, a scroll
+         * ancestor, or a clipping one. */}
+        <div className={embedded ? 'flex flex-1 flex-col' : 'relative flex flex-1 flex-col min-h-0'}>
+          <div className={embedded ? 'flex flex-1 flex-col gap-[4px]' : 'flex flex-1 flex-col gap-[4px] p-[6px] min-h-0 overflow-y-auto thin-scroll'}>
+            <div className="grid grid-cols-2 gap-x-[7px] gap-y-[3px]">
+              <ProductIdentityFields details={d} itemNoAvailability={itemNoAvailability} />
+
+              <TextField label="Product name" value={d.form.name} onChange={d.setName} />
+              <TextField label="SKU" value={d.form.sku} onChange={d.set('sku')} />
+
+              <TextField label="Brand" value={d.form.brand} onChange={d.set('brand')} />
+              <SupplierMultiSelect
+                suppliers={supplierOptions}
+                selectedIds={d.form.supplierIds}
+                onChange={d.setSupplierIds}
+                error={d.errors?.supplierId}
+                onCreateSupplier={(name) =>
+                  suppliers.openCreate({ name, onCreated: (s) => d.setSupplierIds([...d.form.supplierIds, s.id]) })
+                }
+                onAddSupplier={() =>
+                  suppliers.openCreate({ onCreated: (s) => d.setSupplierIds([...d.form.supplierIds, s.id]) })
+                }
               />
-              <button
-                type="button"
-                onClick={d.toggleHandleLock}
-                aria-label={d.handleLocked ? 'Edit handle' : 'Auto-generate handle'}
-                title={d.handleLocked ? 'Edit handle' : 'Auto-generate handle'}
-                className="flex h-[24px] w-[24px] shrink-0 items-center justify-center rounded-[7px] border border-inventory-border-strong bg-inventory-surface text-inventory-text-subtle transition-colors duration-150 hover:bg-inventory-surface-hover hover:text-inventory-text-muted cursor-pointer"
-              >
-                {d.handleLocked ? <Lock className="h-3 w-3" /> : <Unlock className="h-3 w-3" />}
-              </button>
-            </div>
-          </div>
-          {d.errors?.handle && <p className="col-span-2 -mt-1 text-[10px] leading-tight text-inventory-danger">{d.errors.handle}</p>}
 
-          <TextField label="Product name" value={d.form.name} onChange={d.setName} />
-          <TextField label="SKU" value={d.form.sku} onChange={d.set('sku')} />
-
-          <TextField label="Brand" value={d.form.brand} onChange={d.set('brand')} />
-          <SupplierMultiSelect
-            suppliers={supplierOptions}
-            selectedIds={d.form.supplierIds}
-            onChange={d.setSupplierIds}
-            error={d.errors?.supplierId}
-            onCreateSupplier={(name) =>
-              suppliers.openCreate({ name, onCreated: (s) => d.setSupplierIds([...d.form.supplierIds, s.id]) })
-            }
-            onAddSupplier={() =>
-              suppliers.openCreate({ onCreated: (s) => d.setSupplierIds([...d.form.supplierIds, s.id]) })
-            }
-          />
-
-          <div className="col-span-2">
-            <CategoryPicker value={{ id: d.form.categoryId, name: d.form.category }} onChange={d.setCategory} />
-          </div>
-
-          <div className="min-w-0">
-            <FieldLabel>Sizes</FieldLabel>
-            <div className="flex flex-wrap items-center gap-[4px]">
-              <div className="flex min-w-0 flex-1 flex-wrap gap-[4px]">
-                {d.sizes.length === 0 ? (
-                  <span className="text-[11px] leading-none text-inventory-text-subtle">—</span>
-                ) : (
-                  <SizeChips sizes={d.sizes} />
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={() => setColourSizeOpen(true)}
-                aria-label="Edit sizes"
-                title="Edit sizes"
-                className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-[6px] border border-inventory-border-strong bg-inventory-surface text-inventory-text-subtle transition-colors duration-150 hover:bg-inventory-surface-hover hover:text-inventory-text-muted cursor-pointer"
-              >
-                <Plus className="h-3 w-3" />
-              </button>
-            </div>
-            {d.errors?.sizes && <p className="mt-[2px] text-[10px] leading-tight text-inventory-danger">{d.errors.sizes}</p>}
-          </div>
-
-          <div className="min-w-0">
-            <FieldLabel>Colours</FieldLabel>
-            <div className="flex flex-wrap items-center gap-[4px]">
-              <div className="flex min-w-0 flex-1 flex-wrap gap-[4px]">
-                {d.colours.length === 0 ? (
-                  <span className="text-[11px] leading-none text-inventory-text-subtle">—</span>
-                ) : (
-                  <ColourChips colours={d.colours} />
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={() => setColourSizeOpen(true)}
-                aria-label="Edit colours"
-                title="Edit colours"
-                className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-[6px] border border-inventory-border-strong bg-inventory-surface text-inventory-text-subtle transition-colors duration-150 hover:bg-inventory-surface-hover hover:text-inventory-text-muted cursor-pointer"
-              >
-                <Plus className="h-3 w-3" />
-              </button>
-            </div>
-            {d.errors?.colours && <p className="mt-[2px] text-[10px] leading-tight text-inventory-danger">{d.errors.colours}</p>}
-          </div>
-
-          <div className="col-span-2 grid grid-cols-3 gap-x-[7px]">
-            <div className="min-w-0">
-              <FieldLabel>PO Quantity</FieldLabel>
-              <input
-                type="number"
-                min={1}
-                value={d.form.poQuantity}
-                onChange={d.set('poQuantity')}
-                aria-label="PO Quantity"
-                title="Default quantity seeded onto every variant when creating a purchase order"
-                className={FIELD_VISUAL_CLASS + ' w-full'}
+              <CategoryPicker value={{ id: d.form.categoryId, name: d.form.category }} onChange={d.setCategory} />
+              <HubCategoryPicker
+                value={{ id: d.form.inventoryCategoryId, name: d.form.inventoryCategoryName }}
+                onChange={d.setInventoryCategory}
+                categories={inventoryCategories}
               />
-              {d.errors?.poQuantity && <p className="mt-[2px] text-[10px] leading-tight text-inventory-danger">{d.errors.poQuantity}</p>}
-            </div>
-            <div className="min-w-0">
-              <FieldLabel>Status</FieldLabel>
-              <ProductStatusSelect value={d.form.status} onChange={d.setStatus} className={FIELD_VISUAL_CLASS} />
-            </div>
-            <div className="min-w-0">
-              <FieldLabel>Verified</FieldLabel>
-              <label className="inline-flex h-[24px] max-w-full cursor-pointer items-center gap-[5px] text-[11px] font-medium leading-none text-inventory-text-muted" aria-label="Verified">
-                <input
-                  type="checkbox"
-                  checked={d.form.verified}
-                  onChange={(e) => d.setVerified(e.target.checked)}
-                  className="h-3 w-3 cursor-pointer accent-inventory-primary"
+
+              <ProductOptionsRow
+                sizes={d.sizes}
+                colours={d.colours}
+                sizesError={d.errors?.sizes}
+                coloursError={d.errors?.colours}
+                onEdit={() => setColourSizeOpen(true)}
+              />
+
+              {/* Non-embedded: Remark folds into the PO Qty/Status/Verified row to save a row's
+               * worth of height. Embedded (wizard): stays on its own row, unchanged. */}
+              {embedded ? (
+                <>
+                  <ProductMiscFields details={d} />
+                  <div className="col-span-2">
+                    <TextField label="Product Remark" value={d.form.productRemark} onChange={d.set('productRemark')} placeholder="Add remarks…" />
+                  </div>
+                </>
+              ) : (
+                <ProductMiscFields
+                  details={d}
+                  remark={<TextField label="Product Remark" value={d.form.productRemark} onChange={d.set('productRemark')} placeholder="Add remarks…" />}
                 />
-                <span className="cursor-pointer select-none">Verified</span>
-              </label>
+              )}
+
+              <div className="col-span-2">
+                <DescriptionField details={d} compact={!embedded} />
+              </div>
             </div>
-          </div>
-
-          <div className="col-span-2">
-            <DescriptionField details={d} showDetailsButton={!embedded} />
-          </div>
-
-          <div className="col-span-2">
-            <TextField label="Product Remark" value={d.form.productRemark} onChange={d.set('productRemark')} placeholder="Add remarks…" />
           </div>
         </div>
-      </div>
+      </DenseFieldsContext.Provider>
 
       {colourSizeOpen && product && (
         <ColourSizeModal
