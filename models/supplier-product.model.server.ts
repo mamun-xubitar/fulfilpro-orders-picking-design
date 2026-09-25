@@ -448,6 +448,17 @@ export class SupplierProductModel {
   }
 
   /**
+   * Regenerates a product's variants to exactly `sizes` x `colours` — creating the missing combos
+   * and deleting the rest — without touching the product's own declared `sizes`/`colours` lists.
+   * Used by the Variants / stock toolbar's colour panel and sizes dropdown: unchecking a colour or
+   * size there removes its variants but keeps the value declared (and listed, unchecked) on the
+   * product, unlike applyOptions/updateDetails which write the declared lists too.
+   */
+  async syncVariantsToOptions(supplierProductId: string, sizes: string[], colours: string[]): Promise<void> {
+    await this.reconcileVariants(supplierProductId, sizes, colours);
+  }
+
+  /**
    * Promotes variant rows still on the '' sentinel for the given axis to the first declared
    * value on that axis, in place — so stock/pricing on a colour-only (or size-only) product
    * survives the moment its first size (or colour) is added, instead of the sentinel row being
@@ -620,72 +631,19 @@ export class SupplierProductModel {
     }
   }
 
-  /**
-   * Deletes one variant, then prunes any colour/size from the product's declared lists that no
-   * remaining variant uses — otherwise the next Product Details save would re-create the row
-   * just deleted (reconcileVariants treats every declared colour x size as required). Images
-   * tagged with a pruned colour are untagged (mirrors applyColourRenames' removal branch)
-   * rather than left pointing at a colour that no longer exists anywhere on the product.
-   */
-  /**
-   * After one or more variants are deleted, prunes any colour/size from the product's declared
-   * lists that no remaining variant uses — otherwise the next Product Details save would
-   * re-create the row(s) just deleted (reconcileVariants treats every declared colour x size as
-   * required). Images tagged with a pruned colour are untagged (mirrors applyColourRenames'
-   * removal branch) rather than left pointing at a colour that no longer exists anywhere on the
-   * product. Shared by deleteVariant and deleteVariants so a bulk delete runs this once, not once
-   * per row.
-   */
-  private async pruneUnusedAxes(tx: Prisma.TransactionClient, supplierProductId: string): Promise<void> {
-    const product = await tx.supplierProduct.findUnique({ where: { id: supplierProductId }, select: { sizes: true, colours: true } });
-    if (!product) return;
-
-    const remaining = await tx.supplierProductVariant.findMany({ where: { supplierProductId }, select: { colour: true, size: true } });
-    const usedColours = new Set(remaining.map((v) => v.colour.toLowerCase()).filter(Boolean));
-    const usedSizes = new Set(remaining.map((v) => v.size.toLowerCase()).filter(Boolean));
-
-    const currentColours = normalizeColours(product.colours);
-    const currentSizes = product.sizes as string[];
-    const nextColours = currentColours.filter((c) => usedColours.has(c.name.toLowerCase()));
-    const nextSizes = currentSizes.filter((s) => usedSizes.has(s.toLowerCase()));
-    const prunedColours = currentColours.filter((c) => !usedColours.has(c.name.toLowerCase()));
-
-    if (nextColours.length !== currentColours.length || nextSizes.length !== currentSizes.length) {
-      await tx.supplierProduct.update({
-        where: { id: supplierProductId },
-        data: {
-          ...(nextColours.length !== currentColours.length ? { colours: nextColours as unknown as Prisma.InputJsonValue } : {}),
-          ...(nextSizes.length !== currentSizes.length ? { sizes: nextSizes } : {}),
-        },
-      });
-    }
-    for (const colour of prunedColours) {
-      await tx.supplierProductImage.updateMany({
-        where: { supplierProductId, colour: { equals: colour.name, mode: 'insensitive' } },
-        data: { colour: null },
-      });
-    }
-  }
-
+  /** Deletes one variant. The product's declared colours/sizes are left as they are — a colour or
+   * size with no variants left simply shows unchecked in the Variants / stock panel. */
   async deleteVariant(supplierProductId: string, variantId: string): Promise<boolean> {
-    return prisma.$transaction(async (tx) => {
-      const result = await tx.supplierProductVariant.deleteMany({ where: { id: variantId, supplierProductId } });
-      if (result.count === 0) return false;
-      await this.pruneUnusedAxes(tx, supplierProductId);
-      return true;
-    });
+    const result = await prisma.supplierProductVariant.deleteMany({ where: { id: variantId, supplierProductId } });
+    return result.count > 0;
   }
 
-  /** Deletes several variants in one transaction, pruning unused colours/sizes once at the end
-   * rather than once per row. Returns the number actually deleted (ids outside this product are
-   * silently ignored, same as deleteVariant). */
+  /** Deletes several variants, leaving the product's declared colours/sizes untouched (same as
+   * deleteVariant). Returns the number actually deleted (ids outside this product are silently
+   * ignored). */
   async deleteVariants(supplierProductId: string, variantIds: string[]): Promise<number> {
-    return prisma.$transaction(async (tx) => {
-      const result = await tx.supplierProductVariant.deleteMany({ where: { id: { in: variantIds }, supplierProductId } });
-      if (result.count === 0) return 0;
-      await this.pruneUnusedAxes(tx, supplierProductId);
-      return result.count;
-    });
+    const result = await prisma.supplierProductVariant.deleteMany({ where: { id: { in: variantIds }, supplierProductId } });
+    return result.count;
   }
 
   async delete(id: string): Promise<boolean> {

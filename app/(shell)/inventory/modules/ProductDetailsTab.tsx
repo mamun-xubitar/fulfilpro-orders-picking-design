@@ -16,7 +16,7 @@ import type { InventoryPage } from './hooks/useInventoryPage';
  */
 export default function ProductDetailsTab({ p }: { p: InventoryPage }) {
   return (
-    <div className="grid grid-cols-1 gap-[5px] md:grid-cols-2 xl:grid-cols-[150px_minmax(0,1.6fr)_minmax(0,1.15fr)_170px_200px] xl:flex-1 xl:min-h-0">
+    <div className="grid grid-cols-1 gap-[5px] md:grid-cols-2 xl:grid-cols-[150px_minmax(0,1.6fr)_minmax(0,1.15fr)_170px_200px] xl:flex-none">
       <MainImagePanel gallery={p.gallery} productName={p.product?.name ?? ''} onEditImages={p.openEditImages} />
       <ProductFieldsPanel
         details={p.details}

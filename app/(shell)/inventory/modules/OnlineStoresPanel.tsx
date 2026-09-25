@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { BTN_XS, BTN_ROW, PanelHeading, panelBorderClass } from './MainImagePanel';
+import { BTN_XS, BTN_ROW, PANEL_MAX_H, PanelHeading, panelBorderClass } from './MainImagePanel';
 import StoreCard from './StoreCard';
 import StoreConnectCard from './StoreConnectCard';
 import type { StoreListingsState } from './hooks/useStoreListings';
@@ -49,7 +49,7 @@ export default function OnlineStoresPanel({
   }, [someSelected]);
 
   return (
-    <section className={`flex min-w-0 flex-col rounded-[10px] border ${panelBorderClass('stores')} bg-inventory-surface shadow-inventory xl:min-h-0`}>
+    <section className={`flex min-w-0 flex-col rounded-[10px] border ${panelBorderClass('stores')} bg-inventory-surface shadow-inventory ${PANEL_MAX_H}`}>
       <PanelHeading
         tone="stores"
         icon={<Store className="h-3 w-3" />}
@@ -61,15 +61,15 @@ export default function OnlineStoresPanel({
             onClick={onOpenPublish}
             aria-label="Publish to a store"
             title="Publish to a store"
-            className="flex h-[20px] w-[20px] items-center justify-center rounded-full bg-inventory-primary text-white transition-colors duration-150 hover:bg-inventory-primary-hover cursor-pointer"
+            className="flex h-[16px] w-[16px] items-center justify-center rounded-full bg-inventory-primary text-white transition-colors duration-150 hover:bg-inventory-primary-hover cursor-pointer"
           >
-            <Plus className="h-3 w-3" />
+            <Plus className="h-2.5 w-2.5" />
           </button>
         }
       />
 
       {listed.length > 0 && (
-        <div className="flex items-center justify-between gap-2 border-b border-inventory-divider px-[8px] py-[4px]">
+        <div className="flex items-center justify-between gap-2 border-b border-inventory-divider px-[8px] py-[3px]">
           <label className="flex cursor-pointer items-center gap-[5px] text-[10px] font-medium leading-none text-inventory-text-muted">
             <input
               ref={headerCheckboxRef}
@@ -85,7 +85,7 @@ export default function OnlineStoresPanel({
             <button
               type="button"
               onClick={onOpenBulkUpdate}
-              className="rounded-md bg-inventory-primary px-1.5 py-[3px] text-[9.5px] font-semibold text-white transition-colors duration-150 hover:bg-inventory-primary-hover cursor-pointer"
+              className="rounded-md bg-inventory-primary px-1.5 py-[2px] text-[9.5px] font-semibold leading-none text-white transition-colors duration-150 hover:bg-inventory-primary-hover cursor-pointer"
             >
               Bulk Update ({selectedListedCount})
             </button>
@@ -93,7 +93,7 @@ export default function OnlineStoresPanel({
         </div>
       )}
 
-      <div className="max-h-80 space-y-[6px] overflow-y-auto p-[6px]">
+      <div className="min-h-0 flex-1 space-y-[6px] overflow-y-auto thin-scroll p-[6px]">
         {loading ? (
           <StoreCardSkeletons />
         ) : listings.length === 0 ? (

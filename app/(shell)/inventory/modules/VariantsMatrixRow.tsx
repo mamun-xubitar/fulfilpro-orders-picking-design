@@ -1,7 +1,7 @@
 'use client';
 
 import { memo } from 'react';
-import { ColourCell, IncomingCell, Num, NumCell, RowAction, SizeCell, SkuCell, VariantTitleCell } from './VariantsMatrixCells';
+import { IncomingCell, Num, NumCell, RowAction, SkuCell, VariantTitleCell } from './VariantsMatrixCells';
 import { STATUS_STYLES } from './constants';
 import { Check, Close, Trash } from './icons';
 import { computeVariant, formatCurrencyValue, formatMoney, formatNumber } from './utils';
@@ -20,7 +20,6 @@ type VariantsMatrixRowProps = {
   saving: boolean;
   /** Full view renders every column; the inline table hides SKU / Barcode and Trigger. */
   showAllColumns: boolean;
-  swatch: string;
   onToggleSelect: (id: string) => void;
   onFieldChange: (id: string, patch: Partial<VariantRow>) => void;
   onSave: (id: string) => void;
@@ -36,7 +35,6 @@ function VariantsMatrixRow({
   dirty,
   saving,
   showAllColumns,
-  swatch,
   onToggleSelect,
   onFieldChange,
   onSave,
@@ -54,11 +52,10 @@ function VariantsMatrixRow({
         <span className={`absolute left-0 top-0 h-full w-1 ${style.bar}`} aria-hidden="true" />
         <div className="flex items-center gap-[4px]">
           <SelectCheckbox name={name} selected={selected} onToggleSelect={() => onToggleSelect(variant.id)} />
-          <ColourCell value={variant.colour} swatch={swatch} />
+          <span className="truncate text-[10px] leading-none text-inventory-text-muted">{variant.size || '—'}</span>
         </div>
       </td>
 
-      <SizeCell value={variant.size} />
       <VariantTitleCell colour={variant.colour} size={variant.size} />
 
       {showAllColumns && (

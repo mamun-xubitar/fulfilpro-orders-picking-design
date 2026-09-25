@@ -3,7 +3,7 @@
 import { capitaliseFirst } from './utils';
 
 const chipClass =
-  'rounded-full border border-inventory-border bg-inventory-surface px-[5px] py-[1px] text-[9px] font-semibold uppercase leading-none text-inventory-text-muted';
+  'inline-flex items-center rounded-full border border-inventory-border bg-inventory-surface px-[5px] py-[1px] text-[9px] font-semibold uppercase leading-none text-inventory-text-muted';
 
 /** Shared by SizeChips (multi-line) and OverflowChipRow (single-line, item 6b) — same sort,
  * same chip markup, so both read identically. */

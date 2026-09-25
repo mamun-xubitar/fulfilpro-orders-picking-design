@@ -58,7 +58,7 @@ export default function BottomPanels({ p }: BottomPanelsProps) {
         {product.activity.length === 0 ? (
           <p className="py-3 text-center text-[10px] text-inventory-text-subtle">No recent activity</p>
         ) : (
-          <ul className="min-h-0 flex-1 space-y-1 overflow-y-auto pr-1">
+          <ul className="thin-scroll min-h-0 flex-1 space-y-1 overflow-y-auto pr-1">
             {product.activity.map((entry) => (
               <li key={entry.id} className="flex gap-1.5">
                 <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-inventory-primary" aria-hidden="true" />

@@ -1,6 +1,6 @@
 'use client';
 
-import { PanelHeading, panelBorderClass } from './MainImagePanel';
+import { PANEL_MAX_H, PanelHeading, panelBorderClass } from './MainImagePanel';
 import { Cube } from './icons';
 import type { StockSummary } from './types';
 import { formatCurrencyValue, formatNumber } from './utils';
@@ -16,14 +16,14 @@ export default function StockSummaryPanel({ summary, variantCount }: { summary: 
   ];
 
   return (
-    <section className={`flex min-w-0 flex-col rounded-[10px] border ${panelBorderClass('stock')} bg-inventory-surface shadow-inventory xl:flex-none xl:min-h-0`}>
+    <section className={`flex min-w-0 flex-col rounded-[10px] border ${panelBorderClass('stock')} bg-inventory-surface shadow-inventory ${PANEL_MAX_H}`}>
       <PanelHeading
         tone="stock"
         icon={<Cube className="h-3 w-3" />}
         title="Stock summary"
       />
 
-      <div className="flex flex-1 flex-col gap-[4px] p-[6px]">
+      <div className="flex min-h-0 flex-1 flex-col gap-[4px] overflow-y-auto thin-scroll p-[6px]">
         <dl>
           {rows.map((row) => (
             <div key={row.label} className="flex items-center justify-between gap-2 border-b border-inventory-divider py-[4px] leading-none last:border-0">

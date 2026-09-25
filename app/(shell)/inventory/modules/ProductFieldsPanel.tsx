@@ -4,12 +4,12 @@ import { useState } from 'react';
 import ColourSizeModal from './colourSize/ColourSizeModal';
 import CategoryPicker from './CategoryPicker';
 import HubCategoryPicker from './HubCategoryPicker';
-import { PanelHeading, panelBorderClass } from './MainImagePanel';
+import { PANEL_MAX_H, PanelHeading, panelBorderClass } from './MainImagePanel';
 import { ActionButton } from './PricingMarginPanel';
 import ProductIdentityFields from './ProductIdentityFields';
 import ProductMiscFields from './ProductMiscFields';
 import ProductOptionsRow from './ProductOptionsRow';
-import { TextField } from './ProductFieldRows';
+import { DenseFieldsContext, TextField } from './ProductFieldRows';
 import DescriptionField from './DescriptionField';
 import SupplierMultiSelect from './SupplierMultiSelect';
 import { Check, Document } from './icons';
@@ -43,63 +43,81 @@ export default function ProductFieldsPanel({ details: d, supplierOptions, option
   const [colourSizeOpen, setColourSizeOpen] = useState(false);
 
   return (
-    <section className={embedded ? 'flex min-w-0 flex-col' : `flex min-w-0 flex-col rounded-[10px] border ${panelBorderClass('details')} bg-inventory-surface shadow-inventory xl:min-h-0`}>
+    <section className={embedded ? 'flex min-w-0 flex-col' : `flex min-w-0 flex-col rounded-[10px] border ${panelBorderClass('details')} bg-inventory-surface shadow-inventory ${PANEL_MAX_H}`}>
       {!embedded && (
         <PanelHeading
           tone="details"
           icon={<Document className="h-3 w-3" />}
           title="Product details"
-          action={<ActionButton onClick={() => d.saveDetails()} icon={<Check className="h-3 w-3" />} label="Save" primary disabled={!d.dirty} compact />}
+          action={<ActionButton onClick={() => d.saveDetails()} icon={<Check className="h-2.5 w-2.5" />} label="Save" primary disabled={!d.dirty} compact />}
         />
       )}
 
-      <div className={embedded ? 'flex flex-1 flex-col gap-[4px]' : 'flex flex-1 flex-col gap-[4px] p-[6px] xl:min-h-0 xl:overflow-y-auto'}>
-        <div className="grid grid-cols-2 gap-x-[7px] gap-y-[3px]">
-          <ProductIdentityFields details={d} itemNoAvailability={itemNoAvailability} />
+      <DenseFieldsContext.Provider value={!embedded}>
+        {/* `relative` lives on this non-scrolling outer wrapper (not the scrolling body below) so
+         * the expanded Description editor (Move 5) can grow past the scroll body's own
+         * `overflow-y-auto` — it's positioned against this element, not the viewport, a scroll
+         * ancestor, or a clipping one. */}
+        <div className={embedded ? 'flex flex-1 flex-col' : 'relative flex flex-1 flex-col min-h-0'}>
+          <div className={embedded ? 'flex flex-1 flex-col gap-[4px]' : 'flex flex-1 flex-col gap-[4px] p-[6px] min-h-0 overflow-y-auto thin-scroll'}>
+            <div className="grid grid-cols-2 gap-x-[7px] gap-y-[3px]">
+              <ProductIdentityFields details={d} itemNoAvailability={itemNoAvailability} />
 
-          <TextField label="Product name" value={d.form.name} onChange={d.setName} />
-          <TextField label="SKU" value={d.form.sku} onChange={d.set('sku')} />
+              <TextField label="Product name" value={d.form.name} onChange={d.setName} />
+              <TextField label="SKU" value={d.form.sku} onChange={d.set('sku')} />
 
-          <TextField label="Brand" value={d.form.brand} onChange={d.set('brand')} />
-          <SupplierMultiSelect
-            suppliers={supplierOptions}
-            selectedIds={d.form.supplierIds}
-            onChange={d.setSupplierIds}
-            error={d.errors?.supplierId}
-            onCreateSupplier={(name) =>
-              suppliers.openCreate({ name, onCreated: (s) => d.setSupplierIds([...d.form.supplierIds, s.id]) })
-            }
-            onAddSupplier={() =>
-              suppliers.openCreate({ onCreated: (s) => d.setSupplierIds([...d.form.supplierIds, s.id]) })
-            }
-          />
+              <TextField label="Brand" value={d.form.brand} onChange={d.set('brand')} />
+              <SupplierMultiSelect
+                suppliers={supplierOptions}
+                selectedIds={d.form.supplierIds}
+                onChange={d.setSupplierIds}
+                error={d.errors?.supplierId}
+                onCreateSupplier={(name) =>
+                  suppliers.openCreate({ name, onCreated: (s) => d.setSupplierIds([...d.form.supplierIds, s.id]) })
+                }
+                onAddSupplier={() =>
+                  suppliers.openCreate({ onCreated: (s) => d.setSupplierIds([...d.form.supplierIds, s.id]) })
+                }
+              />
 
-          <CategoryPicker value={{ id: d.form.categoryId, name: d.form.category }} onChange={d.setCategory} />
-          <HubCategoryPicker
-            value={{ id: d.form.inventoryCategoryId, name: d.form.inventoryCategoryName }}
-            onChange={d.setInventoryCategory}
-            categories={inventoryCategories}
-          />
+              <CategoryPicker value={{ id: d.form.categoryId, name: d.form.category }} onChange={d.setCategory} />
+              <HubCategoryPicker
+                value={{ id: d.form.inventoryCategoryId, name: d.form.inventoryCategoryName }}
+                onChange={d.setInventoryCategory}
+                categories={inventoryCategories}
+              />
 
-          <ProductOptionsRow
-            sizes={d.sizes}
-            colours={d.colours}
-            sizesError={d.errors?.sizes}
-            coloursError={d.errors?.colours}
-            onEdit={() => setColourSizeOpen(true)}
-          />
+              <ProductOptionsRow
+                sizes={d.sizes}
+                colours={d.colours}
+                sizesError={d.errors?.sizes}
+                coloursError={d.errors?.colours}
+                onEdit={() => setColourSizeOpen(true)}
+              />
 
-          <ProductMiscFields details={d} />
+              {/* Non-embedded: Remark folds into the PO Qty/Status/Verified row to save a row's
+               * worth of height. Embedded (wizard): stays on its own row, unchanged. */}
+              {embedded ? (
+                <>
+                  <ProductMiscFields details={d} />
+                  <div className="col-span-2">
+                    <TextField label="Product Remark" value={d.form.productRemark} onChange={d.set('productRemark')} placeholder="Add remarks…" />
+                  </div>
+                </>
+              ) : (
+                <ProductMiscFields
+                  details={d}
+                  remark={<TextField label="Product Remark" value={d.form.productRemark} onChange={d.set('productRemark')} placeholder="Add remarks…" />}
+                />
+              )}
 
-          <div className="col-span-2">
-            <DescriptionField details={d} showDetailsButton={!embedded} />
-          </div>
-
-          <div className="col-span-2">
-            <TextField label="Product Remark" value={d.form.productRemark} onChange={d.set('productRemark')} placeholder="Add remarks…" />
+              <div className="col-span-2">
+                <DescriptionField details={d} compact={!embedded} />
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      </DenseFieldsContext.Provider>
 
       {colourSizeOpen && product && (
         <ColourSizeModal

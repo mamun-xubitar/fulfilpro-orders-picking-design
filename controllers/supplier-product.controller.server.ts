@@ -425,16 +425,10 @@ export class SupplierProductController {
     return { data: product, message: `${count} variant${count === 1 ? '' : 's'} deleted` };
   }
 
-  /** Applies the Colour & size adjustment modal's checked colours/sizes/variant values to a
-   * product — see SupplierProductModel.applyOptions for what `replace` vs `insert` each do. */
-  async applyOptions(id: string, body: unknown, session: Session) {
-    if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
-    if (!(await model.exists(id))) return { error: { message: 'Product not found', status: 404 } };
-
-    const value = (body ?? {}) as Record<string, unknown>;
-    const mode = value.mode === 'replace' || value.mode === 'insert' ? value.mode : null;
-    if (!mode) return { error: { message: 'mode: Must be "replace" or "insert"', status: 400 } };
-
+  /** Parses `colours`/`sizes` arrays off a request body the same way for every endpoint that
+   * accepts a checked colour/size list: uppercase-trimmed, case-insensitive deduped, colours
+   * paired with a derived swatch. Shared by applyOptions and setOptions. */
+  private parseCheckedOptions(value: Record<string, unknown>): { colours: { name: string; color: string }[]; sizes: string[] } {
     const rawColours = Array.isArray(value.colours) ? (value.colours as unknown[]) : [];
     const seenColours = new Set<string>();
     const colours: { name: string; color: string }[] = [];
@@ -454,6 +448,21 @@ export class SupplierProductController {
       seenSizes.add(size.toLowerCase());
       sizes.push(size);
     }
+
+    return { colours, sizes };
+  }
+
+  /** Applies the Colour & size adjustment modal's checked colours/sizes/variant values to a
+   * product — see SupplierProductModel.applyOptions for what `replace` vs `insert` each do. */
+  async applyOptions(id: string, body: unknown, session: Session) {
+    if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
+    if (!(await model.exists(id))) return { error: { message: 'Product not found', status: 404 } };
+
+    const value = (body ?? {}) as Record<string, unknown>;
+    const mode = value.mode === 'replace' || value.mode === 'insert' ? value.mode : null;
+    if (!mode) return { error: { message: 'mode: Must be "replace" or "insert"', status: 400 } };
+
+    const { colours, sizes } = this.parseCheckedOptions(value);
 
     if (colours.length === 0 && sizes.length === 0) {
       return { error: { message: 'Validation failed', errors: ['colours: Check at least one colour or size'], status: 400 } };
@@ -493,6 +502,50 @@ export class SupplierProductController {
     );
     const product = await model.findById(id);
     return { data: product, message: mode === 'replace' ? 'Variants replaced' : 'Variants inserted' };
+  }
+
+  /** Sets which of a product's own declared colours/sizes currently have variants, from the
+   * Variants / stock toolbar's colour panel and size dropdown. Unlike applyOptions, this never
+   * touches the product's declared `colours`/`sizes` lists — a colour or size stays declared (and
+   * listed, unchecked) even once every one of its variants is gone. It only regenerates the
+   * variants to match the checked combos: see SupplierProductModel.syncVariantsToOptions. */
+  async setOptions(id: string, body: unknown, session: Session) {
+    if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
+    const existingProduct = await model.findById(id);
+    if (!existingProduct) return { error: { message: 'Product not found', status: 404 } };
+
+    const value = (body ?? {}) as Record<string, unknown>;
+    const { colours, sizes } = this.parseCheckedOptions(value);
+
+    // Every checked name must already be declared on the product — this endpoint only toggles
+    // variants for the product's existing colours/sizes, never declares a new one (that's what
+    // the Colour & size adjustment modal is for).
+    const declaredColourByLower = new Map(existingProduct.colours.map((c) => [c.name.toLowerCase(), c.name]));
+    const declaredSizeByLower = new Map(existingProduct.sizes.map((s) => [s.toLowerCase(), s]));
+
+    const resolvedColours: string[] = [];
+    for (const c of colours) {
+      const declared = declaredColourByLower.get(c.name.toLowerCase());
+      if (!declared) return { error: { message: "colours: Not one of this product's colours", status: 400 } };
+      resolvedColours.push(declared);
+    }
+    const resolvedSizes: string[] = [];
+    for (const s of sizes) {
+      const declared = declaredSizeByLower.get(s.toLowerCase());
+      if (!declared) return { error: { message: "sizes: Not one of this product's sizes", status: 400 } };
+      resolvedSizes.push(declared);
+    }
+
+    // At least one checked value per axis the product actually declares — otherwise
+    // reconcileVariants falls back to the '' sentinel and creates blank-colour/blank-size rows.
+    if ((existingProduct.colours.length > 0 && resolvedColours.length === 0) || (existingProduct.sizes.length > 0 && resolvedSizes.length === 0)) {
+      return { error: { message: 'Keep at least one colour and one size checked', status: 400 } };
+    }
+
+    await model.syncVariantsToOptions(id, resolvedSizes, resolvedColours);
+    await model.logActivity(id, 'Variant options updated', 'variant_updated', actorFromSession(session));
+    const product = await model.findById(id);
+    return { data: product, message: 'Variants updated' };
   }
 
   async addImage(id: string, body: unknown, session: Session) {

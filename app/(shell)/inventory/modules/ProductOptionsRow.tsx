@@ -1,8 +1,9 @@
 'use client';
 
+import { useContext } from 'react';
 import OverflowChipRow from './OverflowChipRow';
 import { colourChipItems } from './ProductColoursField';
-import { FieldLabel } from './ProductFieldRows';
+import { DenseFieldsContext, FieldLabel } from './ProductFieldRows';
 import { sizeChipItems } from './ProductSizesField';
 import { Plus } from './icons';
 import type { ColourOption } from './types';
@@ -24,6 +25,7 @@ type ProductOptionsRowProps = {
  * ProductFieldsPanel to keep that file under the component size budget.
  */
 export default function ProductOptionsRow({ sizes, colours, sizesError, coloursError, onEdit }: ProductOptionsRowProps) {
+  const dense = useContext(DenseFieldsContext);
   const editButton = (label: string) => (
     <button
       type="button"
@@ -35,13 +37,20 @@ export default function ProductOptionsRow({ sizes, colours, sizesError, coloursE
       <Plus className="h-3 w-3" />
     </button>
   );
+  // In dense mode (notched labels) the chip row gets the same bordered-box chrome every other
+  // field has, so its label has a border to sit on — plain flex row otherwise (wizard).
+  const rowClass = dense
+    ? 'flex h-[24px] min-w-0 flex-1 items-center gap-[4px] rounded-[7px] border border-inventory-border-strong px-[6px]'
+    : 'flex min-w-0 flex-1 items-center gap-[4px]';
 
   return (
     <>
       <div className="min-w-0">
         <FieldLabel>Sizes</FieldLabel>
         <div className="flex items-center gap-[4px]">
-          <OverflowChipRow items={sizeChipItems(sizes)} onShowMore={onEdit} />
+          <div className={rowClass}>
+            <OverflowChipRow items={sizeChipItems(sizes)} onShowMore={onEdit} />
+          </div>
           {editButton('sizes')}
         </div>
         {sizesError && <p className="mt-[2px] text-[10px] leading-tight text-inventory-danger">{sizesError}</p>}
@@ -50,7 +59,9 @@ export default function ProductOptionsRow({ sizes, colours, sizesError, coloursE
       <div className="min-w-0">
         <FieldLabel>Colours</FieldLabel>
         <div className="flex items-center gap-[4px]">
-          <OverflowChipRow items={colourChipItems(colours)} onShowMore={onEdit} />
+          <div className={rowClass}>
+            <OverflowChipRow items={colourChipItems(colours)} onShowMore={onEdit} />
+          </div>
           {editButton('colours')}
         </div>
         {coloursError && <p className="mt-[2px] text-[10px] leading-tight text-inventory-danger">{coloursError}</p>}

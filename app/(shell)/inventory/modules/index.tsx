@@ -95,11 +95,11 @@ function LoadingState() {
       {/* Mirrors ProductDetailsTab's item-7 column order: Image, Details, Pricing, Stock
           summary, Online stores. */}
       <div className="grid grid-cols-1 gap-[5px] md:grid-cols-2 xl:grid-cols-[150px_minmax(0,1.6fr)_minmax(0,1.15fr)_170px_200px]">
-        <div className="h-64 animate-pulse rounded-xl border border-inventory-border bg-inventory-surface-muted" />
-        <div className="h-80 animate-pulse rounded-xl border border-inventory-border bg-inventory-surface-muted" />
-        <div className="h-80 animate-pulse rounded-xl border border-inventory-border bg-inventory-surface-muted" />
-        <div className="h-64 animate-pulse rounded-xl border border-inventory-border bg-inventory-surface-muted" />
-        <div className="h-80 animate-pulse rounded-xl border border-inventory-border bg-inventory-surface-muted" />
+        <div className="h-[285px] animate-pulse rounded-xl border border-inventory-border bg-inventory-surface-muted" />
+        <div className="h-[285px] animate-pulse rounded-xl border border-inventory-border bg-inventory-surface-muted" />
+        <div className="h-[285px] animate-pulse rounded-xl border border-inventory-border bg-inventory-surface-muted" />
+        <div className="h-[285px] animate-pulse rounded-xl border border-inventory-border bg-inventory-surface-muted" />
+        <div className="h-[285px] animate-pulse rounded-xl border border-inventory-border bg-inventory-surface-muted" />
       </div>
 
       <div className="rounded-xl border border-inventory-border bg-inventory-surface shadow-inventory">

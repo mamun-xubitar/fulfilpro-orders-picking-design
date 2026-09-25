@@ -46,5 +46,7 @@ next-env.d.ts
 /uploads
 /.claude
 skills-lock.json
-
+opencode.json
+pnpm-lock.yaml
+pnpm-workspace.yaml
 !.env.example

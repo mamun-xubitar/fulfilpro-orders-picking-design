@@ -1,5 +1,6 @@
 'use client';
 
+import { createContext, useContext } from 'react';
 import ClampedHtml from './ClampedHtml';
 
 /** Shared label / read-only / input rows for the Product details panel. Sizing matches the
@@ -7,11 +8,21 @@ import ClampedHtml from './ClampedHtml';
  * `leading-none` rather than padding/line-height approximations. */
 
 const LABEL_CLASS = 'mb-[2px] block text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-inventory-text-subtle';
+/** Notched-label variant — sits on the top border of the 24px box that immediately follows it,
+ * instead of on its own row above it. Negative margin pulls the next element up underneath it. */
+const DENSE_LABEL_CLASS =
+  'relative z-[1] mb-[-5px] ml-[5px] block w-fit max-w-[calc(100%-10px)] truncate rounded-[3px] bg-[color-mix(in_srgb,var(--color-inventory-sec-details)_7%,var(--color-inventory-surface))] px-[3px] text-[9.5px] font-bold uppercase leading-[10px] tracking-[0.4px] text-inventory-text-subtle';
 const INPUT_CLASS =
   'h-[24px] w-full rounded-[7px] border border-inventory-border-strong px-[6px] text-[11px] leading-none text-inventory-text outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring';
 
+/** Switches every `FieldLabel` under it to the notched-on-the-border style — only the (non-embedded)
+ * Product details panel turns this on, so the New Product wizard and every other caller of these
+ * shared field components keep today's label-above-box layout. */
+export const DenseFieldsContext = createContext(false);
+
 export function FieldLabel({ children }: { children: React.ReactNode }) {
-  return <span className={LABEL_CLASS}>{children}</span>;
+  const dense = useContext(DenseFieldsContext);
+  return <span className={dense ? DENSE_LABEL_CLASS : LABEL_CLASS}>{children}</span>;
 }
 
 /** Read-mode row for `RichTextField` — the Description value is sanitized HTML (imported

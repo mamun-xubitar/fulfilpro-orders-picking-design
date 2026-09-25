@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { toast } from 'react-toastify';
 import BuyingHistoryModal from './BuyingHistoryModal';
-import { PanelHeading, panelBorderClass } from './MainImagePanel';
+import { PANEL_MAX_H, PanelHeading, panelBorderClass } from './MainImagePanel';
 import PerStoreMarginRows from './PerStoreMarginRows';
 import StoreMarginPriceChips from './StoreMarginPriceChips';
 // Re-enable: StorePriceChips showed each store's *live* Shopify price — swap back in for
@@ -40,10 +40,10 @@ export default function PricingMarginPanel({ pricing: p, storeListings, onEditSt
   const [historyOpen, setHistoryOpen] = useState(false);
 
   return (
-    <section className={embedded ? 'flex min-w-0 flex-col' : `flex min-w-0 flex-col rounded-[10px] border ${panelBorderClass('pricing')} bg-inventory-surface shadow-inventory xl:min-h-0`}>
+    <section className={embedded ? 'flex min-w-0 flex-col' : `flex min-w-0 flex-col rounded-[10px] border ${panelBorderClass('pricing')} bg-inventory-surface shadow-inventory ${PANEL_MAX_H}`}>
       {!embedded && <PanelHeading tone="pricing" icon={<Tag className="h-3 w-3" />} title={`Pricing & margin (${base})`} meta={foreign} />}
 
-      <div className={embedded ? 'flex flex-col gap-[3px]' : 'flex flex-col gap-[3px] p-[6px] xl:min-h-0 xl:overflow-y-auto'}>
+      <div className={embedded ? 'flex flex-col gap-[3px]' : 'flex flex-1 min-h-0 flex-col gap-[3px] overflow-y-auto thin-scroll p-[6px]'}>
         <Row label="Currency">
           <div className="flex gap-[4px]">
             <select
@@ -169,7 +169,7 @@ export function ActionButton({
       onClick={onClick}
       disabled={disabled}
       className={`flex items-center justify-center gap-1 rounded-[6px] text-[10px] font-bold leading-none transition-colors duration-150 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
-        compact ? 'h-[20px] flex-none px-2' : 'h-[22px] flex-1 px-[6px]'
+        compact ? 'h-[16px] flex-none px-2' : 'h-[22px] flex-1 px-[6px]'
       } ${
         primary ? 'bg-inventory-primary text-white hover:bg-inventory-primary-hover' : 'border border-inventory-border-strong text-inventory-text-muted hover:bg-inventory-surface-hover'
       }`}

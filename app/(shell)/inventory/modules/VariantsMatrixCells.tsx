@@ -3,7 +3,6 @@
 /** Read and edit cells for one variants / stock matrix row. Sizing matches the prototype's
  * `.t-sm` table density literally: 4px cell padding, 10px cell text, 15px-tall cell inputs. */
 
-import { formatColourName } from '@/lib/inventory/colour';
 import { formatPoNumber } from '@/lib/inventory/po-number';
 import { formatIncomingLot } from './utils';
 import type { IncomingLot } from './types';
@@ -84,25 +83,6 @@ export function IncomingCell({ lots }: { lots: IncomingLot[] }) {
           </span>
         ))}
       </div>
-    </td>
-  );
-}
-
-/** Colour/size are text, not editable selects — the colour and size axes are owned by Product
- * details (they drive variant reconciliation there), so the matrix only ever displays them. */
-export function ColourCell({ value, swatch }: { value: string; swatch: string }) {
-  return (
-    <div className="flex items-center gap-[4px]">
-      <span className="h-[7px] w-[7px] shrink-0 rounded-full ring-1 ring-black/10" style={{ backgroundColor: swatch }} />
-      <span className="truncate text-[10px] leading-none text-inventory-text-muted">{value ? formatColourName(value) : '—'}</span>
-    </div>
-  );
-}
-
-export function SizeCell({ value }: { value: string }) {
-  return (
-    <td className={CELL_CLASS}>
-      <span className="truncate text-[10px] leading-none text-inventory-text-muted">{value || '—'}</span>
     </td>
   );
 }

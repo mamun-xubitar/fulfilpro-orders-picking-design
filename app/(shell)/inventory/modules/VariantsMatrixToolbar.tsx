@@ -1,12 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { formatColourName } from '@/lib/inventory/colour';
 import ColourSizeModal from './colourSize/ColourSizeModal';
 import { STATUS_LEGEND } from './constants';
 import type { InventoryPage } from './hooks/useInventoryPage';
-import { Adjust, Download, Expand, Plus, Trash } from './icons';
+import { Adjust, Expand, Plus, Trash } from './icons';
 import { BTN_XS } from './MainImagePanel';
+import VariantSizeDropdown from './VariantSizeDropdown';
 
 type VariantsMatrixToolbarProps = {
   p: InventoryPage;
@@ -19,10 +19,6 @@ export default function VariantsMatrixToolbar({ p, fullView }: VariantsMatrixToo
   const { matrix } = p;
   const [colourSizeOpen, setColourSizeOpen] = useState(false);
 
-  // Always the whole product, not the matrix's active colour/size/status filter — "Export
-  // product CSV" means the full product, and filtering the rows here used to also mis-pair
-  // images against variants (buildShopifyProductCsv zips images positionally over the full pool).
-  const exportCsv = () => p.importExport.exportVariants(p.product?.variants ?? []);
   // Re-enable: uncomment this block and the "Apply to selected colours" button below to restore
   // applying the pricing panel's sell/buy price to every variant of the selected colours.
   // const selectedColours = () => {
@@ -53,32 +49,7 @@ export default function VariantsMatrixToolbar({ p, fullView }: VariantsMatrixToo
 
       <span className="mx-[2px] h-[18px] w-px bg-inventory-border" aria-hidden="true" />
 
-      {/* Colour filter pills */}
-      <div className="flex flex-wrap items-center gap-1.5">
-        <Pill active={matrix.allColoursSelected} onClick={matrix.selectAllColours}>
-          All colours
-        </Pill>
-        {matrix.colourNames.map((name) => (
-          <Pill key={name} active={matrix.isColourActive(name)} onClick={() => matrix.toggleColour(name)}>
-            <span className="h-2 w-2 rounded-full ring-1 ring-black/10" style={{ backgroundColor: matrix.swatchOf(name) }} />
-            {formatColourName(name)}
-          </Pill>
-        ))}
-      </div>
-
-      <select
-        value={matrix.sizeFilter}
-        onChange={(e) => matrix.setSizeFilter(e.target.value)}
-        aria-label="Filter by size"
-        className="h-[22px] rounded-[7px] border border-inventory-border-strong bg-inventory-surface px-[6px] text-[10.5px] leading-none text-inventory-text-muted shadow-sm outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring cursor-pointer"
-      >
-        <option value="">All sizes</option>
-        {matrix.sizes.map((size) => (
-          <option key={size} value={size}>
-            {size}
-          </option>
-        ))}
-      </select>
+      <VariantSizeDropdown size={p.variantOptions.size} saving={p.variantOptions.saving} />
 
       <label className="flex cursor-pointer items-center gap-[4px] text-[10px] font-medium leading-none text-inventory-text-muted">
         <input
@@ -112,10 +83,6 @@ export default function VariantsMatrixToolbar({ p, fullView }: VariantsMatrixToo
       </div>
 
       <div className="ml-auto flex flex-wrap items-center gap-[6px]">
-        <SecondaryButton onClick={exportCsv}>
-          <Download className="h-3 w-3" />
-          Export CSV
-        </SecondaryButton>
         <SecondaryButton onClick={matrix.toggleAllRows}>{matrix.allRowsSelected ? 'Deselect all' : 'Select all'}</SecondaryButton>
         {/* Re-enable: uncomment to restore the "Apply to selected colours" action (see selectedColours/applyToSelected above).
         <button
@@ -176,21 +143,6 @@ export default function VariantsMatrixToolbar({ p, fullView }: VariantsMatrixToo
         />
       )}
     </div>
-  );
-}
-
-function Pill({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={`flex h-[22px] items-center gap-1 whitespace-nowrap rounded-full border px-[7px] text-[10px] font-semibold leading-none transition-colors duration-150 cursor-pointer ${
-        active ? 'border-inventory-primary bg-inventory-primary text-white' : 'border-inventory-border-strong bg-inventory-surface text-inventory-text-muted hover:bg-inventory-surface-hover'
-      }`}
-    >
-      {children}
-    </button>
   );
 }
 

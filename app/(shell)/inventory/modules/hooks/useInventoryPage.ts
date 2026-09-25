@@ -21,6 +21,7 @@ import { useStocktake } from './useStocktake';
 import { useSuppliers } from './useSuppliers';
 import { useStoreListings } from './useStoreListings';
 import { useStorePublish } from './useStorePublish';
+import { useVariantOptions } from './useVariantOptions';
 import { useVariantsMatrix } from './useVariantsMatrix';
 import type { ModuleTabId, ProductRecord, StoreListingResult } from '../types';
 
@@ -74,7 +75,8 @@ export function useInventoryPage() {
     onProductSaved(updated);
     details.syncListsFromProduct(updated);
   };
-  const matrix = useVariantsMatrix({ product, sizes: details.sizes, colours: details.colours, quickFilter: data.quickFilter, onVariantSaved });
+  const matrix = useVariantsMatrix({ product, sizes: details.sizes, quickFilter: data.quickFilter, onVariantSaved });
+  const variantOptions = useVariantOptions({ product, onSaved: onVariantSaved });
   const po = usePurchaseOrder({ product, onSaved: onProductSaved });
   const stocktake = useStocktake({ product, onSaved: onProductSaved });
   const adjustments = useAdjustments({ product, onSaved: onProductSaved });
@@ -144,6 +146,7 @@ export function useInventoryPage() {
     pricing,
     details,
     matrix,
+    variantOptions,
     po,
     stocktake,
     adjustments,

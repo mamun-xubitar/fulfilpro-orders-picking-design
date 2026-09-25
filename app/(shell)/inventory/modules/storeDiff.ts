@@ -77,11 +77,33 @@ export type StoreDiffResult = {
   total: number;
 };
 
-/** Collapses HTML whitespace differences (attribute quoting, line breaks) that aren't a real
- * content difference — a description round-tripped through Shopify and back shouldn't show as
- * "changed" just because the tags got reformatted. */
+/** Canonicalizes HTML by parsing it into a DOM and rebuilding a normalized string (lowercase
+ * tags, sorted/trimmed attributes, collapsed whitespace) — a description round-tripped through
+ * the rich-text editor, DOMPurify, and Shopify's own storage shouldn't show as "changed" just
+ * because attribute order, quoting, tag case, or whitespace got reformatted along the way.
+ * `storeDiff.ts` only ever runs client-side (every importer is a 'use client' component), so
+ * `DOMParser` is always available; the regex fallback below only guards a non-browser context. */
 function normalizeHtml(html: string | null): string {
-  return (html ?? '').replace(/>\s+</g, '><').replace(/\s+/g, ' ').trim();
+  const raw = (html ?? '').trim();
+  if (!raw || typeof DOMParser === 'undefined') return raw.replace(/>\s+</g, '><').replace(/\s+/g, ' ').trim();
+  const root = new DOMParser().parseFromString(`<div>${raw}</div>`, 'text/html').body.firstElementChild;
+  return root ? canonicalizeNode(root) : '';
+}
+
+function canonicalizeNode(node: ChildNode): string {
+  if (node.nodeType === Node.TEXT_NODE) {
+    const text = (node.textContent ?? '').replace(/\s+/g, ' ');
+    return text.trim() === '' ? '' : text;
+  }
+  if (node.nodeType !== Node.ELEMENT_NODE) return '';
+  const el = node as Element;
+  const attrs = Array.from(el.attributes)
+    .map((a) => `${a.name.toLowerCase()}="${a.value.trim()}"`)
+    .sort()
+    .join(' ');
+  const tag = el.tagName.toLowerCase();
+  const inner = Array.from(el.childNodes).map(canonicalizeNode).join('');
+  return `<${tag}${attrs ? ' ' + attrs : ''}>${inner}</${tag}>`;
 }
 
 function round2(n: number): number {
