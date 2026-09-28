@@ -29,7 +29,7 @@ export default function VariantColourPanel({ colour }: VariantColourPanelProps) 
           aria-label="Select all colours"
           className="h-3 w-3 cursor-pointer accent-inventory-primary"
         />
-        <h4 className="flex-1 text-[9px] font-bold uppercase leading-none tracking-[0.4px] text-inventory-text-subtle">Colour</h4>
+        <h4 className="flex-1 text-[9px] font-bold uppercase leading-none tracking-[0.4px] text-inventory-text-subtle">Colours</h4>
       </div>
 
       <div className="flex-1 overflow-y-auto thin-scroll">
