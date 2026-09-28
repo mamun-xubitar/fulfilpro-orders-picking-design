@@ -1,9 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { toast } from 'react-toastify';
 import useRequest from '@/hooks/useRequest';
-import { resolveStoreMargin } from '@/lib/inventory/store-price';
 import { computePricing, pricingFormToInputs, pricingInputsToForm, round2 } from '../utils';
 import type { InventoryGlobals, PricingForm, ProductRecord } from '../types';
 import type { StoreListingsState } from './useStoreListings';
@@ -38,12 +36,7 @@ export function useProductPricing({ product, globals, storeListings, onSaved }: 
   const [confirmUse, setConfirmUse] = useState<{ sellingIncTax: number; totalBuying: number } | null>(null);
   const { request: requestSave, loading: saving, errors } = useRequest<ProductRecord>();
   const { request: requestApply, loading: applying } = useRequest<ProductRecord>();
-  // Per-store margin edits, staged locally until Save — never written on blur/change. Cleared by
-  // a successful Save. `null` means "untouched" — no explicit "start edit" moment exists anymore
-  // to seed it at, so it's resolved lazily below (`effectiveMarginDraft`) from whatever the live
-  // listings currently say instead.
-  const [marginDraft, setMarginDraftState] = useState<Record<string, number | null> | null>(null);
-  const [savingMargins, setSavingMargins] = useState(false);
+  const [savingMargin, setSavingMargin] = useState(false);
 
   const saved = product ? pricingInputsToForm(product.pricing) : EMPTY_FORM;
   const form = draft && draft.productId === product?.id ? draft.form : saved;
@@ -52,29 +45,13 @@ export function useProductPricing({ product, globals, storeListings, onSaved }: 
 
   const computed = useMemo(() => computePricing(pricingFormToInputs(form)), [form]);
 
-  // What the per-store margin *rows* actually display: only a product-specific override (this
-  // product's own saved margin for that store, or a local unsaved edit) — a store that merely
-  // inherits its global default renders no row until explicitly added via "+". Falling back to
-  // the global default here (as `resolvedMarginDraft` below still does) would make every
-  // globally-defaulted store appear "already set", which is exactly what per-store margin should
-  // *not* show on load.
-  const explicitMarginDraft = useMemo(
-    () => ({
-      ...Object.fromEntries(storeListings.listings.filter((l) => l.marginPercent !== null).map((l) => [l.storeId, l.marginPercent])),
-      ...(marginDraft ?? {}),
-    }),
-    [storeListings.listings, marginDraft]
-  );
-
-  // The price *chips* still need each store's fully-resolved margin (product override, else the
-  // store's global default) so a globally-defaulted store keeps showing the price that margin
-  // actually produces — this must never lose the global-default fallback the rows above drop.
-  const resolvedMarginDraft = useMemo(
-    () => ({
-      ...Object.fromEntries(storeListings.listings.map((l) => [l.storeId, resolveStoreMargin(l.marginPercent, l.storeDefaultMarginPercent)])),
-      ...(marginDraft ?? {}),
-    }),
-    [storeListings.listings, marginDraft]
+  // What the per-store margin modals reflect: only a product-specific override (this product's
+  // own saved margin for that store) — a store that merely inherits its global default is not
+  // included until explicitly added. Per-store margin now saves directly (saveStoreMargin) rather
+  // than being staged alongside the pricing form, so this reads straight off the live listings.
+  const storeMargins = useMemo(
+    () => Object.fromEntries(storeListings.listings.filter((l) => l.marginPercent !== null).map((l) => [l.storeId, l.marginPercent])),
+    [storeListings.listings]
   );
 
   const set = (field: keyof PricingForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -87,41 +64,32 @@ export function useProductPricing({ product, globals, storeListings, onSaved }: 
     setDraft({ productId: product.id, form: next });
   };
 
-  /** Which staged margin entries actually differ from what's live — unchanged stores are never
-   * re-PATCHed (and so never repriced on Shopify) just because the panel was saved. */
-  const changedMargins = (): [string, number | null][] => {
-    if (!marginDraft) return [];
-    return Object.entries(marginDraft).filter(([storeId, value]) => {
-      const live = storeListings.listings.find((l) => l.storeId === storeId)?.marginPercent ?? null;
-      return live !== value;
-    });
-  };
-
-  /** `after` fires once every part of the save succeeds — used by the New Product wizard to
-   * advance to the next step only on a confirmed save. */
+  /** `after` fires once the save succeeds — used by the New Product wizard to advance to the
+   * next step only on a confirmed save. Per-store margins are no longer part of this save — they
+   * persist directly from the Per store margin modal via `saveStoreMargin`. */
   const savePricing = (after?: () => void) => {
     if (!product) return;
-    const toApply = changedMargins();
     requestSave({
       url: `/api/inventory/catalog/${product.id}/pricing`,
       method: 'PATCH',
       data: pricingFormToInputs(form) as unknown as Record<string, unknown>,
-      // Suppress the default toast when store margins are also changing, so the admin sees one
-      // combined summary instead of "Pricing saved" immediately followed by a second toast.
-      successMessage: toApply.length > 0 ? () => null : 'Pricing saved',
-      onSuccess: async ({ data }) => {
+      successMessage: 'Pricing saved',
+      onSuccess: ({ data }) => {
         onSaved(data);
-        if (toApply.length > 0) {
-          setSavingMargins(true);
-          await Promise.all(toApply.map(([storeId, value]) => storeListings.setMargin(storeId, value, { silent: true })));
-          setSavingMargins(false);
-          toast.success(`Pricing saved · ${toApply.length} store margin${toApply.length === 1 ? '' : 's'} updated`);
-        }
         setDraft(null);
-        setMarginDraftState(null);
         after?.();
       },
     });
+  };
+
+  /** Persists one store's per-store margin immediately — called from the Per store margin
+   * modal's own Apply, independent of the panel's pricing Save. `null` clears the override. */
+  const saveStoreMargin = async (storeId: string, marginPercent: number | null, after?: () => void): Promise<{ ok: boolean; error?: string }> => {
+    setSavingMargin(true);
+    const result = await storeListings.setMargin(storeId, marginPercent);
+    setSavingMargin(false);
+    if (result.ok) after?.();
+    return result;
   };
 
   const confirmUsePrice = () => {
@@ -151,11 +119,14 @@ export function useProductPricing({ product, globals, storeListings, onSaved }: 
 
   return {
     editing,
-    dirty: !pricingFormsEqual(form, saved) || changedMargins().length > 0,
+    dirty: !pricingFormsEqual(form, saved),
     saving,
     applying,
     errors,
     form,
+    /** The last-saved pricing form — the per-store margin modals price-preview off this rather
+     * than the unsaved draft, since the server reprices from saved pricing. */
+    savedForm: saved,
     set,
     computed,
     currencies: globals.currencies,
@@ -163,16 +134,11 @@ export function useProductPricing({ product, globals, storeListings, onSaved }: 
     /** Discards the in-progress draft — the panel itself no longer has a Cancel button (always
      * editable, Save-only), but the New Product wizard's "Skip" still uses this to back out of
      * step 4 without saving. */
-    cancelEdit: () => {
-      setDraft(null);
-      setMarginDraftState(null);
-    },
+    cancelEdit: () => setDraft(null),
     savePricing,
-    marginDraft: explicitMarginDraft,
-    resolvedMarginDraft,
-    savingMargins,
-    setPendingMargin: (storeId: string, marginPercent: number | null) =>
-      setMarginDraftState((prev) => ({ ...(prev ?? {}), [storeId]: marginPercent })),
+    storeMargins,
+    savingMargin,
+    saveStoreMargin,
     confirmUse,
     requestUsePrice: () => setConfirmUse({ sellingIncTax: computed.sellingIncTax, totalBuying: computed.totalBuying }),
     cancelUsePrice: () => setConfirmUse(null),
