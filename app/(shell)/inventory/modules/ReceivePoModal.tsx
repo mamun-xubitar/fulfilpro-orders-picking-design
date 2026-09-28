@@ -89,7 +89,7 @@ export default function ReceivePoModal({ po }: { po: ReturnType<typeof usePurcha
 
         <p className="text-[12px] text-inventory-text-muted">Enter the quantity received for each item. Leave 0 for items not yet shipped — receive again later for partial deliveries.</p>
 
-        <div className="max-h-80 overflow-y-auto rounded-lg border border-inventory-border">
+        <div className="max-h-80 overflow-y-auto thin-scroll rounded-lg border border-inventory-border">
           <div className={`grid ${GRID_COLS} items-center gap-2 border-b border-inventory-border bg-inventory-surface-muted px-2 py-1 text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-inventory-text-subtle`}>
             <span className="flex min-h-[16px] items-center">Variant</span>
             <span className="flex min-h-[16px] items-center">Supplier SKU</span>

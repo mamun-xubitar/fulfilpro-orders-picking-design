@@ -7,7 +7,7 @@ type PoPreview = Extract<ImportPreview, { type: 'po' }>;
 
 export default function PoImportPreviewTable({ preview }: { preview: PoPreview }) {
   return (
-    <div className="max-h-80 space-y-2 overflow-y-auto">
+    <div className="max-h-80 space-y-2 overflow-y-auto thin-scroll">
       {preview.groups.map((group) => (
         <div key={group.poNumber} className="rounded-lg border border-inventory-border">
           <div className="flex items-center justify-between gap-2 border-b border-inventory-border bg-inventory-surface-muted px-2 py-1">

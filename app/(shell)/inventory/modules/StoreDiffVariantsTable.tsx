@@ -50,7 +50,7 @@ export default function StoreDiffVariantsTable({ rows, systemImages, storeImages
           {saving ? 'Saving…' : 'Save variants to store'}
         </button>
       </div>
-      <div className="overflow-x-auto rounded-[8px] border border-inventory-border">
+      <div className="overflow-x-auto thin-scroll rounded-[8px] border border-inventory-border">
         <table className="w-full min-w-[640px] text-[11px] leading-none">
           <thead>
             <tr className="border-b border-inventory-border bg-inventory-surface-muted">

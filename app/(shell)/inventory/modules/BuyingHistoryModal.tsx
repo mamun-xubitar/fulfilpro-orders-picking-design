@@ -28,7 +28,7 @@ export default function BuyingHistoryModal({ purchaseOrders, onClose, onReceive 
     <ModalShell disableBackdropClose title="Buying history" compact onClose={onClose} wide bodyClassName={WIZARD_BODY_CLASS}>
       <div className={WIZARD_CARD_CLASS}>
         <AnimatedStepBody minHeightClassName="min-h-0">
-          <div className="max-h-[28rem] overflow-x-auto overflow-y-auto rounded-lg border border-inventory-border">
+          <div className="max-h-[28rem] overflow-x-auto overflow-y-auto thin-scroll rounded-lg border border-inventory-border">
             <table className="w-full min-w-[560px] text-[11px] leading-none">
               <thead>
                 <tr className="border-b border-inventory-border bg-inventory-surface-muted">

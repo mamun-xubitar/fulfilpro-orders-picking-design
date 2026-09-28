@@ -64,7 +64,7 @@ export default function StoreDraftVariants({
       <p className="mb-1.5 text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-inventory-text-subtle">
         Variants / stock matrix {showPricing ? '(Price AUD ex-tax)' : ''}
       </p>
-      <div className="overflow-x-auto rounded-lg border border-inventory-border">
+      <div className="overflow-x-auto thin-scroll rounded-lg border border-inventory-border">
         <table className="w-full min-w-[560px] text-[11px] leading-none">
           <thead>
             <tr className="border-b border-inventory-border bg-inventory-surface-muted">

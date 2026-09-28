@@ -16,7 +16,7 @@ type EditImagesModalProps = {
 
 export default function EditImagesModal({ images, colours, imageMutations, onClose }: EditImagesModalProps) {
   return (
-    <ModalShell disableBackdropClose title="Edit images" compact onClose={onClose} extraWide bodyClassName="thin-scroll">
+    <ModalShell disableBackdropClose title="Edit images" compact onClose={onClose} extraWide>
       <ImageCardsGrid images={images} colours={colours} imageMutations={imageMutations} />
     </ModalShell>
   );

@@ -32,7 +32,7 @@ export default function PoItemsTable({ rows, quantities, skus, costs, onQuantity
   const grandTotal = rows.reduce((sum, v) => sum + (Number(quantities[v.id]) || 0) * (Number(costs[v.id]) || 0), 0);
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-inventory-border">
+    <div className="overflow-x-auto thin-scroll rounded-lg border border-inventory-border">
       <div className={`grid ${GRID_COLS} items-center gap-[6px] border-b border-inventory-border bg-inventory-surface-muted px-2 py-1 text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-inventory-text-subtle`}>
         <span className="flex min-h-[16px] items-center">Variants</span>
         <span className="flex min-h-[16px] items-center justify-end text-right">Stock</span>

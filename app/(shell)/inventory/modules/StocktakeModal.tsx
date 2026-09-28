@@ -39,7 +39,7 @@ export default function StocktakeModal({ stocktake }: { stocktake: ReturnType<ty
     >
       <div className={WIZARD_CARD_CLASS}>
         <p className="mb-2 text-[12px] text-inventory-text-muted">Enter the counted quantity for each variant. Stock on hand is updated to match your count.</p>
-        <div className="max-h-96 overflow-y-auto rounded-lg border border-inventory-border">
+        <div className="max-h-96 overflow-y-auto thin-scroll rounded-lg border border-inventory-border">
           <table className="w-full border-collapse text-[11px] leading-none">
             <thead>
               <tr className="border-b border-inventory-border bg-inventory-surface-muted text-left text-[10px] font-bold uppercase tracking-[0.4px] text-inventory-text-subtle">

@@ -90,7 +90,7 @@ export default function StoreDraftVariantImage({ variantLabel, storeName, images
           role="listbox"
           aria-label={`Choose an image for ${variantLabel}`}
           style={{ position: 'fixed', top: menuStyle.top, left: menuStyle.left, width: menuStyle.width }}
-          className="z-50 max-h-64 overflow-y-auto rounded-lg border border-inventory-border bg-inventory-surface py-1 shadow-lg"
+          className="z-50 max-h-64 overflow-y-auto thin-scroll rounded-lg border border-inventory-border bg-inventory-surface py-1 shadow-lg"
         >
           <button
             type="button"
