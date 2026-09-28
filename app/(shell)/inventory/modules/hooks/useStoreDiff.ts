@@ -87,13 +87,10 @@ function overlayVariants(
 export function useStoreDiff({ product, listing, storeListings }: UseStoreDiffArgs) {
   const diff = useMemo(() => computeStoreDiff(product, listing), [product, listing]);
 
-  // Same per-variant Available default the publish modal seeds its own input with — the store's
-  // live quantity, or an even split of hub stock for a variant not yet there. Reused here so the
-  // differences table's Available input starts at the same number instead of a blank input.
-  const stockDefaults = useMemo(
-    () => defaultStock(product, listing.storeId, new Set([listing.storeId]), storeListings),
-    [product, listing.storeId, storeListings]
-  );
+  // Same per-variant Available default every flow seeds its own input with — the hub's full
+  // available quantity. Reused here so the differences table's Available input starts at the same
+  // number instead of a blank input.
+  const stockDefaults = useMemo(() => defaultStock(product), [product]);
 
   const [edits, setEdits] = useState<Record<string, string>>(() => {
     const initial: Record<string, string> = {};
@@ -112,9 +109,9 @@ export function useStoreDiff({ product, listing, storeListings }: UseStoreDiffAr
   const { request } = useRequest<{ results: { storeId: string; status: string; error?: string }[] }>();
 
   const push = (aspects: PublishAspect[], overlay: (draft: StoreDraft) => void, key: string) => {
-    const draft = emptyDraft(product, listing.storeId, storeListings);
+    const draft = emptyDraft(product, listing.storeId, storeListings, 'listing');
     overlay(draft);
-    const defaultStockForStore = defaultStock(product, listing.storeId, new Set([listing.storeId]), storeListings);
+    const defaultStockForStore = defaultStock(product);
     const target = buildPublishTarget(product, listing.storeId, draft, aspects, defaultStockForStore);
 
     setSavingKey(key);
@@ -151,7 +148,7 @@ export function useStoreDiff({ product, listing, storeListings }: UseStoreDiffAr
   const saveImages = () => push(['images'], applyImagesOverlay, 'images');
 
   const saveVariants = () => {
-    const aspects = overlayVariants(emptyDraft(product, listing.storeId, storeListings), product, diff, edits);
+    const aspects = overlayVariants(emptyDraft(product, listing.storeId, storeListings, 'listing'), product, diff, edits);
     setConfirmAction(() => () => push(aspects, (draft) => overlayVariants(draft, product, diff, edits), 'variants'));
   };
 
@@ -162,7 +159,7 @@ export function useStoreDiff({ product, listing, storeListings }: UseStoreDiffAr
 
     let variantAspects: PublishAspect[] = [];
     if (diff.variants.length > 0) {
-      variantAspects = overlayVariants(emptyDraft(product, listing.storeId, storeListings), product, diff, edits);
+      variantAspects = overlayVariants(emptyDraft(product, listing.storeId, storeListings, 'listing'), product, diff, edits);
       for (const a of variantAspects) aspects.add(a);
     }
 

@@ -1,7 +1,7 @@
-/** Blocking notice shown when a selected store's draft excludes every hub variant — unlike
- * StockWarningBanner this always disables Save, since Shopify has no valid shape for a product
- * with zero variants (it would fabricate its own zero-price default one instead). See
- * `hasNoVariantsIncluded` in useStorePublish.ts. */
+/** Blocking notice shown when a selected store's draft excludes every hub variant — always
+ * disables Save, since Shopify has no valid shape for a product with zero variants (it would
+ * fabricate its own zero-price default one instead). See `hasNoVariantsIncluded` in
+ * useStorePublish.ts. */
 export default function NoVariantsWarningBanner({ storeNames }: { storeNames: string[] }) {
   if (storeNames.length === 0) return null;
 

@@ -19,8 +19,7 @@ type StoreDraftBlockProps = {
   draft: StoreDraft;
   onChange: (next: StoreDraft) => void;
   /** hubVariantId -> the Available quantity to show/push when the admin hasn't typed an override
-   * — this store's own live Shopify quantity (published) or an even split of the hub's available
-   * stock across the currently-selected new stores (unpublished). See `defaultStock`. */
+   * — the hub's full available quantity, the same for every store. See `defaultStock`. */
   defaultStock: Record<string, number>;
   /** Which field groups to show — the bulk-update modal only renders the checked aspects. */
   showImages: boolean;

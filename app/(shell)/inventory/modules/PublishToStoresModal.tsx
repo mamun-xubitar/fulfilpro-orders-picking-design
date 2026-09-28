@@ -7,7 +7,6 @@ import { productStatusLabel } from "./constants";
 import type { StorePublishState } from "./hooks/useStorePublish";
 import StoreBlockSeparator from "./StoreBlockSeparator";
 import StoreDraftBlock from "./StoreDraftBlock";
-import StockWarningBanner from "./StockWarningBanner";
 import NoVariantsWarningBanner from "./NoVariantsWarningBanner";
 import type { ProductRecord, StoreListingResult } from "./types";
 
@@ -163,17 +162,18 @@ export default function PublishToStoresModal({
               </div>
             </div>
             <p className="mt-1.5 text-[10px] leading-snug text-inventory-text-subtle">
-              Edit each store&apos;s copy below — title, description, media,
-              type, category, collections, status, handle (read-only), brand,
-              SKU, sizes, colours, stock matrix, per-store AUD price and selling
-              tags. Cost always comes from the hub; each store&apos;s available
-              stock defaults to an even split of hub stock (or its own live
-              quantity if already published) and can be adjusted per store.
+              Publish always starts from the system product below — title,
+              description, media, category, status, brand, SKU and variant
+              images reset to the hub&apos;s current values even for a store
+              that&apos;s already listed. Tags, SEO, Shopify Type and
+              collections have no hub source, so they start from what&apos;s
+              already on the store. Cost always comes from the hub; each
+              store&apos;s available stock defaults to the hub&apos;s full
+              available quantity and can be adjusted per store.
             </p>
           </section>
 
           <NoVariantsWarningBanner storeNames={noVariantsStores.map((s) => s.storeName)} />
-          {p.stockWarnings.length > 0 && <StockWarningBanner warnings={p.stockWarnings} />}
 
           {selectedStores.length === 0 ? (
             <p className="rounded-xl border border-dashed border-inventory-border p-6 text-center text-[11px] text-inventory-text-subtle">
@@ -193,7 +193,7 @@ export default function PublishToStoresModal({
                   product={product}
                   draft={p.draftFor(store.storeId)}
                   onChange={(next) => p.setDraft(store.storeId, next)}
-                  defaultStock={p.defaultStockFor(store.storeId)}
+                  defaultStock={p.defaultStockFor()}
                   showImages
                   showDetails
                   showPricing

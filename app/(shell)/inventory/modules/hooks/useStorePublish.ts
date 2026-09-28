@@ -4,7 +4,7 @@ import { useState } from 'react';
 import useRequest from '@/hooks/useRequest';
 import type { ProductRecord } from '../types';
 import type { StoreListingsState } from './useStoreListings';
-import { ALL_ASPECTS, buildPublishTarget, defaultStock, emptyDraft, isPublished, resolveStock } from '../storeDraft';
+import { ALL_ASPECTS, buildPublishTarget, defaultStock, emptyDraft, isPublished } from '../storeDraft';
 import type { PublishAspect, StoreDraft } from '../storeDraft';
 
 export type { PublishAspect, StoreDraft };
@@ -36,16 +36,23 @@ export function useStorePublish({ product, storeListings }: { product: ProductRe
     setSelectedStoreIds(allSelected ? new Set() : new Set(all));
   };
 
-  /** Lazily seeds a store's draft from the hub product (prices suggested from its margin) the
-   * first time it's touched, so opening a modal doesn't need an effect to pre-populate. */
-  const draftFor = (storeId: string): StoreDraft => drafts[storeId] ?? emptyDraft(product, storeId, storeListings);
+  // Publish always seeds from the system (hub) product — even for a store that's already
+  // published there — so re-publishing genuinely re-pushes the hub's current state. Bulk update
+  // seeds from that store's own live listing, since it edits the published product in place. The
+  // two modals are mutually exclusive (see openPublish/openBulkUpdate) and each clears `drafts` on
+  // open, so a draft can never be read under the wrong source.
+  const draftSource = bulkOpen ? 'listing' : 'hub';
+
+  /** Lazily seeds a store's draft (prices suggested from its margin) the first time it's touched,
+   * so opening a modal doesn't need an effect to pre-populate. */
+  const draftFor = (storeId: string): StoreDraft => drafts[storeId] ?? emptyDraft(product, storeId, storeListings, draftSource);
 
   const setDraft = (storeId: string, next: StoreDraft) => setDrafts((prev) => ({ ...prev, [storeId]: next }));
 
-  // Opposite lifecycle to `draftFor`: recomputed on every call, never stored, because the default
-  // split depends on which stores are currently selected — it would go stale the moment the
-  // selection changes if it were baked into a draft the way variantPrices is.
-  const defaultStockFor = (storeId: string) => defaultStock(product, storeId, selectedStoreIds, storeListings);
+  // Every store's Available defaults to the hub's own pool (one shared stock pool, so every store
+  // shows/pushes the same number) — no per-selection split, so this no longer depends on which
+  // store it's for.
+  const defaultStockFor = () => defaultStock(product);
 
   // A store whose draft excludes every hub variant has nothing for `productSet` to push — Shopify
   // would otherwise fabricate its own zero-price, untracked default variant (the same case is
@@ -57,20 +64,6 @@ export function useStorePublish({ product, storeListings }: { product: ProductRe
     const excluded = draftFor(storeId).excludedVariants;
     return variantIds.every((id) => excluded.includes(id));
   };
-
-  // Rows where the unpublished selected stores' resolved stock for a variant sums past the hub's
-  // own available quantity — informational only, so a deliberate overcommit reads as intentional
-  // rather than a mistake. Scoped to unpublished stores: a published store's live Shopify quantity
-  // routinely exceeds hub availability in normal trading, which would make this fire permanently
-  // if included (this also means it's always empty in the bulk-update modal, where every store is
-  // published).
-  const stockWarnings = (product?.variants ?? []).flatMap((v) => {
-    const peers = storeListings.listings.filter((l) => selectedStoreIds.has(l.storeId) && !isPublished(l));
-    if (peers.length === 0) return [];
-    const total = peers.reduce((sum, l) => sum + resolveStock(draftFor(l.storeId), v.id, defaultStockFor(l.storeId)), 0);
-    const available = Math.max(0, v.stockOnHand - v.allocated);
-    return total > available ? [{ variantId: v.id, colour: v.colour, size: v.size, total, available }] : [];
-  });
 
   // Publish and bulk-update are mutually exclusive — each open* closes the other so their store
   // blocks (and any open picker dropdowns inside them) can never render stacked on top of each
@@ -95,7 +88,7 @@ export function useStorePublish({ product, storeListings }: { product: ProductRe
   const submit = (storeIds: string[], aspects: PublishAspect[], onDone: (results: PublishResult[]) => void) => {
     if (!product || storeIds.length === 0) return;
     const targets = storeIds.map((storeId) =>
-      buildPublishTarget(product, storeId, draftFor(storeId), aspects, defaultStockFor(storeId))
+      buildPublishTarget(product, storeId, draftFor(storeId), aspects, defaultStockFor())
     );
 
     request({
@@ -147,7 +140,6 @@ export function useStorePublish({ product, storeListings }: { product: ProductRe
     draftFor,
     setDraft,
     defaultStockFor,
-    stockWarnings,
     hasNoVariantsIncluded,
     publishing,
     publishToSelected,

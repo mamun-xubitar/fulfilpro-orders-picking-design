@@ -29,9 +29,8 @@ type StoreDraftVariantsProps = {
 };
 
 /** Variants / stock matrix — Include (with a select-all header checkbox), SKU/barcode overrides,
- * this store's editable available stock (defaulting to its live Shopify quantity or an even split
- * of hub stock for a new store), and this store's own ex-tax price. Cost always comes from the
- * hub. */
+ * this store's editable available stock (defaulting to the hub's full available quantity, same
+ * for every store), and this store's own ex-tax price. Cost always comes from the hub. */
 export default function StoreDraftVariants({
   storeName,
   product,

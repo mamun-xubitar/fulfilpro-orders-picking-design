@@ -1,10 +1,10 @@
 'use client';
 
 import { formatColourName } from '@/lib/inventory/colour';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { toast } from 'react-toastify';
 import type { useProductImageMutations } from './hooks/useProductImageMutations';
-import { Close, Plus, Trash } from './icons';
+import { Close, Image as ImageIcon, Plus, Trash } from './icons';
 import type { ColourOption, ProductImage } from './types';
 import { makeSwatchResolver } from './utils';
 
@@ -129,11 +129,19 @@ function ImageCard({
   swatchOf: (colour: string) => string;
 }) {
   const assigning = imageMutations.settingColourForImageId === image.id;
+  const [broken, setBroken] = useState(false);
 
   return (
     <figure className="overflow-hidden rounded-xl border border-inventory-border flex flex-col justify-between">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={image.url} alt={image.altText ?? ''} className="aspect-square w-full object-cover " />
+      {broken ? (
+        <div className="flex aspect-square w-full flex-col items-center justify-center gap-1 bg-inventory-danger/10 text-inventory-danger">
+          <ImageIcon className="h-5 w-5" />
+          <span className="text-[10px] font-semibold">File missing</span>
+        </div>
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={image.url} alt={image.altText ?? ''} className="aspect-square w-full object-cover " onError={() => setBroken(true)} />
+      )}
       <figcaption className="space-y-1.5 bg-inventory-surface-muted px-2 py-1.5">
         {image.colour && (
           <div className="flex flex-wrap gap-1">

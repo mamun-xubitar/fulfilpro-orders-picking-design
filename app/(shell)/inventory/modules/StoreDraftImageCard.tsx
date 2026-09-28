@@ -1,6 +1,7 @@
 'use client';
 
-import { Trash } from './icons';
+import { useState } from 'react';
+import { Image as ImageIcon, Trash } from './icons';
 
 type StoreDraftImageCardProps = {
   image: { id: string; url: string; altText: string | null };
@@ -17,10 +18,19 @@ type StoreDraftImageCardProps = {
  * temporary until Save. Excluded images are visibly dimmed and ringed so "not going to this store"
  * reads at a glance. */
 export default function StoreDraftImageCard({ image, excluded, altValue, onToggleInclude, onAltChange, onRemove }: StoreDraftImageCardProps) {
+  const [broken, setBroken] = useState(false);
+
   return (
     <figure className={`overflow-hidden rounded-xl border transition-opacity duration-150 ${excluded ? 'border-inventory-border opacity-50' : 'border-inventory-border-strong'}`}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={image.url} alt={altValue || image.altText || ''} className="aspect-square w-full object-cover" />
+      {broken ? (
+        <div className="flex aspect-square w-full flex-col items-center justify-center gap-1 bg-inventory-danger/10 text-inventory-danger">
+          <ImageIcon className="h-5 w-5" />
+          <span className="text-[10px] font-semibold">File missing</span>
+        </div>
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={image.url} alt={altValue || image.altText || ''} className="aspect-square w-full object-cover" onError={() => setBroken(true)} />
+      )}
       <figcaption className="space-y-1.5 bg-inventory-surface-muted px-2 py-1.5">
         <div className="flex items-center justify-end">
           <button

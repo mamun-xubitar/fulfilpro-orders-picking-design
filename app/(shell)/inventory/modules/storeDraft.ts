@@ -9,9 +9,10 @@ export type PublishAspect = 'images' | 'details' | 'pricing' | 'variants';
 export const ALL_ASPECTS: PublishAspect[] = ['images', 'details', 'pricing', 'variants'];
 
 /** Per-store editable overlay for the publish / bulk-update modals — everything Shopify supports
- * per store. Seeded from the hub product; saving publishes the overlay without writing back to
- * the hub (hub stays the source of truth for cost; stock defaults from the hub or the store's
- * own live quantity but is editable per store — see `defaultStock`). */
+ * per store. Seeded from the hub product (Publish) or the store's live listing (Update /
+ * Differences) — see `emptyDraft`; saving publishes the overlay without writing back to the hub
+ * (hub stays the source of truth for cost; stock defaults to the hub's available quantity but is
+ * editable per store — see `defaultStock`). */
 export type StoreDraft = {
   /** Per-store tags, edited via the searchable Tags multi-select (Add appends + selects). */
   tags: string[];
@@ -59,9 +60,7 @@ export type StoreDraft = {
    * touches the hub's SupplierProductVariant.imageId. */
   variantImages: Record<string, string | null>;
   /** hubVariantId -> available qty for this store, ONLY where the admin typed one. Unset keys
-   * fall back to the computed default (split for a new store, live Shopify qty for a published
-   * one) — the default depends on the current store selection, so it's never baked into a draft
-   * the way variantPrices is (see `defaultStock`). */
+   * fall back to the hub's available quantity (see `defaultStock`). */
   variantStock: Record<string, string>;
 };
 
@@ -111,20 +110,31 @@ export function isPublished(listing: StoreListingsState['listings'][number] | un
   return listing?.found ?? false;
 }
 
-export function emptyDraft(product: ProductRecord | null, storeId: string, storeListings: StoreListingsState): StoreDraft {
+/** Where a draft's hub-owned fields are seeded from. `'hub'` — the Publish modal, which always
+ * pushes the system product, even to a store that already has it. `'listing'` — the Update and
+ * Differences modals, which edit the published product (falls back to the hub for a store that
+ * has nothing live). */
+export type DraftSource = 'hub' | 'listing';
+
+/** Seeds one store's draft. Hub-owned fields (title, description, vendor, category, status,
+ * images, SKU/barcode, variant images) follow `source`. Store-only fields with no hub
+ * counterpart (tags, SEO, Type, collections) always come from the live listing when there is one,
+ * so a Publish over an existing listing never wipes them. Price always follows the store margin. */
+export function emptyDraft(product: ProductRecord | null, storeId: string, storeListings: StoreListingsState, source: DraftSource): StoreDraft {
   const listing = storeListings.listings.find((l) => l.storeId === storeId);
   // Product-specific per-store margin wins; falling back to this store's own global default
   // when the product has none. See lib/inventory/store-price.ts for the full resolution chain,
   // shared with the server-side publish path.
   const margin = resolveStoreMargin(listing?.marginPercent ?? null, listing?.storeDefaultMarginPercent ?? null);
   const published = isPublished(listing);
+  const fromListing = source === 'listing' && published;
   const variantPrices: Record<string, string> = {};
   const variantSku: Record<string, string> = {};
   const variantBarcode: Record<string, string> = {};
   const variantImages: Record<string, string | null> = {};
   const axes = resolveOptionAxes(product?.variants ?? []);
   for (const v of product?.variants ?? []) {
-    const matched = published ? matchListingVariant(listing, v, axes) : undefined;
+    const matched = fromListing ? matchListingVariant(listing, v, axes) : undefined;
     // Price always follows the per-store margin (or the product's own default price) — never the
     // store's currently-live Shopify price, published or not.
     variantPrices[v.id] = String(product ? suggestedPrice(product.pricing, margin, v.sellPrice) : 0);
@@ -132,12 +142,12 @@ export function emptyDraft(product: ProductRecord | null, storeId: string, store
     // showing empty — the live value only wins when it's actually non-blank.
     variantSku[v.id] = matched?.sku ?? v.sku ?? '';
     variantBarcode[v.id] = matched?.barcode ?? v.barcode ?? '';
-    // Published: the live Shopify media id (matches an entry in `listing.images`). Unpublished:
+    // From listing: the live Shopify media id (matches an entry in `listing.images`). From hub:
     // the hub's own variant->image link (matches an entry in the hub gallery, seeded below as
     // `images`) — both id spaces line up with whichever list `images` ends up holding.
-    variantImages[v.id] = published ? matched?.imageId ?? null : v.imageId ?? null;
+    variantImages[v.id] = fromListing ? matched?.imageId ?? null : v.imageId ?? null;
   }
-  if (published) {
+  if (fromListing) {
     // A live Shopify listing's per-variant images can disagree within one colour (e.g. edited
     // outside this app) — the editor now assigns per colour, not per variant, so normalise here
     // by taking the first non-null image seen for each colour and applying it across the group.
@@ -156,15 +166,15 @@ export function emptyDraft(product: ProductRecord | null, storeId: string, store
     tags: published ? listing?.tags ?? [] : [],
     seoTitle: published ? listing?.seoTitle ?? '' : '',
     seoDescription: published ? listing?.seoDescription ?? '' : '',
-    title: published ? listing?.productTitle ?? '' : product?.name ?? '',
-    description: published ? listing?.description ?? '' : product?.description ?? '',
-    vendor: published ? listing?.vendor ?? '' : product?.brand ?? '',
+    title: fromListing ? listing?.productTitle ?? '' : product?.name ?? '',
+    description: fromListing ? listing?.description ?? '' : product?.description ?? '',
+    vendor: fromListing ? listing?.vendor ?? '' : product?.brand ?? '',
     // Shopify's Type is free text (e.g. "Snowboard") and has nothing to do with the hub's
     // taxonomy Category ("Home & Garden > … > Skillets") — falling back to that path here would
     // just dump a confusing breadcrumb into the field, so an unset store Type stays blank
     // (ProductTypePicker's placeholder guides the admin instead).
     productType: listing?.productType ?? '',
-    category: published
+    category: fromListing
       ? listing?.category ?? { id: null, name: '' }
       : { id: product?.categoryId ?? null, name: product?.category ?? '' },
     collections: (listing?.collections ?? []).filter((c) => !c.automated).map((c) => ({ id: c.id, title: c.title })),
@@ -172,14 +182,14 @@ export function emptyDraft(product: ProductRecord | null, storeId: string, store
     // in Shopify admin) — a state our hub's three-value vocabulary doesn't have. It's treated as
     // DRAFT here (both mean "not visible to customers"), same as an admin who re-publishes an
     // archived product would pick.
-    status: published ? toHubStatus(listing?.status) : product?.status ?? 'DRAFT',
+    status: fromListing ? toHubStatus(listing?.status) : product?.status ?? 'DRAFT',
     variantPrices,
     variantPricesEdited: [],
     variantSku,
     variantBarcode,
     variantImages,
     excludedVariants: [],
-    images: published
+    images: fromListing
       ? listing?.images ?? []
       : (product?.images ?? []).map((img) => ({ id: img.id, url: img.url, altText: img.altText })),
     excludedImages: [],
@@ -188,57 +198,20 @@ export function emptyDraft(product: ProductRecord | null, storeId: string, store
   };
 }
 
-/** Available qty (stockOnHand - allocated, clamped at 0) — the hub's own pool for a variant,
- * shared by the default-stock split, the over-allocation warning, and the read-only hint next to
- * the stock input. Kept in sync with the identical expression server-side at
+/** Available qty (stockOnHand - allocated, clamped at 0) — the hub's own pool for a variant.
+ * Kept in sync with the identical expression server-side at
  * controllers/store-listing.controller.server.ts. */
 function hubAvailable(v: { stockOnHand: number; allocated: number }): number {
   return Math.max(0, v.stockOnHand - v.allocated);
 }
 
-/**
- * Per-store default for the editable Available column — a sibling to `emptyDraft`, called the
- * same way but kept separate because it depends on the *current store selection*, not just the
- * store being drafted, so it can't be baked into `emptyDraft`'s one-time seed.
- *
- * Published store: this store's own live Shopify quantity (falling back to the hub pool for an
- * unmatched or blank variant). Unpublished store: the hub pool split evenly across every
- * currently-selected store that isn't published yet, in `storeListings.listings` order — deriving
- * the order from `listings` (rather than the caller's `selectedStoreIds` iteration order, which
- * is just click order) is what keeps the on-screen split and the submitted payload in agreement
- * regardless of the order stores were selected in.
- */
-export function defaultStock(
-  product: ProductRecord | null,
-  storeId: string,
-  selectedStoreIds: Set<string>,
-  storeListings: StoreListingsState
-): Record<string, number> {
+/** Per-variant default for the editable Available column in every flow (Publish, Update,
+ * Differences): the hub's full available quantity. Stock is one shared hub pool, so every store
+ * shows the same number (hub has 100 -> each store gets 100) rather than a split or whatever the
+ * store happens to show live. */
+export function defaultStock(product: ProductRecord | null): Record<string, number> {
   if (!product) return {};
-  const listing = storeListings.listings.find((l) => l.storeId === storeId);
-  const published = isPublished(listing);
-  const peers = published ? [] : storeListings.listings.filter((l) => selectedStoreIds.has(l.storeId) && !isPublished(l));
-  const peerIndex = peers.findIndex((l) => l.storeId === storeId);
-  const n = peers.length || 1;
-  const i = Math.max(0, peerIndex);
-
-  const result: Record<string, number> = {};
-  const axes = resolveOptionAxes(product.variants);
-  for (const v of product.variants) {
-    if (published) {
-      // Sums stock across every location Shopify has it at for this store, while the write path
-      // (getPrimaryLocationId) only ever sets stock at ONE location. On a store with multiple
-      // stocked locations, reopening this modal after a save will show a number already inflated
-      // by that save. Store publishing already assumes one fulfilment location per store — this
-      // is the same assumption, just newly visible here. No effect for the common single-location
-      // store.
-      result[v.id] = matchListingVariant(listing, v, axes)?.inventoryQuantity ?? hubAvailable(v);
-    } else {
-      const available = hubAvailable(v);
-      result[v.id] = Math.floor(available / n) + (i < available % n ? 1 : 0);
-    }
-  }
-  return result;
+  return Object.fromEntries(product.variants.map((v) => [v.id, hubAvailable(v)]));
 }
 
 /** Resolves what actually gets pushed for one variant: the admin's typed value if there is one,

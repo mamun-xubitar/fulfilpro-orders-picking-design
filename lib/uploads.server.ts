@@ -41,6 +41,29 @@ export function toPublicUrl(url: string): string | null {
   return `${base}${url}`;
 }
 
+/** Of the given public URLs, returns the file names of our own uploads (`/api/uploads/files/...`,
+ * bare or prefixed with APP_URL) that no longer exist on disk — Shopify would 404 fetching them and
+ * report only a generic "Media processing failed". URLs on any other host can't be checked locally
+ * and are skipped. */
+export async function findMissingUploads(publicUrls: string[]): Promise<string[]> {
+  const base = process.env.APP_URL?.replace(/\/$/, '') ?? '';
+  const prefix = '/api/uploads/files/';
+  const missing: string[] = [];
+  for (const url of publicUrls) {
+    const pathPart = base && url.startsWith(base + prefix) ? url.slice(base.length) : url;
+    if (!pathPart.startsWith(prefix)) continue;
+    const rawSegments = pathPart.slice(prefix.length).split('/');
+    try {
+      const filePath = resolveUploadPath(rawSegments.map(decodeURIComponent));
+      if (!filePath) throw new Error('outside uploads');
+      await fs.access(filePath);
+    } catch {
+      missing.push(rawSegments[rawSegments.length - 1] || url);
+    }
+  }
+  return missing;
+}
+
 /** Resolve a public file path, guarding against directory traversal. Returns null if outside UPLOADS_DIR. */
 export function resolveUploadPath(segments: string[]): string | null {
   const normalized = path.normalize(path.join(UPLOADS_DIR, ...segments));
