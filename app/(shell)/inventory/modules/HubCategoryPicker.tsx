@@ -79,7 +79,7 @@ export default function HubCategoryPicker({ value, onChange, categories }: HubCa
               placeholder={categories.categories.length === 0 ? 'No categories yet — type to add' : 'Search or add a category…'}
               className="mx-1 mb-1 h-[24px] shrink-0 rounded-[6px] border border-inventory-border px-[6px] text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring placeholder:text-inventory-text-subtle"
             />
-            <div className="min-h-0 flex-1 overflow-y-auto">
+            <div className="min-h-0 flex-1 overflow-y-auto thin-scroll">
               {value.id && (
                 <button
                   type="button"

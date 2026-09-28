@@ -3,20 +3,55 @@
 import { useMemo, useState } from 'react';
 import { toast } from 'react-toastify';
 import useRequest from '@/hooks/useRequest';
-import { getStatus, quickFilterMatches, sortVariantsForDisplay, summariseVariants, variantDraftChanges } from '../utils';
+import { getStatus, naturalCompare, quickFilterMatches, sortVariantsForDisplay, summariseVariants, variantDraftChanges } from '../utils';
 import type { ProductRecord, QuickFilterId, VariantRow, VariantStatus } from '../types';
 
 type MatrixFilters = {
   status: VariantStatus | null;
   showZeroStock: boolean;
   selected: string[];
+  /** Colours/sizes hidden from the table, lower-cased. Stored as "hidden" rather than "checked"
+   * so the default (nothing hidden) shows every row, and a colour/size declared later on the
+   * product shows up checked without this filter having to be told about it. */
+  hiddenColours: string[];
+  hiddenSizes: string[];
 };
 
-const DEFAULT_FILTERS: MatrixFilters = { status: null, showZeroStock: false, selected: [] };
+const DEFAULT_FILTERS: MatrixFilters = { status: null, showZeroStock: false, selected: [], hiddenColours: [], hiddenSizes: [] };
 
 // Module-level so its identity is stable across renders — a fresh {} every render would defeat
 // the `variants` useMemo below whenever there's no active product draft.
 const EMPTY_DRAFTS: Record<string, Partial<VariantRow>> = {};
+
+/** The Variants / stock table's Colour panel and Sizes dropdown are both client-side filters over
+ * `names` (declared on the product) — never a write to the product's variants. `hidden` holds the
+ * lower-cased names currently unchecked; `setHidden` replaces it wholesale via the caller's own
+ * `patch`, same as every other matrix filter. */
+export type OptionFilter = {
+  items: { name: string; checked: boolean }[];
+  toggle: (name: string) => void;
+  toggleAll: (checked: boolean) => void;
+  allChecked: boolean;
+  someChecked: boolean;
+  checkedCount: number;
+};
+
+function buildOptionFilter(names: string[], hidden: string[], setHidden: (next: string[]) => void): OptionFilter {
+  const hiddenSet = new Set(hidden);
+  const items = names.map((name) => ({ name, checked: !hiddenSet.has(name.toLowerCase()) }));
+  const checkedCount = items.filter((i) => i.checked).length;
+  return {
+    items,
+    toggle: (name: string) => {
+      const key = name.toLowerCase();
+      setHidden(hiddenSet.has(key) ? hidden.filter((h) => h !== key) : [...hidden, key]);
+    },
+    toggleAll: (checked: boolean) => setHidden(checked ? [] : names.map((n) => n.toLowerCase())),
+    allChecked: items.length > 0 && checkedCount === items.length,
+    someChecked: checkedCount > 0,
+    checkedCount,
+  };
+}
 
 type UseVariantsMatrixArgs = {
   product: ProductRecord | null;
@@ -100,6 +135,8 @@ export function useVariantsMatrix({ product, sizes, quickFilter, onVariantSaved 
       // unreachable. Pinned dirty rows re-evaluate normally once saved/reverted.
       if (dirtyById[v.id]) return true;
       if (quickFilter && !quickFilterMatches(quickFilter, v)) return false;
+      if (filters.hiddenColours.includes(v.colour.toLowerCase())) return false;
+      if (filters.hiddenSizes.includes(v.size.toLowerCase())) return false;
       if (filters.status && getStatus(v) !== filters.status) return false;
       // Unchecked (default) shows every variant; checking it narrows to zero-or-below stock only.
       if (filters.showZeroStock && v.stockOnHand > 0) return false;
@@ -109,7 +146,7 @@ export function useVariantsMatrix({ product, sizes, quickFilter, onVariantSaved 
     // the product's own declared size order — see sortVariantsForDisplay, shared with the
     // publish/bulk-update store draft tables so all three read the same way.
     return sortVariantsForDisplay(filtered, sizes);
-  }, [variants, sizes, quickFilter, filters.status, filters.showZeroStock, dirtyById]);
+  }, [variants, sizes, quickFilter, filters.hiddenColours, filters.hiddenSizes, filters.status, filters.showZeroStock, dirtyById]);
 
   // Selection is narrowed to the visible rows here rather than pruned in an effect.
   const selectedIds = useMemo(() => {
@@ -196,6 +233,11 @@ export function useVariantsMatrix({ product, sizes, quickFilter, onVariantSaved 
 
   const cancelBulkDelete = () => setStoredBulkDeleteOpen(null);
 
+  // Declared colours, A->Z — same list the Colour & size adjustment modal shows for this axis.
+  const colourNames = useMemo(() => [...(product?.colours ?? [])].map((c) => c.name).sort(naturalCompare), [product]);
+  const colourFilter = buildOptionFilter(colourNames, filters.hiddenColours, (hiddenColours) => patch({ hiddenColours }));
+  const sizeFilter = buildOptionFilter(sizes, filters.hiddenSizes, (hiddenSizes) => patch({ hiddenSizes }));
+
   /** Raw fetch (not useRequest) — mirrors useProductsTable's bulk actions, since the success
    * message's variant count is only known once the server responds. */
   const confirmBulkDelete = async () => {
@@ -222,6 +264,8 @@ export function useVariantsMatrix({ product, sizes, quickFilter, onVariantSaved 
 
   return {
     sizes,
+    colourFilter,
+    sizeFilter,
     rows,
     totals,
     dirtyById,

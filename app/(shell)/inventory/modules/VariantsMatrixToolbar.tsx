@@ -49,7 +49,7 @@ export default function VariantsMatrixToolbar({ p, fullView }: VariantsMatrixToo
 
       <span className="mx-[2px] h-[18px] w-px bg-inventory-border" aria-hidden="true" />
 
-      <VariantSizeDropdown size={p.variantOptions.size} saving={p.variantOptions.saving} />
+      <VariantSizeDropdown size={matrix.sizeFilter} />
 
       <label className="flex cursor-pointer items-center gap-[4px] text-[10px] font-medium leading-none text-inventory-text-muted">
         <input
