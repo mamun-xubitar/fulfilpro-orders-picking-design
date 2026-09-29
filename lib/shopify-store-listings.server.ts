@@ -183,6 +183,7 @@ const PRODUCT_VARIANTS_BULK_UPDATE_MUTATION = `
         price
         inventoryQuantity
         selectedOptions { name value }
+        media(first: 1) { nodes { id } }
       }
       userErrors {
         field

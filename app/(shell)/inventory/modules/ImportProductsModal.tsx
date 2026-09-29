@@ -130,7 +130,7 @@ export default function ImportProductsModal({ importProducts: ip, suppliers }: I
 
 function ImportProductsPreviewTable({ groups, overwrite }: { groups: ProductImportPreviewGroup[]; overwrite: boolean }) {
   return (
-    <div className="max-h-96 overflow-x-auto overflow-y-auto rounded-lg border border-inventory-border">
+    <div className="max-h-96 overflow-x-auto overflow-y-auto thin-scroll rounded-lg border border-inventory-border">
       <table className="w-full min-w-[420px] border-collapse text-[11px] leading-none">
         <thead className="sticky top-0 bg-inventory-surface-muted">
           <tr className="border-b border-inventory-border text-left text-[10px] font-bold uppercase tracking-[0.4px] text-inventory-text-subtle">

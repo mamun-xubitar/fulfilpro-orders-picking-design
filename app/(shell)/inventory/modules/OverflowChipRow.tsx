@@ -78,7 +78,12 @@ export default function OverflowChipRow({ items, onShowMore, emptyLabel = '—' 
       {hiddenCount > 0 && (
         <button
           type="button"
-          onClick={onShowMore}
+          onClick={(e) => {
+            // Stops the click reaching a clickable parent (the Suppliers trigger toggles its
+            // dropdown on click, which would immediately undo this open).
+            e.stopPropagation();
+            onShowMore();
+          }}
           aria-label={`Show ${hiddenCount} more`}
           title={items.slice(visibleCount).map((i) => i.label).join(', ')}
           className="inline-flex shrink-0 items-center rounded-full border border-inventory-border-strong bg-inventory-surface-muted px-[6px] py-[1px] text-[9px] font-bold leading-none text-inventory-text-muted hover:bg-inventory-surface-hover cursor-pointer"
@@ -88,8 +93,9 @@ export default function OverflowChipRow({ items, onShowMore, emptyLabel = '—' 
       )}
 
       {/* Hidden measuring layer — same chips, non-wrapping, off-screen. Widths are read via
-          offsetWidth in the effect above; never shown to the user. */}
-      <div ref={measureRef} aria-hidden className="pointer-events-none absolute left-0 top-0 flex -translate-y-full gap-[4px] opacity-0">
+          offsetWidth in the effect above; never shown to the user. `inert` keeps any focusable
+          chip content (e.g. a supplier chip's remove control) out of the tab order. */}
+      <div ref={measureRef} aria-hidden inert className="pointer-events-none absolute left-0 top-0 flex -translate-y-full gap-[4px] opacity-0">
         {items.map((item) => (
           <span key={item.key}>{item.node}</span>
         ))}

@@ -33,7 +33,7 @@ export default function ColourSizeModal({ product, optionLibrary, onApplied, onC
       maxWidthClass="max-w-4xl"
       disableBackdropClose
       onClose={onClose}
-      bodyClassName={`thin-scroll ${WIZARD_BODY_CLASS}`}
+      bodyClassName={WIZARD_BODY_CLASS}
       footer={
         <div className="flex flex-col gap-1">
           <div className="flex items-center justify-between gap-2">

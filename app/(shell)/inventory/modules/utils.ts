@@ -163,15 +163,6 @@ export function formatCurrencyValue(n: number): string {
   return `$${formatMoney(n)}`;
 }
 
-/** A store's effective per-store margin — `values` (useProductPricing's `marginDraft`) already
- * merges the panel's staged edits over each store's live marginPercent, so this is a lookup, not
- * a live/draft fork. Shared by PerStoreMarginRows (which rows to show) and StoreMarginPriceChips
- * (which stores get a price badge), so the two can never disagree about which stores have a
- * margin set. */
-export function marginForStore(storeId: string, values: Record<string, number | null>): number | null {
-  return values[storeId] ?? null;
-}
-
 /** A store listing's price, or price range, formatted with a leading `$` on both ends of a
  * range — e.g. "$12.00 – $15.00", not "$12.00 – 15.00". Used by both the store cards and the
  * per-store price chips under Pricing & margin. */

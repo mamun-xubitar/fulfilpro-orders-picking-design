@@ -33,8 +33,9 @@ export function ModalShell({
    * from a supplier picker) — bumps the backdrop above the standard z-50 layer so it stacks on
    * top instead of behind. Stays under the shell's z-[65] blocking overlay. */
   elevated?: boolean;
-  /** Extra classes appended to the scrolling body div — e.g. `thin-scroll` for a modal with a
-   * long, densely-scrolled body (a large image gallery). */
+  /** Extra classes appended to the scrolling body div. Note: `compact` (inventory) modals
+   * already get `thin-scroll` on the body from the skin — only a non-compact modal that
+   * needs it should pass it here. */
   bodyClassName?: string;
   /** Suppresses the backdrop-click close — for multi-step flows holding unsaved work (e.g. the
    * New Product wizard), where an accidental click outside shouldn't discard progress. The header
@@ -68,7 +69,7 @@ export function ModalShell({
             </svg>
           </button>
         </div>
-        <div className={`${allowOverflow ? 'px-5 py-4' : 'flex-1 overflow-y-auto px-5 py-4'} ${bodyClassName ?? ''}`}>{children}</div>
+        <div className={`${allowOverflow ? 'px-5 py-4' : `flex-1 overflow-y-auto px-5 py-4${compact ? ' thin-scroll' : ''}`} ${bodyClassName ?? ''}`}>{children}</div>
         {footer && <div className={`shrink-0 border-t ${compact ? 'border-inventory-border' : 'border-gray-200'} px-5 py-4`}>{footer}</div>}
       </div>
     </div>

@@ -77,7 +77,7 @@ export default function StoreDiffModal({ product, listing, storeListings, onClos
                 label={f.label}
                 preview={
                   f.key === 'description' ? (
-                    <div className="max-h-[80px] overflow-y-auto rounded-[6px] border border-inventory-border bg-inventory-surface-muted/60 p-[4px]">
+                    <div className="max-h-[80px] overflow-y-auto thin-scroll rounded-[6px] border border-inventory-border bg-inventory-surface-muted/60 p-[4px]">
                       {/* No `opacity` here — ClampedHtml's "See more" modal renders inline (not
                           via a portal), so an ancestor's opacity would wash the modal out too. */}
                       <ClampedHtml html={f.storeValue} title={`${listing.storeName} — Description`} />

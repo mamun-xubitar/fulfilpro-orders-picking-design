@@ -29,9 +29,8 @@ type StoreDraftVariantsProps = {
 };
 
 /** Variants / stock matrix — Include (with a select-all header checkbox), SKU/barcode overrides,
- * this store's editable available stock (defaulting to its live Shopify quantity or an even split
- * of hub stock for a new store), and this store's own ex-tax price. Cost always comes from the
- * hub. */
+ * this store's editable available stock (defaulting to the hub's full available quantity, same
+ * for every store), and this store's own ex-tax price. Cost always comes from the hub. */
 export default function StoreDraftVariants({
   storeName,
   product,
@@ -64,7 +63,7 @@ export default function StoreDraftVariants({
       <p className="mb-1.5 text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-inventory-text-subtle">
         Variants / stock matrix {showPricing ? '(Price AUD ex-tax)' : ''}
       </p>
-      <div className="overflow-x-auto rounded-lg border border-inventory-border">
+      <div className="overflow-x-auto thin-scroll rounded-lg border border-inventory-border">
         <table className="w-full min-w-[560px] text-[11px] leading-none">
           <thead>
             <tr className="border-b border-inventory-border bg-inventory-surface-muted">

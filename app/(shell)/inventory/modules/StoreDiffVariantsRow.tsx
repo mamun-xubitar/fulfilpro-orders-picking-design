@@ -11,8 +11,8 @@ type StoreDiffVariantsRowProps = {
   row: StoreVariantTableRow;
   systemImages: ProductImage[];
   storeImages: StoreListingImage[];
-  /** This row's Available default (this store's live quantity, or a split of hub stock for a
-   * not-yet-there variant) — the input's starting value until the admin types over it. */
+  /** This row's Available default (the hub's full available quantity) — the input's starting
+   * value until the admin types over it. */
   stockDefault: number;
   editValue: (field: DiffVariantField, fallback: string) => string;
   onEditChange: (field: DiffVariantField, value: string) => void;

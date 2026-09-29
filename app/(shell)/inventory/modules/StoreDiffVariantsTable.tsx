@@ -8,8 +8,8 @@ type StoreDiffVariantsTableProps = {
   rows: StoreVariantTableRow[];
   systemImages: ProductImage[];
   storeImages: StoreListingImage[];
-  /** hubVariantId -> Available default (this store's live quantity, or a split of hub stock for a
-   * not-yet-there variant) — same resolution the publish modal seeds its own input with. */
+  /** hubVariantId -> Available default (the hub's full available quantity) — same resolution
+   * every other flow seeds its own input with. */
   stockDefaults: Record<string, number>;
   edits: Record<string, string>;
   setEdit: (key: string, value: string) => void;
@@ -50,7 +50,7 @@ export default function StoreDiffVariantsTable({ rows, systemImages, storeImages
           {saving ? 'Saving…' : 'Save variants to store'}
         </button>
       </div>
-      <div className="overflow-x-auto rounded-[8px] border border-inventory-border">
+      <div className="overflow-x-auto thin-scroll rounded-[8px] border border-inventory-border">
         <table className="w-full min-w-[640px] text-[11px] leading-none">
           <thead>
             <tr className="border-b border-inventory-border bg-inventory-surface-muted">

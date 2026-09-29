@@ -49,7 +49,7 @@ export default function ProductImportPreviewTable({ preview }: { preview: Produc
       )}
 
       {preview.rows.length > 0 && (
-        <div className="max-h-72 overflow-y-auto rounded-lg border border-inventory-border">
+        <div className="max-h-72 overflow-y-auto thin-scroll rounded-lg border border-inventory-border">
           <table className="w-full border-collapse text-[11px] leading-none">
             <thead>
               <tr className="border-b border-inventory-border bg-inventory-surface-muted text-left text-[10px] font-bold uppercase tracking-[0.4px] text-inventory-text-subtle">

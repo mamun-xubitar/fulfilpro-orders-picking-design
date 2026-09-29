@@ -157,7 +157,7 @@ export default function BulkUpdateStoresModal({ product, storeOptions, publish: 
                   product={product}
                   draft={p.draftFor(store.storeId)}
                   onChange={(next) => p.setDraft(store.storeId, next)}
-                  defaultStock={p.defaultStockFor(store.storeId)}
+                  defaultStock={p.defaultStockFor()}
                   showImages={p.bulkAspects.has('images')}
                   showDetails={p.bulkAspects.has('details')}
                   showPricing={p.bulkAspects.has('pricing')}

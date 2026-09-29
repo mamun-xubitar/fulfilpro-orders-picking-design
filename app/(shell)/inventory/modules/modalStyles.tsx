@@ -1,8 +1,9 @@
 import { MODAL_FOOTER_BTN_PRIMARY, MODAL_FOOTER_BTN_SECONDARY } from '@/components/ModalShell';
 
 /** The New Product wizard's look (gradient body, white content card, gradient footer buttons),
- * shared with the other inventory modals so they read as one family. */
-export const WIZARD_BODY_CLASS = 'thin-scroll overflow-x-clip bg-gradient-to-b from-inventory-primary/[8%] via-inventory-surface to-inventory-surface';
+ * shared with the other inventory modals so they read as one family. (The thin scrollbar comes
+ * from the compact ModalShell skin, not from here.) */
+export const WIZARD_BODY_CLASS = 'overflow-x-clip bg-gradient-to-b from-inventory-primary/[8%] via-inventory-surface to-inventory-surface';
 
 export const WIZARD_CARD_CLASS = 'rounded-[10px] border border-inventory-border bg-inventory-surface p-3 shadow-inventory';
 

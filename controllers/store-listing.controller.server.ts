@@ -7,7 +7,7 @@ import { searchStoreCollections } from '@/lib/shopify-store-collections.server';
 import { createStoreCollection, searchStoreTaxonomy, type TaxonomyField } from '@/lib/shopify-taxonomy.server';
 import { resolveStoreMargin, storePriceFromMargin } from '@/lib/inventory/store-price';
 import { sanitizeHtml } from '@/lib/sanitize-html';
-import { toPublicUrl } from '@/lib/uploads.server';
+import { toPublicUrl, findMissingUploads } from '@/lib/uploads.server';
 import { StoreModel } from '@/models/store.model.server';
 
 const model = new SupplierProductModel();
@@ -395,6 +395,14 @@ export class StoreListingController {
           const info = imageDropInfo.get(target.storeId);
           if ((info?.candidates ?? 0) > 0 && payload.images.length === 0) {
             throw new Error("Images can't be published: APP_URL is not set to a public URL Shopify can fetch from");
+          }
+          // Checked before productSet so a missing file never replaces the store's media with
+          // entries Shopify can only mark FAILED.
+          const missing = await findMissingUploads(payload.images.map((i) => i.url));
+          if (missing.length > 0) {
+            throw new Error(
+              `${missing.length} image(s) are missing from the server's uploads folder (${missing.join(', ')}). Remove them from this store's images (they show as "File missing"), or delete and re-upload them in Edit images, then publish again.`
+            );
           }
         }
         const result = await publishProductToStore({

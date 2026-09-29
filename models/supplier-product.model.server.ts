@@ -448,17 +448,6 @@ export class SupplierProductModel {
   }
 
   /**
-   * Regenerates a product's variants to exactly `sizes` x `colours` — creating the missing combos
-   * and deleting the rest — without touching the product's own declared `sizes`/`colours` lists.
-   * Used by the Variants / stock toolbar's colour panel and sizes dropdown: unchecking a colour or
-   * size there removes its variants but keeps the value declared (and listed, unchecked) on the
-   * product, unlike applyOptions/updateDetails which write the declared lists too.
-   */
-  async syncVariantsToOptions(supplierProductId: string, sizes: string[], colours: string[]): Promise<void> {
-    await this.reconcileVariants(supplierProductId, sizes, colours);
-  }
-
-  /**
    * Promotes variant rows still on the '' sentinel for the given axis to the first declared
    * value on that axis, in place — so stock/pricing on a colour-only (or size-only) product
    * survives the moment its first size (or colour) is added, instead of the sentinel row being

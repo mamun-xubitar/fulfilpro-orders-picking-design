@@ -64,7 +64,7 @@ function NewAdjustmentModal({ a, variants }: { a: ReturnType<typeof useAdjustmen
         <AnimatedStepBody minHeightClassName="min-h-0">
           <AdjustmentChipsStrip a={a} />
 
-          <div className="max-h-[60vh] overflow-x-auto overflow-y-auto rounded-lg border border-inventory-border">
+          <div className="max-h-[60vh] overflow-x-auto overflow-y-auto thin-scroll rounded-lg border border-inventory-border">
             <table className="w-full min-w-[560px] border-collapse text-[11px] leading-none">
               <thead className="sticky top-0 bg-inventory-surface-muted">
                 <tr className="border-b border-inventory-border text-left text-[10px] font-bold uppercase tracking-[0.4px] text-inventory-text-subtle">
@@ -214,7 +214,7 @@ function AdjustmentHistoryModal({ a }: { a: ReturnType<typeof useAdjustments> })
       ) : a.history.length === 0 ? (
         <p className="py-6 text-center text-[11px] text-inventory-text-subtle">No adjustments recorded yet.</p>
       ) : (
-        <ul className="max-h-96 divide-y divide-inventory-divider overflow-y-auto">
+        <ul className="max-h-96 divide-y divide-inventory-divider overflow-y-auto thin-scroll">
           {a.history.map((row) => (
             <li key={row.id} className="flex items-center justify-between gap-2 py-1.5 text-[11px]">
               <span className="min-w-0 truncate text-inventory-text-muted">

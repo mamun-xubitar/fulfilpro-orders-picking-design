@@ -98,17 +98,22 @@ export function useStoreListings(productId: string | null) {
     }
   };
 
-  /** Persists (or, with `marginPercent: null`, clears) one store's per-store margin — called
-   * only from the Pricing & margin panel's own Save (see useProductPricing.savePricing), never on
-   * blur/change, so a store is never repriced until the admin explicitly saves. When that store is
-   * already published, saving immediately reprices every mapped variant on Shopify to match — the
-   * server does the push and returns the updated variants, merged in here the same way
-   * `savePrices` does, so the price chip reflects it without a manual Sync. A store that isn't
-   * listed yet (or a Shopify-side repricing failure) still keeps the saved margin. `silent`
-   * suppresses this call's own toast — used when several stores are saved together, so the panel
-   * shows one combined summary instead of one toast per store. */
-  const setMargin = async (storeId: string, marginPercent: number | null, options?: { silent?: boolean }): Promise<boolean> => {
-    if (!productId) return false;
+  /** Persists (or, with `marginPercent: null`, clears) one store's per-store margin — saved
+   * directly from the Per store margin modal (see useProductPricing.saveStoreMargin), independent
+   * of the panel's own pricing Save. When that store is already published, saving immediately
+   * reprices every mapped variant on Shopify to match — the server does the push and returns the
+   * updated variants, merged in here the same way `savePrices` does, so the price chip reflects it
+   * without a manual Sync. A store that isn't listed yet (or a Shopify-side repricing failure)
+   * still keeps the saved margin. `silent` suppresses this call's own toast — used when several
+   * stores are saved together, so the panel shows one combined summary instead of one toast per
+   * store. Returns `{ ok, error? }` rather than a bare boolean so the modal can show a validation
+   * or server error inline instead of only via toast. */
+  const setMargin = async (
+    storeId: string,
+    marginPercent: number | null,
+    options?: { silent?: boolean }
+  ): Promise<{ ok: boolean; error?: string }> => {
+    if (!productId) return { ok: false, error: 'No product loaded' };
     try {
       const res = await fetch(`/api/inventory/catalog/${productId}/store-listings/${storeId}/margin`, {
         method: 'PATCH',
@@ -116,7 +121,7 @@ export function useStoreListings(productId: string | null) {
         body: JSON.stringify({ marginPercent }),
       });
       const json = (await res.json()) as ApiEnvelope<{ marginPercent: number | null; repriced?: boolean; variants?: StoreListingVariant[] }>;
-      if (!res.ok || !json.success) throw new Error(json.message || 'Failed to save store margin');
+      if (!res.ok || !json.success) throw new Error(json.errors?.[0] || json.message || 'Failed to save store margin');
 
       const updatedById = json.data!.variants ? new Map(json.data!.variants.map((v) => [v.id, v])) : null;
       setListings((prev) =>
@@ -131,10 +136,11 @@ export function useStoreListings(productId: string | null) {
         )
       );
       if (!options?.silent) toast.success(json.message);
-      return true;
+      return { ok: true };
     } catch (err) {
-      if (!options?.silent) toast.error(err instanceof Error ? err.message : 'Failed to save store margin');
-      return false;
+      const message = err instanceof Error ? err.message : 'Failed to save store margin';
+      if (!options?.silent) toast.error(message);
+      return { ok: false, error: message };
     }
   };
 
