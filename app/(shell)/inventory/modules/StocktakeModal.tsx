@@ -17,7 +17,7 @@ export default function StocktakeModal({ stocktake }: { stocktake: ReturnType<ty
       wide
       bodyClassName={WIZARD_BODY_CLASS}
       footer={
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={stocktake.close}

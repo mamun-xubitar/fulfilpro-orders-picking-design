@@ -77,7 +77,7 @@ export default function StorePricesModal({ listing, onClose, onSaveOne, onSaveAl
       maxWidthClass="max-w-[720px]"
       bodyClassName={WIZARD_BODY_CLASS}
       footer={
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={onClose}

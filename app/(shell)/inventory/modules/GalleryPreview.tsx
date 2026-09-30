@@ -13,14 +13,14 @@ type GalleryPreviewProps = {
 export default function GalleryPreview({ active, productName }: GalleryPreviewProps) {
   return (
     <div className="flex flex-col items-center gap-3">
-      <div className="flex max-h-[65vh] items-center justify-center">
+      <div className="flex max-h-[calc(65vh/var(--page-zoom,1))] items-center justify-center">
         {active ? (
           active.kind === 'photo' ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={active.image.url} alt={active.image.altText ?? ''} className="max-h-[65vh] max-w-full object-contain" />
+            <img src={active.image.url} alt={active.image.altText ?? ''} className="max-h-[calc(65vh/var(--page-zoom,1))] max-w-full object-contain" />
           ) : (
             <div
-              className="flex aspect-square max-h-[65vh] w-[65vh] max-w-full items-center justify-center rounded-xl px-6 text-center"
+              className="flex aspect-square max-h-[calc(65vh/var(--page-zoom,1))] w-[calc(65vh/var(--page-zoom,1))] max-w-full items-center justify-center rounded-xl px-6 text-center"
               style={{ backgroundColor: resolveSwatch(active.color) }}
             >
               <span className="text-lg font-semibold text-white line-clamp-2" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.35)' }}>

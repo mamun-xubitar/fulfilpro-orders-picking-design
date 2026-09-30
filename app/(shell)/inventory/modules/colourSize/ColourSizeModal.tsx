@@ -36,11 +36,11 @@ export default function ColourSizeModal({ product, optionLibrary, onApplied, onC
       bodyClassName={WIZARD_BODY_CLASS}
       footer={
         <div className="flex flex-col gap-1">
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <button type="button" onClick={onClose} className={MODAL_FOOTER_BTN_SECONDARY}>
               Cancel
             </button>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <p className="text-[10px] font-semibold leading-none text-inventory-text-subtle">
                 {m.newVariantCount > 0 && <span className="text-inventory-success-hover">+{m.newVariantCount} new</span>}
                 {m.newVariantCount > 0 && m.removedVariantCount > 0 && ' · '}

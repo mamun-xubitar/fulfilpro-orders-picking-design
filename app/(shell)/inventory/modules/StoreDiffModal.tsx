@@ -164,7 +164,7 @@ function ConfirmVariantsSave({ onCancel, onConfirm, saving }: { onCancel: () => 
       <p className="text-[11px] leading-snug text-inventory-warning-ink">
         Saving variants pushes the system&apos;s full variant list to this store — any Shopify variant that isn&apos;t on the system product will be removed, not just the rows that disagree above.
       </p>
-      <div className="flex justify-end gap-[6px]">
+      <div className="flex flex-wrap justify-end gap-[6px]">
         <button type="button" onClick={onCancel} disabled={saving} className="flex h-[24px] items-center rounded-[6px] border border-inventory-border-strong px-[10px] text-[10px] font-bold text-inventory-text-muted hover:bg-inventory-surface-hover disabled:opacity-50 cursor-pointer">
           Cancel
         </button>

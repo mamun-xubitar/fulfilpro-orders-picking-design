@@ -40,7 +40,7 @@ export default function InventoryPage() {
   return (
     <main
       className="inventory-theme flex-1 space-y-2 bg-inventory-bg p-2 xl:flex xl:h-[calc(100vh-60px)] xl:min-h-0 xl:flex-col xl:space-y-0 xl:overflow-hidden xl:gap-2"
-      style={{ zoom: `${zoomPercent}%` }}
+      style={{ zoom: `${zoomPercent}%`, '--page-zoom': zoomPercent / 100 } as React.CSSProperties}
     >
       <ModuleTabs active={p.moduleTab} onChange={p.setModuleTab} right={p.moduleTab === 'products' ? <InventoryGlobals p={p} /> : undefined} />
 

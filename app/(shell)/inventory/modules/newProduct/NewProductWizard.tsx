@@ -100,7 +100,7 @@ function Footer({ p, w }: { p: InventoryPage; w: ReturnType<typeof useNewProduct
 
   if (w.step === 1) {
     return (
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <button type="button" onClick={w.close} className={secondaryClass}>
           Cancel
         </button>
@@ -125,12 +125,12 @@ function Footer({ p, w }: { p: InventoryPage; w: ReturnType<typeof useNewProduct
   const nextSaving = (w.step === 2 && p.details.saving) || (w.step === 4 && p.pricing.saving);
 
   return (
-    <div className="flex items-center justify-between gap-2">
+    <div className="flex flex-wrap items-center justify-between gap-2">
       <button type="button" onClick={w.back} disabled={w.step === 2} className={secondaryClass}>
         <ChevronLeft className="h-3 w-3" />
         Back
       </button>
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <button type="button" onClick={w.skip} className={secondaryClass}>
           Skip
         </button>

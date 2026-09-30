@@ -53,15 +53,15 @@ export function ModalShell({
       onClick={disableBackdropClose ? undefined : onClose}
     >
       <div
-        className={`w-full ${maxWidthClass ?? (fullScreen ? 'max-w-[95vw]' : extraWide ? 'max-w-5xl' : wide ? 'max-w-2xl' : 'max-w-md')} rounded-lg border ${compact ? 'border-inventory-border bg-inventory-surface shadow-inventory-md' : 'border-gray-200 bg-white shadow-xl'} ${allowOverflow ? 'overflow-visible' : `overflow-hidden flex flex-col ${fullScreen ? 'h-[92dvh]' : 'max-h-[calc(100dvh-2rem)]'}`}`}
+        className={`w-full ${maxWidthClass ?? (fullScreen ? 'max-w-[calc(95vw/var(--page-zoom,1))]' : extraWide ? 'max-w-5xl' : wide ? 'max-w-2xl' : 'max-w-md')} rounded-lg border ${compact ? 'border-inventory-border bg-inventory-surface shadow-inventory-md' : 'border-gray-200 bg-white shadow-xl'} ${allowOverflow ? 'overflow-visible' : `overflow-hidden flex flex-col ${fullScreen ? 'h-[calc(92dvh/var(--page-zoom,1))]' : 'max-h-[calc(100dvh/var(--page-zoom,1)_-_2rem)]'}`}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className={`flex shrink-0 items-center justify-between gap-4 border-b ${compact ? 'border-inventory-border' : 'border-gray-200'} ${compact ? 'px-4 py-2' : 'px-5 py-4'}`}>
-          <h3 className={`${compact ? 'text-sm' : 'text-base'} font-semibold ${compact ? 'text-inventory-text' : 'text-gray-900'}`}>{title}</h3>
+          <h3 className={`min-w-0 truncate ${compact ? 'text-sm' : 'text-base'} font-semibold ${compact ? 'text-inventory-text' : 'text-gray-900'}`}>{title}</h3>
           <button
             type="button"
             onClick={onClose}
-            className={`rounded-lg cursor-pointer ${compact ? 'text-inventory-text-subtle hover:bg-inventory-surface-hover hover:text-inventory-text-muted' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'} ${compact ? 'p-1' : 'p-1.5'}`}
+            className={`shrink-0 rounded-lg cursor-pointer ${compact ? 'text-inventory-text-subtle hover:bg-inventory-surface-hover hover:text-inventory-text-muted' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'} ${compact ? 'p-1' : 'p-1.5'}`}
             aria-label="Close"
           >
             <svg className={compact ? 'h-4 w-4' : 'h-5 w-5'} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -127,7 +127,7 @@ export function ModalActions({
  * caller (split pairs, left/right alignment, extra labels) — only these sizing/skin
  * classes are shared. */
 const MODAL_FOOTER_BTN_BASE =
-  'h-[28px] rounded-[7px] px-3 text-[11px] font-bold leading-none transition-colors duration-150 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60';
+  'h-[28px] whitespace-nowrap rounded-[7px] px-3 text-[11px] font-bold leading-none transition-colors duration-150 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60';
 
 export const MODAL_FOOTER_BTN_SECONDARY =
   `${MODAL_FOOTER_BTN_BASE} border border-inventory-border-strong bg-inventory-surface text-inventory-text-muted hover:bg-inventory-surface-hover`;

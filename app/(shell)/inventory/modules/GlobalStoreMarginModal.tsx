@@ -37,7 +37,7 @@ export default function GlobalStoreMarginModal({ state, onClose }: GlobalStoreMa
       onClose={handleCancel}
       bodyClassName={WIZARD_BODY_CLASS}
       footer={
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={handleCancel}

@@ -36,7 +36,7 @@ export default function ImportProductsModal({ importProducts: ip, suppliers }: I
       bodyClassName={WIZARD_BODY_CLASS}
       footer={
         ip.preview ? (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={ip.closeModal}

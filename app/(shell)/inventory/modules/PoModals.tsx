@@ -28,7 +28,7 @@ function CreatePoModal({ po, variants }: { po: ReturnType<typeof usePurchaseOrde
       wide
       bodyClassName={WIZARD_BODY_CLASS}
       footer={
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={po.closeCreate}

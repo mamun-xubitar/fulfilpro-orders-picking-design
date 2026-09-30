@@ -55,7 +55,7 @@ export default function ProductsToolbar(p: InventoryPage) {
         onSelect={nav.selectProduct}
       />
 
-      <div className="flex flex-nowrap items-center gap-[4px]">
+      <div className="flex flex-wrap items-center gap-[4px]">
         {QUICK_FILTERS.map((filter) => {
           const isActive = nav.quickFilter === filter.id;
           return (

@@ -13,12 +13,12 @@ type ModuleTabsProps = {
 
 export default function ModuleTabs({ active, onChange, right }: ModuleTabsProps) {
   return (
-    <div className="flex items-center gap-1.5 rounded-[10px] border border-inventory-primary/25 bg-inventory-primary/[6%] px-1 py-0.5 shadow-inventory">
+    <div className="flex flex-wrap items-center gap-1.5 rounded-[10px] border border-inventory-primary/25 bg-inventory-primary/[6%] px-1 py-0.5 shadow-inventory">
       {/* `thin-scroll` (app/globals.css) makes this a visibly scrollable strip instead of
           hard-clipping tab labels when the shared shell's sidebar is expanded and there isn't
           enough width for every tab — the prototype assumes a collapsed ~56px sidebar, which
           this page doesn't control. */}
-      <nav className="min-h-5.5 thin-scroll flex min-w-0 flex-1 items-center gap-[2px] overflow-x-auto" aria-label="Inventory modules">
+      <nav className="min-h-5.5 thin-scroll flex min-w-0 flex-[1_1_12rem] items-center gap-[2px] overflow-x-auto" aria-label="Inventory modules">
         {MODULE_TABS.map((tab) => {
           const isActive = tab.id === active;
           return (
@@ -38,7 +38,7 @@ export default function ModuleTabs({ active, onChange, right }: ModuleTabsProps)
           );
         })}
       </nav>
-      {right && <div className="ml-auto flex shrink-0 items-center">{right}</div>}
+      {right && <div className="ml-auto flex max-w-full shrink-0 items-center">{right}</div>}
     </div>
   );
 }

@@ -23,7 +23,7 @@ export default function ReceivePoModal({ po }: { po: ReturnType<typeof usePurcha
       maxWidthClass="max-w-4xl"
       bodyClassName={WIZARD_BODY_CLASS}
       footer={
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={po.closeReceive}
