@@ -31,9 +31,9 @@ function NewAdjustmentModal({ a, variants }: { a: ReturnType<typeof useAdjustmen
       maxWidthClass="max-w-[720px]"
       bodyClassName={WIZARD_BODY_CLASS}
       footer={
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <span className="text-[11px] text-inventory-text-subtle">{a.dirtyCount} row{a.dirtyCount === 1 ? '' : 's'} with a pending change</span>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button
               type="button"
               onClick={a.closeModal}
@@ -64,7 +64,7 @@ function NewAdjustmentModal({ a, variants }: { a: ReturnType<typeof useAdjustmen
         <AnimatedStepBody minHeightClassName="min-h-0">
           <AdjustmentChipsStrip a={a} />
 
-          <div className="max-h-[60vh] overflow-x-auto overflow-y-auto thin-scroll rounded-lg border border-inventory-border">
+          <div className="max-h-[calc(60vh/var(--page-zoom,1))] overflow-x-auto overflow-y-auto thin-scroll rounded-lg border border-inventory-border">
             <table className="w-full min-w-[560px] border-collapse text-[11px] leading-none">
               <thead className="sticky top-0 bg-inventory-surface-muted">
                 <tr className="border-b border-inventory-border text-left text-[10px] font-bold uppercase tracking-[0.4px] text-inventory-text-subtle">

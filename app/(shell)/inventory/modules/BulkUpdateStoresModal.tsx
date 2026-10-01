@@ -50,7 +50,7 @@ export default function BulkUpdateStoresModal({ product, storeOptions, publish: 
       onClose={p.closeBulkUpdate}
       fullScreen
       footer={
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={p.closeBulkUpdate}

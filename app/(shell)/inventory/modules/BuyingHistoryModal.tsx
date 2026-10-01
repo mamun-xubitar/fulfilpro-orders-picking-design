@@ -25,10 +25,10 @@ export default function BuyingHistoryModal({ purchaseOrders, onClose, onReceive 
   const [viewTarget, setViewTarget] = useState<PurchaseOrderRecord | null>(null);
 
   return (
-    <ModalShell disableBackdropClose title="Buying history" compact onClose={onClose} wide bodyClassName={WIZARD_BODY_CLASS}>
+    <ModalShell disableBackdropClose title="Buying history" compact onClose={onClose} maxWidthClass="max-w-4xl" bodyClassName={WIZARD_BODY_CLASS}>
       <div className={WIZARD_CARD_CLASS}>
         <AnimatedStepBody minHeightClassName="min-h-0">
-          <div className="max-h-[28rem] overflow-x-auto overflow-y-auto thin-scroll rounded-lg border border-inventory-border">
+          <div className="max-h-[min(28rem,calc(60vh/var(--page-zoom,1)))] overflow-x-auto overflow-y-auto thin-scroll rounded-lg border border-inventory-border">
             <table className="w-full min-w-[560px] text-[11px] leading-none">
               <thead>
                 <tr className="border-b border-inventory-border bg-inventory-surface-muted">
@@ -59,7 +59,7 @@ export default function BuyingHistoryModal({ purchaseOrders, onClose, onReceive 
                     <tr key={po.id} className="border-b border-inventory-divider last:border-0 transition-colors duration-150 hover:bg-inventory-surface-hover">
                       <td className="whitespace-nowrap px-2 py-1.5 text-inventory-text-subtle">{formatDate(po.createdAt)}</td>
                       <td className="whitespace-nowrap px-2 py-1.5 font-medium text-inventory-text">{formatPoNumber(po.number)}</td>
-                      <td className="px-2 py-1.5 text-inventory-text-muted">{po.supplierName}</td>
+                      <td className="px-2 py-1.5 text-inventory-text-muted [overflow-wrap:anywhere]">{po.supplierName}</td>
                       <td className="px-2 py-1.5 text-center">
                         <span className={`inline-flex items-center whitespace-nowrap rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${STATUS_BADGES[po.status]}`}>
                           {po.status.replace('_', ' ')}
@@ -104,5 +104,5 @@ export default function BuyingHistoryModal({ purchaseOrders, onClose, onReceive 
 
 function Th({ align, children }: { align: 'left' | 'right' | 'center'; children: React.ReactNode }) {
   const alignment = align === 'left' ? 'text-left' : align === 'right' ? 'text-right' : 'text-center';
-  return <th className={`px-2 py-1 text-[10px] font-bold uppercase tracking-[0.4px] text-inventory-text-subtle ${alignment}`}>{children}</th>;
+  return <th className={`whitespace-nowrap px-2 py-1 text-[10px] font-bold uppercase tracking-[0.4px] text-inventory-text-subtle ${alignment}`}>{children}</th>;
 }

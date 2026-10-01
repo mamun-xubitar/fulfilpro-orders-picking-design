@@ -24,7 +24,7 @@ export default function InventoryGlobals({ p }: InventoryGlobalsProps) {
   };
 
   return (
-    <div className="flex items-center gap-[6px]">
+    <div className="flex flex-wrap items-center gap-[6px]">
       <GlobalField label="Exch." value={p.rateInput} onChange={p.setRateInput} onApply={p.applyGlobalRate} step="0.01" suffix={p.globals.baseCurrency} />
       <GlobalField label="Margin" value={p.marginInput} onChange={p.setMarginInput} onApply={p.applyGlobalMargin} step="1" suffix="%" />
       <button type="button" onClick={openStoreMargins} aria-haspopup="dialog" title="Per store margin" className={ICONBTN_XS}>

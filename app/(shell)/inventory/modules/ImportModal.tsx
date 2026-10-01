@@ -31,7 +31,7 @@ export default function ImportModal({ importExport: ie }: { importExport: Return
       bodyClassName={WIZARD_BODY_CLASS}
       footer={
         preview ? (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={ie.closeImport}

@@ -111,7 +111,7 @@ export default function StoreMarginEditModal({ listings, savedForm, values, star
       onClose={onClose}
       bodyClassName={WIZARD_BODY_CLASS}
       footer={
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button type="button" onClick={onClose} className={`flex-1 ${WIZARD_BTN_SECONDARY}`}>
             Cancel
           </button>

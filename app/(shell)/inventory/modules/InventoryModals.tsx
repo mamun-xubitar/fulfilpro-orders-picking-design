@@ -110,7 +110,7 @@ export default function InventoryModals(p: InventoryPage) {
           compact
           onClose={matrix.cancelDeleteRow}
           footer={
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={matrix.cancelDeleteRow}
@@ -160,7 +160,7 @@ function BulkDeleteVariantsModal({ p }: { p: InventoryPage }) {
       compact
       onClose={matrix.cancelBulkDelete}
       footer={
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={matrix.cancelBulkDelete}
@@ -195,7 +195,7 @@ function DeleteProductModal({ p }: { p: InventoryPage }) {
       compact
       onClose={p.closeDeleteProduct}
       footer={
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={p.closeDeleteProduct}
@@ -232,7 +232,7 @@ function ApplyPriceModal({ p }: { p: InventoryPage }) {
       onClose={pricing.cancelUsePrice}
       bodyClassName={WIZARD_BODY_CLASS}
       footer={
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={pricing.cancelUsePrice}

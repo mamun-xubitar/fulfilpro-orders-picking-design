@@ -362,7 +362,7 @@ export default function RichTextField({ label, value, onChange, hideLabel, toolb
           compact
           onClose={closeLinkModal}
           footer={
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={closeLinkModal}
