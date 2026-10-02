@@ -1,6 +1,7 @@
 import prisma from '@/lib/prisma.server';
 import { SupplierProductModel } from '@/models/supplier-product.model.server';
 import { SupplierModel } from '@/models/supplier.model.server';
+import { LocationModel } from '@/models/location.model.server';
 import { InventoryCategoryModel } from '@/models/inventory-category.model.server';
 import { CurrencyRateModel } from '@/models/currency-rate.model.server';
 import { saveUploadedFile } from '@/lib/uploads.server';
@@ -12,6 +13,7 @@ import { upperTrim } from '@/lib/utils/common';
 import type { CatalogueListParams, ProductsSortKey, QuickFilterId } from '@/models/supplier-product.model.server';
 
 const model = new SupplierProductModel();
+const locationModel = new LocationModel();
 const currencyModel = new CurrencyRateModel();
 const supplierModel = new SupplierModel();
 const categoryModel = new InventoryCategoryModel();
@@ -368,6 +370,11 @@ export class SupplierProductController {
     if (typeof value.size === 'string' && value.size.trim() === '' && existingProduct.sizes.length > 0) {
       errors.push('size: Enter a size');
     }
+    let locationIds: string[] | undefined;
+    if ('locationIds' in value) {
+      locationIds = Array.isArray(value.locationIds) ? [...new Set((value.locationIds as unknown[]).filter((l): l is string => typeof l === 'string'))] : [];
+      if (locationIds.length > 0 && (await locationModel.countExisting(locationIds)) !== locationIds.length) errors.push('locationIds: Pick existing locations');
+    }
     if (errors.length) return { error: { message: 'Validation failed', errors, status: 400 } };
 
     const fieldsChanged = Object.keys(value).some((k) => k !== 'imageId');
@@ -385,6 +392,7 @@ export class SupplierProductController {
         imageId = typeof value.imageId === 'string' && value.imageId.trim() ? value.imageId.trim() : null;
         await model.setVariantImage(id, variantId, imageId);
       }
+      if (locationIds !== undefined) await locationModel.setVariantLocations(variantId, locationIds);
     } catch (error) {
       return { error: { message: error instanceof Error ? error.message : 'Failed to update variant', status: 409 } };
     }
@@ -407,6 +415,30 @@ export class SupplierProductController {
     await model.logActivity(id, 'Variant deleted', 'variant_deleted', actorFromSession(session), variantId);
     const product = await model.findById(id);
     return { data: product, message: 'Variant deleted' };
+  }
+
+  /** Bulk location assignment for the selected variants of a product. */
+  async setVariantLocations(id: string, body: unknown, session: Session) {
+    if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
+    const existingProduct = await model.findById(id);
+    if (!existingProduct) return { error: { message: 'Product not found', status: 404 } };
+
+    const value = (body ?? {}) as Record<string, unknown>;
+    const strings = (raw: unknown) => (Array.isArray(raw) ? [...new Set((raw as unknown[]).filter((v): v is string => typeof v === 'string'))] : []);
+    const productVariantIds = new Set(existingProduct.variants.map((v) => v.id));
+    const variantIds = strings(value.variantIds).filter((v) => productVariantIds.has(v));
+    const locationIds = strings(value.locationIds);
+    const mode = value.mode === 'replace' ? 'replace' : 'add';
+
+    const errors: string[] = [];
+    if (variantIds.length === 0) errors.push('variantIds: Select at least one variant');
+    if (mode === 'add' && locationIds.length === 0) errors.push('locationIds: Pick at least one location');
+    if (locationIds.length > 0 && (await locationModel.countExisting(locationIds)) !== locationIds.length) errors.push('locationIds: Pick existing locations');
+    if (errors.length) return { error: { message: 'Validation failed', errors, status: 400 } };
+
+    await locationModel.bulkSetVariantLocations(variantIds, locationIds, mode);
+    await model.logActivity(id, `Locations updated on ${variantIds.length} variant${variantIds.length === 1 ? '' : 's'}`, 'variant_updated', actorFromSession(session));
+    return { data: await model.findById(id), message: 'Locations updated' };
   }
 
   async deleteVariants(id: string, body: unknown, session: Session) {

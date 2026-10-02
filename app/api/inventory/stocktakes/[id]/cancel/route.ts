@@ -6,11 +6,10 @@ import { auth } from '@/auth';
 const controller = new StocktakeController();
 type ErrResult = { error: { message: string; errors?: string[]; status: number } };
 
-export async function PATCH(request: NextRequest, { params }: { params: Promise<{ stocktakeId: string }> }) {
+export async function POST(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
-  const { stocktakeId } = await params;
-  const body = await request.json().catch(() => ({}));
-  const result = await controller.complete(stocktakeId, body, session);
+  const { id } = await params;
+  const result = await controller.cancel(id, session);
   if ('error' in result) {
     const { error } = result as ErrResult;
     return apiError({ message: error.message, errors: error.errors, status: error.status });

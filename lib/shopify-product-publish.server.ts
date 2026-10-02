@@ -211,6 +211,17 @@ async function getAllPublicationIds(storeDomain: string, accessToken: string): P
   return ids;
 }
 
+/** Publishes a product to every sales channel on the store — idempotent for channels it is already
+ * on. Shared by the full publish flow and the differences modal's single-field status save. */
+export async function publishToAllChannels(storeDomain: string, accessToken: string, productGid: string): Promise<void> {
+  const publicationIds = await getAllPublicationIds(storeDomain, accessToken);
+  if (publicationIds.length === 0) return;
+  await shopifyGraphQL(storeDomain, accessToken, PUBLISHABLE_PUBLISH_MUTATION, {
+    id: productGid,
+    input: publicationIds.map((publicationId) => ({ publicationId })),
+  });
+}
+
 type MediaReadyNode = {
   status: string;
   mediaErrors: { code: string; details: string | null; message: string }[];
@@ -223,7 +234,7 @@ type MediaReadyNode = {
  * only picking them up on the next unrelated Sync. Throws with Shopify's own mediaErrors when a
  * media item fails to process (e.g. it couldn't fetch the URL), instead of quietly reporting
  * success with an image that will never appear. */
-async function waitForImagesReady(storeDomain: string, accessToken: string, productGid: string, expectedCount: number): Promise<void> {
+export async function waitForImagesReady(storeDomain: string, accessToken: string, productGid: string, expectedCount: number): Promise<void> {
   for (let attempt = 0; attempt < 3; attempt++) {
     const data = await shopifyGraphQL<{ node: { media: { nodes: MediaReadyNode[] } } | null }>(
       storeDomain,
@@ -247,7 +258,7 @@ async function waitForImagesReady(storeDomain: string, accessToken: string, prod
  * search filter this used to run server-side turned out to exclude stores where no location has
  * that flag set — leaving `locationId` null and inventory silently unset); falls back to the
  * first active location of any kind rather than publishing with no stock destination at all. */
-async function getPrimaryLocationId(storeDomain: string, accessToken: string): Promise<string | null> {
+export async function getPrimaryLocationId(storeDomain: string, accessToken: string): Promise<string | null> {
   const cached = locationIdCache.get(storeDomain);
   if (cached) return cached;
 
@@ -273,7 +284,7 @@ async function getPrimaryLocationId(storeDomain: string, accessToken: string): P
  * check — this app is the source of truth). Both inventory mutations require an
  * `@idempotent` key, so every call gets a fresh UUID.
  */
-async function setVariantInventory(
+export async function setVariantInventory(
   storeDomain: string,
   accessToken: string,
   locationId: string,
@@ -504,13 +515,7 @@ export async function publishProductToStore(args: {
   // price/variant-only bulk update never force-publishes a product to every channel behind the
   // admin's back. Idempotent no-op for channels already published there.
   if (includes('details') && (payload.status === 'ACTIVE' || payload.status === 'UNLISTED')) {
-    const publicationIds = await getAllPublicationIds(store.storeDomain, store.accessToken);
-    if (publicationIds.length > 0) {
-      await shopifyGraphQL(store.storeDomain, store.accessToken, PUBLISHABLE_PUBLISH_MUTATION, {
-        id: product.id,
-        input: publicationIds.map((publicationId) => ({ publicationId })),
-      });
-    }
+    await publishToAllChannels(store.storeDomain, store.accessToken, product.id);
   }
 
   if (includes('images') && payload.images.length > 0) {

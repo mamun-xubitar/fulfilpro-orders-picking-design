@@ -4,16 +4,16 @@ import type { ModuleTabId, ProductStatusValue, QuickFilterId, TabDef, VariantSta
 // info/Suppliers/Images/Notes/Documents/History) is gone. Only the primary tabs remain, with
 // History promoted here as its own primary tab (ComingSoon for now).
 export const MODULE_TABS: TabDef<ModuleTabId>[] = [
+  { id: 'variants', label: 'Variant', blurb: 'Variants, stock and the product they belong to.' },
   { id: 'products', label: 'Products', blurb: 'Browse and maintain the product catalogue.' },
   { id: 'purchase-recommend', label: 'Purchase Recommend', blurb: 'Reorder suggestions rolled up across every product.' },
   { id: 'purchase-orders', label: 'Purchase Orders', blurb: 'Raise and track supplier purchase orders.' },
-  { id: 'receiving', label: 'Receiving', blurb: 'Book incoming stock against open purchase orders.' },
+  { id: 'locations', label: 'Location', blurb: 'Where each variant is kept.' },
   { id: 'stocktake', label: 'Stocktake', blurb: 'Plan counts and reconcile counted quantities.' },
   { id: 'adjustments', label: 'Adjustments', blurb: 'Record and review manual stock corrections.' },
   { id: 'suppliers', label: 'Suppliers', blurb: 'Manage supplier records and their product links.' },
   { id: 'payments', label: 'Payments', blurb: 'Track supplier invoices and settlements.' },
   { id: 'reports', label: 'Reports', blurb: 'Stock valuation, movement and margin reporting.' },
-  { id: 'dashboard', label: 'Dashboard', blurb: 'Headline inventory metrics at a glance.' },
   { id: 'history', label: 'History', blurb: 'Every change made across the product catalogue.' },
 ];
 

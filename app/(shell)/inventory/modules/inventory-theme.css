@@ -14,6 +14,20 @@
   animation: inventory-pop-in 200ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* Number inputs across the inventory module (and its modals / portalled dropdowns, which all
+   carry `.inventory-theme`) drop the browser's hover-revealed stepper arrows — the cells are
+   dense and the arrows overlap the value. Arrow keys still step the value. */
+.inventory-theme input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.inventory-theme input[type='number']::-webkit-inner-spin-button,
+.inventory-theme input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
 .inventory-dropdown-in {
   animation: inventory-pop-in 160ms cubic-bezier(0.16, 1, 0.3, 1);
 }

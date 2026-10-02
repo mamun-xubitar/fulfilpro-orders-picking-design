@@ -6,6 +6,10 @@ import { computeStoreDiff, type StoreDiffResult } from '../storeDiff';
 import { buildPublishTarget, defaultStock, emptyDraft, type PublishAspect, type StoreDraft } from '../storeDraft';
 import type { ProductRecord, StoreListingResult } from '../types';
 import type { StoreListingsState } from './useStoreListings';
+import { useStoreActionConfirm } from './useStoreActionConfirm';
+import { useStoreEditRunner } from './useStoreEditRunner';
+import { useStoreImageActions } from './useStoreImageActions';
+import { useStoreVariantActions } from './useStoreVariantActions';
 
 type FieldKey = 'title' | 'description' | 'vendor' | 'status' | 'category';
 
@@ -95,7 +99,10 @@ export function useStoreDiff({ product, listing, storeListings }: UseStoreDiffAr
   const [edits, setEdits] = useState<Record<string, string>>(() => {
     const initial: Record<string, string> = {};
     for (const f of diff.fields) initial[f.key] = f.systemValue;
-    for (const v of diff.variants) for (const f of v.fields) initial[`variant:${v.key}:${f.field}`] = f.systemValue;
+    // The Image field is left out: its diff value is a label ("Image 2"), not an id, and the table's
+    // picker keeps its own edit (see variantEditKey) — seeding it here would feed the label to the
+    // full-push overlay as if it were a hub image id.
+    for (const v of diff.variants) for (const f of v.fields) if (f.field !== 'image') initial[`variant:${v.key}:${f.field}`] = f.systemValue;
     return initial;
   });
   const setEdit = (key: string, value: string) => setEdits((prev) => ({ ...prev, [key]: value }));
@@ -108,23 +115,28 @@ export function useStoreDiff({ product, listing, storeListings }: UseStoreDiffAr
 
   const { request } = useRequest<{ results: { storeId: string; status: string; error?: string }[] }>();
 
-  const push = (aspects: PublishAspect[], overlay: (draft: StoreDraft) => void, key: string) => {
+  const push = (aspects: PublishAspect[], overlay: (draft: StoreDraft) => void, key: string): Promise<unknown> => {
     const draft = emptyDraft(product, listing.storeId, storeListings, 'listing');
     overlay(draft);
     const defaultStockForStore = defaultStock(product);
     const target = buildPublishTarget(product, listing.storeId, draft, aspects, defaultStockForStore);
 
     setSavingKey(key);
-    request({
+    // The returned promise settles only once the live listing has been re-fetched, so a confirm
+    // dialog awaiting it stays busy until the modal already shows the result.
+    let refreshed: Promise<unknown> = Promise.resolve();
+    return request({
       url: `/api/inventory/catalog/${product.id}/store-listings/publish`,
       method: 'POST',
       data: { aspects, targets: [target] },
       successMessage: 'Store listing synced',
       onSuccess: () => {
-        storeListings.sync();
+        refreshed = storeListings.syncQuiet();
         setConfirmAction(null);
       },
-    }).finally(() => setSavingKey((prev) => (prev === key ? null : prev)));
+    })
+      .then(() => refreshed)
+      .finally(() => setSavingKey((prev) => (prev === key ? null : prev)));
   };
 
   const applyFieldOverlay = (draft: StoreDraft, key: FieldKey) => {
@@ -137,7 +149,16 @@ export function useStoreDiff({ product, listing, storeListings }: UseStoreDiffAr
     else if (key === 'category') draft.category = categoryValue;
   };
 
-  const saveField = (key: FieldKey) => push(['details'], (draft) => applyFieldOverlay(draft, key), `field:${key}`);
+  const { run } = useStoreEditRunner({ product, listing, storeListings, setSavingKey });
+  const confirm = useStoreActionConfirm();
+
+  /** One field straight to Shopify (`productUpdate`) — not the full publish push. */
+  const saveField = (key: FieldKey) => {
+    const value = edits[key] ?? diff.fields.find((f) => f.key === key)?.systemValue ?? '';
+    const fields: Record<string, unknown> =
+      key === 'description' ? { descriptionHtml: value } : key === 'category' ? { category: categoryValue.id } : { [key]: value };
+    return run(`field:${key}`, { path: 'product', method: 'PATCH', json: { fields } }, `${diff.fields.find((f) => f.key === key)?.label ?? 'Field'} saved`);
+  };
 
   const applyImagesOverlay = (draft: StoreDraft) => {
     draft.images = product.images.map((img) => ({ id: img.id, url: img.url, altText: img.altText }));
@@ -146,6 +167,24 @@ export function useStoreDiff({ product, listing, storeListings }: UseStoreDiffAr
   };
 
   const saveImages = () => push(['images'], applyImagesOverlay, 'images');
+
+  // A replaced image shows its new picture immediately — keyed by media id, dropped again once the
+  // refreshed listing carries the real one (or the replace failed).
+  const [previews, setPreviews] = useState<Record<string, string>>({});
+  const setPreview = (mediaId: string, url: string | null) =>
+    setPreviews((prev) => {
+      const next = { ...prev };
+      if (url) next[mediaId] = url;
+      else delete next[mediaId];
+      return next;
+    });
+  const liveListing = useMemo(
+    () => (Object.keys(previews).length === 0 ? listing : { ...listing, images: listing.images.map((img) => (previews[img.id] ? { ...img, url: previews[img.id] } : img)) }),
+    [listing, previews]
+  );
+
+  const images = useStoreImageActions({ storeImages: listing.images, run, confirm, replaceAllWithSystem: saveImages, setPreview });
+  const variantActions = useStoreVariantActions({ rows: diff.rows, edits, setEdit, stockDefaults, run, confirm });
 
   const saveVariants = () => {
     const aspects = overlayVariants(emptyDraft(product, listing.storeId, storeListings, 'listing'), product, diff, edits);
@@ -180,6 +219,7 @@ export function useStoreDiff({ product, listing, storeListings }: UseStoreDiffAr
 
   return {
     diff,
+    liveListing,
     stockDefaults,
     edits,
     setEdit,
@@ -193,6 +233,9 @@ export function useStoreDiff({ product, listing, storeListings }: UseStoreDiffAr
     confirmOpen: confirmAction !== null,
     confirmSave: () => confirmAction?.(),
     cancelConfirm: () => setConfirmAction(null),
+    images,
+    variantActions,
+    confirm,
   };
 }
 

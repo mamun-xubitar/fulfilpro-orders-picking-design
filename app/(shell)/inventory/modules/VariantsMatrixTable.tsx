@@ -2,17 +2,22 @@
 
 import ColumnFillInput from './ColumnFillInput';
 import VariantsMatrixRow from './VariantsMatrixRow';
+import type { LocationsState } from './hooks/useLocations';
 import type { useVariantsMatrix } from './hooks/useVariantsMatrix';
 import { formatCurrencyValue, formatNumber } from './utils';
 
 type VariantsMatrixTableProps = {
   matrix: ReturnType<typeof useVariantsMatrix>;
+  locations: LocationsState;
   /** Rendered inside the full-screen "Full view" modal — fills the modal's height and scrolls
    * internally instead of capping at the fixed max-h used in the normal inline placement. */
   fillHeight?: boolean;
   /** Full view shows every column; the normal inline table hides SKU / Barcode and Trigger to
    * keep the common case compact — both are still reachable (and editable) via Full view. */
   showAllColumns?: boolean;
+  /** The Variant tab: the table is the page's main content, so it gets a taller scroll area than the
+   * compact inline card. */
+  tall?: boolean;
 };
 
 // Keyed so the header, each row, and the totals footer can't drift out of alignment — the
@@ -28,6 +33,7 @@ const NUMERIC_HEADERS = [
 // Past this many body rows the table scrolls internally instead of growing the page —
 // header + 8 body rows + totals footer = 10 rows visible at once (sticky header/footer).
 const SCROLL_THRESHOLD = 8;
+const TALL_SCROLL_THRESHOLD = 16;
 
 // `border-collapse` means a sticky cell's own border doesn't paint (the border lives on the
 // adjacent cell instead), so the header/footer's separating line is an inset box-shadow instead.
@@ -40,18 +46,18 @@ const STICKY_HEADER_TH = 'sticky top-0 z-10 bg-inventory-surface-muted shadow-[i
 // here is safe) — a light line, but a visibly darker step than the bg fill, not full-saturation.
 const STICKY_FOOTER_TD = 'sticky bottom-0 z-10 bg-[#f9f1fa] shadow-[inset_0_1px_0_rgba(162,28,175,0.35)]';
 
-export default function VariantsMatrixTable({ matrix, fillHeight, showAllColumns }: VariantsMatrixTableProps) {
+export default function VariantsMatrixTable({ matrix, locations, fillHeight, showAllColumns, tall }: VariantsMatrixTableProps) {
   const { rows, totals } = matrix;
-  const scrollable = rows.length > SCROLL_THRESHOLD;
+  const scrollable = rows.length > (tall ? TALL_SCROLL_THRESHOLD : SCROLL_THRESHOLD);
   const numericHeaders = NUMERIC_HEADERS.filter((h) => showAllColumns || h.key !== 'trigger');
   // Size, Variant, [SKU / Barcode], numeric columns, Status, Buy price, Sell price, Stock value,
   // Actions — 13 in full view, 11 inline (SKU/Barcode and Trigger dropped). The 7 accounts for the
   // always-shown non-numeric columns: Size, Variant, Status, Buy price, Sell price, Stock value,
   // Actions. Colour is now a separate panel beside the table, not a column.
-  const columnCount = 7 + numericHeaders.length + (showAllColumns ? 1 : 0);
+  const columnCount = 8 + numericHeaders.length + (showAllColumns ? 1 : 0);
 
   return (
-    <div className={`thin-scroll ${fillHeight ? 'h-full overflow-y-auto overflow-x-auto' : scrollable ? 'max-h-[12.5rem] overflow-y-auto overflow-x-auto' : 'overflow-x-auto'}`}>
+    <div className={`thin-scroll ${fillHeight ? 'h-full overflow-y-auto overflow-x-auto' : scrollable ? `${tall ? 'max-h-[26rem]' : 'max-h-[12.5rem]'} overflow-y-auto overflow-x-auto` : 'overflow-x-auto'}`}>
       <table className="w-full min-w-5xl border-collapse">
         <thead>
           <tr className="border-b border-inventory-border bg-inventory-surface-muted">
@@ -68,6 +74,7 @@ export default function VariantsMatrixTable({ matrix, fillHeight, showAllColumns
               </label>
             </th>
             <Th align="left">Variant</Th>
+            <Th align="left">Location</Th>
             {showAllColumns && <Th align="left">SKU / Barcode</Th>}
             {numericHeaders.map((h) => (
               <Th key={h.key} align="right">
@@ -112,13 +119,18 @@ export default function VariantsMatrixTable({ matrix, fillHeight, showAllColumns
               variant={variant}
               selected={matrix.selectedIds.has(variant.id)}
               dirty={matrix.isRowDirty(variant.id)}
+              changes={matrix.dirtyById[variant.id]}
               saving={matrix.savingRowId === variant.id}
+              savingField={matrix.savingCell?.startsWith(`${variant.id}:`) ? matrix.savingCell.slice(variant.id.length + 1) : null}
               showAllColumns={!!showAllColumns}
               onToggleSelect={matrix.toggleRow}
               onFieldChange={matrix.setVariantEdit}
               onSave={matrix.saveRow}
+              onSaveField={matrix.saveField}
               onRevert={matrix.revertRow}
               onDelete={matrix.requestDeleteRow}
+              locationOptions={locations.options}
+              onCreateLocation={locations.createInline}
             />
           ))}
           {rows.length === 0 && (
@@ -138,6 +150,7 @@ export default function VariantsMatrixTable({ matrix, fillHeight, showAllColumns
                 {rows.length} row{rows.length === 1 ? '' : 's'}
                 {matrix.hiddenCount > 0 && <span className="text-inventory-text-subtle"> · {matrix.hiddenCount} hidden</span>}
               </td>
+              <td className={STICKY_FOOTER_TD} />
               {showAllColumns && <td className={STICKY_FOOTER_TD} />}
               <TotalCell value={formatNumber(totals.totalStock)} />
               <TotalCell value={formatNumber(totals.allocated)} />

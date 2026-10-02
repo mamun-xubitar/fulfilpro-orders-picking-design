@@ -6,7 +6,24 @@ import type { useSuppliers } from './hooks/useSuppliers';
 import { Pencil, Plus, Search, Trash, Users } from './icons';
 import { formatDate } from './utils';
 
-export default function SuppliersTab({ suppliers: s }: { suppliers: ReturnType<typeof useSuppliers> }) {
+type SuppliersTabProps = {
+  suppliers: ReturnType<typeof useSuppliers>;
+  /** Jump to the Purchase Orders / Payments tab narrowed to this supplier. */
+  onOpenPurchaseOrders: (supplierId: string) => void;
+  onOpenPayments: (supplierId: string) => void;
+};
+
+/** A count that opens the matching tab, filtered to the supplier; a plain 0 when there's nothing to open. */
+function CountLink({ count, label, onClick }: { count: number; label: string; onClick: () => void }) {
+  if (count === 0) return <span className="tabular-nums text-inventory-text-subtle">0</span>;
+  return (
+    <button type="button" onClick={onClick} aria-label={label} title={label} className="font-semibold tabular-nums text-inventory-secondary underline-offset-2 hover:underline cursor-pointer">
+      {count}
+    </button>
+  );
+}
+
+export default function SuppliersTab({ suppliers: s, onOpenPurchaseOrders, onOpenPayments }: SuppliersTabProps) {
   return (
     <div className="overflow-hidden rounded-xl border border-inventory-border bg-inventory-surface shadow-sm">
       <div className="flex flex-wrap items-center gap-[6px] border-b border-inventory-border px-2 py-1.5">
@@ -39,6 +56,7 @@ export default function SuppliersTab({ suppliers: s }: { suppliers: ReturnType<t
               <th className="px-2 py-1">Contact email</th>
               <th className="px-2 py-1 text-right">Products</th>
               <th className="px-2 py-1 text-right">PO&apos;s</th>
+              <th className="px-2 py-1 text-right">Payments</th>
               <th className="px-2 py-1">Created</th>
               <th className="px-2 py-1" />
             </tr>
@@ -48,7 +66,7 @@ export default function SuppliersTab({ suppliers: s }: { suppliers: ReturnType<t
               <SkeletonRows />
             ) : s.rows.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-2 py-8 text-center text-[11px] text-inventory-text-subtle">
+                <td colSpan={8} className="px-2 py-8 text-center text-[11px] text-inventory-text-subtle">
                   <Users className="mx-auto mb-1.5 h-5 w-5 text-inventory-border-strong" />
                   {s.searchInput ? 'No suppliers match your search.' : 'No suppliers yet — add one to get started.'}
                 </td>
@@ -60,7 +78,12 @@ export default function SuppliersTab({ suppliers: s }: { suppliers: ReturnType<t
                   <td className="px-2 py-1 text-inventory-text-muted">{row.poEmail}</td>
                   <td className="px-2 py-1 text-inventory-text-subtle">{row.contactEmail || '—'}</td>
                   <td className="px-2 py-1 text-right tabular-nums text-inventory-text-subtle">{row.productCount}</td>
-                  <td className="px-2 py-1 text-right tabular-nums text-inventory-text-subtle">{row.purchaseOrderCount}</td>
+                  <td className="px-2 py-1 text-right">
+                    <CountLink count={row.purchaseOrderCount} label={`View ${row.name}'s purchase orders`} onClick={() => onOpenPurchaseOrders(row.id)} />
+                  </td>
+                  <td className="px-2 py-1 text-right">
+                    <CountLink count={row.paymentCount} label={`View ${row.name}'s payments`} onClick={() => onOpenPayments(row.id)} />
+                  </td>
                   <td className="px-2 py-1 text-inventory-text-subtle">{formatDate(row.createdAt)}</td>
                   <td className="px-2 py-1">
                     <div className="flex items-center justify-end gap-1">
@@ -141,7 +164,7 @@ function SkeletonRows() {
     <>
       {Array.from({ length: 5 }).map((_, i) => (
         <tr key={i} className="border-b border-inventory-divider last:border-0">
-          {Array.from({ length: 6 }).map((__, j) => (
+          {Array.from({ length: 8 }).map((__, j) => (
             <td key={j} className="px-2 py-1.5">
               <div className="h-3 animate-pulse rounded bg-inventory-surface-muted" />
             </td>

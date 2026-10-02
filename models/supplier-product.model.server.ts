@@ -27,6 +27,8 @@ export type SupplierProductVariantRow = {
   incomingLots: IncomingLotRow[];
   /** One image from the product's pool, Shopify-style. Several variants may point at the same image. */
   imageId: string | null;
+  /** Where the variant is kept — any number of locations, A→Z. */
+  locations: { id: string; name: string }[];
 };
 
 export type SupplierProductImageRow = { id: string; url: string; altText: string | null; colour: string | null };
@@ -123,10 +125,13 @@ const OPEN_PO_STATUSES = ['REQUESTED', 'CONFIRMED', 'PARTIALLY_RECEIVED'] as con
 const catalogueInclude = {
   supplierLinks: { include: { supplier: { select: { id: true, name: true, poEmail: true } } }, orderBy: { supplier: { name: 'asc' as const } } },
   inventoryCategory: { select: { id: true, name: true } },
-  variants: { orderBy: { position: 'asc' as const } },
+  variants: {
+    orderBy: { position: 'asc' as const },
+    include: { locations: { select: { location: { select: { id: true, name: true } } } } },
+  },
   images: { orderBy: { position: 'asc' as const } },
   pricing: true,
-  stocktakes: { orderBy: { createdAt: 'desc' as const }, take: 1 },
+  stocktakes: { where: { status: 'COMPLETED' as const }, orderBy: { completedAt: 'desc' as const }, take: 1 },
   activity: { orderBy: { createdAt: 'desc' as const }, take: 30 },
 };
 
@@ -885,6 +890,7 @@ export class SupplierProductModel {
           incoming: incomingLots.reduce((sum, lot) => sum + lot.quantity, 0),
           incomingLots,
           imageId: v.imageId,
+          locations: v.locations.map((l) => l.location).sort((a, b) => a.name.localeCompare(b.name)),
         };
       }),
       pricing: row.pricing

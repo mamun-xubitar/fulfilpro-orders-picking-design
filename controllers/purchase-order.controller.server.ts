@@ -1,8 +1,8 @@
 import prisma from '@/lib/prisma.server';
-import { PurchaseOrderModel } from '@/models/purchase-order.model.server';
+import { PurchaseOrderModel, PO_SORT_KEYS, type PoSortKey } from '@/models/purchase-order.model.server';
 import { SupplierProductModel } from '@/models/supplier-product.model.server';
 import { upperTrim } from '@/lib/utils/common';
-import { PurchaseOrderStatus } from '@prisma/client';
+import { PoPaymentStatus, PurchaseOrderStatus } from '@prisma/client';
 
 const model = new PurchaseOrderModel();
 const productModel = new SupplierProductModel();
@@ -27,17 +27,24 @@ export class PurchaseOrderController {
   async list(searchParams: URLSearchParams, session: Session) {
     if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
 
-    const supplierProductId = searchParams.get('supplierProductId')?.trim() ?? '';
-    if (!supplierProductId) return { error: { message: 'supplierProductId is required', status: 400 } };
-
+    // Scoped to one product when `supplierProductId` is given (the product view's PO panel), across
+    // every product otherwise (the Purchase Orders tab).
+    const supplierProductId = searchParams.get('supplierProductId')?.trim() || undefined;
+    const supplierId = searchParams.get('supplierId')?.trim() || undefined;
     const statusRaw = searchParams.get('status') ?? '';
     const status = STATUS_VALUES.has(statusRaw) ? (statusRaw as PurchaseOrderStatus) : undefined;
+    const payRaw = searchParams.get('payStatus') ?? '';
+    const payStatus = (Object.values(PoPaymentStatus) as string[]).includes(payRaw) ? (payRaw as PoPaymentStatus) : undefined;
+    const search = searchParams.get('search')?.trim() || undefined;
     const dateFrom = searchParams.get('dateFrom') ?? undefined;
     const dateTo = searchParams.get('dateTo') ?? undefined;
+    const sortRaw = searchParams.get('sort') ?? '';
+    const sort = (PO_SORT_KEYS as readonly string[]).includes(sortRaw) ? (sortRaw as PoSortKey) : undefined;
+    const dir = searchParams.get('dir') === 'asc' ? 'asc' : 'desc';
     const page = Math.max(1, parseInt(searchParams.get('page') ?? '1'));
     const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get('pageSize') ?? '20')));
 
-    const result = await model.list({ supplierProductId, status, dateFrom, dateTo, page, pageSize });
+    const result = await model.list({ supplierProductId, supplierId, status, payStatus, search, dateFrom, dateTo, sort, dir, page, pageSize });
     const totalPages = Math.max(1, Math.ceil(result.total / pageSize));
 
     return {
@@ -46,6 +53,13 @@ export class PurchaseOrderController {
         pagination: { page, pageSize, total: result.total, totalPages, hasPrev: page > 1, hasNext: page < totalPages },
       },
     };
+  }
+
+  async get(id: string, session: Session) {
+    if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
+    const po = await model.findById(id);
+    if (!po) return { error: { message: 'Purchase order not found', status: 404 } };
+    return { data: po };
   }
 
   async create(body: unknown, session: Session) {
@@ -150,6 +164,11 @@ export class PurchaseOrderController {
     if (!existing) return { error: { message: 'Purchase order not found', status: 404 } };
 
     const value = (body ?? {}) as Record<string, unknown>;
+    // An inline remark edit from the Purchase Orders tab.
+    if ('poRemark' in value && !('status' in value)) {
+      const remark = typeof value.poRemark === 'string' ? upperTrim(value.poRemark) : '';
+      return { data: await model.updateRemark(id, remark || null), message: 'Remark saved' };
+    }
     const status = typeof value.status === 'string' ? value.status : '';
     if (!STATUS_VALUES.has(status)) return { error: { message: 'status: Invalid status', status: 400 } };
 
@@ -216,5 +235,37 @@ export class PurchaseOrderController {
     const purchaseOrder = await model.receive(id, receipts, actorFromSession(session));
     const product = await productModel.findById(po.supplierProductId);
     return { data: { purchaseOrder, product }, message: 'Inventory received' };
+  }
+
+  /** Receives every outstanding line, in full and at its own unit cost, of each selected PO.
+   * POs that are cancelled or already fully received are skipped, not failed. */
+  async bulkReceive(body: unknown, session: Session) {
+    if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
+    const value = (body ?? {}) as Record<string, unknown>;
+    const ids = Array.isArray(value.ids) ? [...new Set((value.ids as unknown[]).filter((v): v is string => typeof v === 'string'))].slice(0, 100) : [];
+    if (ids.length === 0) return { error: { message: 'Validation failed', errors: ['ids: Select at least one purchase order'], status: 400 } };
+
+    const orders = await model.findManyByIds(ids);
+    let received = 0;
+    let skipped = 0;
+    const failed: string[] = [];
+    for (const po of orders) {
+      const receipts = po.items.filter((i) => i.quantity > i.receivedQuantity).map((i) => ({ itemId: i.id, quantity: i.quantity - i.receivedQuantity }));
+      if (po.status === 'CANCELLED' || receipts.length === 0) {
+        skipped++;
+        continue;
+      }
+      try {
+        await model.receive(po.id, receipts, actorFromSession(session));
+        received++;
+      } catch {
+        failed.push(String(po.number));
+      }
+    }
+    if (received === 0 && failed.length > 0) return { error: { message: 'Could not receive the selected purchase orders', status: 500 } };
+    const parts = [`${received} purchase order${received === 1 ? '' : 's'} received`];
+    if (skipped > 0) parts.push(`${skipped} skipped (nothing outstanding or cancelled)`);
+    if (failed.length > 0) parts.push(`${failed.length} failed`);
+    return { data: { received, skipped, failed }, message: parts.join(' · ') };
   }
 }

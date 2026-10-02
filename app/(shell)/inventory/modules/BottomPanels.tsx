@@ -21,10 +21,8 @@ export default function BottomPanels({ p }: BottomPanelsProps) {
         <Stat label="Last stocktake" value={formatDate(product.stocktake.lastAt)} />
         <Stat label="Next stocktake" value={formatDate(product.stocktake.nextAt)} />
         <Actions>
-          <PrimaryButton onClick={p.stocktake.start} disabled={p.stocktake.starting}>
-            New stocktake
-          </PrimaryButton>
-          <SecondaryButton onClick={p.stocktake.printCountSheet}>Print count sheet</SecondaryButton>
+          <PrimaryButton onClick={p.stocktake.openModal}>New stocktake</PrimaryButton>
+          <SecondaryButton onClick={() => p.setModuleTab('stocktake')}>View stocktakes</SecondaryButton>
         </Actions>
       </Card>
 

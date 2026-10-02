@@ -239,7 +239,7 @@ export function ActionButton({
   );
 }
 
-function Row({ label, children, className }: { label: string; children: React.ReactNode, className?: string }) {
+export function Row({ label, children, className }: { label: string; children: React.ReactNode, className?: string }) {
   return (
     <div className={`flex items-center justify-between gap-2 ${className ?? ''}`}>
       <span className="text-[11.5px] font-medium leading-none text-inventory-text-muted">{label}</span>
@@ -252,11 +252,11 @@ function Value({ children }: { children: React.ReactNode }) {
   return <span className="text-[11.5px] font-bold leading-none text-inventory-text tabular-nums">{children}</span>;
 }
 
-function Unit({ children, className }: { children: React.ReactNode; className?: string }) {
+export function Unit({ children, className }: { children: React.ReactNode; className?: string }) {
   return <span className={`text-[10px] font-medium leading-none ${className ?? 'text-inventory-text-subtle'}`}>{children}</span>;
 }
 
-function NumberInput({
+export function NumberInput({
   value,
   onChange,
   step,

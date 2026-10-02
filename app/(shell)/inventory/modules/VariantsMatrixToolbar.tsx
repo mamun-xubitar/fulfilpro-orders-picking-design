@@ -49,6 +49,15 @@ export default function VariantsMatrixToolbar({ p, fullView }: VariantsMatrixToo
 
       <span className="mx-[2px] h-[18px] w-px bg-inventory-border" aria-hidden="true" />
 
+      <input
+        type="search"
+        value={matrix.search}
+        onChange={(e) => matrix.setSearch(e.target.value)}
+        placeholder="Search SKU, barcode, colour, size…"
+        aria-label="Search variants"
+        className="h-[22px] w-[210px] rounded-[7px] border border-inventory-border-strong bg-inventory-surface px-[7px] text-[10.5px] leading-none outline-none placeholder:text-inventory-text-subtle focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring"
+      />
+
       <VariantSizeDropdown size={matrix.sizeFilter} />
 
       <label className="flex cursor-pointer items-center gap-[4px] text-[10px] font-medium leading-none text-inventory-text-muted">
@@ -107,6 +116,15 @@ export default function VariantsMatrixToolbar({ p, fullView }: VariantsMatrixToo
         </button>
         <button
           type="button"
+          onClick={p.bulkLocations.openModal}
+          disabled={matrix.selectedIds.size === 0}
+          title="Sets the locations of the selected variants"
+          className="flex h-[22px] items-center gap-1 rounded-[6px] border border-inventory-border-strong bg-inventory-surface px-[6px] text-[10px] font-bold leading-none text-inventory-text-muted transition-colors duration-150 hover:bg-inventory-surface-hover disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+        >
+          Set locations{matrix.selectedIds.size > 0 ? ` (${matrix.selectedIds.size})` : ''}
+        </button>
+        <button
+          type="button"
           onClick={matrix.requestBulkDelete}
           disabled={matrix.selectedIds.size === 0}
           title="Deletes the selected variants"
@@ -131,6 +149,10 @@ export default function VariantsMatrixToolbar({ p, fullView }: VariantsMatrixToo
         <SecondaryButton onClick={() => setColourSizeOpen(true)}>
           <Plus className="h-3 w-3" />
           Colour / size
+        </SecondaryButton>
+        <SecondaryButton onClick={p.locations.openCreate}>
+          <Plus className="h-3 w-3" />
+          Location
         </SecondaryButton>
       </div>
 

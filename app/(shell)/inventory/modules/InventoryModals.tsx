@@ -10,6 +10,8 @@ import ImportModal from './ImportModal';
 import ImportProductsModal from './ImportProductsModal';
 import PoModals from './PoModals';
 import PublishToStoresModal from './PublishToStoresModal';
+import StocktakeConfirmDialogs from './StocktakeConfirmDialogs';
+import StocktakeCountModal from './StocktakeCountModal';
 import StocktakeModal from './StocktakeModal';
 import StorePricesModal from './StorePricesModal';
 import SupplierModal from './SupplierModal';
@@ -17,7 +19,11 @@ import VariantsMatrixSection from './VariantsMatrixSection';
 import type { InventoryPage } from './hooks/useInventoryPage';
 import { ChevronLeft, ChevronRight, Close } from './icons';
 import { SPINNER, WIZARD_BODY_CLASS, WIZARD_BTN_PRIMARY, WIZARD_BTN_SECONDARY, WIZARD_CARD_CLASS } from './modalStyles';
+import BulkLocationModal from './BulkLocationModal';
+import LocationModal from './LocationModal';
 import NewProductWizard from './newProduct/NewProductWizard';
+import PayPoModal from './PayPoModal';
+import SupplierDetailsModal from './SupplierDetailsModal';
 import { formatMoney, variantTitle } from './utils';
 
 export default function InventoryModals(p: InventoryPage) {
@@ -27,9 +33,15 @@ export default function InventoryModals(p: InventoryPage) {
   return (
     <>
       {p.newProductOpen && <NewProductWizard p={p} />}
+      <LocationModal locations={p.locations} />
+      <PayPoModal pay={p.payment} globals={p.globals} />
+      {p.supplierDetailId && (
+        <SupplierDetailsModal supplierId={p.supplierDetailId} onClose={p.closeSupplierDetails} onOpenPurchaseOrders={p.openPurchaseOrdersFor} onOpenPayments={p.openPaymentsFor} />
+      )}
+      <BulkLocationModal bulk={p.bulkLocations} locations={p.locations} />
 
       {p.matrixFullView && p.product && (
-        <ModalShell disableBackdropClose title="Variants / stock matrix" compact onClose={p.closeMatrixFullView} fullScreen>
+        <ModalShell disableBackdropClose title={`Variants / stock — ${p.product.name}`} compact onClose={p.closeMatrixFullView} fullScreen>
           <VariantsMatrixSection p={p} fullView />
         </ModalShell>
       )}
@@ -144,6 +156,8 @@ export default function InventoryModals(p: InventoryPage) {
 
       <PoModals po={p.po} variants={variants} />
       <StocktakeModal stocktake={p.stocktake} />
+      <StocktakeCountModal detail={p.stocktakeDetail} />
+      <StocktakeConfirmDialogs detail={p.stocktakeDetail} />
       <AdjustmentModals adjustments={p.adjustments} variants={variants} />
       <ImportModal importExport={p.importExport} />
       <ImportProductsModal importProducts={p.importProducts} suppliers={p.supplierOptions} />

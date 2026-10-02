@@ -8,7 +8,9 @@ import { useAdjustments } from './useAdjustments';
 import { useCatalogData } from './useCatalogData';
 import { useImportExport } from './useImportExport';
 import { useImportProducts } from './useImportProducts';
+import { useBulkLocations } from './useBulkLocations';
 import { useInventoryCategories } from './useInventoryCategories';
+import { useLocations } from './useLocations';
 import { useOptionLibrary } from './useOptionLibrary';
 import { useProductDetails } from './useProductDetails';
 import { useProductImageMutations } from './useProductImageMutations';
@@ -16,8 +18,13 @@ import { useProductImages } from './useProductImages';
 import { useProductNavigation } from './useProductNavigation';
 import { useProductPricing } from './useProductPricing';
 import { useProductsTable } from './useProductsTable';
+import { usePaymentsTab } from './usePaymentsTab';
+import { usePoPayment } from './usePoPayment';
 import { usePurchaseOrder } from './usePurchaseOrder';
+import { usePurchaseOrdersTab } from './usePurchaseOrdersTab';
 import { useStocktake } from './useStocktake';
+import { useStocktakeDetail } from './useStocktakeDetail';
+import { useStocktakesTab } from './useStocktakesTab';
 import { useSuppliers } from './useSuppliers';
 import { useStoreListings } from './useStoreListings';
 import { useStorePublish } from './useStorePublish';
@@ -27,11 +34,13 @@ import type { ModuleTabId, ProductRecord, StoreListingResult } from '../types';
 export function useInventoryPage() {
   const data = useCatalogData();
   const [now] = useState(() => Date.now());
-  const [moduleTab, setModuleTab] = useState<ModuleTabId>('products');
+  const [moduleTab, setModuleTabState] = useState<ModuleTabId>('variants');
   const [newProductOpen, setNewProductOpen] = useState(false);
   const [editImagesOpen, setEditImagesOpen] = useState(false);
   const [deleteProductOpen, setDeleteProductOpen] = useState(false);
   const [matrixFullView, setMatrixFullView] = useState(false);
+  // Bumped when a variant's locations are saved, so the Location tab's per-location counts refresh.
+  const [locationRefreshNonce, setLocationRefreshNonce] = useState(0);
   const [storePriceTarget, setStorePriceTarget] = useState<StoreListingResult | null>(null);
   const { request: requestCreate, loading: creatingProduct, errors: createErrors } = useRequest<ProductRecord>();
   const { request: requestDeleteProduct, loading: deletingProduct } = useRequest<null>();
@@ -41,8 +50,26 @@ export function useInventoryPage() {
   const [supplierRefreshNonce, setSupplierRefreshNonce] = useState(0);
   const bumpSupplierRefresh = () => setSupplierRefreshNonce((n) => n + 1);
 
-  const nav = useProductNavigation(data);
-  const product = nav.product;
+  const baseNav = useProductNavigation(data);
+  const product = baseNav.product;
+  // The Variant tab is always single-product, and the products list lives on the Products tab — so
+  // tab and list mode move together. The toolbar sits above every tab, so picking a product while on
+  // a non-product tab (Purchase Orders, Location, …) lands on the Variant tab.
+  const setModuleTab = (id: ModuleTabId) => {
+    if (id === 'variants' && data.allRecords) data.setAllRecords(false);
+    setModuleTabState(id);
+  };
+  const nav = {
+    ...baseNav,
+    setAllRecords: (value: boolean) => {
+      baseNav.setAllRecords(value);
+      if (value) setModuleTabState('products');
+    },
+    selectProduct: (id: string) => {
+      baseNav.selectProduct(id);
+      if (moduleTab !== 'products' && moduleTab !== 'variants') setModuleTabState('variants');
+    },
+  };
   const storeListings = useStoreListings(product?.id ?? null);
   const storePublish = useStorePublish({ product, storeListings });
   // Stepping to another product invalidates any open store-price modal, and any in-progress
@@ -73,15 +100,55 @@ export function useInventoryPage() {
   const onVariantSaved = (updated: ProductRecord) => {
     onProductSaved(updated);
     details.syncListsFromProduct(updated);
+    setLocationRefreshNonce((n) => n + 1);
   };
   const matrix = useVariantsMatrix({ product, sizes: details.sizes, quickFilter: data.quickFilter, onVariantSaved });
+  const locations = useLocations({ refreshKey: locationRefreshNonce, onChanged: data.refresh });
+  const bulkLocations = useBulkLocations({
+    product,
+    selectedIds: matrix.selectedIds,
+    onSaved: (updated) => {
+      onProductSaved(updated);
+      setLocationRefreshNonce((n) => n + 1);
+    },
+    onDone: () => matrix.clearSelection(),
+  });
   const po = usePurchaseOrder({ product, onSaved: onProductSaved });
-  const stocktake = useStocktake({ product, onSaved: onProductSaved });
+  // Bumped after a payment save so the PO list, the Payments list and the Suppliers tab's payment
+  // counts all refetch.
+  const [payNonce, setPayNonce] = useState(0);
+  const payment = usePoPayment({ globals: data.globals, onSaved: () => setPayNonce((n) => n + 1) });
+  const poTab = usePurchaseOrdersTab({
+    enabled: moduleTab === 'purchase-orders',
+    refreshKey: po.receivedNonce + payNonce,
+    onChanged: () => {
+      data.refresh();
+      bumpSupplierRefresh();
+    },
+  });
+  const paymentsTab = usePaymentsTab({ enabled: moduleTab === 'payments', refreshKey: payNonce });
+  const [supplierDetailId, setSupplierDetailId] = useState<string | null>(null);
+  /** The Suppliers tab's PO / payment counts: jump to that tab already narrowed to the supplier. */
+  const openPurchaseOrdersFor = (supplierId: string) => {
+    poTab.focusSupplier(supplierId);
+    setSupplierDetailId(null);
+    setModuleTabState('purchase-orders');
+  };
+  const openPaymentsFor = (supplierId: string) => {
+    paymentsTab.focusSupplier(supplierId);
+    setSupplierDetailId(null);
+    setModuleTabState('payments');
+  };
+  // Bumped when a stocktake is created so the Stocktake tab's list refetches.
+  const [stocktakeNonce, setStocktakeNonce] = useState(0);
+  const stocktake = useStocktake({ product, onCreated: () => setStocktakeNonce((n) => n + 1) });
+  const stocktakesTab = useStocktakesTab({ enabled: moduleTab === 'stocktake', refreshKey: stocktakeNonce });
+  const stocktakeDetail = useStocktakeDetail({ isAdmin: stocktakesTab.isAdmin, onChanged: stocktakesTab.refresh, onSynced: onProductSaved });
   const adjustments = useAdjustments({ product, onSaved: onProductSaved });
   const importExport = useImportExport({ product, onSaved: onProductSaved, onPoImported: po.loadPurchaseOrders, supplierOptions: po.supplierOptions });
   const productsTable = useProductsTable({ enabled: data.allRecords, verifiedOnly: nav.verifiedOnly, quickFilter: nav.quickFilter, onView: nav.viewProduct, onCounts: data.syncCounts, onDeleted: bumpSupplierRefresh });
   const importProducts = useImportProducts({ supplierOptions: po.supplierOptions, onImported: () => { data.refresh(); productsTable.refresh(); bumpSupplierRefresh(); } });
-  const suppliers = useSuppliers({ onChanged: po.refreshSuppliers, refreshKey: po.receivedNonce + supplierRefreshNonce });
+  const suppliers = useSuppliers({ onChanged: po.refreshSuppliers, refreshKey: po.receivedNonce + supplierRefreshNonce + payNonce });
 
   /** Stock Summary always reflects the whole product, not the matrix's filtered rows. */
   const summary = useMemo(() => summariseVariants(product?.variants ?? []), [product]);
@@ -144,8 +211,20 @@ export function useInventoryPage() {
     pricing,
     details,
     matrix,
+    locations,
+    bulkLocations,
     po,
+    poTab,
+    payment,
+    paymentsTab,
+    supplierDetailId,
+    openSupplierDetails: setSupplierDetailId,
+    closeSupplierDetails: () => setSupplierDetailId(null),
+    openPurchaseOrdersFor,
+    openPaymentsFor,
     stocktake,
+    stocktakesTab,
+    stocktakeDetail,
     adjustments,
     suppliers,
     importExport,
