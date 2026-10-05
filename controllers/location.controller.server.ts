@@ -1,5 +1,6 @@
 import { LocationModel } from '@/models/location.model.server';
 import { upperTrim } from '@/lib/utils/common';
+import { canReadInventory } from '@/lib/roles';
 
 const model = new LocationModel();
 
@@ -13,7 +14,7 @@ const forbidden = { error: { message: 'Forbidden', status: 403 } };
 
 export class LocationController {
   async list(searchParams: URLSearchParams, session: Session) {
-    if (!isAdmin(session)) return forbidden;
+    if (!canReadInventory(session?.user?.role)) return forbidden;
 
     // Every location, name only — what the variant location pickers need.
     if (searchParams.get('options') === '1') return { data: { locations: await model.listOptions() } };

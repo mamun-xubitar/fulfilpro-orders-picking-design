@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { ModalShell } from '@/components/ModalShell';
 import AnimatedStepBody from './newProduct/AnimatedStepBody';
+import { useInventoryAccess } from './InventoryAccess';
 import { WIZARD_BODY_CLASS, WIZARD_CARD_CLASS } from './modalStyles';
 import { STATUS_BADGES } from './PurchaseOrdersPanel';
 import ViewPoModal from './ViewPoModal';
@@ -22,6 +23,7 @@ type BuyingHistoryModalProps = {
  * total value, and View/Receive actions. Reuses `usePurchaseOrder.purchaseOrders`, already loaded
  * for the Purchase orders panel — no new fetch. */
 export default function BuyingHistoryModal({ purchaseOrders, onClose, onReceive }: BuyingHistoryModalProps) {
+  const { canEdit } = useInventoryAccess();
   const [viewTarget, setViewTarget] = useState<PurchaseOrderRecord | null>(null);
 
   return (
@@ -77,7 +79,7 @@ export default function BuyingHistoryModal({ purchaseOrders, onClose, onReceive 
                           >
                             View
                           </button>
-                          {outstanding && po.status !== 'CANCELLED' && (
+                          {canEdit && outstanding && po.status !== 'CANCELLED' && (
                             <button
                               type="button"
                               onClick={() => onReceive(po)}

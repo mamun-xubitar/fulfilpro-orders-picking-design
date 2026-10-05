@@ -9,6 +9,7 @@ import { resolveStoreMargin, storePriceFromMargin } from '@/lib/inventory/store-
 import { sanitizeHtml } from '@/lib/sanitize-html';
 import { toPublicUrl, findMissingUploads } from '@/lib/uploads.server';
 import { StoreModel } from '@/models/store.model.server';
+import { canReadInventory } from '@/lib/roles';
 
 const model = new SupplierProductModel();
 const listingModel = new StoreListingModel();
@@ -109,7 +110,7 @@ export class StoreListingController {
   }
 
   async list(productId: string, session: Session) {
-    if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
+    if (!canReadInventory(session?.user?.role)) return { error: { message: 'Forbidden', status: 403 } };
     const handle = await model.findHandle(productId);
     if (!handle) return { error: { message: 'Product not found', status: 404 } };
 

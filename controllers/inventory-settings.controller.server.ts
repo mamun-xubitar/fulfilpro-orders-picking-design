@@ -3,6 +3,7 @@ import { CurrencyRateModel } from '@/models/currency-rate.model.server';
 import { SettingsModel } from '@/models/settings.model.server';
 import { StoreModel } from '@/models/store.model.server';
 import type { UpdateAppSettingsData } from '@/models/settings.model.server';
+import { canReadInventory } from '@/lib/roles';
 
 const currencyModel = new CurrencyRateModel();
 const settingsModel = new SettingsModel();
@@ -18,7 +19,7 @@ function isAdmin(session: Session) {
 
 export class InventorySettingsController {
   async get(session: Session) {
-    if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
+    if (!canReadInventory(session?.user?.role)) return { error: { message: 'Forbidden', status: 403 } };
 
     const [settings, currencies, exchangeRateRow] = await Promise.all([
       settingsModel.get(),
@@ -138,7 +139,7 @@ export class InventorySettingsController {
    * global fallback margin per connected store, used when a product has no product-specific
    * per-store margin of its own (see the resolution chain in lib/inventory/store-price.ts). */
   async listStoreMargins(session: Session) {
-    if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
+    if (!canReadInventory(session?.user?.role)) return { error: { message: 'Forbidden', status: 403 } };
 
     const stores = await storeModel.findConnectedWithDefaultMargins();
     return {

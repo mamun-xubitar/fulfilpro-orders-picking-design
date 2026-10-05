@@ -210,9 +210,6 @@ export class StocktakeModel {
         result.adjusted++;
       }
 
-      const nextStocktakeAt = new Date();
-      nextStocktakeAt.setDate(nextStocktakeAt.getDate() + 90);
-      await tx.supplierProduct.update({ where: { id: stocktake.supplierProductId }, data: { nextStocktakeAt } });
       await tx.inventoryActivity.create({
         data: {
           supplierProductId: stocktake.supplierProductId,

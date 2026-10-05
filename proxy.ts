@@ -29,7 +29,7 @@ const LOGIN_ROUTE = '/';
 const RESTRICTED_ROUTE = '/restricted';
 const SESSION_EXPIRED_ROUTE = '/session-expired';
 
-const STAFF_ALLOWED_PAGE_ROUTES = ['/orders', '/back-in-stock', '/profile', '/tasks', '/tracking', '/messages'];
+const STAFF_ALLOWED_PAGE_ROUTES = ['/orders', '/back-in-stock', '/profile', '/tasks', '/tracking', '/messages', '/inventory'];
 const STAFF_ALLOWED_API_ROUTES = [
   '/api/orders',
   '/api/orders/.*',
@@ -49,10 +49,18 @@ const STAFF_ALLOWED_API_ROUTES = [
   '/api/tracking/.*',
   '/api/conversations',
   '/api/conversations/.*',
+  '/api/inventory',
+  '/api/inventory/.*',
+];
+// Inventory is read-only for staff apart from creating a stocktake and saving its counts.
+const STAFF_INVENTORY_API_ROUTES = ['/api/inventory/.*'];
+const STAFF_INVENTORY_WRITE_ROUTES = [
+  { method: 'POST', route: '^/api/inventory/catalog/[^/]+/stocktakes$' },
+  { method: 'PATCH', route: '^/api/inventory/stocktakes/[^/]+$' },
 ];
 const STAFF_RESTRICTED_API_ROUTES = ['/api/auth/.*'];
 const STAFF_EXPIRED_API_ROUTES = ['/api/auth/.*'];
-const TEST_USER_MUTATION_BLOCKED_API_ROUTES = ['/api/orders', '/api/orders/.*', '/api/back-in-stock', '/api/back-in-stock/.*', '/api/fulfillment-requests', '/api/fulfillment-requests/.*', '/api/tasks', '/api/tasks/.*'];
+const TEST_USER_MUTATION_BLOCKED_API_ROUTES = ['/api/orders', '/api/orders/.*', '/api/back-in-stock', '/api/back-in-stock/.*', '/api/fulfillment-requests', '/api/fulfillment-requests/.*', '/api/tasks', '/api/tasks/.*', '/api/inventory/.*'];
 
 const PICKER_ALLOWED_PAGE_ROUTES = ['/picking-list', '/profile', '/tasks', '/messages'];
 const PICKER_ALLOWED_API_ROUTES = [
@@ -228,6 +236,17 @@ export const proxy = auth(async (request) => {
       if (!matchesRoute(pathname, STAFF_ALLOWED_API_ROUTES)) {
         return NextResponse.json(
           { error: 'Forbidden', message: 'Staff users do not have access to this API' },
+          { status: 403 }
+        );
+      }
+
+      if (
+        request.method !== 'GET' &&
+        matchesRoute(pathname, STAFF_INVENTORY_API_ROUTES) &&
+        !STAFF_INVENTORY_WRITE_ROUTES.some((w) => w.method === request.method && matchesRoute(pathname, [w.route]))
+      ) {
+        return NextResponse.json(
+          { error: 'Forbidden', message: 'Staff users have read-only access to Inventory' },
           { status: 403 }
         );
       }

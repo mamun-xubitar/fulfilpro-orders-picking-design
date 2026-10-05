@@ -15,6 +15,9 @@ const EMPTY_PAGINATION: PaginationState = { page: 1, pageSize: 20, total: 0, tot
 
 type Filters = { supplierId: string; status: '' | PurchaseOrderStatusValue; payStatus: PayFilter; dateFrom: string; dateTo: string };
 const NO_FILTERS: Filters = { supplierId: '', status: '', payStatus: '', dateFrom: '', dateTo: '' };
+/** Both the list endpoint's `pageSize` and bulk-receive's `ids` are capped at this many. */
+const API_BATCH = 100;
+type ApiEnvelope<T> = { success: boolean; message: string; data?: T };
 
 type Args = {
   /** Only fetch while the tab is on screen. */
@@ -42,6 +45,9 @@ export function usePurchaseOrdersTab({ enabled, refreshKey, onChanged }: Args) {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSizeState] = useState(PO_PAGE_SIZE_OPTIONS[0]);
   const [selected, setSelected] = useState<string[]>([]);
+  const [selectAllFilters, setSelectAllFilters] = useState(false);
+  const [matchingRows, setMatchingRows] = useState<PurchaseOrderRecord[] | null>(null);
+  const [resolving, setResolving] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const setSearchInput = (value: string) => {
@@ -99,9 +105,52 @@ export function usePurchaseOrdersTab({ enabled, refreshKey, onChanged }: Args) {
   const pageIds = new Set(rows.map((r) => r.id));
   const selectedIds = selected.filter((id) => pageIds.has(id));
   const allSelected = rows.length > 0 && rows.every((r) => selectedIds.includes(r.id));
-  const toggle = (id: string) => setSelected(selectedIds.includes(id) ? selectedIds.filter((s) => s !== id) : [...selectedIds, id]);
-  const toggleAll = () => setSelected(allSelected ? [] : rows.map((r) => r.id));
+  const toggle = (id: string) => {
+    setSelectAllFilters(false);
+    setSelected(selectedIds.includes(id) ? selectedIds.filter((s) => s !== id) : [...selectedIds, id]);
+  };
+  const toggleAll = () => {
+    setSelectAllFilters(false);
+    setSelected(allSelected ? [] : rows.map((r) => r.id));
+  };
+  const toggleSelectAllFilters = () => {
+    setSelectAllFilters((prev) => !prev);
+    setSelected([]);
+  };
+  const clearSelection = () => {
+    setSelected([]);
+    setSelectAllFilters(false);
+  };
   const selectedRows = rows.filter((r) => selectedIds.includes(r.id));
+
+  /** "Select all matching filters" only ever has one page on the client, so the full rows are
+   * fetched (in API_BATCH pages, with the current filters and sort) when an action needs them.
+   * Resolves to null — after a toast — if a page fails. */
+  const resolveTargets = async (): Promise<PurchaseOrderRecord[] | null> => {
+    if (!selectAllFilters) return selectedRows;
+    setResolving(true);
+    try {
+      const all: PurchaseOrderRecord[] = [];
+      let pageNo = 1;
+      let totalPages = 1;
+      do {
+        const params = new URLSearchParams({ search, ...filters, sort, dir, page: String(pageNo), pageSize: String(API_BATCH) });
+        const res = await fetch(`/api/inventory/purchase-orders?${params.toString()}`);
+        const json = (await res.json()) as ApiEnvelope<{ purchaseOrders: PurchaseOrderRecord[]; pagination: PaginationState }>;
+        if (!res.ok || !json.success || !json.data) throw new Error(json.message || 'Failed to resolve selection');
+        all.push(...json.data.purchaseOrders);
+        totalPages = json.data.pagination.totalPages;
+        pageNo++;
+      } while (pageNo <= totalPages);
+      return all;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to resolve selection');
+      return null;
+    } finally {
+      setResolving(false);
+    }
+  };
+  const targetRows = selectAllFilters ? (matchingRows ?? []) : selectedRows;
 
   const { request: requestRemark } = useRequest<PurchaseOrderRecord>();
   const saveRemark = (po: PurchaseOrderRecord, poRemark: string) => {
@@ -116,25 +165,64 @@ export function usePurchaseOrdersTab({ enabled, refreshKey, onChanged }: Args) {
   };
 
   const [receiveConfirmOpen, setReceiveConfirmOpen] = useState(false);
-  const { request: requestBulkReceive, loading: bulkReceiving } = useRequest<{ received: number; skipped: number; failed: string[] }>();
-  const receivable = selectedRows.filter((r) => r.status !== 'CANCELLED' && r.items.some((i) => i.quantity > i.receivedQuantity));
-  const confirmBulkReceive = () =>
-    requestBulkReceive({
-      url: '/api/inventory/purchase-orders/bulk-receive',
-      method: 'POST',
-      data: { ids: selectedIds },
-      successMessage: 'Purchase orders received',
-      onSuccess: () => {
-        setReceiveConfirmOpen(false);
-        setSelected([]);
-        load();
-        onChanged();
-      },
-    });
+  const [bulkReceiving, setBulkReceiving] = useState(false);
+  const receivable = targetRows.filter((r) => r.status !== 'CANCELLED' && r.items.some((i) => i.quantity > i.receivedQuantity));
+  const openReceiveConfirm = async () => {
+    if (selectAllFilters) {
+      const resolved = await resolveTargets();
+      if (!resolved) return;
+      setMatchingRows(resolved);
+    }
+    setReceiveConfirmOpen(true);
+  };
+  const closeReceiveConfirm = () => {
+    setReceiveConfirmOpen(false);
+    setMatchingRows(null);
+  };
+  const confirmBulkReceive = async () => {
+    setBulkReceiving(true);
+    const ids = targetRows.map((r) => r.id);
+    let received = 0;
+    let skipped = 0;
+    let failed = 0;
+    let errorMessage = '';
+    try {
+      for (let i = 0; i < ids.length; i += API_BATCH) {
+        const res = await fetch('/api/inventory/purchase-orders/bulk-receive', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids: ids.slice(i, i + API_BATCH) }),
+        });
+        const json = (await res.json()) as ApiEnvelope<{ received: number; skipped: number; failed: string[] }>;
+        if (!res.ok || !json.success || !json.data) throw new Error(json.message || 'Could not receive the selected purchase orders');
+        received += json.data.received;
+        skipped += json.data.skipped;
+        failed += json.data.failed.length;
+      }
+    } catch (err) {
+      errorMessage = err instanceof Error ? err.message : 'Could not receive the selected purchase orders';
+    }
+    const parts = [`${received} purchase order${received === 1 ? '' : 's'} received`];
+    if (skipped > 0) parts.push(`${skipped} skipped (nothing outstanding or cancelled)`);
+    if (failed > 0) parts.push(`${failed} failed`);
+    if (errorMessage) toast.error(received > 0 ? `${parts.join(' · ')} · ${errorMessage}` : errorMessage);
+    else toast.success(parts.join(' · '));
+    setBulkReceiving(false);
+    if (errorMessage && received === 0) return;
+    closeReceiveConfirm();
+    clearSelection();
+    load();
+    onChanged();
+  };
 
   const print = (pos: PurchaseOrderRecord[]) => {
     if (pos.length === 0) return;
     printPurchaseOrders(pos).catch((err: unknown) => toast.error(err instanceof Error ? err.message : 'Unable to print'));
+  };
+
+  const printSelection = async () => {
+    const resolved = await resolveTargets();
+    if (resolved) print(resolved);
   };
 
   const [viewTarget, setViewTarget] = useState<PurchaseOrderRecord | null>(null);
@@ -163,18 +251,24 @@ export function usePurchaseOrdersTab({ enabled, refreshKey, onChanged }: Args) {
     },
     selectedIds,
     selectedRows,
+    selectAllFilters,
+    hasSelection: selectAllFilters || selectedIds.length > 0,
+    resolving,
+    targetRows,
     allSelected,
     toggle,
     toggleAll,
-    clearSelection: () => setSelected([]),
+    toggleSelectAllFilters,
+    clearSelection,
     saveRemark,
     receivable,
     receiveConfirmOpen,
-    openReceiveConfirm: () => setReceiveConfirmOpen(true),
-    closeReceiveConfirm: () => setReceiveConfirmOpen(false),
+    openReceiveConfirm,
+    closeReceiveConfirm,
     confirmBulkReceive,
     bulkReceiving,
     print,
+    printSelection,
     viewTarget,
     setViewTarget,
   };

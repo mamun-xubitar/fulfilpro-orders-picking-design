@@ -7,8 +7,7 @@ const controller = new InventoryCsvImportController();
 const MAX_SIZE = 10 * 1024 * 1024; // 10 MB
 type ErrResult = { error: { message: string; errors?: string[]; status: number } };
 
-/** Auto-detects a Shopify product CSV vs. our own PO CSV from the header row. `commit=false`
- * (the default) parses and validates without writing, for the import modal's preview table;
+/** Imports a Shopify product CSV. `commit=false` (the default) parses and validates without writing, for the import modal's preview table;
  * `commit=true` re-parses the same file and applies it. */
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -23,11 +22,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // Overwrite defaults to today's always-replace behaviour when the client omits it.
     const overwrite = formData.get('overwrite') !== 'false';
     const markVerified = formData.get('markVerified') === 'true';
-    const rawSupplierId = formData.get('supplierId');
-    const poSupplierId = typeof rawSupplierId === 'string' && rawSupplierId ? rawSupplierId : undefined;
     const result = commit
-      ? await controller.commit(id, file, session, { overwrite, markVerified, poSupplierId })
-      : await controller.preview(id, file, session, { overwrite, markVerified, poSupplierId });
+      ? await controller.commit(id, file, session, { overwrite, markVerified })
+      : await controller.preview(id, file, session, { overwrite, markVerified });
     if ('error' in result) {
       const { error } = result as ErrResult;
       return apiError({ message: error.message, errors: error.errors, status: error.status });

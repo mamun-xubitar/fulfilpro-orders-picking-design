@@ -95,8 +95,6 @@ export function usePoPayment({ globals, onSaved }: Args) {
       return { ...prev, [field]: value };
     });
   };
-  const setStatus = (status: PoPaymentStatusValue) =>
-    setForm((prev) => (prev ? { ...prev, status, paidAt: status === 'PAID' ? prev.paidAt || new Date().toISOString().slice(0, 10) : '' } : prev));
 
   const quantity = target ? target.items.reduce((sum, i) => sum + i.quantity, 0) : 0;
   const totals = useMemo(() => {
@@ -124,7 +122,7 @@ export function usePoPayment({ globals, onSaved }: Args) {
     });
   };
 
-  return { target, form, history, quantity, totals, errors, saving, open, close, set, setStatus, save, openById, isEdit: Boolean(target?.payment) };
+  return { target, form, history, quantity, totals, errors, saving, open, close, set, save, openById, isEdit: Boolean(target?.payment), isPaid: form?.status === 'PAID' };
 }
 
 export type PoPaymentState = ReturnType<typeof usePoPayment>;

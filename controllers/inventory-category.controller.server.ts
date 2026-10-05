@@ -1,4 +1,5 @@
 import { InventoryCategoryModel } from '@/models/inventory-category.model.server';
+import { canReadInventory } from '@/lib/roles';
 
 const model = new InventoryCategoryModel();
 
@@ -10,7 +11,7 @@ function isAdmin(session: Session) {
 
 export class InventoryCategoryController {
   async list(session: Session) {
-    if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
+    if (!canReadInventory(session?.user?.role)) return { error: { message: 'Forbidden', status: 403 } };
     const categories = await model.list();
     return { data: { categories } };
   }

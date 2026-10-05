@@ -1,5 +1,6 @@
 'use client';
 
+import { useInventoryAccess } from './InventoryAccess';
 import { panelBorderClass } from './MainImagePanel';
 import ProductSearchBox from './ProductSearchBox';
 import { QUICK_FILTERS } from './constants';
@@ -12,6 +13,7 @@ import { formatNumber } from './utils';
  * rendered in the module-tabs row instead. */
 export default function ProductsToolbar(p: InventoryPage) {
   const { nav } = p;
+  const { canEdit } = useInventoryAccess();
   // In table mode the count reflects the products table's own filtered total (search, status,
   // supplier, quick filter and all) instead of the record stepper's verified-only count, so it
   // never disagrees with the visible rows — the "n /" position is dropped since paging has no
@@ -76,6 +78,8 @@ export default function ProductsToolbar(p: InventoryPage) {
 
       <span className="ml-auto" />
 
+      {canEdit && (
+      <>
       <button
         type="button"
         onClick={p.importProducts.openModal}
@@ -102,6 +106,8 @@ export default function ProductsToolbar(p: InventoryPage) {
       >
         <Trash className="h-3 w-3" />
       </button>
+      </>
+      )}
     </div>
   );
 }

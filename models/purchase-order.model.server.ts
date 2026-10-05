@@ -41,9 +41,11 @@ export type PurchaseOrderRow = {
   itemNo: string;
   /** What has been paid / is to be paid for this PO; null until a payment is first saved. */
   payment: PoPaymentRow | null;
-  /** The product's own "Pricing & margin" figures — what the Pay modal seeds from before any payment exists. */
-  productPricing: { currencyCode: string; exchangeRate: number; buyingPrice: number; freight: number; misc: number } | null;
+  /** The "Pricing & margin" figures frozen on the PO when it was created (the product's live ones for a PO that predates the snapshot) — what the Pay modal seeds from before any payment exists. */
+  productPricing: PoPricingSnapshot | null;
 };
+
+export type PoPricingSnapshot = { currencyCode: string; exchangeRate: number; buyingPrice: number; freight: number; misc: number };
 
 const itemsInclude = {
   items: { include: { variant: { select: { colour: true, size: true } } } },
@@ -136,11 +138,15 @@ export class PurchaseOrderModel {
     return row ? toPurchaseOrderRow(row) : null;
   }
 
-  /** Looks up a PO by its DB-assigned display number — used by PO CSV import to find the
-   * existing PO a "PO-00042"-style cell refers to. Never creates one under an invented number. */
-  async findByNumber(number: number): Promise<PurchaseOrderRow | null> {
-    const row = await prisma.purchaseOrder.findUnique({ where: { number }, include: itemsInclude });
-    return row ? toPurchaseOrderRow(row) : null;
+  /** The product's current "Pricing & margin" figures, to freeze onto a PO being created. */
+  async findProductPricing(supplierProductId: string): Promise<PoPricingSnapshot | null> {
+    const row = await prisma.supplierProductPricing.findUnique({
+      where: { supplierProductId },
+      select: { currencyCode: true, exchangeRate: true, buyingPrice: true, freight: true, misc: true },
+    });
+    return row
+      ? { currencyCode: row.currencyCode, exchangeRate: Number(row.exchangeRate), buyingPrice: Number(row.buyingPrice), freight: Number(row.freight), misc: Number(row.misc) }
+      : null;
   }
 
   async create(data: {
@@ -158,22 +164,30 @@ export class PurchaseOrderModel {
     createdById: string;
     createdByName: string;
     items: Array<{ variantId: string; variantTitle: string; sku: string | null; quantity: number; unitCost?: number }>;
+    /** The product's pricing at this moment — frozen onto the PO so later product edits don't move it. */
+    pricing: PoPricingSnapshot | null;
   }) {
+    const { pricing, ...fields } = data;
     const created = await prisma.purchaseOrder.create({
       data: {
-        supplierId: data.supplierId,
-        supplierName: data.supplierName,
-        poEmail: data.poEmail,
-        supplierProductId: data.supplierProductId,
-        productTitle: data.productTitle,
-        referenceNumber: data.referenceNumber,
+        supplierId: fields.supplierId,
+        supplierName: fields.supplierName,
+        poEmail: fields.poEmail,
+        supplierProductId: fields.supplierProductId,
+        productTitle: fields.productTitle,
+        referenceNumber: fields.referenceNumber,
         status: 'REQUESTED',
-        deliveryDate: data.deliveryDate,
-        poRemark: data.poRemark,
-        shippingRemark: data.shippingRemark,
-        createdById: data.createdById,
-        createdByName: data.createdByName,
-        items: { create: data.items },
+        deliveryDate: fields.deliveryDate,
+        poRemark: fields.poRemark,
+        shippingRemark: fields.shippingRemark,
+        pricingCurrencyCode: pricing?.currencyCode ?? null,
+        pricingExchangeRate: pricing?.exchangeRate ?? null,
+        pricingBuyingPrice: pricing?.buyingPrice ?? null,
+        pricingFreight: pricing?.freight ?? null,
+        pricingMisc: pricing?.misc ?? null,
+        createdById: fields.createdById,
+        createdByName: fields.createdByName,
+        items: { create: fields.items },
       },
       include: itemsInclude,
     });
@@ -287,45 +301,6 @@ export class PurchaseOrderModel {
       return toPurchaseOrderRow(row);
     });
   }
-
-  /** PO-level field patch for PO CSV import — blank/omitted fields leave the existing value untouched. */
-  async updateFields(id: string, data: Partial<{ status: PurchaseOrderStatus; referenceNumber: string | null; deliveryDate: Date | null; poRemark: string | null }>): Promise<void> {
-    await prisma.purchaseOrder.update({ where: { id }, data });
-  }
-
-  /** Upserts one line item per variant on an existing PO, keyed by the (purchaseOrderId, variantId)
-   * unique constraint — used by PO CSV import to update quantities/cost on matching lines and add
-   * new ones for variants the PO didn't already have. */
-  async upsertItems(
-    purchaseOrderId: string,
-    items: Array<{ variantId: string; variantTitle: string; sku: string | null; quantity: number; receivedQuantity: number; unitCost: number | null }>
-  ): Promise<PurchaseOrderRow> {
-    await prisma.$transaction(
-      items.map((item) =>
-        prisma.purchaseOrderItem.upsert({
-          where: { purchaseOrderId_variantId: { purchaseOrderId, variantId: item.variantId } },
-          create: {
-            purchaseOrderId,
-            variantId: item.variantId,
-            variantTitle: item.variantTitle,
-            sku: item.sku,
-            quantity: item.quantity,
-            receivedQuantity: item.receivedQuantity,
-            unitCost: item.unitCost,
-          },
-          update: {
-            variantTitle: item.variantTitle,
-            sku: item.sku,
-            quantity: item.quantity,
-            receivedQuantity: item.receivedQuantity,
-            unitCost: item.unitCost,
-          },
-        })
-      )
-    );
-    const row = await prisma.purchaseOrder.findUniqueOrThrow({ where: { id: purchaseOrderId }, include: itemsInclude });
-    return toPurchaseOrderRow(row);
-  }
 }
 
 function toPurchaseOrderRow(row: PurchaseOrderWithItems): PurchaseOrderRow {
@@ -351,7 +326,15 @@ function toPurchaseOrderRow(row: PurchaseOrderWithItems): PurchaseOrderRow {
     updatedAt: row.updatedAt.toISOString(),
     itemNo: row.supplierProduct.itemNo,
     payment: row.payment ? toPoPaymentRow(row.payment) : null,
-    productPricing: row.supplierProduct.pricing
+    productPricing: row.pricingCurrencyCode
+      ? {
+          currencyCode: row.pricingCurrencyCode,
+          exchangeRate: Number(row.pricingExchangeRate ?? 1),
+          buyingPrice: Number(row.pricingBuyingPrice ?? 0),
+          freight: Number(row.pricingFreight ?? 0),
+          misc: Number(row.pricingMisc ?? 0),
+        }
+      : row.supplierProduct.pricing
       ? {
           currencyCode: row.supplierProduct.pricing.currencyCode,
           exchangeRate: Number(row.supplierProduct.pricing.exchangeRate),

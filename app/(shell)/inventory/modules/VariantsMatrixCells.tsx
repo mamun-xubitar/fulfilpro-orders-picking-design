@@ -5,6 +5,7 @@
 
 import { formatPoNumber } from '@/lib/inventory/po-number';
 import { Check } from './icons';
+import { useInventoryAccess } from './InventoryAccess';
 import { formatIncomingLot } from './utils';
 import type { IncomingLot } from './types';
 
@@ -85,6 +86,7 @@ export function NumCell({
   onSave: () => void;
   onChange: (value: number) => void;
 }) {
+  const { canEdit } = useInventoryAccess();
   return (
     <td className={`${CELL_CLASS} text-right`} title={title}>
       <div className="flex items-center justify-end gap-[2px]">
@@ -95,6 +97,7 @@ export function NumCell({
           value={value}
           onChange={(e) => onChange(Math.max(0, Number(e.target.value) || 0))}
           onKeyDown={saveOnEnter(dirty, onSave)}
+          readOnly={!canEdit}
           aria-label={label}
           className={`w-14 pr-[5px] text-right tabular-nums ${INPUT_BASE}`}
         />
@@ -163,6 +166,7 @@ export function SkuCell({
   onChangeBarcode: (value: string) => void;
   onSave: (field: 'sku' | 'barcode') => void;
 }) {
+  const { canEdit } = useInventoryAccess();
   return (
     <td className={CELL_CLASS}>
       <div className="mb-[2px] flex items-center gap-[2px]">
@@ -171,6 +175,7 @@ export function SkuCell({
           value={sku ?? ''}
           onChange={(e) => onChangeSku(e.target.value)}
           onKeyDown={saveOnEnter(skuDirty, () => onSave('sku'))}
+          readOnly={!canEdit}
           aria-label="SKU"
           className={`block w-24 font-medium ${INPUT_BASE}`}
         />
@@ -182,6 +187,7 @@ export function SkuCell({
           value={barcode ?? ''}
           onChange={(e) => onChangeBarcode(e.target.value)}
           onKeyDown={saveOnEnter(barcodeDirty, () => onSave('barcode'))}
+          readOnly={!canEdit}
           aria-label="Barcode"
           className={`block w-24 tabular-nums ${INPUT_BASE}`}
         />

@@ -1,5 +1,6 @@
 'use client';
 
+import { useInventoryAccess } from './InventoryAccess';
 import { PanelHeading, panelBorderClass, type PanelTone } from './MainImagePanel';
 import PurchaseOrdersPanel from './PurchaseOrdersPanel';
 import type { InventoryPage } from './hooks/useInventoryPage';
@@ -12,6 +13,7 @@ type BottomPanelsProps = { p: InventoryPage };
  * Import/export and Recent activity, all sized to the same fixed height. */
 export default function BottomPanels({ p }: BottomPanelsProps) {
   const product = p.product!;
+  const { canEdit, canCount } = useInventoryAccess();
 
   return (
     <div className="grid grid-cols-1 gap-[5px] md:grid-cols-2 xl:h-24 xl:flex-none xl:grid-cols-5">
@@ -21,7 +23,7 @@ export default function BottomPanels({ p }: BottomPanelsProps) {
         <Stat label="Last stocktake" value={formatDate(product.stocktake.lastAt)} />
         <Stat label="Next stocktake" value={formatDate(product.stocktake.nextAt)} />
         <Actions>
-          <PrimaryButton onClick={p.stocktake.openModal}>New stocktake</PrimaryButton>
+          {canCount && <PrimaryButton onClick={p.stocktake.openModal}>New stocktake</PrimaryButton>}
           <SecondaryButton onClick={() => p.setModuleTab('stocktake')}>View stocktakes</SecondaryButton>
         </Actions>
       </Card>
@@ -30,20 +32,22 @@ export default function BottomPanels({ p }: BottomPanelsProps) {
         <Stat label="Last adjustment" value={formatDate(product.adjustments.lastAt)} />
         <Stat label="This month" value={String(product.adjustments.thisMonth)} />
         <Actions>
-          <PrimaryButton onClick={p.adjustments.openModal}>New adjustment</PrimaryButton>
+          {canEdit && <PrimaryButton onClick={p.adjustments.openModal}>New adjustment</PrimaryButton>}
           <SecondaryButton onClick={p.adjustments.openHistory}>View history</SecondaryButton>
         </Actions>
       </Card>
 
       <Card tone="import" icon={<Swap className="h-3 w-3" />} title="Import / export">
-        <button
-          type="button"
-          onClick={p.importExport.openImport}
-          className="mt-auto flex h-[22px] w-full items-center justify-center gap-1 rounded-[6px] bg-inventory-success text-[10px] font-bold leading-none text-white transition-colors duration-150 hover:bg-inventory-success-hover cursor-pointer"
-        >
-          <Upload className="h-3 w-3" />
-          Import Product/PO CSV
-        </button>
+        {canEdit && (
+          <button
+            type="button"
+            onClick={p.importExport.openImport}
+            className="mt-auto flex h-[22px] w-full items-center justify-center gap-1 rounded-[6px] bg-inventory-success text-[10px] font-bold leading-none text-white transition-colors duration-150 hover:bg-inventory-success-hover cursor-pointer"
+          >
+            <Upload className="h-3 w-3" />
+            Import Product CSV
+          </button>
+        )}
         {/* Not pinned: this card has no stat rows, so the exports sit with the import
             rather than being stranded at the bottom of a stretched grid cell. */}
         <Actions pin={false}>

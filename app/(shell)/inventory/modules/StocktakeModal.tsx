@@ -1,6 +1,7 @@
 'use client';
 
 import { ModalShell } from '@/components/ModalShell';
+import { useInventoryAccess } from './InventoryAccess';
 import { locationChipClass } from './LocationPickerMenu';
 import { variantTitle } from './utils';
 import { NO_LOCATION, type useStocktake } from './hooks/useStocktake';
@@ -51,6 +52,7 @@ function StocktakeFilterBar({ stocktake }: { stocktake: StocktakeState }) {
 }
 
 export default function StocktakeModal({ stocktake }: { stocktake: StocktakeState }) {
+  const { canEdit } = useInventoryAccess();
   if (!stocktake.open) return null;
 
   return (
@@ -75,12 +77,12 @@ export default function StocktakeModal({ stocktake }: { stocktake: StocktakeStat
     >
       <div className={WIZARD_CARD_CLASS}>
         <p className="mb-2 text-[12px] text-inventory-text-muted">
-          Tick the variants to count. A variant kept in several locations has a line per location. Counts can be left blank and entered later, after printing the sheet.
+          Tick the variants to count. A variant kept in several locations has a line per location. Print the sheet after creating, then enter the counts from the Stocktake tab.
         </p>
         <StocktakeFilterBar stocktake={stocktake} />
         <div className="max-h-96 overflow-y-auto thin-scroll rounded-lg border border-inventory-border">
           <table className="w-full border-collapse text-[11px] leading-none">
-            <thead>
+            <thead className="sticky top-0 z-10 bg-inventory-surface-muted shadow-[0_1px_0_var(--inventory-border)]">
               <tr className="border-b border-inventory-border bg-inventory-surface-muted text-left text-[10px] font-bold uppercase tracking-[0.4px] text-inventory-text-subtle">
                 <th className="w-7 px-2 py-1">
                   <input
@@ -95,13 +97,14 @@ export default function StocktakeModal({ stocktake }: { stocktake: StocktakeStat
                 <th className="px-2 py-1">Colour / Size</th>
                 <th className="px-2 py-1">SKU</th>
                 <th className="px-2 py-1">Location</th>
+                {canEdit && <th className="px-2 py-1 text-right">Quantity</th>}
                 <th className="px-2 py-1 text-right">Counted</th>
               </tr>
             </thead>
             <tbody>
               {stocktake.visible.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-2 py-6 text-center text-inventory-text-subtle">
+                  <td colSpan={canEdit ? 6 : 5} className="px-2 py-6 text-center text-inventory-text-subtle">
                     No variants match these filters.
                   </td>
                 </tr>
@@ -120,14 +123,19 @@ export default function StocktakeModal({ stocktake }: { stocktake: StocktakeStat
                         <span className="text-inventory-text-subtle">—</span>
                       )}
                     </td>
+                    {canEdit && (
+                      <td title="Stock on hand now, for the whole variant across its locations" className="px-2 py-1 text-right tabular-nums text-inventory-text-muted">
+                        {variant.stockOnHand}
+                      </td>
+                    )}
                     <td className="px-2 py-1 text-right">
                       <input
                         type="number"
-                        min={0}
-                        value={stocktake.counts[key] ?? ''}
-                        onChange={(e) => stocktake.setCount(key, e.target.value)}
+                        disabled
+                        value=""
+                        title="Counts are entered after the stocktake is created"
                         aria-label={`Counted for ${variantTitle(variant)}${location ? ` at ${location.name}` : ''}`}
-                        className="h-[22px] w-20 rounded-[7px] border border-inventory-border-strong pl-[6px] pr-[10px] text-right text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring"
+                        className="h-[22px] w-20 rounded-[7px] border border-inventory-border-strong pl-[6px] pr-[10px] text-right text-[11px] leading-none outline-none disabled:cursor-not-allowed disabled:bg-inventory-surface-muted"
                       />
                     </td>
                   </tr>

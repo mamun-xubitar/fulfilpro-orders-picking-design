@@ -2,6 +2,7 @@
 
 import { memo } from 'react';
 import VariantLocationCell from './VariantLocationCell';
+import { useInventoryAccess } from './InventoryAccess';
 import type { LocationOption } from './hooks/useLocations';
 import { IncomingCell, Num, NumCell, RowAction, SkuCell, VariantTitleCell } from './VariantsMatrixCells';
 import { STATUS_STYLES } from './constants';
@@ -59,6 +60,7 @@ function VariantsMatrixRow({
   locationOptions,
   onCreateLocation,
 }: VariantsMatrixRowProps) {
+  const { canEdit } = useInventoryAccess();
   const { available, stockValue, status } = computeVariant(variant);
   const style = STATUS_STYLES[status];
   const name = variant.sku ?? variant.id;
@@ -142,9 +144,11 @@ function VariantsMatrixRow({
               </RowAction>
             </>
           )}
-          <RowAction label={`Delete ${variant.sku ?? 'variant'}`} danger onClick={() => onDelete(variant)}>
-            <Trash className="h-3 w-3" />
-          </RowAction>
+          {canEdit && (
+            <RowAction label={`Delete ${variant.sku ?? 'variant'}`} danger onClick={() => onDelete(variant)}>
+              <Trash className="h-3 w-3" />
+            </RowAction>
+          )}
         </div>
       </td>
     </tr>

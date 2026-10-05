@@ -1,11 +1,11 @@
 'use client';
 
 import { ModalShell } from '@/components/ModalShell';
-import { NumberInput, Row, Unit } from './PricingMarginPanel';
+import { NumberInput, Row } from './PricingMarginPanel';
 import type { PoPaymentState } from './hooks/usePoPayment';
 import { SPINNER, WIZARD_BODY_CLASS, WIZARD_BTN_FINISH, WIZARD_BTN_PRIMARY, WIZARD_BTN_SECONDARY, WIZARD_CARD_CLASS } from './modalStyles';
 import type { InventoryGlobals } from './types';
-import { formatDate, formatMoney, formatPoNumber } from './utils';
+import { formatDate, formatPoNumber } from './utils';
 
 const LABEL = 'mb-[2px] block text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-inventory-text-subtle';
 const FIELD =
@@ -27,7 +27,7 @@ export default function PayPoModal({ pay, globals }: { pay: PoPaymentState; glob
       disableBackdropClose
       elevated
       compact
-      title={`${pay.isEdit ? 'Edit payment' : 'Pay'} — ${formatPoNumber(target.number)}`}
+      title={`${paid ? 'Edit pay' : 'Pay'} — ${formatPoNumber(target.number)}`}
       onClose={pay.close}
       maxWidthClass="max-w-[520px]"
       bodyClassName={WIZARD_BODY_CLASS}
@@ -57,26 +57,14 @@ export default function PayPoModal({ pay, globals }: { pay: PoPaymentState; glob
                 {target.supplierName} · {pay.quantity} unit{pay.quantity === 1 ? '' : 's'}
               </p>
             </div>
-            <div role="radiogroup" aria-label="Payment status" className="flex overflow-hidden rounded-[8px] border border-inventory-border-strong">
-              {(['UNPAID', 'PAID'] as const).map((status) => (
-                <button
-                  key={status}
-                  type="button"
-                  role="radio"
-                  aria-checked={form.status === status}
-                  onClick={() => pay.setStatus(status)}
-                  className={`h-[24px] px-[12px] text-[10.5px] font-bold uppercase tracking-[0.3px] transition-colors duration-150 cursor-pointer ${
-                    form.status === status
-                      ? status === 'PAID'
-                        ? 'bg-inventory-success text-white'
-                        : 'bg-inventory-warning text-white'
-                      : 'bg-inventory-surface text-inventory-text-subtle hover:bg-inventory-surface-hover'
-                  }`}
-                >
-                  {status === 'PAID' ? 'Paid' : 'Unpaid'}
-                </button>
-              ))}
-            </div>
+            <span
+              aria-label="Payment status"
+              className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${
+                paid ? 'border-inventory-success/30 bg-inventory-success/10 text-inventory-success-hover' : 'border-inventory-warning/30 bg-inventory-warning/10 text-inventory-warning-ink'
+              }`}
+            >
+              {paid ? 'Paid' : 'Unpaid'}
+            </span>
           </div>
 
           <Row label="Currency bought in">
@@ -108,23 +96,6 @@ export default function PayPoModal({ pay, globals }: { pay: PoPaymentState; glob
               <NumberInput value={form.misc} onChange={pay.set('misc')} step="0.01" suffix={base} width="w-[78px]" />
             </div>
           </Row>
-
-          <div className="space-y-[4px] rounded-[9px] bg-inventory-surface-muted px-[9px] py-[6px]">
-            <div className="flex items-center justify-between text-[10.5px] text-inventory-text-muted">
-              <span>
-                Goods ({pay.quantity} × {form.buyingPrice || 0} {form.currencyCode} × {form.exchangeRate || 0})
-              </span>
-              <span className="tabular-nums">
-                {formatMoney(pay.totals.goods)} <Unit>{base}</Unit>
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-[9.5px] font-bold uppercase leading-none tracking-[0.4px] text-inventory-danger">Total to pay</span>
-              <span className="text-[12px] font-bold leading-none text-inventory-danger-hover tabular-nums">
-                {formatMoney(pay.totals.total)} <Unit>{base}</Unit>
-              </span>
-            </div>
-          </div>
         </div>
 
         <div className={`${WIZARD_CARD_CLASS} grid grid-cols-2 gap-x-3 gap-y-2`}>
@@ -132,7 +103,7 @@ export default function PayPoModal({ pay, globals }: { pay: PoPaymentState; glob
             <label className={LABEL} htmlFor="pay-date">
               Paid on
             </label>
-            <input id="pay-date" type="date" value={form.paidAt} onChange={pay.set('paidAt')} disabled={!paid} className={`${FIELD} disabled:cursor-not-allowed disabled:bg-inventory-surface-muted disabled:opacity-60`} />
+            <input id="pay-date" type="date" value={form.paidAt} onChange={pay.set('paidAt')} disabled={paid} className={`${FIELD} disabled:cursor-not-allowed disabled:bg-inventory-surface-muted disabled:opacity-60`} />
           </div>
           <div>
             <label className={LABEL} htmlFor="pay-reference">
@@ -165,7 +136,6 @@ export default function PayPoModal({ pay, globals }: { pay: PoPaymentState; glob
                   <span className="min-w-0 truncate">
                     <span className="font-semibold text-inventory-text">{ACTION_LABELS[h.action] ?? h.action}</span> · {h.actorName} · {formatDate(h.createdAt)}
                   </span>
-                  <span className="shrink-0 tabular-nums">${formatMoney(h.totalAud)}</span>
                 </li>
               ))}
             </ul>

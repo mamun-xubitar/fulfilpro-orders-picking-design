@@ -25,6 +25,11 @@ export function isStaffLikeRole(role: string | null | undefined) {
   return role === STAFF_ROLE || role === TEST_USER_ROLE;
 }
 
+/** Who may open Inventory at all: admins, plus staff-like users who only read it (writes stay admin-only). */
+export function canReadInventory(role: string | null | undefined) {
+  return role === ADMIN_ROLE || isStaffLikeRole(role);
+}
+
 export function isOrderPickerRole(role: string | null | undefined) {
   return role === ORDER_PICKER_ROLE;
 }

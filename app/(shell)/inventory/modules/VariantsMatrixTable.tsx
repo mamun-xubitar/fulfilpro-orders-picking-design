@@ -1,6 +1,7 @@
 'use client';
 
 import ColumnFillInput from './ColumnFillInput';
+import { useInventoryAccess } from './InventoryAccess';
 import VariantsMatrixRow from './VariantsMatrixRow';
 import type { LocationsState } from './hooks/useLocations';
 import type { useVariantsMatrix } from './hooks/useVariantsMatrix';
@@ -47,6 +48,7 @@ const STICKY_HEADER_TH = 'sticky top-0 z-10 bg-inventory-surface-muted shadow-[i
 const STICKY_FOOTER_TD = 'sticky bottom-0 z-10 bg-[#f9f1fa] shadow-[inset_0_1px_0_rgba(162,28,175,0.35)]';
 
 export default function VariantsMatrixTable({ matrix, locations, fillHeight, showAllColumns, tall }: VariantsMatrixTableProps) {
+  const { canEdit } = useInventoryAccess();
   const { rows, totals } = matrix;
   const scrollable = rows.length > (tall ? TALL_SCROLL_THRESHOLD : SCROLL_THRESHOLD);
   const numericHeaders = NUMERIC_HEADERS.filter((h) => showAllColumns || h.key !== 'trigger');
@@ -80,7 +82,7 @@ export default function VariantsMatrixTable({ matrix, locations, fillHeight, sho
               <Th key={h.key} align="right">
                 <span className="flex items-center justify-end gap-[4px]">
                   <span>{h.label}</span>
-                  {(h.key === 'stockOnHand' || h.key === 'allocated') && (
+                  {canEdit && (h.key === 'stockOnHand' || h.key === 'allocated') && (
                     <span className="inline-block w-[64px] min-w-0">
                       <ColumnFillInput
                         label={h.label}
@@ -100,9 +102,11 @@ export default function VariantsMatrixTable({ matrix, locations, fillHeight, sho
             <Th align="right">
               <span className="flex items-center justify-end gap-[4px]">
                 <span>Sell price</span>
-                <span className="inline-block w-[64px] min-w-0">
-                  <ColumnFillInput label="Sell price" rowCount={rows.length} step="0.01" min={0} onApply={(value) => matrix.fillColumn('sellPrice', value)} />
-                </span>
+                {canEdit && (
+                  <span className="inline-block w-[64px] min-w-0">
+                    <ColumnFillInput label="Sell price" rowCount={rows.length} step="0.01" min={0} onApply={(value) => matrix.fillColumn('sellPrice', value)} />
+                  </span>
+                )}
               </span>
             </Th>
             <Th align="right">Stock value</Th>

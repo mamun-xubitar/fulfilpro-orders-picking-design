@@ -3,6 +3,7 @@
 import { MODAL_FOOTER_BTN_SECONDARY, ModalShell } from '@/components/ModalShell';
 import Pagination from '@/components/Pagination';
 import PoListToolbar from './PoListToolbar';
+import PoSelectionBar from './PoSelectionBar';
 import PurchaseOrdersTable from './PurchaseOrdersTable';
 import ViewPoModal from './ViewPoModal';
 import { PO_PAGE_SIZE_OPTIONS, type PurchaseOrdersTabState } from './hooks/usePurchaseOrdersTab';
@@ -27,30 +28,7 @@ export default function PurchaseOrdersTab({ tab, suppliers, onReceive, onPay, on
     <div className="overflow-hidden rounded-xl border border-inventory-border bg-inventory-surface shadow-sm xl:min-h-0 xl:flex-1 xl:overflow-y-auto thin-scroll">
       <PoListToolbar tab={tab} suppliers={suppliers} />
 
-      {tab.selectedIds.length > 0 && (
-        <div className="flex flex-wrap items-center gap-[6px] border-b border-inventory-primary/25 bg-inventory-primary/[6%] px-2 py-1">
-          <span className="rounded-full bg-inventory-primary px-[8px] py-[2px] text-[10px] font-bold leading-none text-white tabular-nums">{tab.selectedIds.length} selected</span>
-          <button
-            type="button"
-            onClick={tab.openReceiveConfirm}
-            disabled={tab.receivable.length === 0}
-            title={tab.receivable.length === 0 ? 'Nothing outstanding on the selected purchase orders' : 'Receives everything outstanding on the selected purchase orders'}
-            className="flex h-[22px] items-center rounded-[6px] bg-inventory-success px-[8px] text-[10px] font-bold leading-none text-white transition-colors duration-150 hover:bg-inventory-success-hover disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
-          >
-            Receive
-          </button>
-          <button
-            type="button"
-            onClick={() => tab.print(tab.selectedRows)}
-            className="flex h-[22px] items-center rounded-[6px] border border-inventory-border-strong bg-inventory-surface px-[8px] text-[10px] font-bold leading-none text-inventory-text-muted transition-colors duration-150 hover:bg-inventory-surface-hover cursor-pointer"
-          >
-            Print
-          </button>
-          <button type="button" onClick={tab.clearSelection} className="h-[22px] rounded-[6px] px-[8px] text-[10px] font-bold text-inventory-text-subtle hover:bg-inventory-surface-hover cursor-pointer">
-            Clear
-          </button>
-        </div>
-      )}
+      {tab.hasSelection && <PoSelectionBar tab={tab} />}
 
       <PurchaseOrdersTable tab={tab} onReceive={onReceive} onPay={onPay} onOpenSupplier={onOpenSupplier} onOpenProduct={onOpenProduct} />
 
@@ -97,8 +75,8 @@ export default function PurchaseOrdersTab({ tab, suppliers, onReceive, onPay, on
               </li>
             ))}
           </ul>
-          {tab.selectedRows.length > tab.receivable.length && (
-            <p className="mt-2 text-[11px] text-inventory-text-subtle">{tab.selectedRows.length - tab.receivable.length} selected order(s) are cancelled or already fully received and will be skipped.</p>
+          {tab.targetRows.length > tab.receivable.length && (
+            <p className="mt-2 text-[11px] text-inventory-text-subtle">{tab.targetRows.length - tab.receivable.length} selected order(s) are cancelled or already fully received and will be skipped.</p>
           )}
         </ModalShell>
       )}

@@ -345,7 +345,7 @@ export type ProductDetailsForm = {
 
 // — Purchase orders —
 
-export type PurchaseOrderStatusValue = 'DRAFT' | 'REQUESTED' | 'CONFIRMED' | 'PARTIALLY_RECEIVED' | 'RECEIVED' | 'CANCELLED';
+export type PurchaseOrderStatusValue = 'REQUESTED' | 'PARTIALLY_RECEIVED' | 'RECEIVED' | 'CANCELLED';
 
 export type PurchaseOrderItemRecord = {
   id: string;
@@ -378,7 +378,7 @@ export type PurchaseOrderRecord = {
   itemNo: string;
   /** Null until a payment is first saved for this PO. */
   payment: PoPaymentRecord | null;
-  /** The product's own pricing — what the Pay modal starts from when no payment exists yet. */
+  /** The pricing frozen on the PO at creation — what the Pay modal starts from when no payment exists yet. */
   productPricing: { currencyCode: string; exchangeRate: number; buyingPrice: number; freight: number; misc: number } | null;
 };
 

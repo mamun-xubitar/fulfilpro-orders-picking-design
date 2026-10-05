@@ -4,6 +4,7 @@ import { MODAL_FOOTER_BTN_DANGER, MODAL_FOOTER_BTN_SECONDARY, ModalShell } from 
 import Pagination from '@/components/Pagination';
 import type { useSuppliers } from './hooks/useSuppliers';
 import { Pencil, Plus, Search, Trash, Users } from './icons';
+import { useInventoryAccess } from './InventoryAccess';
 import { formatDate } from './utils';
 
 type SuppliersTabProps = {
@@ -24,6 +25,7 @@ function CountLink({ count, label, onClick }: { count: number; label: string; on
 }
 
 export default function SuppliersTab({ suppliers: s, onOpenPurchaseOrders, onOpenPayments }: SuppliersTabProps) {
+  const { canEdit } = useInventoryAccess();
   return (
     <div className="overflow-hidden rounded-xl border border-inventory-border bg-inventory-surface shadow-sm">
       <div className="flex flex-wrap items-center gap-[6px] border-b border-inventory-border px-2 py-1.5">
@@ -37,14 +39,16 @@ export default function SuppliersTab({ suppliers: s, onOpenPurchaseOrders, onOpe
             className="h-[24px] w-full rounded-[7px] border border-inventory-border-strong pl-7 pr-2 text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring"
           />
         </div>
-        <button
-          type="button"
-          onClick={() => s.openCreate()}
-          className="flex h-[22px] items-center gap-1 whitespace-nowrap rounded-[6px] bg-inventory-success px-[6px] text-[10px] font-bold leading-none text-white shadow-sm transition-colors duration-150 hover:bg-inventory-success-hover cursor-pointer"
-        >
-          <Plus className="h-3 w-3" />
-          Add supplier
-        </button>
+        {canEdit && (
+          <button
+            type="button"
+            onClick={() => s.openCreate()}
+            className="flex h-[22px] items-center gap-1 whitespace-nowrap rounded-[6px] bg-inventory-success px-[6px] text-[10px] font-bold leading-none text-white shadow-sm transition-colors duration-150 hover:bg-inventory-success-hover cursor-pointer"
+          >
+            <Plus className="h-3 w-3" />
+            Add supplier
+          </button>
+        )}
       </div>
 
       <div className="overflow-x-auto">
@@ -86,6 +90,7 @@ export default function SuppliersTab({ suppliers: s, onOpenPurchaseOrders, onOpe
                   </td>
                   <td className="px-2 py-1 text-inventory-text-subtle">{formatDate(row.createdAt)}</td>
                   <td className="px-2 py-1">
+                    {canEdit && (
                     <div className="flex items-center justify-end gap-1">
                       <button
                         type="button"
@@ -104,6 +109,7 @@ export default function SuppliersTab({ suppliers: s, onOpenPurchaseOrders, onOpe
                         <Trash className="h-3 w-3" />
                       </button>
                     </div>
+                    )}
                   </td>
                 </tr>
               ))

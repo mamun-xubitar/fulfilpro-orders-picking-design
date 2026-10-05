@@ -1,5 +1,6 @@
 import { InventoryOptionLibraryModel } from '@/models/inventory-option-library.model.server';
 import { upperTrim } from '@/lib/utils/common';
+import { canReadInventory } from '@/lib/roles';
 
 const model = new InventoryOptionLibraryModel();
 
@@ -26,7 +27,7 @@ function cleanNames(raw: unknown): string[] {
 
 export class InventoryOptionLibraryController {
   async list(session: Session) {
-    if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
+    if (!canReadInventory(session?.user?.role)) return { error: { message: 'Forbidden', status: 403 } };
     const [colours, sizes] = await Promise.all([model.listColours(), model.listSizes()]);
     return { data: { colours, sizes } };
   }

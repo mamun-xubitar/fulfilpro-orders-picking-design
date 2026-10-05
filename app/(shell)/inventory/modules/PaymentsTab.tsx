@@ -5,6 +5,7 @@ import PaymentHistoryModal from './PaymentHistoryModal';
 import SortableTh from './SortableTh';
 import { PAYMENT_PAGE_SIZE_OPTIONS, type PaymentSortKey, type PaymentsTabState } from './hooks/usePaymentsTab';
 import { Search } from './icons';
+import { useInventoryAccess } from './InventoryAccess';
 import type { SupplierOption } from './types';
 import { formatDate, formatMoney, formatPoNumber } from './utils';
 
@@ -25,6 +26,7 @@ type PaymentsTabProps = {
  * the Pay modal) and each save is kept in that payment's History. */
 export default function PaymentsTab({ tab, suppliers, onEdit, onOpenSupplier }: PaymentsTabProps) {
   const { filters } = tab;
+  const { canEdit } = useInventoryAccess();
   const th = (label: string, sortKey?: PaymentSortKey, align?: 'left' | 'right' | 'center') => (
     <SortableTh label={label} sortKey={sortKey} align={align} sort={tab.sort} dir={tab.dir} onSortChange={tab.changeSort} />
   );
@@ -146,9 +148,11 @@ export default function PaymentsTab({ tab, suppliers, onEdit, onOpenSupplier }: 
                         <button type="button" onClick={() => tab.setHistoryTarget(row)} className={ACTION_BTN}>
                           History{row.historyCount > 1 ? ` (${row.historyCount})` : ''}
                         </button>
-                        <button type="button" onClick={() => onEdit(row.purchaseOrderId)} className="h-[20px] rounded-[6px] bg-inventory-primary px-[6px] text-[9px] font-bold text-white transition-colors duration-150 hover:bg-inventory-primary-hover cursor-pointer">
-                          Edit
-                        </button>
+                        {canEdit && (
+                          <button type="button" onClick={() => onEdit(row.purchaseOrderId)} className="h-[20px] rounded-[6px] bg-inventory-primary px-[6px] text-[9px] font-bold text-white transition-colors duration-150 hover:bg-inventory-primary-hover cursor-pointer">
+                            {paid ? 'Edit pay' : 'Pay'}
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

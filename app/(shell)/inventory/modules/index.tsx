@@ -6,6 +6,7 @@ import { useZoom } from '@/components/ZoomContext';
 import { useEffect } from 'react';
 import BottomPanels from './BottomPanels';
 import ComingSoon from './ComingSoon';
+import { InventoryAccessProvider, useInventoryAccess } from './InventoryAccess';
 import InventoryGlobals from './InventoryGlobals';
 import InventoryModals from './InventoryModals';
 import LocationsTab from './LocationsTab';
@@ -27,11 +28,21 @@ import { useInventoryPage } from './hooks/useInventoryPage';
 import './inventory-theme.css';
 
 export default function InventoryPage() {
+  return (
+    <InventoryAccessProvider>
+      <InventoryPageBody />
+    </InventoryAccessProvider>
+  );
+}
+
+function InventoryPageBody() {
   const p = useInventoryPage();
   const { zoomPercent } = useZoom();
   const moduleTab = MODULE_TABS.find((t) => t.id === p.moduleTab)!;
   const isProductTab = p.moduleTab === 'products' || p.moduleTab === 'variants';
-  const hasSelection = p.productsTable.selectAllFilters || p.productsTable.selectedIds.length > 0;
+  const { canEdit } = useInventoryAccess();
+  // Every bulk action on the selection bar writes, so staff never see it.
+  const hasSelection = canEdit && (p.productsTable.selectAllFilters || p.productsTable.selectedIds.length > 0);
 
   // Contributes the focused product's name to the shell header ("Inventory / <name>") in
   // single-product view only — the all-records table view shows the plain "Inventory" title.

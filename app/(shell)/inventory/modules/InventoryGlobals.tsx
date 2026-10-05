@@ -5,6 +5,7 @@ import { ICONBTN_XS } from './MainImagePanel';
 import GlobalStoreMarginModal from './GlobalStoreMarginModal';
 import { useGlobalStoreMargins } from './hooks/useGlobalStoreMargins';
 import type { InventoryPage } from './hooks/useInventoryPage';
+import { useInventoryAccess } from './InventoryAccess';
 import { ChevronDown } from './icons';
 
 type InventoryGlobalsProps = {
@@ -17,6 +18,7 @@ type InventoryGlobalsProps = {
 export default function InventoryGlobals({ p }: InventoryGlobalsProps) {
   const storeMargins = useGlobalStoreMargins();
   const [storeMarginsOpen, setStoreMarginsOpen] = useState(false);
+  const { canEdit } = useInventoryAccess();
 
   const openStoreMargins = () => {
     storeMargins.openModal();
@@ -25,8 +27,8 @@ export default function InventoryGlobals({ p }: InventoryGlobalsProps) {
 
   return (
     <div className="flex flex-wrap items-center gap-[6px]">
-      <GlobalField label="Exch." value={p.rateInput} onChange={p.setRateInput} onApply={p.applyGlobalRate} step="0.01" suffix={p.globals.baseCurrency} />
-      <GlobalField label="Margin" value={p.marginInput} onChange={p.setMarginInput} onApply={p.applyGlobalMargin} step="1" suffix="%" />
+      <GlobalField label="Exch." value={p.rateInput} onChange={p.setRateInput} onApply={p.applyGlobalRate} step="0.01" suffix={p.globals.baseCurrency} readOnly={!canEdit} />
+      <GlobalField label="Margin" value={p.marginInput} onChange={p.setMarginInput} onApply={p.applyGlobalMargin} step="1" suffix="%" readOnly={!canEdit} />
       <button type="button" onClick={openStoreMargins} aria-haspopup="dialog" title="Per store margin" className={ICONBTN_XS}>
         <ChevronDown className="h-3 w-3" />
       </button>
@@ -42,6 +44,7 @@ function GlobalField({
   onApply,
   step,
   suffix,
+  readOnly,
 }: {
   label: string;
   value: string;
@@ -49,6 +52,7 @@ function GlobalField({
   onApply: () => void;
   step: string;
   suffix: string;
+  readOnly: boolean;
 }) {
   return (
     <span className="flex items-center gap-[4px]">
@@ -61,18 +65,21 @@ function GlobalField({
           step={step}
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          readOnly={readOnly}
           aria-label={label}
           className="h-full min-w-0 flex-1 rounded-[7px] bg-transparent pl-[6px] pr-[4px] text-right text-[10.5px] font-bold leading-none text-inventory-text tabular-nums outline-none"
         />
         <span className="pointer-events-none shrink-0 pr-[6px] text-[9px] leading-none text-inventory-text-subtle">{suffix}</span>
       </span>
-      <button
-        type="button"
-        onClick={onApply}
-        className="h-[22px] rounded-[6px] bg-inventory-primary px-[6px] text-[10px] font-bold leading-none text-white transition-colors duration-150 hover:bg-inventory-primary-hover cursor-pointer"
-      >
-        Apply
-      </button>
+      {!readOnly && (
+        <button
+          type="button"
+          onClick={onApply}
+          className="h-[22px] rounded-[6px] bg-inventory-primary px-[6px] text-[10px] font-bold leading-none text-white transition-colors duration-150 hover:bg-inventory-primary-hover cursor-pointer"
+        >
+          Apply
+        </button>
+      )}
     </span>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react';
 import LocationPickerMenu, { locationChipClass } from './LocationPickerMenu';
+import { useInventoryAccess } from './InventoryAccess';
 import { CellSave } from './VariantsMatrixCells';
 import type { LocationOption } from './hooks/useLocations';
 import { Plus } from './icons';
@@ -22,6 +23,7 @@ type VariantLocationCellProps = {
  * cell's own save button (or the row's Save) writes them. */
 export default function VariantLocationCell({ locations, options, dirty, saving, label, onChange, onSave, onCreate }: VariantLocationCellProps) {
   const [open, setOpen] = useState(false);
+  const { canEdit } = useInventoryAccess();
   const anchorRef = useRef<HTMLButtonElement>(null);
   // Names come from the live option list so a rename shows without a reload; a draft may hold a
   // location the option list hasn't re-fetched yet, so fall back to the draft's own copy.
@@ -34,10 +36,11 @@ export default function VariantLocationCell({ locations, options, dirty, saving,
           ref={anchorRef}
           type="button"
           onClick={() => setOpen((v) => !v)}
+          disabled={!canEdit}
           aria-haspopup="listbox"
           aria-expanded={open}
           aria-label={label}
-          className="flex min-h-[15px] min-w-[84px] flex-col items-start gap-[2px] rounded-[5px] border border-transparent px-[2px] py-[1px] text-left transition-colors duration-150 hover:border-inventory-border-strong hover:bg-inventory-surface-hover cursor-pointer"
+          className="flex min-h-[15px] min-w-[84px] flex-col items-start gap-[2px] rounded-[5px] border border-transparent px-[2px] py-[1px] text-left transition-colors duration-150 hover:border-inventory-border-strong hover:bg-inventory-surface-hover cursor-pointer disabled:cursor-default disabled:hover:border-transparent disabled:hover:bg-transparent"
         >
           {locations.length === 0 ? (
             <span className="inline-flex items-center gap-[2px] text-[9px] font-semibold leading-[13px] text-inventory-text-subtle">

@@ -891,9 +891,7 @@ model Supplier {
 }
 
 enum PurchaseOrderStatus {
-  DRAFT
   REQUESTED
-  CONFIRMED
   PARTIALLY_RECEIVED
   RECEIVED
   CANCELLED
@@ -915,6 +913,15 @@ model PurchaseOrder {
   deliveryDate        DateTime?
   poRemark            String?
   shippingRemark      String?
+  /**
+   * The product's "Pricing & margin" figures frozen when the PO was created — what the Pay modal
+   * seeds from before any payment exists. Null only on POs created before the snapshot existed.
+   */
+  pricingCurrencyCode String?
+  pricingExchangeRate Decimal?              @db.Decimal(14, 6)
+  pricingBuyingPrice  Decimal?              @db.Decimal(14, 2)
+  pricingFreight      Decimal?              @db.Decimal(14, 2)
+  pricingMisc         Decimal?              @db.Decimal(14, 2)
   createdById         String
   createdByName       String
   statusUpdatedById   String?

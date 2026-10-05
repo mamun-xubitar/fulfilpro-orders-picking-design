@@ -5,6 +5,7 @@ import Pagination from '@/components/Pagination';
 import { locationChipClass } from './LocationPickerMenu';
 import type { LocationsState } from './hooks/useLocations';
 import { Pencil, Plus, Search, Trash } from './icons';
+import { useInventoryAccess } from './InventoryAccess';
 import { formatDate } from './utils';
 
 const TH = 'px-2 py-1';
@@ -12,6 +13,7 @@ const TH = 'px-2 py-1';
 /** The Location module tab — every location with how many variants are kept there. Mirrors
  * SuppliersTab: search, add, edit, delete (refused while variants are still assigned). */
 export default function LocationsTab({ locations: l }: { locations: LocationsState }) {
+  const { canEdit } = useInventoryAccess();
   return (
     <div className="overflow-hidden rounded-xl border border-inventory-border bg-inventory-surface shadow-sm">
       <div className="flex flex-wrap items-center gap-[6px] border-b border-inventory-border px-2 py-1.5">
@@ -26,14 +28,16 @@ export default function LocationsTab({ locations: l }: { locations: LocationsSta
             className="h-[24px] w-full rounded-[7px] border border-inventory-border-strong pl-7 pr-2 text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring"
           />
         </div>
-        <button
-          type="button"
-          onClick={l.openCreate}
-          className="flex h-[22px] items-center gap-1 whitespace-nowrap rounded-[6px] bg-inventory-success px-[6px] text-[10px] font-bold leading-none text-white shadow-sm transition-colors duration-150 hover:bg-inventory-success-hover cursor-pointer"
-        >
-          <Plus className="h-3 w-3" />
-          Add location
-        </button>
+        {canEdit && (
+          <button
+            type="button"
+            onClick={l.openCreate}
+            className="flex h-[22px] items-center gap-1 whitespace-nowrap rounded-[6px] bg-inventory-success px-[6px] text-[10px] font-bold leading-none text-white shadow-sm transition-colors duration-150 hover:bg-inventory-success-hover cursor-pointer"
+          >
+            <Plus className="h-3 w-3" />
+            Add location
+          </button>
+        )}
       </div>
 
       <div className="overflow-x-auto">
@@ -68,6 +72,7 @@ export default function LocationsTab({ locations: l }: { locations: LocationsSta
                   <td className="px-2 py-1 text-right tabular-nums text-inventory-text-subtle">{row.variantCount}</td>
                   <td className="px-2 py-1 text-inventory-text-subtle">{formatDate(row.createdAt)}</td>
                   <td className="px-2 py-1">
+                    {canEdit && (
                     <div className="flex items-center justify-end gap-1">
                       <button type="button" onClick={() => l.openEdit(row)} aria-label={`Edit ${row.name}`} className="flex h-[22px] w-[22px] items-center justify-center rounded-[6px] text-inventory-text-subtle transition-colors duration-150 hover:bg-inventory-surface-hover hover:text-inventory-text-muted cursor-pointer">
                         <Pencil className="h-3 w-3" />
@@ -76,6 +81,7 @@ export default function LocationsTab({ locations: l }: { locations: LocationsSta
                         <Trash className="h-3 w-3" />
                       </button>
                     </div>
+                    )}
                   </td>
                 </tr>
               ))

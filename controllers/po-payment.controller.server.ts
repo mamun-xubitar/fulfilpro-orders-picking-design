@@ -2,6 +2,7 @@ import { PoPaymentModel, PAYMENT_SORT_KEYS, type PaymentSortKey } from '@/models
 import { PurchaseOrderModel } from '@/models/purchase-order.model.server';
 import { upperTrim } from '@/lib/utils/common';
 import { PoPaymentStatus } from '@prisma/client';
+import { canReadInventory } from '@/lib/roles';
 
 const model = new PoPaymentModel();
 const poModel = new PurchaseOrderModel();
@@ -18,7 +19,7 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 
 export class PoPaymentController {
   async get(purchaseOrderId: string, session: Session) {
-    if (!isAdmin(session)) return forbidden;
+    if (!canReadInventory(session?.user?.role)) return forbidden;
     if (!(await poModel.findById(purchaseOrderId))) return { error: { message: 'Purchase order not found', status: 404 } };
     const found = await model.findByPurchaseOrderId(purchaseOrderId);
     return { data: found ?? { payment: null, history: [] } };
@@ -60,6 +61,10 @@ export class PoPaymentController {
     // Paid with no date given means paid now; unpaid carries no paid date.
     if (status === 'PAID' && !paidAt) paidAt = new Date();
     if (status === 'UNPAID') paidAt = null;
+    // Pay is one-time: once paid, the status and paid date are fixed — later saves only edit the amounts.
+    const existing = (await model.findByPurchaseOrderId(purchaseOrderId))?.payment;
+    const lockedPaid = existing?.status === 'PAID';
+    if (lockedPaid) paidAt = existing.paidAt ? new Date(existing.paidAt) : paidAt;
 
     const quantity = po.items.reduce((sum, i) => sum + i.quantity, 0);
     const reference = typeof value.reference === 'string' ? upperTrim(value.reference) : '';
@@ -69,7 +74,7 @@ export class PoPaymentController {
     await model.save(
       purchaseOrderId,
       {
-        status,
+        status: lockedPaid ? PoPaymentStatus.PAID : status,
         currencyCode,
         exchangeRate,
         buyingPrice,
@@ -87,7 +92,7 @@ export class PoPaymentController {
   }
 
   async list(searchParams: URLSearchParams, session: Session) {
-    if (!isAdmin(session)) return forbidden;
+    if (!canReadInventory(session?.user?.role)) return forbidden;
     const statusRaw = searchParams.get('status') ?? '';
     const sortRaw = searchParams.get('sort') ?? '';
     const page = Math.max(1, parseInt(searchParams.get('page') ?? '1'));

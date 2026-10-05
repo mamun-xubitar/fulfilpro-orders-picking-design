@@ -1,7 +1,8 @@
 'use client';
 
 import { STATUS_BADGES } from './PurchaseOrdersPanel';
-import { Card, Eye, Printer, Truck } from './icons';
+import { Card, Eye, Pencil, Printer, Truck } from './icons';
+import { useInventoryAccess } from './InventoryAccess';
 import SortableTh from './SortableTh';
 import type { PurchaseOrdersTabState, PoSortKey } from './hooks/usePurchaseOrdersTab';
 import type { PurchaseOrderRecord } from './types';
@@ -70,11 +71,12 @@ export default function PurchaseOrdersTable({ tab, onReceive, onPay, onOpenSuppl
 }
 
 function PoRow({ po, tab, onReceive, onPay, onOpenSupplier, onOpenProduct }: { po: PurchaseOrderRecord; tab: PurchaseOrdersTabState } & Omit<PurchaseOrdersTableProps, 'tab'>) {
+  const { canEdit } = useInventoryAccess();
   const qty = po.items.reduce((sum, i) => sum + i.quantity, 0);
   const received = po.items.reduce((sum, i) => sum + i.receivedQuantity, 0);
-  const canReceive = po.status !== 'CANCELLED' && received < qty;
+  const canReceive = canEdit && po.status !== 'CANCELLED' && received < qty;
   const paid = po.payment?.status === 'PAID';
-  const selected = tab.selectedIds.includes(po.id);
+  const selected = tab.selectAllFilters || tab.selectedIds.includes(po.id);
 
   return (
     <tr className={`border-b border-inventory-divider transition-colors duration-150 last:border-0 hover:bg-inventory-surface-hover ${selected ? 'bg-inventory-primary/[5%]' : ''}`}>
@@ -120,6 +122,7 @@ function PoRow({ po, tab, onReceive, onPay, onOpenSupplier, onOpenProduct }: { p
           key={`${po.id}:${po.poRemark ?? ''}`}
           type="text"
           defaultValue={po.poRemark ?? ''}
+          readOnly={!canEdit}
           onBlur={(e) => tab.saveRemark(po, e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') e.currentTarget.blur();
@@ -148,17 +151,19 @@ function PoRow({ po, tab, onReceive, onPay, onOpenSupplier, onOpenProduct }: { p
           <button type="button" onClick={() => tab.print([po])} title="Print" aria-label={`Print ${formatPoNumber(po.number)}`} className={ACTION_BTN}>
             <Printer className="h-3 w-3" />
           </button>
-          <button
-            type="button"
-            onClick={() => onPay(po)}
-            title={po.payment ? 'Edit payment' : 'Pay'}
-            aria-label={`${po.payment ? 'Edit payment for' : 'Pay'} ${formatPoNumber(po.number)}`}
-            className={`${ICON_BTN} ${
-              po.payment ? 'border border-inventory-primary/40 bg-inventory-primary/10 text-inventory-primary hover:bg-inventory-primary/15' : 'bg-inventory-primary text-white hover:bg-inventory-primary-hover'
-            }`}
-          >
-            <Card className="h-3 w-3" />
-          </button>
+          {canEdit && (
+            <button
+              type="button"
+              onClick={() => onPay(po)}
+              title={paid ? 'Edit pay' : 'Pay'}
+              aria-label={`${paid ? 'Edit pay for' : 'Pay'} ${formatPoNumber(po.number)}`}
+              className={`${ICON_BTN} ${
+                paid ? 'border border-inventory-primary/40 bg-inventory-primary/10 text-inventory-primary hover:bg-inventory-primary/15' : 'bg-inventory-primary text-white hover:bg-inventory-primary-hover'
+              }`}
+            >
+              {paid ? <Pencil className="h-3 w-3" /> : <Card className="h-3 w-3" />}
+            </button>
+          )}
         </div>
       </td>
     </tr>

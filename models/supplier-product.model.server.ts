@@ -1,3 +1,4 @@
+import moment from 'moment-timezone';
 import prisma from '@/lib/prisma.server';
 import { deriveColorFromName } from '@/lib/inventory/colour';
 import { Prisma, SupplierProductStatus } from '@prisma/client';
@@ -120,7 +121,7 @@ const EMPTY_PRICING: SupplierProductPricingRow = {
   tax: 10,
 };
 
-const OPEN_PO_STATUSES = ['REQUESTED', 'CONFIRMED', 'PARTIALLY_RECEIVED'] as const;
+const OPEN_PO_STATUSES = ['REQUESTED', 'PARTIALLY_RECEIVED'] as const;
 
 const catalogueInclude = {
   supplierLinks: { include: { supplier: { select: { id: true, name: true, poEmail: true } } }, orderBy: { supplier: { name: 'asc' as const } } },
@@ -848,6 +849,11 @@ export class SupplierProductModel {
       : [];
     const lastAdjustmentByProduct = new Map(lastAdjustmentRows.map((r) => [r.supplierProductId, r.createdAt.toISOString()]));
 
+    // Stocktakes fall on the 1st of every month: a product's next one is the 1st of the month after its
+    // last completed stocktake, in the app's operating timezone. Derived here, not stored, so it can't go stale.
+    const settings = await prisma.appSettings.findUnique({ where: { id: 'default' }, select: { timezone: true } });
+    const timezone = settings?.timezone ?? 'Australia/Sydney';
+
     return rows.map((row) => {
       // Already alphabetical by supplier name — see catalogueInclude's supplierLinks orderBy.
       return {
@@ -906,7 +912,7 @@ export class SupplierProductModel {
         : EMPTY_PRICING,
       stocktake: {
         lastAt: row.stocktakes[0]?.completedAt?.toISOString() ?? null,
-        nextAt: row.nextStocktakeAt?.toISOString() ?? null,
+        nextAt: row.stocktakes[0]?.completedAt ? moment.tz(row.stocktakes[0].completedAt, timezone).add(1, 'month').startOf('month').toISOString() : null,
       },
       adjustments: {
         lastAt: lastAdjustmentByProduct.get(row.id) ?? null,

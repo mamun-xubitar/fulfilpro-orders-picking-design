@@ -87,6 +87,15 @@ export function useInventoryPage() {
     bumpSupplierRefresh();
   };
 
+  // A sync rewrites stock for whichever product the stocktake belongs to — which needn't be the one on
+  // screen (and "See List" shows none) — so refetch the focused product and the products table too,
+  // not just patch the synced product in place.
+  const onStocktakeSynced = (updated: ProductRecord) => {
+    onProductSaved(updated);
+    data.refresh();
+    productsTable.refresh();
+  };
+
   const gallery = useProductImages(product);
   const imageMutations = useProductImageMutations({ product, onSaved: onProductSaved });
   const pricing = useProductPricing({ product, globals: data.globals, storeListings, onSaved: onProductSaved });
@@ -142,9 +151,9 @@ export function useInventoryPage() {
   const [stocktakeNonce, setStocktakeNonce] = useState(0);
   const stocktake = useStocktake({ product, onCreated: () => setStocktakeNonce((n) => n + 1) });
   const stocktakesTab = useStocktakesTab({ enabled: moduleTab === 'stocktake', refreshKey: stocktakeNonce });
-  const stocktakeDetail = useStocktakeDetail({ isAdmin: stocktakesTab.isAdmin, onChanged: stocktakesTab.refresh, onSynced: onProductSaved });
+  const stocktakeDetail = useStocktakeDetail({ isAdmin: stocktakesTab.isAdmin, onChanged: stocktakesTab.refresh, onSynced: onStocktakeSynced });
   const adjustments = useAdjustments({ product, onSaved: onProductSaved });
-  const importExport = useImportExport({ product, onSaved: onProductSaved, onPoImported: po.loadPurchaseOrders, supplierOptions: po.supplierOptions });
+  const importExport = useImportExport({ product, onSaved: onProductSaved });
   const productsTable = useProductsTable({ enabled: data.allRecords, verifiedOnly: nav.verifiedOnly, quickFilter: nav.quickFilter, onView: moduleTab === 'products' ? nav.viewProduct : openProductInVariants, onCounts: data.syncCounts, onDeleted: bumpSupplierRefresh });
   const importProducts = useImportProducts({ supplierOptions: po.supplierOptions, onImported: () => { data.refresh(); productsTable.refresh(); bumpSupplierRefresh(); } });
   const suppliers = useSuppliers({ onChanged: po.refreshSuppliers, refreshKey: po.receivedNonce + supplierRefreshNonce + payNonce });

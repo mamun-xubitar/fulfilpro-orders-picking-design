@@ -3,6 +3,7 @@ import { PurchaseOrderModel, PO_SORT_KEYS, type PoSortKey } from '@/models/purch
 import { SupplierProductModel } from '@/models/supplier-product.model.server';
 import { upperTrim } from '@/lib/utils/common';
 import { PoPaymentStatus, PurchaseOrderStatus } from '@prisma/client';
+import { canReadInventory } from '@/lib/roles';
 
 const model = new PurchaseOrderModel();
 const productModel = new SupplierProductModel();
@@ -25,7 +26,7 @@ function variantTitle(colour: string, size: string): string {
 
 export class PurchaseOrderController {
   async list(searchParams: URLSearchParams, session: Session) {
-    if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
+    if (!canReadInventory(session?.user?.role)) return { error: { message: 'Forbidden', status: 403 } };
 
     // Scoped to one product when `supplierProductId` is given (the product view's PO panel), across
     // every product otherwise (the Purchase Orders tab).
@@ -56,7 +57,7 @@ export class PurchaseOrderController {
   }
 
   async get(id: string, session: Session) {
-    if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
+    if (!canReadInventory(session?.user?.role)) return { error: { message: 'Forbidden', status: 403 } };
     const po = await model.findById(id);
     if (!po) return { error: { message: 'Purchase order not found', status: 404 } };
     return { data: po };
@@ -129,6 +130,7 @@ export class PurchaseOrderController {
     if (missing) return { error: { message: 'One or more variants do not belong to this product', status: 400 } };
 
     const actor = actorFromSession(session);
+    const pricing = await model.findProductPricing(product.id);
     const purchaseOrder = await model.create({
       supplierId: supplier.id,
       supplierName: supplier.name,
@@ -141,6 +143,7 @@ export class PurchaseOrderController {
       shippingRemark: shippingRemarkRaw || null,
       createdById: actor.id,
       createdByName: actor.name,
+      pricing,
       items: items.map((i) => {
         const variant = variantMap.get(i.variantId)!;
         return {

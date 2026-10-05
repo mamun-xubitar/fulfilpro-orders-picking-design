@@ -11,6 +11,7 @@ import { sanitizeHtml } from '@/lib/sanitize-html';
 import { SupplierProductStatus } from '@prisma/client';
 import { upperTrim } from '@/lib/utils/common';
 import type { CatalogueListParams, ProductsSortKey, QuickFilterId } from '@/models/supplier-product.model.server';
+import { canReadInventory } from '@/lib/roles';
 
 const model = new SupplierProductModel();
 const locationModel = new LocationModel();
@@ -61,7 +62,7 @@ export class SupplierProductController {
   }
 
   async list(searchParams: URLSearchParams, session: Session) {
-    if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
+    if (!canReadInventory(session?.user?.role)) return { error: { message: 'Forbidden', status: 403 } };
 
     const modeParam = searchParams.get('mode') ?? 'detail';
     const mode = CATALOGUE_MODES.has(modeParam) ? (modeParam as 'detail' | 'table' | 'search' | 'ids') : 'detail';

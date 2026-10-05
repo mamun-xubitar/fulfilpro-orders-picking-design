@@ -1,16 +1,12 @@
 import prisma from '@/lib/prisma.server';
-import { detectCsvType, findIncompleteAxisRows, normalizeParsedProductRows, parsePoCsv, parseShopifyProductCsv, upsertParsedProductVariants } from '@/lib/inventory/csv-import';
-import type { ParsedPoRow, ParsedProductGroup } from '@/lib/inventory/csv-import';
+import { detectCsvType, findIncompleteAxisRows, normalizeParsedProductRows, parseShopifyProductCsv, upsertParsedProductVariants } from '@/lib/inventory/csv-import';
+import type { ParsedProductGroup } from '@/lib/inventory/csv-import';
 import { SupplierProductModel } from '@/models/supplier-product.model.server';
 import type { SupplierProductRow } from '@/models/supplier-product.model.server';
-import { PurchaseOrderModel } from '@/models/purchase-order.model.server';
-import { PurchaseOrderStatus, SupplierProductStatus } from '@prisma/client';
+import { SupplierProductStatus } from '@prisma/client';
 
 const productModel = new SupplierProductModel();
-const poModel = new PurchaseOrderModel();
 const PRODUCT_STATUS_VALUES = new Set<string>(Object.values(SupplierProductStatus));
-const PO_STATUS_VALUES = new Set<string>(Object.values(PurchaseOrderStatus));
-const NUMERIC_PO = /^PO-?(\d+)$/i;
 
 type Session = { user?: { id?: string | null; name?: string | null; email?: string | null; role?: string | null } | null } | null;
 
@@ -18,22 +14,10 @@ function isAdmin(session: Session) {
   return session?.user?.role === 'admin';
 }
 
-function actorFromSession(session: Session) {
-  return { id: session?.user?.id ?? null, name: session?.user?.name ?? session?.user?.email ?? 'Unknown' };
-}
-
-/** "Black / M", "Black" (colour-only), "M" (size-only), or "—" (neither axis). */
-function variantTitle(colour: string, size: string): string {
-  return [colour, size].filter(Boolean).join(' / ') || '—';
-}
-
 type ProductCsvOptions = {
   /** Defaults to today's always-replace behaviour when the flag is omitted by an older caller. */
   overwrite: boolean;
   markVerified: boolean;
-  /** PO CSV only — which supplier a brand-new PO the file creates is attributed to. The admin
-   * picks this explicitly in the import modal now that products can have several suppliers. */
-  poSupplierId?: string;
 };
 
 export class InventoryCsvImportController {
@@ -52,13 +36,10 @@ export class InventoryCsvImportController {
 
     const text = await file.text();
     const type = detectCsvType(text);
-    if (type === 'unknown') {
-      return { error: { message: 'Unrecognized file — expected a Shopify product CSV or a purchase-order CSV', status: 400 } };
+    if (type !== 'product') {
+      return { error: { message: 'Unrecognized file — expected a Shopify product CSV', status: 400 } };
     }
-    // The overwrite / markVerified options apply to product CSVs only — a PO CSV never
-    // replaces product details, so there's nothing for them to gate.
-    if (type === 'product') return this.processProductCsv(product, text, commit, session, options);
-    return this.processPoCsv(product, text, commit, session, options.poSupplierId);
+    return this.processProductCsv(product, text, commit, session, options);
   }
 
   /** Picks the group in a (possibly multi-product) CSV that belongs to this product: the group
@@ -184,162 +165,5 @@ export class InventoryCsvImportController {
 
     const updatedProduct = await productModel.findById(product.id);
     return { data: { product: updatedProduct, created, updated }, message: `Imported ${rows.length} row${rows.length === 1 ? '' : 's'}` };
-  }
-
-  /** Groups rows by PO Number: a numeric "PO-00042" cell must match a real, existing PO for this
-   * product (import never fabricates a value in the DB's own autoincrement sequence); any other
-   * label groups its rows into one brand-new PO. Every row must resolve to a real variant (by SKU,
-   * falling back to Colour+Size) — PO import never creates a variant. All-or-nothing: any invalid
-   * row rejects the whole file. */
-  private async processPoCsv(product: SupplierProductRow, text: string, commit: boolean, session: Session, poSupplierId?: string) {
-    const parsed = parsePoCsv(text);
-    if (parsed.rows.length === 0) {
-      return { error: { message: 'rows: No valid rows found — expected PO Number, Colour, Size and Quantity columns', status: 400 } };
-    }
-
-    const groupedRows = new Map<string, ParsedPoRow[]>();
-    for (const row of parsed.rows) {
-      const list = groupedRows.get(row.poNumber) ?? [];
-      list.push(row);
-      groupedRows.set(row.poNumber, list);
-    }
-
-    const variantBySku = new Map(product.variants.filter((v) => v.sku).map((v) => [v.sku!.toLowerCase(), v]));
-    const variantByColourSize = new Map(product.variants.map((v) => [`${v.colour.toLowerCase()}::${v.size.toLowerCase()}`, v]));
-
-    type ResolvedItem = { variantId: string; variantTitle: string; sku: string | null; quantity: number; receivedQuantity: number; unitCost: number | null };
-    type ResolvedGroup = {
-      poNumber: string;
-      existingId: string | null;
-      referenceNumber?: string;
-      status?: PurchaseOrderStatus;
-      deliveryDate?: Date;
-      poRemark?: string;
-      items: ResolvedItem[];
-    };
-
-    const errors: string[] = [];
-    const groups: ResolvedGroup[] = [];
-
-    for (const [poNumber, rows] of groupedRows) {
-      let existingId: string | null = null;
-      const numericMatch = poNumber.match(NUMERIC_PO);
-      if (numericMatch) {
-        const existing = await poModel.findByNumber(parseInt(numericMatch[1], 10));
-        if (!existing) {
-          errors.push(`${poNumber}: No purchase order with this number exists`);
-          continue;
-        }
-        if (existing.supplierProductId !== product.id) {
-          errors.push(`${poNumber}: This purchase order belongs to a different product`);
-          continue;
-        }
-        existingId = existing.id;
-      }
-
-      const first = rows[0];
-      let status: PurchaseOrderStatus | undefined;
-      if (first.status) {
-        const upper = first.status.toUpperCase();
-        if (PO_STATUS_VALUES.has(upper)) status = upper as PurchaseOrderStatus;
-        else errors.push(`${poNumber}: Invalid status "${first.status}"`);
-      }
-
-      let deliveryDate: Date | undefined;
-      if (first.deliveryDate) {
-        const parsedDate = new Date(first.deliveryDate);
-        if (Number.isNaN(parsedDate.getTime())) errors.push(`${poNumber}: Invalid delivery date "${first.deliveryDate}"`);
-        else deliveryDate = parsedDate;
-      }
-
-      const items: ResolvedItem[] = [];
-      for (const row of rows) {
-        const variant = (row.sku && variantBySku.get(row.sku.toLowerCase())) || variantByColourSize.get(`${row.colour.toLowerCase()}::${row.size.toLowerCase()}`);
-        if (!variant) {
-          errors.push(`${poNumber}: No variant found for ${row.sku || variantTitle(row.colour, row.size)}`);
-          continue;
-        }
-        if (!Number.isFinite(row.quantity) || row.quantity < 0) {
-          errors.push(`${poNumber}: Invalid quantity for ${variantTitle(variant.colour, variant.size)}`);
-          continue;
-        }
-        items.push({
-          variantId: variant.id,
-          variantTitle: variantTitle(variant.colour, variant.size),
-          sku: row.sku || variant.sku,
-          quantity: Math.trunc(row.quantity),
-          receivedQuantity: row.receivedQuantity !== undefined ? Math.trunc(row.receivedQuantity) : 0,
-          unitCost: row.unitCost ?? null,
-        });
-      }
-
-      groups.push({ poNumber, existingId, referenceNumber: first.referenceNumber, status, deliveryDate, poRemark: first.poRemark, items });
-    }
-
-    if (errors.length > 0) return { error: { message: 'Validation failed', errors, status: 400 } };
-
-    if (!commit) {
-      return {
-        data: {
-          type: 'po' as const,
-          groups: groups.map((g) => ({ poNumber: g.poNumber, isNew: !g.existingId, referenceNumber: g.referenceNumber, status: g.status, deliveryDate: g.deliveryDate?.toISOString(), poRemark: g.poRemark, items: g.items })),
-        },
-        message: 'Preview ready',
-      };
-    }
-
-    const actor = actorFromSession(session);
-    let supplierInfo: { id: string; name: string; poEmail: string } | null = null;
-    let poCreated = 0;
-    let poUpdated = 0;
-
-    for (const group of groups) {
-      let poId = group.existingId;
-      if (poId) {
-        poUpdated++;
-      } else {
-        if (!supplierInfo) {
-          // The admin's explicit choice wins; fall back to the product's own supplier only when
-          // it's unambiguous (exactly one linked) — a multi-supplier product without a choice is
-          // a validation error rather than a silent guess.
-          const resolvedSupplierId = poSupplierId || (product.suppliers.length === 1 ? product.suppliers[0].id : undefined);
-          if (!resolvedSupplierId) {
-            return { error: { message: 'supplierId: This product has multiple suppliers — choose one in the import dialog', status: 400 } };
-          }
-          supplierInfo = await prisma.supplier.findUnique({ where: { id: resolvedSupplierId }, select: { id: true, name: true, poEmail: true } });
-          if (!supplierInfo) return { error: { message: 'supplierId: Selected supplier not found', status: 400 } };
-        }
-        const created = await poModel.create({
-          supplierId: supplierInfo.id,
-          supplierName: supplierInfo.name,
-          poEmail: supplierInfo.poEmail,
-          supplierProductId: product.id,
-          productTitle: product.name,
-          referenceNumber: group.referenceNumber ?? null,
-          deliveryDate: group.deliveryDate ?? null,
-          poRemark: group.poRemark ?? null,
-          shippingRemark: null,
-          createdById: actor.id ?? '',
-          createdByName: actor.name,
-          items: [],
-        });
-        poId = created.id;
-        poCreated++;
-      }
-
-      await poModel.updateFields(poId, {
-        ...(group.referenceNumber !== undefined && { referenceNumber: group.referenceNumber }),
-        ...(group.status && { status: group.status }),
-        ...(group.deliveryDate !== undefined && { deliveryDate: group.deliveryDate }),
-        ...(group.poRemark !== undefined && { poRemark: group.poRemark }),
-      });
-      await poModel.upsertItems(poId, group.items);
-    }
-
-    const updatedProduct = await productModel.findById(product.id);
-    return {
-      data: { product: updatedProduct, poCreated, poUpdated },
-      message: `Imported ${groups.length} purchase order${groups.length === 1 ? '' : 's'}`,
-    };
   }
 }

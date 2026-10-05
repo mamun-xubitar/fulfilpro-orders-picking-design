@@ -1,6 +1,7 @@
 'use client';
 
 import { formatStocktakeNumber } from '@/lib/inventory/stocktake-number';
+import { useInventoryAccess } from './InventoryAccess';
 import SortableTh from './SortableTh';
 import type { StocktakeDetailState } from './hooks/useStocktakeDetail';
 import type { StocktakeSortKey, StocktakesTabState } from './hooks/useStocktakesTab';
@@ -67,6 +68,7 @@ export default function StocktakesTable({ tab, detail }: StocktakesTableProps) {
 
 function StocktakeRow({ row, tab, detail }: { row: StocktakeRecord } & StocktakesTableProps) {
   const open = row.status === 'OPEN' || row.status === 'COUNTED';
+  const { canCount } = useInventoryAccess();
   const number = formatStocktakeNumber(row.number);
 
   return (
@@ -113,7 +115,7 @@ function StocktakeRow({ row, tab, detail }: { row: StocktakeRecord } & Stocktake
       <td className="px-2 py-1.5">
         <div className="flex items-center justify-end gap-[4px]">
           <button type="button" onClick={() => detail.openStocktake(row.id)} className={ACTION_BTN}>
-            {open ? (tab.isAdmin && row.status === 'COUNTED' ? 'Review' : 'Count') : 'View'}
+            {row.status === 'COUNTED' ? 'View count' : open && canCount ? 'Count' : 'View'}
           </button>
           <button type="button" onClick={() => tab.print(row)} aria-label={`Print ${number}`} className={ACTION_BTN}>
             Print

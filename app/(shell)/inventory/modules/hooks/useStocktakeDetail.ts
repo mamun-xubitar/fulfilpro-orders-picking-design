@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { toast } from 'react-toastify';
 import useRequest from '@/hooks/useRequest';
+import { useInventoryAccess } from '../InventoryAccess';
 import type { ProductRecord, StocktakeItemRecord, StocktakeRecord, StocktakeSyncSummary } from '../types';
 
 /** The lines of one variant, rolled up for the admin's comparison. */
@@ -49,9 +50,12 @@ type Args = {
 /** One stocktake in the count modal: load it, key in counts, save, and (admin) sync it into stock
  * on hand or cancel it. Sync and cancel each sit behind a confirmation. */
 export function useStocktakeDetail({ isAdmin, onChanged, onSynced }: Args) {
+  const { canCount } = useInventoryAccess();
   const [record, setRecord] = useState<StocktakeRecord | null>(null);
   const [open, setOpen] = useState(false);
   const [counts, setCounts] = useState<Record<string, string>>({});
+  /** A fully counted stocktake is read-only until "Edit count" is pressed. */
+  const [editing, setEditing] = useState(false);
   const [syncOpen, setSyncOpen] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<StocktakeRecord | null>(null);
   const { request: requestGet, loading } = useRequest<StocktakeRecord>();
@@ -62,6 +66,7 @@ export function useStocktakeDetail({ isAdmin, onChanged, onSynced }: Args) {
   const apply = (next: StocktakeRecord) => {
     setRecord(next);
     setCounts(toInputs(next.items));
+    setEditing(false);
   };
 
   const openStocktake = (id: string) => {
@@ -81,11 +86,13 @@ export function useStocktakeDetail({ isAdmin, onChanged, onSynced }: Args) {
   const close = () => {
     setOpen(false);
     setSyncOpen(false);
+    setEditing(false);
   };
   const setCount = (itemId: string, value: string) => setCounts((prev) => ({ ...prev, [itemId]: value }));
 
-  const editable = !!record && (record.status === 'OPEN' || record.status === 'COUNTED');
-  const dirty = !!record && record.items.some((i) => (counts[i.id] ?? '') !== (i.countedQty === null ? '' : String(i.countedQty)));
+  const editable = canCount && !!record && (record.status === 'OPEN' || record.status === 'COUNTED');
+  const locked = !!record && record.status === 'COUNTED' && !editing;
+  const dirty =!!record && record.items.some((i) => (counts[i.id] ?? '') !== (i.countedQty === null ? '' : String(i.countedQty)));
 
   const save = () => {
     if (!record) return;
@@ -145,6 +152,8 @@ export function useStocktakeDetail({ isAdmin, onChanged, onSynced }: Args) {
     counts,
     setCount,
     editable,
+    locked,
+    startEdit: () => setEditing(true),
     dirty,
     save,
     saving,

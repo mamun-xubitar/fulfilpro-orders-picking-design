@@ -34,13 +34,12 @@ type UseStocktakeArgs = {
   onCreated: () => void;
 };
 
-/** The "New stocktake" modal: pick which variant × location lines to count, optionally key in counts
- * that are already known, and create. Nothing is saved until Create. */
+/** The "New stocktake" modal: pick which variant × location lines to count and create. Counts are
+ * keyed in later from the Stocktake tab, after the sheet is printed. Nothing is saved until Create. */
 export function useStocktake({ product, onCreated }: UseStocktakeArgs) {
   const [open, setOpen] = useState(false);
   const [filters, setFilters] = useState<StocktakeFilters>(NO_FILTERS);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
-  const [counts, setCounts] = useState<Record<string, string>>({});
   const { request, loading: creating } = useRequest<StocktakeRecord>();
 
   const lines = buildStocktakeLines(product);
@@ -51,14 +50,12 @@ export function useStocktake({ product, onCreated }: UseStocktakeArgs) {
   const openModal = () => {
     setFilters(NO_FILTERS);
     setSelected({});
-    setCounts({});
     setOpen(true);
   };
   const close = () => setOpen(false);
   const setFilter = (key: keyof StocktakeFilters, value: string) => setFilters((prev) => ({ ...prev, [key]: value }));
   const toggle = (key: string) => setSelected((prev) => ({ ...prev, [key]: !prev[key] }));
   const toggleAllVisible = () => setSelected((prev) => ({ ...prev, ...Object.fromEntries(visible.map((l) => [l.key, !allVisibleChecked])) }));
-  const setCount = (key: string, value: string) => setCounts((prev) => ({ ...prev, [key]: value }));
 
   const create = () => {
     if (!product || selectedLines.length === 0) return;
@@ -66,11 +63,7 @@ export function useStocktake({ product, onCreated }: UseStocktakeArgs) {
       url: `/api/inventory/catalog/${product.id}/stocktakes`,
       method: 'POST',
       data: {
-        lines: selectedLines.map((l) => ({
-          variantId: l.variant.id,
-          locationId: l.location?.id ?? null,
-          countedQty: (counts[l.key] ?? '').trim() === '' ? null : Number(counts[l.key]),
-        })),
+        lines: selectedLines.map((l) => ({ variantId: l.variant.id, locationId: l.location?.id ?? null })),
       },
       successMessage: 'Stocktake created',
       onSuccess: () => {
@@ -97,8 +90,6 @@ export function useStocktake({ product, onCreated }: UseStocktakeArgs) {
     allVisibleChecked,
     toggle,
     toggleAllVisible,
-    counts,
-    setCount,
     creating,
     create,
     options: { colours, sizes, locations, hasUnlocated: lines.some((l) => !l.location) },

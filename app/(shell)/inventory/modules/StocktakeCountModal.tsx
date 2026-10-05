@@ -3,7 +3,6 @@
 import { ModalShell } from '@/components/ModalShell';
 import { formatStocktakeNumber } from '@/lib/inventory/stocktake-number';
 import { locationChipClass } from './LocationPickerMenu';
-import StocktakeAdminSummary from './StocktakeAdminSummary';
 import { STOCKTAKE_STATUS_LABELS } from './StocktakesTable';
 import { SPINNER, WIZARD_BODY_CLASS, WIZARD_BTN_FINISH, WIZARD_BTN_PRIMARY, WIZARD_BTN_SECONDARY, WIZARD_CARD_CLASS } from './modalStyles';
 import type { StocktakeDetailState } from './hooks/useStocktakeDetail';
@@ -29,7 +28,12 @@ export default function StocktakeCountModal({ detail }: { detail: StocktakeDetai
           <button type="button" onClick={detail.close} className={`flex-1 ${WIZARD_BTN_SECONDARY}`}>
             Close
           </button>
-          {detail.editable && (
+          {detail.editable && detail.locked && (
+            <button type="button" onClick={detail.startEdit} className={`flex-1 ${WIZARD_BTN_PRIMARY}`}>
+              Edit count
+            </button>
+          )}
+          {detail.editable && !detail.locked && (
             <button type="button" onClick={detail.save} disabled={detail.saving || !detail.dirty} className={`flex-1 ${WIZARD_BTN_PRIMARY}`}>
               {detail.saving && SPINNER}
               {detail.saving ? 'Saving...' : 'Save counts'}
@@ -55,7 +59,7 @@ export default function StocktakeCountModal({ detail }: { detail: StocktakeDetai
         <div className={WIZARD_CARD_CLASS}>
           <p className="mb-2 text-[12px] text-inventory-text-muted">
             <span className="font-semibold text-inventory-text">{STOCKTAKE_STATUS_LABELS[record.status]}</span> · {record.itemNo} · created {formatDate(record.createdAt)} by {record.startedByName}
-            {detail.editable && ' — enter what was counted on each line. Lines left blank stay uncounted.'}
+            {detail.editable && !detail.locked && ' — enter what was counted on each line. Lines left blank stay uncounted.'}
           </p>
           <div className="max-h-80 overflow-y-auto thin-scroll rounded-lg border border-inventory-border">
             <table className="w-full border-collapse text-[11px] leading-none">
@@ -64,6 +68,7 @@ export default function StocktakeCountModal({ detail }: { detail: StocktakeDetai
                   <th className="px-2 py-1">Colour / Size</th>
                   <th className="px-2 py-1">SKU</th>
                   <th className="px-2 py-1">Location</th>
+                  {detail.isAdmin && <th className="px-2 py-1 text-right">Quantity</th>}
                   <th className="px-2 py-1 text-right">Counted</th>
                 </tr>
               </thead>
@@ -79,13 +84,18 @@ export default function StocktakeCountModal({ detail }: { detail: StocktakeDetai
                         <span className="text-inventory-text-subtle">—</span>
                       )}
                     </td>
+                    {detail.isAdmin && (
+                      <td title="Stock on hand now, for the whole variant across its locations" className="px-2 py-1 text-right tabular-nums text-inventory-text-muted">
+                        {item.systemQty ?? '—'}
+                      </td>
+                    )}
                     <td className="px-2 py-1 text-right">
                       <input
                         type="number"
                         min={0}
                         value={detail.counts[item.id] ?? ''}
                         onChange={(e) => detail.setCount(item.id, e.target.value)}
-                        disabled={!detail.editable}
+                        disabled={!detail.editable || detail.locked}
                         aria-label={`Counted for ${variantTitle(item)}${item.locationName ? ` at ${item.locationName}` : ''}`}
                         className="h-[22px] w-20 rounded-[7px] border border-inventory-border-strong pl-[6px] pr-[10px] text-right text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring disabled:cursor-not-allowed disabled:bg-inventory-surface-muted"
                       />
@@ -95,7 +105,6 @@ export default function StocktakeCountModal({ detail }: { detail: StocktakeDetai
               </tbody>
             </table>
           </div>
-          {detail.isAdmin && <StocktakeAdminSummary tallies={detail.tallies} />}
         </div>
       )}
     </ModalShell>

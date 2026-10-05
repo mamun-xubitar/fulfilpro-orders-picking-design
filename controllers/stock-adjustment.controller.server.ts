@@ -3,6 +3,7 @@ import { StockAdjustmentModel } from '@/models/stock-adjustment.model.server';
 import { SupplierProductModel } from '@/models/supplier-product.model.server';
 import { upperTrim } from '@/lib/utils/common';
 import { StockAdjustmentReason } from '@prisma/client';
+import { canReadInventory } from '@/lib/roles';
 
 const model = new StockAdjustmentModel();
 const productModel = new SupplierProductModel();
@@ -16,7 +17,7 @@ function isAdmin(session: Session) {
 
 export class StockAdjustmentController {
   async list(supplierProductId: string, session: Session) {
-    if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
+    if (!canReadInventory(session?.user?.role)) return { error: { message: 'Forbidden', status: 403 } };
     const adjustments = await model.listForProduct(supplierProductId);
     return { data: { adjustments } };
   }

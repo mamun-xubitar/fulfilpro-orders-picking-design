@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import BuyingHistoryModal from './BuyingHistoryModal';
+import { useInventoryAccess } from './InventoryAccess';
 import { BTN_XS, BTN_XS_PRIMARY, PANEL_MAX_H, PanelHeading, panelBorderClass } from './MainImagePanel';
 import StoreMarginEditModal from './StoreMarginEditModal';
 import StoreMarginViewModal from './StoreMarginViewModal';
@@ -34,6 +35,8 @@ export default function PricingMarginPanel({ pricing: p, storeListings, onEditSt
   const foreign = p.form.currencyCode;
   const base = p.baseCurrency;
   const [historyOpen, setHistoryOpen] = useState(false);
+  const { canEdit } = useInventoryAccess();
+  const readOnly = !embedded && !canEdit;
   // 'view' — the read-only list opened from the store-count pill. 'edit' — the add/edit list,
   // opened from "+".
   const [marginModal, setMarginModal] = useState<'view' | 'edit' | null>(null);
@@ -51,7 +54,7 @@ export default function PricingMarginPanel({ pricing: p, storeListings, onEditSt
         </span>
       </div>
 
-      <PricingActions p={p} embedded={embedded} onOpenHistory={() => setHistoryOpen(true)} />
+      <PricingActions p={p} embedded={embedded} readOnly={readOnly} onOpenHistory={() => setHistoryOpen(true)} />
     </>
   );
 
@@ -61,6 +64,7 @@ export default function PricingMarginPanel({ pricing: p, storeListings, onEditSt
 
       <div className={embedded ? 'flex flex-col gap-[3px]' : 'flex flex-1 min-h-0 flex-col'}>
         <div className={embedded ? 'contents' : 'flex flex-1 min-h-0 flex-col gap-[3px] overflow-y-auto thin-scroll p-[6px]'}>
+          <fieldset disabled={readOnly} className="m-0 flex min-w-0 flex-col gap-[3px] border-0 p-0">
           <Row label="Currency">
             <div className="flex gap-[4px]">
               <select
@@ -103,6 +107,7 @@ export default function PricingMarginPanel({ pricing: p, storeListings, onEditSt
               <NumberInput value={p.form.tax} onChange={p.set('tax')} step="0.1" suffix="%" width="w-[62px]" />
             </div>
           </Row>
+          </fieldset>
 
           <Row label="Sell price (ex tax)" className='py-1'>
             <Value>
@@ -130,14 +135,16 @@ export default function PricingMarginPanel({ pricing: p, storeListings, onEditSt
                     {overrideCount} {overrideCount === 1 ? 'store' : 'stores'}
                   </button>
                 )}
-                <button
-                  type="button"
-                  onClick={() => setMarginModal('edit')}
-                  aria-label="Add or edit per-store margin"
-                  className="flex h-[18px] w-[18px] items-center justify-center rounded-full border border-inventory-border-strong text-inventory-text-subtle transition-colors duration-150 hover:bg-inventory-surface-hover cursor-pointer"
-                >
-                  <Plus className="h-2.5 w-2.5" />
-                </button>
+                {canEdit && (
+                  <button
+                    type="button"
+                    onClick={() => setMarginModal('edit')}
+                    aria-label="Add or edit per-store margin"
+                    className="flex h-[18px] w-[18px] items-center justify-center rounded-full border border-inventory-border-strong text-inventory-text-subtle transition-colors duration-150 hover:bg-inventory-surface-hover cursor-pointer"
+                  >
+                    <Plus className="h-2.5 w-2.5" />
+                  </button>
+                )}
               </div>
             </Row>
           )}
@@ -178,7 +185,7 @@ export default function PricingMarginPanel({ pricing: p, storeListings, onEditSt
   );
 }
 
-function PricingActions({ p, embedded, onOpenHistory }: { p: PricingMarginPanelInner; embedded?: boolean; onOpenHistory: () => void }) {
+function PricingActions({ p, embedded, readOnly, onOpenHistory }: { p: PricingMarginPanelInner; embedded?: boolean; readOnly: boolean; onOpenHistory: () => void }) {
   // Embedded (the New Product wizard's Pricing step): the wizard's own footer already drives
   // Save/Next, so only "Use price" belongs here — applying the computed price to every variant
   // is a distinct, one-off action neither Save nor Next performs.
@@ -191,8 +198,8 @@ function PricingActions({ p, embedded, onOpenHistory }: { p: PricingMarginPanelI
   }
   return (
     <div className="flex gap-[6px]">
-      <ActionButton onClick={() => p.savePricing()} icon={<Check className="h-3 w-3" />} label="Save" primary disabled={!p.dirty} />
-      <ActionButton onClick={p.requestUsePrice} icon={<Tag className="h-3 w-3" />} label="Use price" />
+      {!readOnly && <ActionButton onClick={() => p.savePricing()} icon={<Check className="h-3 w-3" />} label="Save" primary disabled={!p.dirty} />}
+      {!readOnly && <ActionButton onClick={p.requestUsePrice} icon={<Tag className="h-3 w-3" />} label="Use price" />}
       <ActionButton onClick={onOpenHistory} icon={<Clipboard className="h-3 w-3" />} label="PO history" />
     </div>
   );
