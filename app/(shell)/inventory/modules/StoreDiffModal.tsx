@@ -52,6 +52,7 @@ export default function StoreDiffModal({ product, listing, storeListings, onClos
       onClose={onClose}
       extraWide
       compact
+      disableBackdropClose
       footer={
         d.confirmOpen ? (
           <ConfirmVariantsSave onCancel={d.cancelConfirm} onConfirm={d.confirmSave} saving={d.savingKey === 'variants' || d.savingKey === 'all'} />

@@ -87,7 +87,7 @@ export default function StocktakeCountModal({ detail }: { detail: StocktakeDetai
                         onChange={(e) => detail.setCount(item.id, e.target.value)}
                         disabled={!detail.editable}
                         aria-label={`Counted for ${variantTitle(item)}${item.locationName ? ` at ${item.locationName}` : ''}`}
-                        className="h-[22px] w-20 rounded-[7px] border border-inventory-border-strong px-[6px] text-right text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring disabled:cursor-not-allowed disabled:bg-inventory-surface-muted"
+                        className="h-[22px] w-20 rounded-[7px] border border-inventory-border-strong pl-[6px] pr-[10px] text-right text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring disabled:cursor-not-allowed disabled:bg-inventory-surface-muted"
                       />
                     </td>
                   </tr>

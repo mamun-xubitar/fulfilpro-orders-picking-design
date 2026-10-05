@@ -20,6 +20,9 @@ type StoreImageTileProps = {
   onUploadUpdate?: () => void;
   onSystemUpdate?: (image: ProductImage) => void;
   onDelete?: () => void;
+  /** Gallery size — with `onMove`, shows a position dropdown (1…N) under the picture. */
+  positionCount?: number;
+  onMove?: (position: number) => void;
 };
 
 const ICON_BTN =
@@ -29,12 +32,12 @@ const ICON_BTN =
  * buttons on hover or keyboard focus — and always on touch, where there is no hover: upload a new
  * file over it, pick one of the system images for it, or delete it. A system tile is just the
  * picture and its number. */
-export default function StoreImageTile({ url, altText, position, busy, saving, systemImages, onUploadUpdate, onSystemUpdate, onDelete }: StoreImageTileProps) {
+export default function StoreImageTile({ url, altText, position, busy, saving, systemImages, onUploadUpdate, onSystemUpdate, onDelete, positionCount, onMove }: StoreImageTileProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const actionable = Boolean(onUploadUpdate || onSystemUpdate || onDelete);
   const disabled = busy || saving;
 
-  return (
+  const tile = (
     <div className={`group relative ${IMAGE_TILE_SIZE} shrink-0 overflow-hidden rounded-[8px] border border-inventory-border bg-inventory-surface-muted`}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={url} alt={altText ?? `Image ${position}`} className="h-full w-full object-cover" loading="lazy" />
@@ -84,6 +87,29 @@ export default function StoreImageTile({ url, altText, position, busy, saving, s
           <span className="h-4 w-4 animate-spin rounded-full border-2 border-inventory-border-strong border-t-inventory-primary" />
         </div>
       )}
+    </div>
+  );
+
+  if (!onMove || !positionCount) return tile;
+  return (
+    <div className="flex shrink-0 flex-col gap-[4px]">
+      {tile}
+      <label className="flex items-center justify-between gap-[4px] text-[9px] font-semibold uppercase tracking-[0.3px] text-inventory-text-subtle">
+        Position
+        <select
+          value={position}
+          onChange={(e) => onMove(Number(e.target.value))}
+          disabled={disabled}
+          aria-label={`Position of image ${position}`}
+          className="h-[20px] rounded-[5px] border border-inventory-border-strong bg-inventory-surface px-[4px] text-[10.5px] font-bold normal-case tracking-normal text-inventory-text outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+        >
+          {Array.from({ length: positionCount }, (_, i) => (
+            <option key={i + 1} value={i + 1}>
+              {i + 1}
+            </option>
+          ))}
+        </select>
+      </label>
     </div>
   );
 }

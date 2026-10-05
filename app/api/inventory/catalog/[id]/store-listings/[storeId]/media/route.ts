@@ -41,6 +41,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   const session = await auth();
   const { id, storeId } = await params;
   const { body, source } = await readBody(request);
+  if (body.action === 'reorder') return respond(await controller.reorderMedia(id, storeId, body, session));
   if (typeof body.hubImageId === 'string') source.hubImageId = body.hubImageId;
   return respond(await controller.updateMedia(id, storeId, body, source, session));
 }

@@ -68,7 +68,7 @@ export default function PoItemsTable({ rows, quantities, skus, costs, onQuantity
                 value={quantities[v.id] ?? ''}
                 onChange={(e) => onQuantityChange(v.id, e.target.value)}
                 aria-label={`Quantity for ${name}`}
-                className="h-[22px] w-full rounded-[6px] border border-inventory-border-strong px-[6px] text-right text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring"
+                className="h-[22px] w-full rounded-[6px] border border-inventory-border-strong pl-[6px] pr-[10px] text-right text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring"
               />
               <div className="relative w-full min-w-0">
                 <span className="pointer-events-none absolute inset-y-0 left-[6px] flex items-center text-[11px] text-inventory-text-subtle">$</span>
@@ -80,7 +80,7 @@ export default function PoItemsTable({ rows, quantities, skus, costs, onQuantity
                   onChange={(e) => onCostChange(v.id, e.target.value)}
                   aria-label={`Cost for ${name}`}
                   title="Defaults to the product's buying price (converted to AUD)"
-                  className="h-[22px] w-full rounded-[6px] border border-inventory-border-strong pl-[14px] pr-[6px] text-right text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring"
+                  className="h-[22px] w-full rounded-[6px] border border-inventory-border-strong pl-[14px] pr-[10px] text-right text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring"
                 />
               </div>
               <span className="text-right font-medium tabular-nums text-inventory-text-muted">{formatCurrencyValue(qty * cost)}</span>

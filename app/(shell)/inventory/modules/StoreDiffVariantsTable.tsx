@@ -46,9 +46,9 @@ export default function StoreDiffVariantsTable({ rows, systemImages, storeImages
               <th className={TH_CLASS}>Variant</th>
               <th className={TH_CLASS}>SKU</th>
               <th className={TH_CLASS}>Barcode</th>
-              <th className={`${TH_CLASS} text-right`}>Available</th>
+              <th className={TH_CLASS}>Available</th>
               <th className={TH_CLASS}>Image</th>
-              <th className={`${TH_CLASS} text-right`}>Price (AUD)</th>
+              <th className={TH_CLASS}>Price (AUD)</th>
               <th className={`${TH_CLASS} text-right`}>Actions</th>
             </tr>
           </thead>

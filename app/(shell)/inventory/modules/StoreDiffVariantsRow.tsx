@@ -5,7 +5,7 @@ import StoreDiffVariantCell, { CellSaveButton } from './StoreDiffVariantCell';
 import StoreDraftVariantImage from './StoreDraftVariantImage';
 import type { StoreVariantTableRow } from './storeDiff';
 import type { StoreVariantActions } from './hooks/useStoreVariantActions';
-import { Plus, Trash } from './icons';
+import { Check, Plus, Trash } from './icons';
 import { variantRowLabel, type DiffVariantField } from './storeVariantEdit';
 import type { ProductImage, StoreListingImage } from './types';
 
@@ -115,10 +115,10 @@ export default function StoreDiffVariantsRow({ row, systemImages, storeImages, s
                 onClick={() => actions.saveRow(row)}
                 disabled={locked || dirtyCount === 0}
                 aria-label={`Save ${label}`}
-                className="flex h-[22px] items-center gap-[4px] rounded-[6px] bg-inventory-primary px-[8px] text-[10px] font-bold text-white transition-colors duration-150 hover:bg-inventory-primary-hover disabled:cursor-not-allowed disabled:bg-inventory-border-strong disabled:text-inventory-text-subtle cursor-pointer"
+                title="Save"
+                className="flex h-[22px] w-[22px] items-center justify-center rounded-[6px] bg-inventory-primary text-white transition-colors duration-150 hover:bg-inventory-primary-hover disabled:cursor-not-allowed disabled:bg-inventory-border-strong disabled:text-inventory-text-subtle cursor-pointer"
               >
-                {rowSaving && <span className="h-3 w-3 animate-spin rounded-full border-2 border-white/40 border-t-white" />}
-                {rowSaving ? 'Saving…' : 'Save'}
+                {rowSaving ? <span className="h-3 w-3 animate-spin rounded-full border-2 border-white/40 border-t-white" /> : <Check className="h-3 w-3" />}
               </button>
               <button
                 type="button"
@@ -137,10 +137,10 @@ export default function StoreDiffVariantsRow({ row, systemImages, storeImages, s
               onClick={() => actions.addRow(row)}
               disabled={locked}
               aria-label={`Add ${label} to the store`}
-              className="flex h-[22px] items-center gap-[4px] rounded-[6px] bg-inventory-success px-[8px] text-[10px] font-bold text-white transition-colors duration-150 hover:bg-inventory-success-hover disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+              title="Add to the store"
+              className="flex h-[22px] w-[22px] items-center justify-center rounded-[6px] bg-inventory-success text-white transition-colors duration-150 hover:bg-inventory-success-hover disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
             >
               {rowSaving ? <span className="h-3 w-3 animate-spin rounded-full border-2 border-white/40 border-t-white" /> : <Plus className="h-3 w-3" />}
-              {rowSaving ? 'Adding…' : 'Add'}
             </button>
           )}
         </div>

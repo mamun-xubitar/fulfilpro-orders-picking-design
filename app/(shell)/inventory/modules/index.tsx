@@ -54,19 +54,7 @@ export default function InventoryPage() {
           tabs show, and a pick made from any other tab jumps to the Variant tab. */}
       <ProductsToolbar {...p} />
 
-      {p.moduleTab === 'suppliers' ? (
-        <SuppliersTab suppliers={p.suppliers} onOpenPurchaseOrders={p.openPurchaseOrdersFor} onOpenPayments={p.openPaymentsFor} />
-      ) : p.moduleTab === 'purchase-orders' ? (
-        <PurchaseOrdersTab tab={p.poTab} suppliers={p.supplierOptions} onReceive={p.po.openReceive} onPay={p.payment.open} onOpenSupplier={p.openSupplierDetails} />
-      ) : p.moduleTab === 'payments' ? (
-        <PaymentsTab tab={p.paymentsTab} suppliers={p.supplierOptions} onEdit={p.payment.openById} onOpenSupplier={p.openSupplierDetails} />
-      ) : p.moduleTab === 'locations' ? (
-        <LocationsTab locations={p.locations} />
-      ) : p.moduleTab === 'stocktake' ? (
-        <StocktakesTab tab={p.stocktakesTab} detail={p.stocktakeDetail} />
-      ) : !isProductTab ? (
-        <ComingSoon label={moduleTab.label} blurb={moduleTab.blurb} />
-      ) : p.moduleTab === 'products' && p.nav.allRecords ? (
+      {p.nav.allRecords ? (
         <div className="overflow-hidden rounded-xl border border-inventory-border bg-inventory-surface shadow-inventory xl:min-h-0 xl:flex-1 xl:overflow-y-auto">
           <ProductsTableToolbar table={p.productsTable} onRefresh={p.productsTable.refresh} loading={p.productsTable.loading} />
           {hasSelection && <ProductsSelectionBar table={p.productsTable} />}
@@ -81,6 +69,18 @@ export default function InventoryPage() {
             onPageSizeChange={p.productsTable.setPageSize}
           />
         </div>
+      ) : p.moduleTab === 'suppliers' ? (
+        <SuppliersTab suppliers={p.suppliers} onOpenPurchaseOrders={p.openPurchaseOrdersFor} onOpenPayments={p.openPaymentsFor} />
+      ) : p.moduleTab === 'purchase-orders' ? (
+        <PurchaseOrdersTab tab={p.poTab} suppliers={p.supplierOptions} onReceive={p.po.openReceive} onPay={p.payment.open} onOpenSupplier={p.openSupplierDetails} onOpenProduct={p.openProductInVariants} />
+      ) : p.moduleTab === 'payments' ? (
+        <PaymentsTab tab={p.paymentsTab} suppliers={p.supplierOptions} onEdit={p.payment.openById} onOpenSupplier={p.openSupplierDetails} />
+      ) : p.moduleTab === 'locations' ? (
+        <LocationsTab locations={p.locations} />
+      ) : p.moduleTab === 'stocktake' ? (
+        <StocktakesTab tab={p.stocktakesTab} detail={p.stocktakeDetail} />
+      ) : !isProductTab ? (
+        <ComingSoon label={moduleTab.label} blurb={moduleTab.blurb} />
       ) : p.showSkeleton ? (
         <LoadingState />
       ) : !p.product ? (
@@ -95,7 +95,7 @@ export default function InventoryPage() {
         </div>
       )}
 
-      {p.moduleTab === 'products' && p.nav.allRecords && <ProductsBulkModals table={p.productsTable} />}
+      {p.nav.allRecords && <ProductsBulkModals table={p.productsTable} />}
       <InventoryModals {...p} />
     </main>
   );

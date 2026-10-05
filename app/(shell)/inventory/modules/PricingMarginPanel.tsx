@@ -269,21 +269,21 @@ export function NumberInput({
   suffix: string;
   width?: string;
 }) {
-  // A 1-char suffix ("%") needs far less reserved gutter than a 3-4 letter currency code
-  // ("AUD"/"USD"/"rate") — a uniform gutter clipped 3-digit values (e.g. a 150% margin) against
-  // a short suffix, so it's sized per suffix instead of one fixed value for every field.
-  const gutter = suffix.length <= 1 ? 'pr-[16px]' : 'pr-[22px]';
+  // The suffix is part of the flex layout (not an overlay on a fixed gutter), so the value always
+  // stops short of it whatever its length ("%" / "AUD" / "rate").
   return (
-    <div className="relative">
+    <div
+      className={`flex h-[22px] ${width ?? 'w-[62px]'} items-center rounded-[7px] border border-inventory-border-strong bg-inventory-surface focus-within:border-inventory-primary focus-within:ring-2 focus-within:ring-inventory-primary-ring`}
+    >
       <input
         type="number"
         step={step}
         value={value}
         onChange={onChange}
         aria-label={suffix}
-        className={`h-[22px] ${width ?? 'w-[62px]'} rounded-[7px] border border-inventory-border-strong pl-[6px] ${gutter} text-right text-[10.5px] leading-none tabular-nums outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring`}
+        className="h-full min-w-0 flex-1 rounded-[7px] bg-transparent pl-[6px] pr-[4px] text-right text-[10.5px] leading-none tabular-nums outline-none"
       />
-      <span className="pointer-events-none absolute right-[6px] top-1/2 -translate-y-1/2 text-[9px] leading-none text-inventory-text-subtle">{suffix}</span>
+      <span className="pointer-events-none shrink-0 pr-[6px] text-[9px] leading-none text-inventory-text-subtle">{suffix}</span>
     </div>
   );
 }

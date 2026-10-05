@@ -101,7 +101,7 @@ async function waitForMediaReady(domain: string, token: string, mediaId: string)
 const ADD_MEDIA_MUTATION = `
   mutation AppendStoreProductMedia($product: ProductUpdateInput!, $media: [CreateMediaInput!]) {
     productUpdate(product: $product, media: $media) {
-      product { id media(last: 1) { nodes { id } } }
+      product { id media(first: 1, reverse: true) { nodes { id } } }
       userErrors { field message }
     }
   }
@@ -169,6 +169,42 @@ export async function removeStoreMedia(args: { storeId: string; productGid: stri
     });
     throwOnUserErrors(data.fileUpdate.userErrors);
   });
+}
+
+const REORDER_MEDIA_MUTATION = `
+  mutation ReorderStoreProductMedia($id: ID!, $moves: [MoveInput!]!) {
+    productReorderMedia(id: $id, moves: $moves) {
+      job { id done }
+      mediaUserErrors { field message }
+    }
+  }
+`;
+
+const JOB_STATUS_QUERY = `
+  query StoreJobStatus($id: ID!) {
+    job(id: $id) { id done }
+  }
+`;
+
+/** Moves one image to a 1-based `position` in the product's gallery. Shopify reorders
+ * asynchronously (a `Job`), so this polls until it is done — otherwise the listing the caller
+ * re-fetches straight afterwards would still show the old order. Needs `write_products`. */
+export async function reorderStoreMedia(args: { storeId: string; productGid: string; mediaId: string; position: number }) {
+  const { domain, token } = await storeCredentials(args.storeId);
+  const data = await shopifyGraphQL<{ productReorderMedia: { job: { id: string; done: boolean } | null; mediaUserErrors: UserError[] } }>(domain, token, REORDER_MEDIA_MUTATION, {
+    id: args.productGid,
+    moves: [{ id: args.mediaId, newPosition: String(args.position - 1) }],
+  });
+  throwOnUserErrors(data.productReorderMedia.mediaUserErrors);
+  const job = data.productReorderMedia.job;
+  if (!job || job.done) return;
+
+  for (let attempt = 0; attempt < 10; attempt++) {
+    await sleep(800);
+    const status = await shopifyGraphQL<{ job: { done: boolean } | null }>(domain, token, JOB_STATUS_QUERY, { id: job.id });
+    if (!status.job || status.job.done) return;
+  }
+  throw new Error('Shopify is still reordering the images — refresh in a moment to see the new order');
 }
 
 export type StoreVariantUpdate = {

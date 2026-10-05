@@ -52,19 +52,18 @@ export function useInventoryPage() {
 
   const baseNav = useProductNavigation(data);
   const product = baseNav.product;
-  // The Variant tab is always single-product, and the products list lives on the Products tab — so
-  // tab and list mode move together. The toolbar sits above every tab, so picking a product while on
-  // a non-product tab (Purchase Orders, Location, …) lands on the Variant tab.
-  const setModuleTab = (id: ModuleTabId) => {
-    if (id === 'variants' && data.allRecords) data.setAllRecords(false);
-    setModuleTabState(id);
+  // "See List" is one shared toggle that persists across every tab: ticked, whichever tab is active
+  // shows the products list in place; unticked, it shows that tab's own content. The toolbar sits
+  // above every tab, so picking a product while on a non-product tab (Purchase Orders, Location, …)
+  // lands on the Variant tab.
+  const setModuleTab = (id: ModuleTabId) => setModuleTabState(id);
+  /** Opens a product's Variant tab — untick See List, focus the product, switch tab. */
+  const openProductInVariants = (id: string) => {
+    baseNav.viewProduct(id);
+    setModuleTabState('variants');
   };
   const nav = {
     ...baseNav,
-    setAllRecords: (value: boolean) => {
-      baseNav.setAllRecords(value);
-      if (value) setModuleTabState('products');
-    },
     selectProduct: (id: string) => {
       baseNav.selectProduct(id);
       if (moduleTab !== 'products' && moduleTab !== 'variants') setModuleTabState('variants');
@@ -146,7 +145,7 @@ export function useInventoryPage() {
   const stocktakeDetail = useStocktakeDetail({ isAdmin: stocktakesTab.isAdmin, onChanged: stocktakesTab.refresh, onSynced: onProductSaved });
   const adjustments = useAdjustments({ product, onSaved: onProductSaved });
   const importExport = useImportExport({ product, onSaved: onProductSaved, onPoImported: po.loadPurchaseOrders, supplierOptions: po.supplierOptions });
-  const productsTable = useProductsTable({ enabled: data.allRecords, verifiedOnly: nav.verifiedOnly, quickFilter: nav.quickFilter, onView: nav.viewProduct, onCounts: data.syncCounts, onDeleted: bumpSupplierRefresh });
+  const productsTable = useProductsTable({ enabled: data.allRecords, verifiedOnly: nav.verifiedOnly, quickFilter: nav.quickFilter, onView: moduleTab === 'products' ? nav.viewProduct : openProductInVariants, onCounts: data.syncCounts, onDeleted: bumpSupplierRefresh });
   const importProducts = useImportProducts({ supplierOptions: po.supplierOptions, onImported: () => { data.refresh(); productsTable.refresh(); bumpSupplierRefresh(); } });
   const suppliers = useSuppliers({ onChanged: po.refreshSuppliers, refreshKey: po.receivedNonce + supplierRefreshNonce + payNonce });
 
@@ -218,6 +217,7 @@ export function useInventoryPage() {
     payment,
     paymentsTab,
     supplierDetailId,
+    openProductInVariants,
     openSupplierDetails: setSupplierDetailId,
     closeSupplierDetails: () => setSupplierDetailId(null),
     openPurchaseOrdersFor,

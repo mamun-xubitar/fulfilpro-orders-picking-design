@@ -16,12 +16,13 @@ type PurchaseOrdersTabProps = {
   onReceive: (po: PurchaseOrderRecord) => void;
   onPay: (po: PurchaseOrderRecord) => void;
   onOpenSupplier: (supplierId: string) => void;
+  onOpenProduct: (productId: string) => void;
 };
 
 const outstanding = (po: PurchaseOrderRecord) => po.items.reduce((sum, i) => sum + Math.max(0, i.quantity - i.receivedQuantity), 0);
 
 /** The Purchase Orders tab — every product's POs in one table. */
-export default function PurchaseOrdersTab({ tab, suppliers, onReceive, onPay, onOpenSupplier }: PurchaseOrdersTabProps) {
+export default function PurchaseOrdersTab({ tab, suppliers, onReceive, onPay, onOpenSupplier, onOpenProduct }: PurchaseOrdersTabProps) {
   return (
     <div className="overflow-hidden rounded-xl border border-inventory-border bg-inventory-surface shadow-sm xl:min-h-0 xl:flex-1 xl:overflow-y-auto thin-scroll">
       <PoListToolbar tab={tab} suppliers={suppliers} />
@@ -51,7 +52,7 @@ export default function PurchaseOrdersTab({ tab, suppliers, onReceive, onPay, on
         </div>
       )}
 
-      <PurchaseOrdersTable tab={tab} onReceive={onReceive} onPay={onPay} onOpenSupplier={onOpenSupplier} />
+      <PurchaseOrdersTable tab={tab} onReceive={onReceive} onPay={onPay} onOpenSupplier={onOpenSupplier} onOpenProduct={onOpenProduct} />
 
       <Pagination
         pagination={tab.pagination}

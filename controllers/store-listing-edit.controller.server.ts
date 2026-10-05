@@ -7,6 +7,7 @@ import {
   createStoreVariant,
   deleteStoreVariants,
   removeStoreMedia,
+  reorderStoreMedia,
   replaceStoreMedia,
   updateStoreProductField,
   updateStoreVariants,
@@ -151,6 +152,22 @@ export class StoreListingEditController {
       return fail(error instanceof Error ? error.message : 'Failed to update the image', 502);
     }
     return this.finish(ctx.product, 'Image replaced', 'Replaced an image on a store listing', session);
+  }
+
+  async reorderMedia(productId: string, storeId: string, body: unknown, session: Session) {
+    const ctx = await this.context(productId, body, session);
+    if ('error' in ctx) return ctx;
+    const mediaId = str(ctx.value.mediaId);
+    const position = Number(ctx.value.position);
+    if (!mediaId) return fail('Validation failed', 400, ['mediaId: Required']);
+    if (!Number.isInteger(position) || position < 1 || position > 250) return fail('Validation failed', 400, ['position: Enter a whole number from 1 to 250']);
+
+    try {
+      await reorderStoreMedia({ storeId, productGid: ctx.productGid, mediaId, position });
+    } catch (error) {
+      return fail(error instanceof Error ? error.message : 'Failed to move the image', 502);
+    }
+    return this.finish(ctx.product, 'Image moved', `Moved an image to position ${position} on a store listing`, session);
   }
 
   async removeMedia(productId: string, storeId: string, body: unknown, session: Session) {

@@ -96,7 +96,7 @@ export function NumCell({
           onChange={(e) => onChange(Math.max(0, Number(e.target.value) || 0))}
           onKeyDown={saveOnEnter(dirty, onSave)}
           aria-label={label}
-          className={`w-14 text-right tabular-nums ${INPUT_BASE}`}
+          className={`w-14 pr-[5px] text-right tabular-nums ${INPUT_BASE}`}
         />
         <CellSave show={dirty} saving={saving} label={`Save ${label}`} onSave={onSave} />
       </div>

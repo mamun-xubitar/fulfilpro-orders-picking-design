@@ -50,9 +50,12 @@ export default function SupplierDetailsModal({ supplierId, onClose, onOpenPurcha
       }
     >
       {!supplier ? (
-        <div className="space-y-2" aria-busy={loading}>
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="h-8 animate-pulse rounded bg-inventory-surface-muted" />
+        <div className="grid grid-cols-2 gap-x-4 gap-y-3" aria-busy={loading} aria-label="Loading supplier details">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="space-y-[6px]">
+              <div className="h-[10px] w-16 animate-pulse rounded bg-inventory-border" />
+              <div className="h-[14px] w-full max-w-[160px] animate-pulse rounded bg-inventory-border" />
+            </div>
           ))}
         </div>
       ) : (

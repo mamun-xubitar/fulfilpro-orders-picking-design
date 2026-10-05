@@ -1,6 +1,7 @@
 'use client';
 
 import { STATUS_BADGES } from './PurchaseOrdersPanel';
+import { Card, Eye, Printer, Truck } from './icons';
 import SortableTh from './SortableTh';
 import type { PurchaseOrdersTabState, PoSortKey } from './hooks/usePurchaseOrdersTab';
 import type { PurchaseOrderRecord } from './types';
@@ -11,18 +12,19 @@ type PurchaseOrdersTableProps = {
   onReceive: (po: PurchaseOrderRecord) => void;
   onPay: (po: PurchaseOrderRecord) => void;
   onOpenSupplier: (supplierId: string) => void;
+  onOpenProduct: (productId: string) => void;
 };
 
 const COLUMN_COUNT = 13;
-const ACTION_BTN =
-  'h-[20px] rounded-[6px] border border-inventory-border-strong bg-inventory-surface px-[6px] text-[9px] font-bold text-inventory-text-muted transition-colors duration-150 hover:bg-inventory-surface-hover cursor-pointer';
+const ICON_BTN = 'flex h-[20px] w-[20px] items-center justify-center rounded-[6px] transition-colors duration-150 cursor-pointer';
+const ACTION_BTN = `${ICON_BTN} border border-inventory-border-strong bg-inventory-surface text-inventory-text-muted hover:bg-inventory-surface-hover`;
 
 /** Order value: Σ(qty × unit cost) of the lines that have a cost. */
 function poValue(po: PurchaseOrderRecord): number {
   return po.items.reduce((sum, i) => sum + i.quantity * (i.unitCost ?? 0), 0);
 }
 
-export default function PurchaseOrdersTable({ tab, onReceive, onPay, onOpenSupplier }: PurchaseOrdersTableProps) {
+export default function PurchaseOrdersTable({ tab, onReceive, onPay, onOpenSupplier, onOpenProduct }: PurchaseOrdersTableProps) {
   const th = (label: string, sortKey?: PoSortKey, align?: 'left' | 'right' | 'center') => (
     <SortableTh label={label} sortKey={sortKey} align={align} sort={tab.sort} dir={tab.dir} onSortChange={tab.changeSort} />
   );
@@ -59,7 +61,7 @@ export default function PurchaseOrdersTable({ tab, onReceive, onPay, onOpenSuppl
               </td>
             </tr>
           ) : (
-            tab.rows.map((po) => <PoRow key={po.id} po={po} tab={tab} onReceive={onReceive} onPay={onPay} onOpenSupplier={onOpenSupplier} />)
+            tab.rows.map((po) => <PoRow key={po.id} po={po} tab={tab} onReceive={onReceive} onPay={onPay} onOpenSupplier={onOpenSupplier} onOpenProduct={onOpenProduct} />)
           )}
         </tbody>
       </table>
@@ -67,7 +69,7 @@ export default function PurchaseOrdersTable({ tab, onReceive, onPay, onOpenSuppl
   );
 }
 
-function PoRow({ po, tab, onReceive, onPay, onOpenSupplier }: { po: PurchaseOrderRecord; tab: PurchaseOrdersTabState } & Omit<PurchaseOrdersTableProps, 'tab'>) {
+function PoRow({ po, tab, onReceive, onPay, onOpenSupplier, onOpenProduct }: { po: PurchaseOrderRecord; tab: PurchaseOrdersTabState } & Omit<PurchaseOrdersTableProps, 'tab'>) {
   const qty = po.items.reduce((sum, i) => sum + i.quantity, 0);
   const received = po.items.reduce((sum, i) => sum + i.receivedQuantity, 0);
   const canReceive = po.status !== 'CANCELLED' && received < qty;
@@ -82,9 +84,14 @@ function PoRow({ po, tab, onReceive, onPay, onOpenSupplier }: { po: PurchaseOrde
       <td className="whitespace-nowrap px-2 py-1.5 text-inventory-text-subtle">{formatDate(po.createdAt)}</td>
       <td className="whitespace-nowrap px-2 py-1.5 font-medium text-inventory-text">{formatPoNumber(po.number)}</td>
       <td className="max-w-[200px] px-2 py-1.5">
-        <span className="block truncate text-inventory-text" title={po.productTitle}>
+        <button
+          type="button"
+          onClick={() => onOpenProduct(po.supplierProductId)}
+          title={`Open ${po.productTitle} in Variants`}
+          className="block max-w-full truncate text-left font-medium text-inventory-secondary underline-offset-2 hover:underline cursor-pointer"
+        >
           {po.productTitle}
-        </span>
+        </button>
         <span className="mt-[2px] block truncate text-[9.5px] text-inventory-text-subtle">{po.itemNo}</span>
       </td>
       <td className="max-w-[150px] px-2 py-1.5">
@@ -124,25 +131,33 @@ function PoRow({ po, tab, onReceive, onPay, onOpenSupplier }: { po: PurchaseOrde
       </td>
       <td className="px-2 py-1.5">
         <div className="flex items-center justify-end gap-[4px]">
-          <button type="button" onClick={() => tab.setViewTarget(po)} className={ACTION_BTN}>
-            View
+          <button type="button" onClick={() => tab.setViewTarget(po)} title="View" aria-label={`View ${formatPoNumber(po.number)}`} className={ACTION_BTN}>
+            <Eye className="h-3 w-3" />
           </button>
           {canReceive && (
-            <button type="button" onClick={() => onReceive(po)} className="h-[20px] rounded-[6px] bg-inventory-success px-[6px] text-[9px] font-bold text-white transition-colors duration-150 hover:bg-inventory-success-hover cursor-pointer">
-              Receive
+            <button
+              type="button"
+              onClick={() => onReceive(po)}
+              title="Receive"
+              aria-label={`Receive ${formatPoNumber(po.number)}`}
+              className={`${ICON_BTN} bg-inventory-success text-white hover:bg-inventory-success-hover`}
+            >
+              <Truck className="h-3 w-3" />
             </button>
           )}
-          <button type="button" onClick={() => tab.print([po])} className={ACTION_BTN}>
-            Print
+          <button type="button" onClick={() => tab.print([po])} title="Print" aria-label={`Print ${formatPoNumber(po.number)}`} className={ACTION_BTN}>
+            <Printer className="h-3 w-3" />
           </button>
           <button
             type="button"
             onClick={() => onPay(po)}
-            className={`h-[20px] rounded-[6px] px-[6px] text-[9px] font-bold transition-colors duration-150 cursor-pointer ${
+            title={po.payment ? 'Edit payment' : 'Pay'}
+            aria-label={`${po.payment ? 'Edit payment for' : 'Pay'} ${formatPoNumber(po.number)}`}
+            className={`${ICON_BTN} ${
               po.payment ? 'border border-inventory-primary/40 bg-inventory-primary/10 text-inventory-primary hover:bg-inventory-primary/15' : 'bg-inventory-primary text-white hover:bg-inventory-primary-hover'
             }`}
           >
-            {po.payment ? 'Edit pay' : 'Pay'}
+            <Card className="h-3 w-3" />
           </button>
         </div>
       </td>

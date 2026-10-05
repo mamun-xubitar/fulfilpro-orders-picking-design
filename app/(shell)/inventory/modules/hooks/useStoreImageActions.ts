@@ -97,6 +97,12 @@ export function useStoreImageActions({ storeImages, run, confirm, replaceAllWith
       run: () => replaceImage(image, { hubImageId: systemImage.id }, systemImage.url),
     });
 
+  /** Moves a store image to a 1-based position in the gallery (Shopify shifts the others). */
+  const move = (image: StoreListingImage & { position: number }, position: number) => {
+    if (position === image.position) return;
+    return run(`image:${image.id}`, { path: 'media', method: 'PATCH', json: { action: 'reorder', mediaId: image.id, position } }, 'Image moved');
+  };
+
   const submitUpload = (file: File) => {
     if (picker?.mode !== 'upload') return;
     const { image } = picker;
@@ -119,6 +125,7 @@ export function useStoreImageActions({ storeImages, run, confirm, replaceAllWith
     submitAdd,
     submitUpload,
     updateFromSystem,
+    move,
     removeOne,
     removeColour,
     removeAll,

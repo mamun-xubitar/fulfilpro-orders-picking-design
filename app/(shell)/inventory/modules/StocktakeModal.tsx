@@ -127,7 +127,7 @@ export default function StocktakeModal({ stocktake }: { stocktake: StocktakeStat
                         value={stocktake.counts[key] ?? ''}
                         onChange={(e) => stocktake.setCount(key, e.target.value)}
                         aria-label={`Counted for ${variantTitle(variant)}${location ? ` at ${location.name}` : ''}`}
-                        className="h-[22px] w-20 rounded-[7px] border border-inventory-border-strong px-[6px] text-right text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring"
+                        className="h-[22px] w-20 rounded-[7px] border border-inventory-border-strong pl-[6px] pr-[10px] text-right text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring"
                       />
                     </td>
                   </tr>

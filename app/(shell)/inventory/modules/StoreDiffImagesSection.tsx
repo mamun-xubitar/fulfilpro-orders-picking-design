@@ -6,7 +6,7 @@ import StoreImageTile, { StoreImageAddTile } from './StoreImageTile';
 import { groupImagesByColour, storeImageColours, type ImageColourGroup, type StoreVariantTableRow } from './storeDiff';
 import type { StoreImageActions } from './hooks/useStoreImageActions';
 import { Trash } from './icons';
-import type { ProductImage, ProductRecord, StoreListingImage, StoreListingResult } from './types';
+import type { ProductImage, ProductRecord, StoreListingResult } from './types';
 
 type StoreDiffImagesSectionProps = {
   product: ProductRecord;
@@ -36,22 +36,6 @@ export default function StoreDiffImagesSection({ product, listing, rows, actions
   }, [listing.images, rows, colourOrder]);
   const systemGroups = useMemo(() => groupImagesByColour(product.images, (img) => img.colour, colourOrder), [product.images, colourOrder]);
 
-  // One row per colour present on either side, in the same order, so a colour's store and system
-  // images sit across from each other.
-  const keys = useMemo(() => {
-    const seen = new Set<string>();
-    const ordered: { key: string; label: string }[] = [];
-    for (const g of [...systemGroups, ...storeGroups]) {
-      if (seen.has(g.key)) continue;
-      seen.add(g.key);
-      ordered.push({ key: g.key, label: g.label });
-    }
-    // Images tied to no colour go last.
-    return [...ordered.filter((o) => o.key !== ''), ...ordered.filter((o) => o.key === '')];
-  }, [systemGroups, storeGroups]);
-
-  const storeByKey = new Map(storeGroups.map((g) => [g.key, g]));
-  const systemByKey = new Map(systemGroups.map((g) => [g.key, g]));
   const busy = savingKey !== null;
   const total = listing.images.length;
   const systemImages = product.images;
@@ -87,20 +71,17 @@ export default function StoreDiffImagesSection({ product, listing, rows, actions
 
       <div className="mt-[8px] overflow-x-auto thin-scroll">
         <div className="grid min-w-[520px] grid-cols-2 gap-x-[12px]">
-          <p className="mb-[4px] text-[9px] font-semibold uppercase tracking-[0.3px] text-inventory-text-subtle">Store ({total})</p>
-          <p className="mb-[4px] text-[9px] font-semibold uppercase tracking-[0.3px] text-inventory-text-subtle">System ({product.images.length})</p>
-          {keys.map(({ key, label }) => (
-            <ColourRow
-              key={key}
-              label={label}
-              swatch={swatches.get(key)}
-              store={storeByKey.get(key)}
-              system={systemByKey.get(key)}
-              systemImages={systemImages}
-              savingKey={savingKey}
-              actions={actions}
-            />
-          ))}
+          <ImageColumn
+            title={`Store (${total})`}
+            groups={storeGroups}
+            swatches={swatches}
+            side="store"
+            systemImages={systemImages}
+            positionCount={total}
+            savingKey={savingKey}
+            actions={actions}
+          />
+          <ImageColumn title={`System (${product.images.length})`} groups={systemGroups} swatches={swatches} side="system" savingKey={savingKey} actions={actions} />
           <div className="col-span-2 mt-[6px] border-t border-inventory-divider pt-[8px]">
             <StoreImageAddTile onClick={actions.openAdd} busy={busy} />
           </div>
@@ -110,73 +91,101 @@ export default function StoreDiffImagesSection({ product, listing, rows, actions
   );
 }
 
-function ColourRow({
-  label,
-  swatch,
-  store,
-  system,
-  systemImages,
-  savingKey,
-  actions,
-}: {
-  label: string;
-  swatch: string | undefined;
-  store: Group<StoreListingImage> | undefined;
-  system: Group<{ id: string; url: string; altText: string | null }> | undefined;
-  systemImages: ProductImage[];
+type ColumnImage = { id: string; url: string; altText: string | null; position: number };
+
+type ImageColumnProps = {
+  title: string;
+  groups: Group<ColumnImage>[];
+  swatches: Map<string, string>;
+  side: 'store' | 'system';
+  systemImages?: ProductImage[];
+  positionCount?: number;
   savingKey: string | null;
   actions: StoreImageActions;
-}) {
-  const busy = savingKey !== null;
+};
+
+/** One side of the Images section: the colours as compact cells in a wrapping grid (normally one
+ * image each), then the images tied to no colour in their own "Unassigned" grid below. Store
+ * tiles carry the edit buttons and a position dropdown; system tiles are just the picture. */
+function ImageColumn({ title, groups, swatches, side, systemImages, positionCount, savingKey, actions }: ImageColumnProps) {
+  const coloured = groups.filter((g) => g.key !== '');
+  const unassigned = groups.find((g) => g.key === '');
+  const noun = side === 'store' ? 'the store' : 'the system';
+
   return (
-    <>
-      <section className="min-w-0 border-t border-inventory-divider py-[8px]" aria-label={`${label} — store images`}>
-        <GroupHeader label={label} swatch={swatch} count={store?.images.length ?? 0}>
-          {store && (
-            <button
-              type="button"
-              onClick={() => actions.removeColour(store)}
-              disabled={busy}
-              aria-label={`Delete all ${label} images from the store`}
-              title={`Delete all ${label} images`}
-              className="flex h-[20px] w-[20px] items-center justify-center rounded-[5px] text-inventory-text-subtle transition-colors duration-150 hover:bg-inventory-danger/10 hover:text-inventory-danger disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
-            >
-              <Trash className="h-3 w-3" />
-            </button>
-          )}
-        </GroupHeader>
-        <div className="mt-[5px] flex flex-wrap gap-[8px]">
-          {store ? (
-            store.images.map((img) => (
-              <StoreImageTile
-                key={img.id}
-                url={img.url}
-                altText={img.altText}
-                position={img.position}
-                busy={busy}
-                saving={savingKey === `image:${img.id}`}
-                systemImages={systemImages}
-                onUploadUpdate={() => actions.openUpload(img)}
-                onSystemUpdate={(systemImage) => actions.updateFromSystem(img, systemImage)}
-                onDelete={() => actions.removeOne(img)}
-              />
-            ))
-          ) : (
-            <p className="py-[6px] text-[10.5px] text-inventory-text-subtle">None on the store</p>
-          )}
+    <section className="min-w-0" aria-label={`${side} images`}>
+      <p className="mb-[4px] text-[9px] font-semibold uppercase tracking-[0.3px] text-inventory-text-subtle">{title}</p>
+      {groups.length === 0 && <p className="border-t border-inventory-divider py-[8px] text-[10.5px] text-inventory-text-subtle">None on {noun}</p>}
+      {coloured.length > 0 && (
+        <div className="flex flex-wrap gap-[8px] border-t border-inventory-divider py-[8px]">
+          {coloured.map((group) => (
+            <ImageGroupCell key={group.key} group={group} swatch={swatches.get(group.key)} side={side} systemImages={systemImages} positionCount={positionCount} savingKey={savingKey} actions={actions} />
+          ))}
         </div>
-      </section>
-      <section className="min-w-0 border-t border-inventory-divider py-[8px]" aria-label={`${label} — system images`}>
-        <GroupHeader label={label} swatch={swatch} count={system?.images.length ?? 0} />
-        <div className="mt-[5px] flex flex-wrap gap-[8px]">
-          {system ? (
-            system.images.map((img) => <StoreImageTile key={img.id} url={img.url} altText={img.altText} position={img.position} />)
-          ) : (
-            <p className="py-[6px] text-[10.5px] text-inventory-text-subtle">None on the system</p>
-          )}
+      )}
+      {unassigned && (
+        <div className="border-t border-inventory-divider py-[8px]">
+          <ImageGroupCell group={unassigned} side={side} systemImages={systemImages} positionCount={positionCount} savingKey={savingKey} actions={actions} bare />
         </div>
-      </section>
-    </>
+      )}
+    </section>
+  );
+}
+
+type ImageGroupCellProps = {
+  group: Group<ColumnImage>;
+  swatch?: string;
+  side: 'store' | 'system';
+  systemImages?: ProductImage[];
+  positionCount?: number;
+  savingKey: string | null;
+  actions: StoreImageActions;
+  /** Unassigned block: no cell border, tiles wrap across the full column width. */
+  bare?: boolean;
+};
+
+function ImageGroupCell({ group, swatch, side, systemImages, positionCount, savingKey, actions, bare }: ImageGroupCellProps) {
+  const busy = savingKey !== null;
+  const isStore = side === 'store';
+  return (
+    <div className={bare ? 'min-w-0' : 'min-w-0 rounded-[8px] border border-inventory-divider p-[6px]'} aria-label={`${group.label} — ${side} images`}>
+      <GroupHeader label={group.label} swatch={bare ? undefined : swatch} count={group.images.length}>
+        {isStore && !bare && (
+          <button
+            type="button"
+            onClick={() => actions.removeColour(group)}
+            disabled={busy}
+            aria-label={`Delete all ${group.label} images from the store`}
+            title={`Delete all ${group.label} images`}
+            className="flex h-[20px] w-[20px] items-center justify-center rounded-[5px] text-inventory-text-subtle transition-colors duration-150 hover:bg-inventory-danger/10 hover:text-inventory-danger disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+          >
+            <Trash className="h-3 w-3" />
+          </button>
+        )}
+      </GroupHeader>
+      <div className="mt-[5px] flex flex-wrap gap-[8px]">
+        {group.images.map((img) =>
+          isStore ? (
+            <StoreImageTile
+              key={img.id}
+              url={img.url}
+              altText={img.altText}
+              position={img.position}
+              busy={busy}
+              saving={savingKey === `image:${img.id}`}
+              systemImages={systemImages}
+              positionCount={positionCount}
+              onMove={(position) => actions.move(img, position)}
+              onUploadUpdate={() => actions.openUpload(img)}
+              onSystemUpdate={(systemImage) => actions.updateFromSystem(img, systemImage)}
+              onDelete={() => actions.removeOne(img)}
+            />
+          ) : (
+            <StoreImageTile key={img.id} url={img.url} altText={img.altText} position={img.position} />
+          )
+        )}
+      </div>
+    </div>
   );
 }
 
