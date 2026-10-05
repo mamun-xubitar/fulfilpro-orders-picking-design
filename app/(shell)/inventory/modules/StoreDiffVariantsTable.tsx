@@ -2,17 +2,17 @@
 
 import StoreDiffVariantsRow from './StoreDiffVariantsRow';
 import type { StoreVariantTableRow } from './storeDiff';
+import type { StoreVariantActions } from './hooks/useStoreVariantActions';
 import type { ProductImage, StoreListingImage } from './types';
 
 type StoreDiffVariantsTableProps = {
   rows: StoreVariantTableRow[];
   systemImages: ProductImage[];
   storeImages: StoreListingImage[];
-  /** hubVariantId -> Available default (the hub's full available quantity) — same resolution
-   * every other flow seeds its own input with. */
+  /** hubVariantId -> Available default (the hub's full available quantity). */
   stockDefaults: Record<string, number>;
-  edits: Record<string, string>;
-  setEdit: (key: string, value: string) => void;
+  actions: StoreVariantActions;
+  savingKey: string | null;
   onSave: () => void;
   saving: boolean;
 };
@@ -20,23 +20,12 @@ type StoreDiffVariantsTableProps = {
 const TH_CLASS = 'px-2 py-1 text-left text-[9.5px] font-bold uppercase tracking-[0.3px] text-inventory-text-subtle';
 
 /**
- * The differences modal's full variants table (item 4) — every hub variant plus any
- * Shopify-only variant, shaped like the publish modal's own Variants / stock matrix so the two
- * read the same way, with each mismatched row tinted by the action a sync would take on it (see
- * StoreDiffVariantsRow). One "Save variants to store" button pushes every change at once — see
- * useStoreDiff's `saveVariants`, which reconciles the whole list rather than one row at a time.
+ * The differences modal's full variants table — every hub variant plus any Shopify-only variant,
+ * shaped like the publish modal's own Variants / stock matrix. Each cell and each row saves
+ * straight to the store (see StoreDiffVariantsRow); "Save variants to store" is the older
+ * all-at-once push, which reconciles the whole list to match the system.
  */
-export default function StoreDiffVariantsTable({ rows, systemImages, storeImages, stockDefaults, edits, setEdit, onSave, saving }: StoreDiffVariantsTableProps) {
-  // Shopify-style: an image is assigned per colour, not per variant — picking one for a row
-  // applies to every row sharing its colour, mirroring the publish modal's own setVariantImage
-  // (StoreDraftBlock.tsx).
-  const handleImageChange = (colour: string, imageId: string | null) => {
-    const colourKey = colour.toLowerCase();
-    for (const r of rows) {
-      if (r.hubVariantId && r.colour.toLowerCase() === colourKey) setEdit(`variant:${r.key}:image`, imageId ?? '');
-    }
-  };
-
+export default function StoreDiffVariantsTable({ rows, systemImages, storeImages, stockDefaults, actions, savingKey, onSave, saving }: StoreDiffVariantsTableProps) {
   return (
     <div>
       <div className="mb-[6px] flex items-center justify-between">
@@ -44,22 +33,23 @@ export default function StoreDiffVariantsTable({ rows, systemImages, storeImages
         <button
           type="button"
           onClick={onSave}
-          disabled={saving}
-          className="flex h-[24px] items-center rounded-[6px] bg-inventory-primary px-[10px] text-[10.5px] font-bold text-white transition-colors duration-150 hover:bg-inventory-primary-hover disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+          disabled={saving || savingKey !== null}
+          className="flex h-[24px] items-center rounded-[6px] border border-inventory-primary/50 px-[10px] text-[10.5px] font-bold text-inventory-primary transition-colors duration-150 hover:bg-inventory-primary/10 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
         >
           {saving ? 'Saving…' : 'Save variants to store'}
         </button>
       </div>
       <div className="overflow-x-auto thin-scroll rounded-[8px] border border-inventory-border">
-        <table className="w-full min-w-[640px] text-[11px] leading-none">
+        <table className="w-full min-w-[960px] text-[11px] leading-none">
           <thead>
             <tr className="border-b border-inventory-border bg-inventory-surface-muted">
               <th className={TH_CLASS}>Variant</th>
               <th className={TH_CLASS}>SKU</th>
               <th className={TH_CLASS}>Barcode</th>
-              <th className={`${TH_CLASS} text-right`}>Available</th>
+              <th className={TH_CLASS}>Available</th>
               <th className={TH_CLASS}>Image</th>
-              <th className={`${TH_CLASS} text-right`}>Price (AUD)</th>
+              <th className={TH_CLASS}>Price (AUD)</th>
+              <th className={`${TH_CLASS} text-right`}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -70,9 +60,8 @@ export default function StoreDiffVariantsTable({ rows, systemImages, storeImages
                 systemImages={systemImages}
                 storeImages={storeImages}
                 stockDefault={stockDefaults[row.hubVariantId ?? ''] ?? 0}
-                editValue={(field, fallback) => edits[`variant:${row.key}:${field}`] ?? fallback}
-                onEditChange={(field, value) => setEdit(`variant:${row.key}:${field}`, value)}
-                onImageChange={handleImageChange}
+                actions={actions}
+                savingKey={savingKey}
               />
             ))}
           </tbody>

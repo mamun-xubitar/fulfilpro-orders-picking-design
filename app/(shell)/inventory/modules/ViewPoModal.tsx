@@ -1,8 +1,11 @@
 'use client';
 
-import { MODAL_FOOTER_BTN_SECONDARY, ModalShell } from '@/components/ModalShell';
+import { toast } from 'react-toastify';
+import { MODAL_FOOTER_BTN_PRIMARY, MODAL_FOOTER_BTN_SECONDARY, ModalShell } from '@/components/ModalShell';
 import { formatColourName } from '@/lib/inventory/colour';
 import { STATUS_BADGES } from './PurchaseOrdersPanel';
+import { Printer } from './icons';
+import { printPurchaseOrders } from './poPrint';
 import type { PurchaseOrderRecord } from './types';
 import { formatDate, formatMoney, formatPoNumber, poAveragePrice } from './utils';
 
@@ -26,9 +29,19 @@ export default function ViewPoModal({ po, onClose }: ViewPoModalProps) {
       onClose={onClose}
       maxWidthClass="max-w-4xl"
       footer={
-        <button type="button" onClick={onClose} className={`w-full ${MODAL_FOOTER_BTN_SECONDARY}`}>
-          Close
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" onClick={onClose} className={`flex-1 ${MODAL_FOOTER_BTN_SECONDARY}`}>
+            Close
+          </button>
+          <button
+            type="button"
+            onClick={() => printPurchaseOrders([po]).catch((err: unknown) => toast.error(err instanceof Error ? err.message : 'Unable to print'))}
+            className={`flex flex-1 items-center justify-center gap-1.5 ${MODAL_FOOTER_BTN_PRIMARY}`}
+          >
+            <Printer className="h-3.5 w-3.5" />
+            Print
+          </button>
+        </div>
       }
     >
       <div className="space-y-2">

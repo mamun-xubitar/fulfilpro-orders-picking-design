@@ -64,7 +64,7 @@ export default function VariantListColumn({ variants, onChange, onFillAll }: Var
               value={row.stockOnHand}
               onChange={(e) => onChange(row.key, 'stockOnHand', Math.max(0, Math.trunc(Number(e.target.value) || 0)))}
               aria-label={`Stock on hand for ${variantTitle(row)}`}
-              className="h-[22px] w-full min-w-0 rounded-[6px] border border-inventory-border-strong px-[6px] text-right text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring"
+              className="h-[22px] w-full min-w-0 rounded-[6px] border border-inventory-border-strong pl-[6px] pr-[10px] text-right text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring"
             />
             <input
               type="number"
@@ -74,7 +74,7 @@ export default function VariantListColumn({ variants, onChange, onFillAll }: Var
               placeholder="Default"
               onChange={(e) => onChange(row.key, 'trigger', Math.max(0, Math.trunc(Number(e.target.value) || 0)))}
               aria-label={`Trigger for ${variantTitle(row)}`}
-              className="h-[22px] w-full min-w-0 rounded-[6px] border border-inventory-border-strong px-[6px] text-right text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring"
+              className="h-[22px] w-full min-w-0 rounded-[6px] border border-inventory-border-strong pl-[6px] pr-[10px] text-right text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring"
             />
           </div>
         ))}

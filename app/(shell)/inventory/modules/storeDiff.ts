@@ -63,6 +63,13 @@ export type StoreVariantTableRow = {
    * real id from the hub gallery, so it's what seeds and falls back the differences table's Image
    * picker. Null for an extra-in-store row (no hub variant to link). */
   systemImageId: string | null;
+  /** The live Shopify variant this row is backed by — null for a missing-in-store row. Every
+   * per-row direct edit (save / remove) targets this gid. */
+  storeVariantId: string | null;
+  storeInventoryItemId: string | null;
+  /** This store's own MediaImage id the variant is linked to (null = none) — the differences
+   * table's Image picker works on the store gallery, since a variant can only link store media. */
+  storeImageId: string | null;
   mismatchedFields: Set<VariantFieldKey>;
 };
 
@@ -189,6 +196,9 @@ export function computeStoreDiff(product: ProductRecord, listing: StoreListingRe
           systemImagePosition,
           storeImagePosition: null,
           systemImageId: v.imageId ?? null,
+          storeVariantId: null,
+          storeInventoryItemId: null,
+          storeImageId: null,
           mismatchedFields: new Set(),
         });
       }
@@ -240,6 +250,9 @@ export function computeStoreDiff(product: ProductRecord, listing: StoreListingRe
       systemImagePosition,
       storeImagePosition,
       systemImageId: v.imageId ?? null,
+      storeVariantId: matched.id,
+      storeInventoryItemId: matched.inventoryItemId,
+      storeImageId: matched.imageId,
       mismatchedFields,
     });
   }
@@ -265,6 +278,9 @@ export function computeStoreDiff(product: ProductRecord, listing: StoreListingRe
         systemImagePosition: null,
         storeImagePosition: imagePosition(listing.images, sv.imageId),
         systemImageId: null,
+        storeVariantId: sv.id,
+        storeInventoryItemId: sv.inventoryItemId,
+        storeImageId: sv.imageId,
         mismatchedFields: new Set(),
       });
     }
@@ -272,4 +288,48 @@ export function computeStoreDiff(product: ProductRecord, listing: StoreListingRe
 
   const variantDiffCount = variants.reduce((sum, v) => sum + (v.fields.length > 0 ? v.fields.length : 1), 0);
   return { fields, images, variants, rows, total: fields.length + (images ? 1 : 0) + variantDiffCount };
+}
+
+export type ImageColourGroup<T> = {
+  /** Lower-cased colour name, or '' for images tied to no colour. */
+  key: string;
+  /** Display name as first seen — 'Unassigned' for the no-colour group. */
+  label: string;
+  /** Each image keeps its 1-based position within the full gallery, so a tile can still show
+   * "#3" even though it's rendered inside its colour group. */
+  images: (T & { position: number })[];
+};
+
+/** Splits a gallery into per-colour groups, ordered like the product's own colour list with the
+ * no-colour group last. `colourOf` supplies each image's colour — the hub gallery stores it on the
+ * image, while a store's images only have one through the variants that link them (see
+ * `storeImageColours`). */
+export function groupImagesByColour<T extends { id: string }>(
+  images: T[],
+  colourOf: (img: T) => string | null | undefined,
+  colourOrder: string[]
+): ImageColourGroup<T>[] {
+  const groups = new Map<string, ImageColourGroup<T>>();
+  images.forEach((img, index) => {
+    const colour = (colourOf(img) ?? '').trim();
+    const key = colour.toLowerCase();
+    const group = groups.get(key) ?? { key, label: colour || 'Unassigned', images: [] };
+    group.images.push({ ...img, position: index + 1 });
+    groups.set(key, group);
+  });
+  const rank = (key: string) => {
+    if (key === '') return Number.MAX_SAFE_INTEGER;
+    const i = colourOrder.findIndex((c) => c.trim().toLowerCase() === key);
+    return i === -1 ? colourOrder.length : i;
+  };
+  return [...groups.values()].sort((a, b) => rank(a.key) - rank(b.key));
+}
+
+/** store MediaImage id -> the colour of the first variant row linked to it. */
+export function storeImageColours(rows: StoreVariantTableRow[]): Map<string, string> {
+  const colours = new Map<string, string>();
+  for (const row of rows) {
+    if (row.storeImageId && row.colour && !colours.has(row.storeImageId)) colours.set(row.storeImageId, row.colour);
+  }
+  return colours;
 }

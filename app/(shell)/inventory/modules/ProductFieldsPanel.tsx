@@ -4,6 +4,7 @@ import { useState } from 'react';
 import ColourSizeModal from './colourSize/ColourSizeModal';
 import CategoryPicker from './CategoryPicker';
 import HubCategoryPicker from './HubCategoryPicker';
+import { useInventoryAccess } from './InventoryAccess';
 import { PANEL_MAX_H, PanelHeading, panelBorderClass } from './MainImagePanel';
 import { ActionButton } from './PricingMarginPanel';
 import ProductIdentityFields from './ProductIdentityFields';
@@ -41,6 +42,9 @@ type ProductFieldsPanelProps = {
 export default function ProductFieldsPanel({ details: d, supplierOptions, optionLibrary, inventoryCategories, suppliers, product, onOptionsApplied, embedded }: ProductFieldsPanelProps) {
   const itemNoAvailability = useItemNoAvailability(d.form.itemNo, d.productId ?? undefined);
   const [colourSizeOpen, setColourSizeOpen] = useState(false);
+  // Read-only for non-admins: the wizard (embedded) is admin-only, so it never hits this.
+  const { canEdit } = useInventoryAccess();
+  const readOnly = !embedded && !canEdit;
 
   return (
     <section className={embedded ? 'flex min-w-0 flex-col' : `flex min-w-0 flex-col rounded-[10px] border ${panelBorderClass('details')} bg-inventory-surface shadow-inventory ${PANEL_MAX_H}`}>
@@ -49,7 +53,7 @@ export default function ProductFieldsPanel({ details: d, supplierOptions, option
           tone="details"
           icon={<Document className="h-3 w-3" />}
           title="Product details"
-          action={<ActionButton onClick={() => d.saveDetails()} icon={<Check className="h-2.5 w-2.5" />} label="Save" primary disabled={!d.dirty} compact />}
+          action={readOnly ? undefined : <ActionButton onClick={() => d.saveDetails()} icon={<Check className="h-2.5 w-2.5" />} label="Save" primary disabled={!d.dirty} compact />}
         />
       )}
 
@@ -60,7 +64,7 @@ export default function ProductFieldsPanel({ details: d, supplierOptions, option
          * ancestor, or a clipping one. */}
         <div className={embedded ? 'flex flex-1 flex-col' : 'relative flex flex-1 flex-col min-h-0'}>
           <div className={embedded ? 'flex flex-1 flex-col gap-[4px]' : 'flex flex-1 flex-col gap-[4px] p-[6px] min-h-0 overflow-y-auto thin-scroll'}>
-            <div className="grid grid-cols-2 gap-x-[7px] gap-y-[3px]">
+            <fieldset disabled={readOnly} className="m-0 grid min-w-0 grid-cols-2 gap-x-[7px] gap-y-[3px] border-0 p-0">
               <ProductIdentityFields details={d} itemNoAvailability={itemNoAvailability} />
 
               <TextField label="Product name" value={d.form.name} onChange={d.setName} />
@@ -114,7 +118,7 @@ export default function ProductFieldsPanel({ details: d, supplierOptions, option
               <div className="col-span-2">
                 <DescriptionField details={d} compact={!embedded} />
               </div>
-            </div>
+            </fieldset>
           </div>
         </div>
       </DenseFieldsContext.Provider>

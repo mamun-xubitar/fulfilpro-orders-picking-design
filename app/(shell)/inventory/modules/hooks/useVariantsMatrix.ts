@@ -3,12 +3,14 @@
 import { useMemo, useState } from 'react';
 import { toast } from 'react-toastify';
 import useRequest from '@/hooks/useRequest';
-import { getStatus, naturalCompare, quickFilterMatches, sortVariantsForDisplay, summariseVariants, variantDraftChanges } from '../utils';
+import { getStatus, naturalCompare, quickFilterMatches, sortVariantsForDisplay, summariseVariants, variantDraftChanges, variantPatchBody } from '../utils';
 import type { ProductRecord, QuickFilterId, VariantRow, VariantStatus } from '../types';
 
 type MatrixFilters = {
   status: VariantStatus | null;
   showZeroStock: boolean;
+  /** Free-text filter over SKU, barcode, colour and size (case-insensitive). */
+  search: string;
   selected: string[];
   /** Colours/sizes hidden from the table, lower-cased. Stored as "hidden" rather than "checked"
    * so the default (nothing hidden) shows every row, and a colour/size declared later on the
@@ -17,7 +19,7 @@ type MatrixFilters = {
   hiddenSizes: string[];
 };
 
-const DEFAULT_FILTERS: MatrixFilters = { status: null, showZeroStock: false, selected: [], hiddenColours: [], hiddenSizes: [] };
+const DEFAULT_FILTERS: MatrixFilters = { status: null, showZeroStock: false, search: '', selected: [], hiddenColours: [], hiddenSizes: [] };
 
 // Module-level so its identity is stable across renders — a fresh {} every render would defeat
 // the `variants` useMemo below whenever there's no active product draft.
@@ -80,6 +82,8 @@ export function useVariantsMatrix({ product, sizes, quickFilter, onVariantSaved 
   // every row (one hook instance), so this is what lets only the row actually being saved show a
   // spinner instead of all of them lighting up together.
   const [savingRowId, setSavingRowId] = useState<string | null>(null);
+  // Same idea for a single input's own save (`${variantId}:${field}`).
+  const [savingCell, setSavingCell] = useState<string | null>(null);
 
   // Tagged with its product so navigation exits any pending confirmation.
   const [storedDeleteTarget, setStoredDeleteTarget] = useState<{ productId: string; variant: VariantRow } | null>(null);
@@ -127,26 +131,31 @@ export function useVariantsMatrix({ product, sizes, quickFilter, onVariantSaved 
   }, [product, drafts]);
 
   const rows = useMemo(() => {
+    // The zero-stock filter reads the *saved* stock, not the draft: it must hold even for rows
+    // with unsaved edits (e.g. after a "Set all" fill stages a draft on every visible row),
+    // otherwise the dirty-row pin below would let every row through and the filter would look dead.
+    const term = filters.search.trim().toLowerCase();
+    const savedStock = new Map((product?.variants ?? []).map((v) => [v.id, v.stockOnHand]));
     const filtered = variants.filter((v) => {
+      if (filters.showZeroStock && (savedStock.get(v.id) ?? v.stockOnHand) !== 0) return false;
       // Unsaved edits must never hide their own row: every filter below reads the
       // draft-overlaid values, so typing a value that breaks the active filter (e.g.
-      // raising stock while "Zero stock" is checked, or raising the sell price while
-      // "Sell < $1" is active) would otherwise unmount the row mid-edit and make Save
-      // unreachable. Pinned dirty rows re-evaluate normally once saved/reverted.
+      // raising the sell price while "Sell < $1" is active) would otherwise unmount the row
+      // mid-edit and make Save unreachable. Pinned dirty rows re-evaluate normally once
+      // saved/reverted.
       if (dirtyById[v.id]) return true;
       if (quickFilter && !quickFilterMatches(quickFilter, v)) return false;
       if (filters.hiddenColours.includes(v.colour.toLowerCase())) return false;
       if (filters.hiddenSizes.includes(v.size.toLowerCase())) return false;
       if (filters.status && getStatus(v) !== filters.status) return false;
-      // Unchecked (default) shows every variant; checking it narrows to zero-or-below stock only.
-      if (filters.showZeroStock && v.stockOnHand > 0) return false;
+      if (term && ![v.sku, v.barcode, v.colour, v.size].some((f) => (f ?? '').toLowerCase().includes(term))) return false;
       return true;
     });
     // Grouped by colour (A->Z) so same-colour rows stay together; within a colour, ordered by
     // the product's own declared size order — see sortVariantsForDisplay, shared with the
     // publish/bulk-update store draft tables so all three read the same way.
     return sortVariantsForDisplay(filtered, sizes);
-  }, [variants, sizes, quickFilter, filters.hiddenColours, filters.hiddenSizes, filters.status, filters.showZeroStock, dirtyById]);
+  }, [variants, sizes, quickFilter, filters.hiddenColours, filters.hiddenSizes, filters.status, filters.showZeroStock, filters.search, dirtyById, product]);
 
   // Selection is narrowed to the visible rows here rather than pruned in an effect.
   const selectedIds = useMemo(() => {
@@ -193,7 +202,7 @@ export function useVariantsMatrix({ product, sizes, quickFilter, onVariantSaved 
     request({
       url: `/api/inventory/catalog/${product.id}/variants/${variantId}`,
       method: 'PATCH',
-      data: changes as unknown as Record<string, unknown>,
+      data: variantPatchBody(changes),
       successMessage: 'Variant updated',
       onSuccess: ({ data }) => {
         setSavingRowId(null);
@@ -203,6 +212,41 @@ export function useVariantsMatrix({ product, sizes, quickFilter, onVariantSaved 
       // useRequest has no onSettled — savingRowId must be cleared on both branches, since a
       // validation/network failure leaves the draft in place for the admin to fix and retry.
       onError: () => setSavingRowId(null),
+    });
+  };
+
+  /** Drops just one field of a row's draft — what a per-input save clears, leaving the row's other
+   * unsaved edits in place. */
+  const clearFieldDraft = (variantId: string, field: keyof VariantRow) => {
+    setStoredDrafts((prev) => {
+      if (!prev || !prev.drafts[variantId] || !(field in prev.drafts[variantId])) return prev;
+      const { [field]: _dropped, ...rest } = prev.drafts[variantId];
+      void _dropped;
+      const next = { ...prev.drafts };
+      if (Object.keys(rest).length === 0) delete next[variantId];
+      else next[variantId] = rest;
+      return { productId: prev.productId, drafts: next };
+    });
+  };
+
+  /** Saves a single input — the PATCH carries only that field, so the row's other unsaved edits
+   * are neither sent nor lost. */
+  const saveField = (variantId: string, field: keyof VariantRow) => {
+    const changes = dirtyById[variantId];
+    if (!product || !changes || !(field in changes)) return;
+    const key = `${variantId}:${field}`;
+    setSavingCell(key);
+    request({
+      url: `/api/inventory/catalog/${product.id}/variants/${variantId}`,
+      method: 'PATCH',
+      data: variantPatchBody({ [field]: changes[field] } as Partial<VariantRow>),
+      successMessage: 'Variant updated',
+      onSuccess: ({ data }) => {
+        setSavingCell(null);
+        onVariantSaved(data);
+        clearFieldDraft(variantId, field);
+      },
+      onError: () => setSavingCell(null),
     });
   };
 
@@ -271,7 +315,9 @@ export function useVariantsMatrix({ product, sizes, quickFilter, onVariantSaved 
     dirtyById,
     isRowDirty: (id: string) => dirtyById[id] !== undefined,
     savingRowId,
+    savingCell,
     saveRow,
+    saveField,
     revertRow,
     setVariantEdit,
     fillColumn,
@@ -290,9 +336,12 @@ export function useVariantsMatrix({ product, sizes, quickFilter, onVariantSaved 
     setStatusFilter: (status: VariantStatus) => patch({ status: filters.status === status ? null : status }),
     showZeroStock: filters.showZeroStock,
     setShowZeroStock: (showZeroStock: boolean) => patch({ showZeroStock }),
+    search: filters.search,
+    setSearch: (search: string) => patch({ search }),
     selectedIds,
     toggleRow: (id: string) => patch({ selected: selectedIds.has(id) ? [...selectedIds].filter((s) => s !== id) : [...selectedIds, id] }),
     allRowsSelected,
+    clearSelection: () => patch({ selected: [] }),
     toggleAllRows: () => patch({ selected: allRowsSelected ? [] : rows.map((r) => r.id) }),
   };
 }

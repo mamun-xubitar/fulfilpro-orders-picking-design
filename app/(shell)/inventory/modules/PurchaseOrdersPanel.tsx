@@ -3,17 +3,16 @@
 import { useState } from 'react';
 import BuyingHistoryModal from './BuyingHistoryModal';
 import type { usePurchaseOrder } from './hooks/usePurchaseOrder';
+import { useInventoryAccess } from './InventoryAccess';
 import { Clipboard } from './icons';
 import { PanelHeading, panelBorderClass } from './MainImagePanel';
 import { formatDate, formatMoney, formatPoNumber, poAveragePrice } from './utils';
 
 export const STATUS_BADGES: Record<string, string> = {
   REQUESTED: 'bg-inventory-warning/10 text-inventory-warning-ink border-inventory-warning/30',
-  CONFIRMED: 'bg-inventory-primary/10 text-inventory-primary border-inventory-primary/30',
   PARTIALLY_RECEIVED: 'bg-inventory-secondary/10 text-inventory-secondary border-inventory-secondary/30',
   RECEIVED: 'bg-inventory-success/10 text-inventory-success-hover border-inventory-success/30',
   CANCELLED: 'bg-inventory-danger/10 text-inventory-danger-hover border-inventory-danger/30',
-  DRAFT: 'bg-inventory-surface-muted text-inventory-text-muted border-inventory-border',
 };
 
 type PurchaseOrdersPanelProps = { po: ReturnType<typeof usePurchaseOrder> };
@@ -23,6 +22,7 @@ type PurchaseOrdersPanelProps = { po: ReturnType<typeof usePurchaseOrder> };
  * activity) instead of the old full-width strip. */
 export default function PurchaseOrdersPanel({ po }: PurchaseOrdersPanelProps) {
   const [historyOpen, setHistoryOpen] = useState(false);
+  const { canEdit } = useInventoryAccess();
   return (
     <>
     <section className={`flex min-h-0 flex-col rounded-[10px] border ${panelBorderClass('po')} bg-inventory-surface shadow-inventory`}>
@@ -66,7 +66,7 @@ export default function PurchaseOrdersPanel({ po }: PurchaseOrdersPanelProps) {
                       {row.items.length} variant{row.items.length === 1 ? '' : 's'} · {formatDate(row.createdAt)}
                     </p>
                   </div>
-                  {outstanding && row.status !== 'CANCELLED' && (
+                  {canEdit && outstanding && row.status !== 'CANCELLED' && (
                     <button
                       type="button"
                       onClick={() => po.openReceive(row)}

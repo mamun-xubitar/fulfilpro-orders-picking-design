@@ -31,7 +31,7 @@ type ProductImportOptions = { overwrite: boolean; markVerified: boolean };
 /** Bulk "Import products" — creates one SupplierProduct per Handle group in a (possibly
  * multi-product) Shopify product CSV, all under one chosen supplier. A handle that already
  * exists is skipped unless `overwrite` is set, in which case that product is updated in place
- * instead (same behaviour as the single-product "Import Product/PO CSV", just for many products
+ * instead (same behaviour as the single-product "Import Product CSV", just for many products
  * at once). */
 export class InventoryProductImportController {
   async preview(file: File, supplierId: string, session: Session, options: ProductImportOptions) {

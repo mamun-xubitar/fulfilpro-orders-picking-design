@@ -42,6 +42,8 @@ export type VariantRow = {
   /** The one image from the product's pool this variant is linked to, Shopify-style — several
    * variants may point at the same image. Null when unlinked. */
   imageId: string | null;
+  /** Where the variant is kept — any number of locations. */
+  locations: { id: string; name: string }[];
 };
 
 /** Below / near / above the reorder trigger. Drives row tint, badge and legend. */
@@ -85,6 +87,8 @@ export type StoreListingVariant = {
   inventoryQuantity: number | null;
   /** This store's live MediaImage id for the variant, if one is assigned. */
   imageId: string | null;
+  /** The variant's inventory item gid on that store — used to set its Available quantity. */
+  inventoryItemId: string | null;
 };
 
 /** One product image as it exists on a single connected store, fetched live from Shopify. */
@@ -279,16 +283,16 @@ export type ProductsResponse = {
 // — UI-only types —
 
 export type ModuleTabId =
+  | 'variants'
   | 'products'
   | 'purchase-recommend'
   | 'purchase-orders'
-  | 'receiving'
+  | 'locations'
   | 'stocktake'
   | 'adjustments'
   | 'suppliers'
   | 'payments'
   | 'reports'
-  | 'dashboard'
   | 'history';
 
 export type TabDef<T extends string> = {
@@ -341,7 +345,7 @@ export type ProductDetailsForm = {
 
 // — Purchase orders —
 
-export type PurchaseOrderStatusValue = 'DRAFT' | 'REQUESTED' | 'CONFIRMED' | 'PARTIALLY_RECEIVED' | 'RECEIVED' | 'CANCELLED';
+export type PurchaseOrderStatusValue = 'REQUESTED' | 'PARTIALLY_RECEIVED' | 'RECEIVED' | 'CANCELLED';
 
 export type PurchaseOrderItemRecord = {
   id: string;
@@ -371,23 +375,93 @@ export type PurchaseOrderRecord = {
   shippingRemark: string | null;
   createdAt: string;
   items: PurchaseOrderItemRecord[];
+  itemNo: string;
+  /** Null until a payment is first saved for this PO. */
+  payment: PoPaymentRecord | null;
+  /** The pricing frozen on the PO at creation — what the Pay modal starts from when no payment exists yet. */
+  productPricing: { currencyCode: string; exchangeRate: number; buyingPrice: number; freight: number; misc: number } | null;
+};
+
+export type PoPaymentStatusValue = 'UNPAID' | 'PAID';
+
+type PoPaymentFields = {
+  status: PoPaymentStatusValue;
+  currencyCode: string;
+  exchangeRate: number;
+  buyingPrice: number;
+  freight: number;
+  misc: number;
+  totalAud: number;
+  paidAt: string | null;
+  reference: string | null;
+  remark: string | null;
+};
+
+export type PoPaymentRecord = PoPaymentFields & {
+  id: string;
+  purchaseOrderId: string;
+  updatedByName: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PoPaymentHistoryRecord = PoPaymentFields & {
+  id: string;
+  /** created | updated | paid | unpaid */
+  action: string;
+  actorName: string;
+  createdAt: string;
+};
+
+/** A payment as listed on the Payments tab: the payment plus the PO it settles. */
+export type PoPaymentListRecord = PoPaymentRecord & {
+  purchaseOrder: { number: number; productTitle: string; supplierId: string; supplierName: string; supplierProductId: string };
+  historyCount: number;
 };
 
 export type SupplierOption = { id: string; name: string; poEmail: string };
 
 // — Stocktake —
 
-export type StocktakeItemRecord = { id: string; variantId: string; colour: string; size: string; sku: string | null; expectedQty: number; countedQty: number | null };
+export type StocktakeStatusValue = 'OPEN' | 'COUNTED' | 'COMPLETED' | 'CANCELLED';
+
+/** One counting line — a variant at one location. `expectedQty` / `systemQty` only come back for admins. */
+export type StocktakeItemRecord = {
+  id: string;
+  variantId: string;
+  colour: string;
+  size: string;
+  sku: string | null;
+  locationId: string | null;
+  locationName: string | null;
+  /** Stock on hand when the stocktake was created. */
+  expectedQty?: number;
+  /** Stock on hand right now. */
+  systemQty?: number;
+  countedQty: number | null;
+  /** Locations the variant has now with no line here — such a variant is skipped on sync. */
+  uncoveredLocations: number;
+};
 
 export type StocktakeRecord = {
   id: string;
+  number: number;
   supplierProductId: string;
-  status: 'OPEN' | 'COMPLETED' | 'CANCELLED';
+  productName: string;
+  itemNo: string;
+  status: StocktakeStatusValue;
   startedByName: string;
+  countedByName: string | null;
+  countedAt: string | null;
+  syncedByName: string | null;
   completedAt: string | null;
   createdAt: string;
+  itemCount: number;
+  countedCount: number;
   items: StocktakeItemRecord[];
 };
+
+export type StocktakeSyncSummary = { adjusted: number; unchanged: number; skipped: number };
 
 // — Stock adjustments —
 

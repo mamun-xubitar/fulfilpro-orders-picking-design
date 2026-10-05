@@ -143,7 +143,7 @@ export default function ReceivePoModal({ po }: { po: ReturnType<typeof usePurcha
                         value={po.receiveCost[item.id] ?? ''}
                         onChange={(e) => po.setReceiveItemCost(item.id, e.target.value)}
                         aria-label={`Unit cost for ${item.variantTitle}`}
-                        className="h-[22px] w-full rounded-[7px] border border-inventory-border-strong pl-[14px] pr-[6px] text-right text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring"
+                        className="h-[22px] w-full rounded-[7px] border border-inventory-border-strong pl-[14px] pr-[10px] text-right text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring"
                       />
                     </div>
                     <div className="w-full min-w-0">
@@ -157,7 +157,7 @@ export default function ReceivePoModal({ po }: { po: ReturnType<typeof usePurcha
                         aria-label={`Receive quantity for ${item.variantTitle}`}
                         aria-invalid={qtyError !== null}
                         title={qtyError ?? `0 to ${remaining}`}
-                        className={`h-[22px] w-full rounded-[7px] border px-[6px] text-right text-[11px] leading-none outline-none focus:ring-2 ${qtyError ? 'border-inventory-danger/45 bg-inventory-danger/8 focus:border-inventory-danger focus:ring-inventory-danger/20' : 'border-inventory-border-strong focus:border-inventory-primary focus:ring-inventory-primary-ring'}`}
+                        className={`h-[22px] w-full rounded-[7px] border pl-[6px] pr-[10px] text-right text-[11px] leading-none outline-none focus:ring-2 ${qtyError ? 'border-inventory-danger/45 bg-inventory-danger/8 focus:border-inventory-danger focus:ring-inventory-danger/20' : 'border-inventory-border-strong focus:border-inventory-primary focus:ring-inventory-primary-ring'}`}
                       />
                     </div>
                   </div>

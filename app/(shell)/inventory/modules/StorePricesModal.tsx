@@ -150,7 +150,7 @@ export default function StorePricesModal({ listing, onClose, onSaveOne, onSaveAl
                         value={drafts[variant.id] ?? ''}
                         onChange={(e) => setDraft(variant.id, e.target.value)}
                         aria-label={`Price for ${variant.title}`}
-                        className={`ml-auto h-[22px] w-24 rounded-[6px] border px-[6px] text-right text-[11px] leading-none tabular-nums outline-none focus:ring-2 ${
+                        className={`ml-auto h-[22px] w-24 rounded-[6px] border pl-[6px] pr-[10px] text-right text-[11px] leading-none tabular-nums outline-none focus:ring-2 ${
                           invalid ? 'border-inventory-danger/35 focus:border-inventory-danger focus:ring-inventory-danger/20' : 'border-inventory-border-strong focus:border-inventory-primary focus:ring-inventory-primary-ring'
                         }`}
                       />

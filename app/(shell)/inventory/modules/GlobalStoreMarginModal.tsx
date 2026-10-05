@@ -127,9 +127,9 @@ export default function GlobalStoreMarginModal({ state, onClose }: GlobalStoreMa
                       if (Number.isFinite(value) && value >= 0) state.setValue(s.storeId, value);
                     }}
                     aria-label={`Margin for ${s.storeName}`}
-                    className="h-[22px] w-[62px] rounded-[7px] border border-inventory-border-strong pl-[6px] pr-[18px] text-right text-[10.5px] leading-none tabular-nums outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring"
+                    className="h-[22px] w-[62px] rounded-[7px] border border-inventory-border-strong pl-[6px] pr-[20px] text-right text-[10.5px] leading-none tabular-nums outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring"
                   />
-                  <span className="pointer-events-none absolute right-[5px] top-1/2 -translate-y-1/2 text-[9px] leading-none text-inventory-text-subtle">%</span>
+                  <span className="pointer-events-none absolute right-[7px] top-1/2 -translate-y-1/2 text-[9px] leading-none text-inventory-text-subtle">%</span>
                 </div>
                 <button
                   type="button"

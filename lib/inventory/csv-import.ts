@@ -227,62 +227,6 @@ export function parseShopifyProductCsv(text: string): ParsedProductGroup[] {
   return order.map((handle) => buildGroup(handle, byHandle.get(handle)!));
 }
 
-export type ParsedPoRow = {
-  /** Raw cell — "PO-00042" style numeric reference, or a free-form label grouping new-PO rows. */
-  poNumber: string;
-  referenceNumber?: string;
-  status?: string;
-  deliveryDate?: string;
-  poRemark?: string;
-  colour: string;
-  size: string;
-  sku: string;
-  quantity: number;
-  receivedQuantity?: number;
-  unitCost?: number;
-};
-
-export type ParsedPoImport = { type: 'po'; rows: ParsedPoRow[] };
-
-/** Reads the PO CSV format produced by buildPoCsv. Received Quantity and Unit Cost are left
- * undefined when blank so an update doesn't wipe an existing value with a zero. */
-export function parsePoCsv(text: string): ParsedPoImport {
-  const records = parseRecords(text);
-  const rows: ParsedPoRow[] = [];
-
-  for (const record of records) {
-    const get = (name: string) => record[name]?.trim() ?? '';
-    const poNumber = get('po number');
-    const colour = get('colour');
-    const size = get('size');
-    const sku = get('sku');
-    // A single-axis variant's PO row has an empty Colour or Size cell — require at least one
-    // of colour/size/sku so the row can still resolve to a variant, rather than the old
-    // "both colour and size" rule that silently dropped every line for such a product.
-    if (!poNumber || (!colour && !size && !sku)) continue;
-
-    const receivedQuantity = get('received quantity');
-    const unitCost = get('unit cost');
-    rows.push({
-      poNumber,
-      referenceNumber: get('reference') || undefined,
-      status: get('status') || undefined,
-      deliveryDate: get('delivery date') || undefined,
-      // Accepts the current "PO Remark" header and the legacy "Remark" header so operator
-      // spreadsheets exported before the item 6 rename keep importing.
-      poRemark: get('po remark') || get('remark') || undefined,
-      colour,
-      size,
-      sku,
-      quantity: Number(get('quantity')) || 0,
-      receivedQuantity: receivedQuantity !== '' && Number.isFinite(Number(receivedQuantity)) ? Number(receivedQuantity) : undefined,
-      unitCost: unitCost !== '' && Number.isFinite(Number(unitCost)) ? Number(unitCost) : undefined,
-    });
-  }
-
-  return { type: 'po', rows };
-}
-
 /** An existing product's colour/size vocabulary, in the shape both import controllers already
  * carry it in (`SupplierProductRow` and its variants) — kept minimal here so this module doesn't
  * need to import the Prisma-backed model type. */

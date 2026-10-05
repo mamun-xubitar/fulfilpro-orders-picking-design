@@ -11,24 +11,26 @@ type VariantsMatrixSectionProps = {
   /** Rendered inside the "Full view" full-screen modal — fills the available height instead of
    * the normal inline card, and flips the toolbar's expand button into an exit action. */
   fullView?: boolean;
+  /** The Variant tab: every column, and a taller table than the compact inline card. */
+  tall?: boolean;
 };
 
 /** The toolbar + colour panel + table trio, extracted so it can be rendered either inline (the
  * normal product view) or inside the full-screen "Full view" modal — see InventoryModals. The
  * colour panel and table sit in one flex row so the panel is always exactly as tall as the table
  * beside it, in both placements. */
-export default function VariantsMatrixSection({ p, fullView }: VariantsMatrixSectionProps) {
+export default function VariantsMatrixSection({ p, fullView, tall }: VariantsMatrixSectionProps) {
   return (
     <section className={fullView ? 'flex h-full min-h-0 flex-col' : `rounded-xl border ${panelBorderClass('variants')} bg-inventory-surface shadow-sm`}>
       <VariantsMatrixToolbar p={p} fullView={fullView} />
-      <div className={`flex ${fullView ? 'min-h-0 flex-1' : 'min-h-[10rem]'}`}>
+      <div className={`flex ${fullView ? 'min-h-0 flex-1' : tall ? 'min-h-[14rem]' : 'min-h-[10rem]'}`}>
         <div className="relative w-[170px] shrink-0 border-r border-inventory-border">
           <div className="absolute inset-0">
             <VariantColourPanel colour={p.matrix.colourFilter} />
           </div>
         </div>
         <div className="min-w-0 flex-1">
-          <VariantsMatrixTable matrix={p.matrix} fillHeight={fullView} showAllColumns={!!fullView} />
+          <VariantsMatrixTable matrix={p.matrix} locations={p.locations} fillHeight={fullView} showAllColumns={!!fullView || !!tall} tall={tall} />
         </div>
       </div>
     </section>

@@ -1,5 +1,6 @@
 import { SupplierModel } from '@/models/supplier.model.server';
 import { upperTrim } from '@/lib/utils/common';
+import { canReadInventory } from '@/lib/roles';
 
 const model = new SupplierModel();
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -12,7 +13,7 @@ function isAdmin(session: Session) {
 
 export class SupplierController {
   async list(searchParams: URLSearchParams, session: Session) {
-    if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
+    if (!canReadInventory(session?.user?.role)) return { error: { message: 'Forbidden', status: 403 } };
 
     const search = searchParams.get('search')?.trim() ?? '';
     const page = Math.max(1, parseInt(searchParams.get('page') ?? '1'));
@@ -34,6 +35,13 @@ export class SupplierController {
         },
       },
     };
+  }
+
+  async get(id: string, session: Session) {
+    if (!canReadInventory(session?.user?.role)) return { error: { message: 'Forbidden', status: 403 } };
+    const supplier = await model.findById(id);
+    if (!supplier) return { error: { message: 'Supplier not found', status: 404 } };
+    return { data: supplier };
   }
 
   async create(body: unknown, session: Session) {

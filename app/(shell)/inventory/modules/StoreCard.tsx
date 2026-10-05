@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useInventoryAccess } from './InventoryAccess';
 import { BTN_XS } from './MainImagePanel';
 import StoreDiffModal from './StoreDiffModal';
 import { LISTING_STATUS_BADGES } from './constants';
@@ -23,6 +24,7 @@ type StoreCardProps = {
  * panel already has, so opening it costs nothing extra; the count is 0 when nothing disagrees. */
 export default function StoreCard({ listing, selected, onToggle, product, storeListings }: StoreCardProps) {
   const [diffOpen, setDiffOpen] = useState(false);
+  const { canEdit } = useInventoryAccess();
   const diffCount = useMemo(() => computeStoreDiff(product, listing).total, [product, listing]);
 
   return (
@@ -77,7 +79,7 @@ export default function StoreCard({ listing, selected, onToggle, product, storeL
       )}
 
       <div className="mt-[6px] flex gap-[6px]">
-        {listing.found && (
+        {canEdit && listing.found && (
           <button
             type="button"
             onClick={() => setDiffOpen(true)}

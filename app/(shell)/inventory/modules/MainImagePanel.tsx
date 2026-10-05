@@ -2,6 +2,7 @@
 
 import { resolveSwatch } from "@/lib/inventory/colour";
 import GalleryThumbRow from "./GalleryThumbRow";
+import { useInventoryAccess } from "./InventoryAccess";
 import type { useProductImages } from "./hooks/useProductImages";
 import { Expand, Image as ImageIcon, Pencil } from "./icons";
 
@@ -30,6 +31,7 @@ export default function MainImagePanel({
   onEditImages,
 }: MainImagePanelProps) {
   const { images, tiles, active, activeKey, setActiveKey } = gallery;
+  const { canEdit } = useInventoryAccess();
 
   return (
     <section className={`flex min-w-0 flex-col rounded-[10px] border ${panelBorderClass("image")} bg-inventory-surface shadow-inventory ${PANEL_MAX_H}`}>
@@ -89,10 +91,12 @@ export default function MainImagePanel({
           <Expand className="h-3 w-3 min-w-3" />
           Enlarge
         </button>
-        <button type="button" onClick={onEditImages} className={`flex-1 ${BTN_XS}`}>
-          <Pencil className="h-3 w-3 min-w-3" />
-          Edit ({images.length})
-        </button>
+        {canEdit && (
+          <button type="button" onClick={onEditImages} className={`flex-1 ${BTN_XS}`}>
+            <Pencil className="h-3 w-3 min-w-3" />
+            Edit ({images.length})
+          </button>
+        )}
       </div>
     </section>
   );

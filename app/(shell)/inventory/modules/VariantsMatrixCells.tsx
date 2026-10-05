@@ -4,6 +4,8 @@
  * `.t-sm` table density literally: 4px cell padding, 10px cell text, 15px-tall cell inputs. */
 
 import { formatPoNumber } from '@/lib/inventory/po-number';
+import { Check } from './icons';
+import { useInventoryAccess } from './InventoryAccess';
 import { formatIncomingLot } from './utils';
 import type { IncomingLot } from './types';
 
@@ -33,30 +35,74 @@ export function Num({ value, bold, muted, className, title }: { value: string; b
   );
 }
 
+/** The per-input save: a 15px check button that appears right of an input once *that* input holds
+ * something the server doesn't, and saves only that field. A same-width slot is always reserved so
+ * the input never shifts when the button shows up. Enter inside the input triggers it too. */
+export function CellSave({ show, saving, label, onSave }: { show: boolean; saving: boolean; label: string; onSave: () => void }) {
+  return (
+    <span className="flex h-[15px] w-[15px] shrink-0 items-center justify-center">
+      {(show || saving) && (
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={saving}
+          aria-label={label}
+          title={label}
+          className="flex h-[15px] w-[15px] items-center justify-center rounded-[4px] bg-inventory-primary text-white transition-colors duration-150 hover:bg-inventory-primary-hover disabled:cursor-not-allowed disabled:opacity-70 cursor-pointer"
+        >
+          {saving ? <span className="block h-2 w-2 animate-spin rounded-full border-[1.5px] border-white/40 border-t-white" /> : <Check className="h-2.5 w-2.5" />}
+        </button>
+      )}
+    </span>
+  );
+}
+
+/** Enter saves a dirty field; the cell inputs below share it. */
+function saveOnEnter(dirty: boolean, onSave: () => void) {
+  return (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && dirty) {
+      e.preventDefault();
+      onSave();
+    }
+  };
+}
+
 export function NumCell({
   value,
   label,
   step,
   title,
+  dirty,
+  saving,
+  onSave,
   onChange,
 }: {
   value: number;
   label: string;
   step?: string;
   title?: string;
+  dirty: boolean;
+  saving: boolean;
+  onSave: () => void;
   onChange: (value: number) => void;
 }) {
+  const { canEdit } = useInventoryAccess();
   return (
     <td className={`${CELL_CLASS} text-right`} title={title}>
-      <input
-        type="number"
-        min={0}
-        step={step}
-        value={value}
-        onChange={(e) => onChange(Math.max(0, Number(e.target.value) || 0))}
-        aria-label={label}
-        className={`w-14 text-right tabular-nums ${INPUT_BASE}`}
-      />
+      <div className="flex items-center justify-end gap-[2px]">
+        <input
+          type="number"
+          min={0}
+          step={step}
+          value={value}
+          onChange={(e) => onChange(Math.max(0, Number(e.target.value) || 0))}
+          onKeyDown={saveOnEnter(dirty, onSave)}
+          readOnly={!canEdit}
+          aria-label={label}
+          className={`w-14 pr-[5px] text-right tabular-nums ${INPUT_BASE}`}
+        />
+        <CellSave show={dirty} saving={saving} label={`Save ${label}`} onSave={onSave} />
+      </div>
     </td>
   );
 }
@@ -103,18 +149,50 @@ export function VariantTitleCell({ colour, size }: { colour: string; size: strin
 export function SkuCell({
   sku,
   barcode,
+  skuDirty,
+  barcodeDirty,
+  savingField,
   onChangeSku,
   onChangeBarcode,
+  onSave,
 }: {
   sku: string | null;
   barcode: string | null;
+  skuDirty: boolean;
+  barcodeDirty: boolean;
+  /** Which of this row's inputs is mid-save, if any. */
+  savingField: string | null;
   onChangeSku: (value: string) => void;
   onChangeBarcode: (value: string) => void;
+  onSave: (field: 'sku' | 'barcode') => void;
 }) {
+  const { canEdit } = useInventoryAccess();
   return (
     <td className={CELL_CLASS}>
-      <input type="text" value={sku ?? ''} onChange={(e) => onChangeSku(e.target.value)} aria-label="SKU" className={`mb-[2px] block w-24 font-medium ${INPUT_BASE}`} />
-      <input type="text" value={barcode ?? ''} onChange={(e) => onChangeBarcode(e.target.value)} aria-label="Barcode" className={`block w-24 tabular-nums ${INPUT_BASE}`} />
+      <div className="mb-[2px] flex items-center gap-[2px]">
+        <input
+          type="text"
+          value={sku ?? ''}
+          onChange={(e) => onChangeSku(e.target.value)}
+          onKeyDown={saveOnEnter(skuDirty, () => onSave('sku'))}
+          readOnly={!canEdit}
+          aria-label="SKU"
+          className={`block w-24 font-medium ${INPUT_BASE}`}
+        />
+        <CellSave show={skuDirty} saving={savingField === 'sku'} label="Save SKU" onSave={() => onSave('sku')} />
+      </div>
+      <div className="flex items-center gap-[2px]">
+        <input
+          type="text"
+          value={barcode ?? ''}
+          onChange={(e) => onChangeBarcode(e.target.value)}
+          onKeyDown={saveOnEnter(barcodeDirty, () => onSave('barcode'))}
+          readOnly={!canEdit}
+          aria-label="Barcode"
+          className={`block w-24 tabular-nums ${INPUT_BASE}`}
+        />
+        <CellSave show={barcodeDirty} saving={savingField === 'barcode'} label="Save barcode" onSave={() => onSave('barcode')} />
+      </div>
     </td>
   );
 }

@@ -1,5 +1,6 @@
 import prisma from '@/lib/prisma.server';
 import { Prisma } from '@prisma/client';
+import { PoPaymentModel } from '@/models/po-payment.model.server';
 
 export type SupplierRow = {
   id: string;
@@ -9,11 +10,15 @@ export type SupplierRow = {
   description: string | null;
   productCount: number;
   purchaseOrderCount: number;
+  /** Purchase orders of this supplier that have a payment saved. */
+  paymentCount: number;
   createdAt: string;
   updatedAt: string;
 };
 
 export type SupplierOption = { id: string; name: string; poEmail: string };
+
+const paymentModel = new PoPaymentModel();
 
 export class SupplierModel {
   async list(params: { search?: string; page: number; pageSize: number }) {
@@ -39,7 +44,8 @@ export class SupplierModel {
       }),
     ]);
 
-    return { total, suppliers: rows.map(toSupplierRow) };
+    const paymentCounts = await paymentModel.countBySupplier();
+    return { total, suppliers: rows.map((r) => toSupplierRow(r, paymentCounts.get(r.id) ?? 0)) };
   }
 
   async findById(id: string): Promise<SupplierRow | null> {
@@ -54,7 +60,7 @@ export class SupplierModel {
         } 
       },
     });
-    return row ? toSupplierRow(row) : null;
+    return row ? toSupplierRow(row, (await paymentModel.countBySupplier()).get(id) ?? 0) : null;
   }
 
   async create(data: { name: string; contactEmail: string | null; poEmail: string; description: string | null }) {
@@ -62,7 +68,7 @@ export class SupplierModel {
       data,
       include: { _count: { select: { productLinks: true, purchaseOrders: true } } },
     });
-    return toSupplierRow(row);
+    return toSupplierRow(row, 0);
   }
 
   async update(id: string, data: { name?: string; contactEmail?: string | null; poEmail?: string; description?: string | null }) {
@@ -71,7 +77,7 @@ export class SupplierModel {
       data,
       include: { _count: { select: { productLinks: true, purchaseOrders: true } } },
     });
-    return toSupplierRow(row);
+    return toSupplierRow(row, (await paymentModel.countBySupplier()).get(id) ?? 0);
   }
 
   async delete(id: string) {
@@ -118,7 +124,7 @@ type SupplierWithCount = {
   _count: { productLinks: number; purchaseOrders: number };
 };
 
-function toSupplierRow(row: SupplierWithCount): SupplierRow {
+function toSupplierRow(row: SupplierWithCount, paymentCount: number): SupplierRow {
   return {
     id: row.id,
     name: row.name,
@@ -127,6 +133,7 @@ function toSupplierRow(row: SupplierWithCount): SupplierRow {
     description: row.description,
     productCount: row._count.productLinks,
     purchaseOrderCount: row._count.purchaseOrders,
+    paymentCount,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };

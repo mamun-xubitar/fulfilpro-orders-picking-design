@@ -891,17 +891,15 @@ model Supplier {
 }
 
 enum PurchaseOrderStatus {
-  DRAFT
   REQUESTED
-  CONFIRMED
   PARTIALLY_RECEIVED
   RECEIVED
   CANCELLED
 }
 
 model PurchaseOrder {
-  id                  String              @id @default(uuid())
-  number              Int                 @unique @default(autoincrement())
+  id                  String                @id @default(uuid())
+  number              Int                   @unique @default(autoincrement())
   /**
    * Supplier's or internal free-text reference. Optional; not unique.
    */
@@ -911,20 +909,30 @@ model PurchaseOrder {
   poEmail             String
   supplierProductId   String
   productTitle        String
-  status              PurchaseOrderStatus @default(REQUESTED)
+  status              PurchaseOrderStatus   @default(REQUESTED)
   deliveryDate        DateTime?
   poRemark            String?
   shippingRemark      String?
+  /**
+   * The product's "Pricing & margin" figures frozen when the PO was created — what the Pay modal
+   * seeds from before any payment exists. Null only on POs created before the snapshot existed.
+   */
+  pricingCurrencyCode String?
+  pricingExchangeRate Decimal?              @db.Decimal(14, 6)
+  pricingBuyingPrice  Decimal?              @db.Decimal(14, 2)
+  pricingFreight      Decimal?              @db.Decimal(14, 2)
+  pricingMisc         Decimal?              @db.Decimal(14, 2)
   createdById         String
   createdByName       String
   statusUpdatedById   String?
   statusUpdatedByName String?
   statusUpdatedAt     DateTime?
-  createdAt           DateTime            @default(now())
-  updatedAt           DateTime            @updatedAt
-  supplier            Supplier            @relation(fields: [supplierId], references: [id], onDelete: Restrict)
-  supplierProduct     SupplierProduct     @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  supplier            Supplier              @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  supplierProduct     SupplierProduct       @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
   items               PurchaseOrderItem[]
+  payment             PurchaseOrderPayment?
 
   @@index([supplierProductId, createdAt])
   @@index([supplierId])
@@ -945,6 +953,95 @@ model PurchaseOrderItem {
 
   @@unique([purchaseOrderId, variantId])
   @@index([purchaseOrderId])
+}
+
+enum PoPaymentStatus {
+  UNPAID
+  PAID
+}
+
+/**
+ * What was (or is to be) paid for one purchase order — one row per PO, edited in place. The
+ * cost breakdown mirrors the product's "Pricing & margin (AUD)" panel: the currency the goods were
+ * bought in, its rate to AUD, the per-unit buying price in that currency, and freight / misc in AUD.
+ * Every save also appends a snapshot to `PurchaseOrderPaymentHistory`.
+ */
+model PurchaseOrderPayment {
+  id              String                        @id @default(uuid())
+  purchaseOrderId String                        @unique
+  status          PoPaymentStatus               @default(UNPAID)
+  currencyCode    String
+  exchangeRate    Decimal                       @db.Decimal(14, 6)
+  /// Per-unit buying price, in `currencyCode`.
+  buyingPrice     Decimal                       @db.Decimal(14, 2)
+  /// AUD.
+  freight         Decimal                       @default(0) @db.Decimal(14, 2)
+  /// AUD.
+  misc            Decimal                       @default(0) @db.Decimal(14, 2)
+  /// Whole-order landed cost in AUD: qty × buyingPrice × rate + freight + misc.
+  totalAud        Decimal                       @db.Decimal(14, 2)
+  paidAt          DateTime?
+  reference       String?
+  remark          String?
+  createdById     String
+  createdByName   String
+  updatedById     String
+  updatedByName   String
+  createdAt       DateTime                      @default(now())
+  updatedAt       DateTime                      @updatedAt
+  purchaseOrder   PurchaseOrder                 @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  history         PurchaseOrderPaymentHistory[]
+
+  @@index([status])
+}
+
+model PurchaseOrderPaymentHistory {
+  id           String               @id @default(uuid())
+  paymentId    String
+  /// created | updated | paid | unpaid
+  action       String
+  status       PoPaymentStatus
+  currencyCode String
+  exchangeRate Decimal              @db.Decimal(14, 6)
+  buyingPrice  Decimal              @db.Decimal(14, 2)
+  freight      Decimal              @db.Decimal(14, 2)
+  misc         Decimal              @db.Decimal(14, 2)
+  totalAud     Decimal              @db.Decimal(14, 2)
+  paidAt       DateTime?
+  reference    String?
+  remark       String?
+  actorId      String
+  actorName    String
+  createdAt    DateTime             @default(now())
+  payment      PurchaseOrderPayment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([paymentId, createdAt])
+  @@index([createdAt])
+}
+
+/**
+ * A physical place variants are kept (a shelf, bin, rack). Tags only — a variant belongs to any
+ * number of locations and its single stock-on-hand is not split between them.
+ */
+model InventoryLocation {
+  id             String                           @id @default(uuid())
+  name           String                           @unique
+  description    String?
+  variants       SupplierProductVariantLocation[]
+  stocktakeItems StocktakeItem[]
+  createdAt      DateTime                         @default(now())
+  updatedAt      DateTime                         @updatedAt
+}
+
+model SupplierProductVariantLocation {
+  variantId  String
+  locationId String
+  createdAt  DateTime               @default(now())
+  variant    SupplierProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  location   InventoryLocation      @relation(fields: [locationId], references: [id], onDelete: Restrict)
+
+  @@id([variantId, locationId])
+  @@index([locationId])
 }
 
 enum SupplierProductStatus {
@@ -1025,38 +1122,39 @@ model SupplierProductSupplier {
 }
 
 model SupplierProductVariant {
-  id                 String                        @id @default(uuid())
+  id                 String                           @id @default(uuid())
   supplierProductId  String
   sku                String?
   barcode            String?
   colour             String
   size               String
-  stockOnHand        Int                           @default(0)
+  stockOnHand        Int                              @default(0)
   /**
    * Committed to unfulfilled orders. Manually editable; wins over the order-derived figure shown as a hint.
    */
-  allocated          Int                           @default(0)
-  buyPrice           Decimal                       @default(0) @db.Decimal(14, 2)
-  sellPrice          Decimal                       @default(0) @db.Decimal(14, 2)
-  trigger            Int                           @default(10)
+  allocated          Int                              @default(0)
+  buyPrice           Decimal                          @default(0) @db.Decimal(14, 2)
+  sellPrice          Decimal                          @default(0) @db.Decimal(14, 2)
+  trigger            Int                              @default(10)
   /**
    * Unused by the UI — kept for backward compatibility with existing rows.
    */
-  forwardOrders      Int                           @default(0)
-  position           Int                           @default(0)
+  forwardOrders      Int                              @default(0)
+  position           Int                              @default(0)
   /**
    * One image from the product's pool, Shopify-style — several variants may point at the same image.
    */
   imageId            String?
-  image              SupplierProductImage?         @relation(fields: [imageId], references: [id], onDelete: SetNull)
-  supplierProduct    SupplierProduct               @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
+  image              SupplierProductImage?            @relation(fields: [imageId], references: [id], onDelete: SetNull)
+  supplierProduct    SupplierProduct                  @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
   purchaseOrderItems PurchaseOrderItem[]
+  locations          SupplierProductVariantLocation[]
   stocktakeItems     StocktakeItem[]
   adjustments        StockAdjustment[]
   storeVariants      SupplierProductStoreVariant[]
   allocations        InventoryAllocation[]
-  createdAt          DateTime                      @default(now())
-  updatedAt          DateTime                      @updatedAt
+  createdAt          DateTime                         @default(now())
+  updatedAt          DateTime                         @updatedAt
 
   @@unique([supplierProductId, colour, size])
   @@index([supplierProductId])
@@ -1100,18 +1198,35 @@ model SupplierProductPricing {
   updatedAt         DateTime        @updatedAt
 }
 
+/**
+ * OPEN: created, not every line counted yet. COUNTED: every line has a count, waiting for an admin
+ * to sync. COMPLETED: synced into stock on hand.
+ */
 enum StocktakeStatus {
   OPEN
+  COUNTED
   COMPLETED
   CANCELLED
 }
 
 model Stocktake {
   id                String          @id @default(uuid())
+  /**
+   * Human reference, shown as ST-0001.
+   */
+  number            Int             @unique @default(autoincrement())
   supplierProductId String
   status            StocktakeStatus @default(OPEN)
   startedById       String
   startedByName     String
+  countedById       String?
+  countedByName     String?
+  countedAt         DateTime?
+  syncedById        String?
+  syncedByName      String?
+  /**
+   * When the counts were synced into stock on hand.
+   */
   completedAt       DateTime?
   supplierProduct   SupplierProduct @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
   items             StocktakeItem[]
@@ -1119,19 +1234,32 @@ model Stocktake {
   updatedAt         DateTime        @updatedAt
 
   @@index([supplierProductId, createdAt])
+  @@index([status, createdAt])
 }
 
+/**
+ * One counting line: a variant at one of its locations (or the lone line of a variant with no
+ * location). expectedQty is the variant's stock on hand when the stocktake was created — the same
+ * on every line of that variant, since stock is not split between locations.
+ */
 model StocktakeItem {
-  id          String                 @id @default(uuid())
-  stocktakeId String
-  variantId   String
-  expectedQty Int
-  countedQty  Int?
-  stocktake   Stocktake              @relation(fields: [stocktakeId], references: [id], onDelete: Cascade)
-  variant     SupplierProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  id           String                 @id @default(uuid())
+  stocktakeId  String
+  variantId    String
+  locationId   String?
+  /**
+   * Snapshot so the sheet still reads right after a location is renamed or deleted.
+   */
+  locationName String?
+  expectedQty  Int
+  countedQty   Int?
+  stocktake    Stocktake              @relation(fields: [stocktakeId], references: [id], onDelete: Cascade)
+  variant      SupplierProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  location     InventoryLocation?     @relation(fields: [locationId], references: [id], onDelete: SetNull)
 
   @@index([stocktakeId])
   @@index([variantId])
+  @@index([locationId])
 }
 
 enum StockAdjustmentReason {

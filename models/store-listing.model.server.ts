@@ -130,4 +130,13 @@ export class StoreListingModel {
       )
     );
   }
+
+  /** Drops the mapping rows for Shopify variants deleted straight from the differences modal, so a
+   * later publish never resends a dead variantGid. */
+  async deleteVariantMappingsByGid(supplierProductId: string, storeId: string, variantGids: string[]) {
+    if (variantGids.length === 0) return;
+    const listing = await prisma.supplierProductStoreListing.findUnique({ where: { supplierProductId_storeId: { supplierProductId, storeId } } });
+    if (!listing) return;
+    await prisma.supplierProductStoreVariant.deleteMany({ where: { listingId: listing.id, variantGid: { in: variantGids } } });
+  }
 }

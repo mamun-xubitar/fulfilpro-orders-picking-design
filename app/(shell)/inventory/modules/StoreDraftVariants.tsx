@@ -143,7 +143,7 @@ export default function StoreDraftVariants({
                           value={draft.variantStock[v.id] ?? String(defaultStock[v.id] ?? 0)}
                           onChange={(e) => setStock(v.id, e.target.value)}
                           aria-label={`Available stock for ${v.colour} / ${v.size} at ${storeName}`}
-                          className="h-[22px] w-20 rounded-[6px] border border-inventory-border-strong px-[6px] text-right text-[11px] leading-none tabular-nums outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring"
+                          className="h-[22px] w-20 rounded-[6px] border border-inventory-border-strong pl-[6px] pr-[10px] text-right text-[11px] leading-none tabular-nums outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring"
                         />
                         <span className="ml-1 text-[10px] text-inventory-text-subtle">/ {Math.max(0, v.stockOnHand - v.allocated)}</span>
                       </td>
@@ -169,7 +169,7 @@ export default function StoreDraftVariants({
                         value={draft.variantPrices[v.id] ?? String(v.sellPrice)}
                         onChange={(e) => setPrice(v.id, e.target.value)}
                         aria-label={`Price for ${v.colour} / ${v.size} at ${storeName}`}
-                        className="h-[22px] w-24 rounded-[6px] border border-inventory-border-strong px-[6px] text-right text-[11px] leading-none tabular-nums outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring"
+                        className="h-[22px] w-24 rounded-[6px] border border-inventory-border-strong pl-[6px] pr-[10px] text-right text-[11px] leading-none tabular-nums outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring"
                       />
                     </td>
                   )}

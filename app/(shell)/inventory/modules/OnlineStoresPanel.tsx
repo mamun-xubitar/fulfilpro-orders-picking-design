@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { useInventoryAccess } from './InventoryAccess';
 import { BTN_XS, BTN_ROW, PANEL_MAX_H, PanelHeading, panelBorderClass } from './MainImagePanel';
 import StoreCard from './StoreCard';
 import StoreConnectCard from './StoreConnectCard';
@@ -36,6 +37,7 @@ export default function OnlineStoresPanel({
   product,
 }: OnlineStoresPanelProps) {
   const { listings, loading, syncing, sync } = storeListings;
+  const { canEdit } = useInventoryAccess();
   const listed = listings.filter((l) => l.found);
   const unlisted = listings.filter((l) => !l.found);
   const listedIds = listed.map((l) => l.storeId);
@@ -56,19 +58,21 @@ export default function OnlineStoresPanel({
         title="Online stores"
         meta={`${listed.length}/${listings.length}`}
         action={
-          <button
-            type="button"
-            onClick={onOpenPublish}
-            aria-label="Publish to a store"
-            title="Publish to a store"
-            className="flex h-[16px] w-[16px] items-center justify-center rounded-full bg-inventory-primary text-white transition-colors duration-150 hover:bg-inventory-primary-hover cursor-pointer"
-          >
-            <Plus className="h-2.5 w-2.5" />
-          </button>
+          canEdit ? (
+            <button
+              type="button"
+              onClick={onOpenPublish}
+              aria-label="Publish to a store"
+              title="Publish to a store"
+              className="flex h-[16px] w-[16px] items-center justify-center rounded-full bg-inventory-primary text-white transition-colors duration-150 hover:bg-inventory-primary-hover cursor-pointer"
+            >
+              <Plus className="h-2.5 w-2.5" />
+            </button>
+          ) : undefined
         }
       />
 
-      {listed.length > 0 && (
+      {canEdit && listed.length > 0 && (
         <div className="flex items-center justify-between gap-2 border-b border-inventory-divider px-[8px] py-[3px]">
           <label className="flex cursor-pointer items-center gap-[5px] text-[10px] font-medium leading-none text-inventory-text-muted">
             <input
@@ -112,19 +116,21 @@ export default function OnlineStoresPanel({
                 />
               ) : null
             )}
-            {unlisted.map((listing) => (
+            {canEdit && unlisted.map((listing) => (
               <StoreConnectCard key={listing.storeId} listing={listing} onConnect={() => onConnect(listing.storeId)} />
             ))}
           </>
         )}
       </div>
 
-      <div className={BTN_ROW}>
-        <button type="button" onClick={sync} disabled={syncing} aria-label="Sync store listings" title="Sync store listings" className={`flex-1 ${BTN_XS}`}>
-          <Refresh className={`h-3 w-3 ${syncing ? 'animate-spin' : ''}`} />
-          {syncing ? 'Syncing…' : 'Sync listings'}
-        </button>
-      </div>
+      {canEdit && (
+        <div className={BTN_ROW}>
+          <button type="button" onClick={sync} disabled={syncing} aria-label="Sync store listings" title="Sync store listings" className={`flex-1 ${BTN_XS}`}>
+            <Refresh className={`h-3 w-3 ${syncing ? 'animate-spin' : ''}`} />
+            {syncing ? 'Syncing…' : 'Sync listings'}
+          </button>
+        </div>
+      )}
     </section>
   );
 }

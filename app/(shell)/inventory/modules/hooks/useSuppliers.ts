@@ -12,6 +12,7 @@ export type SupplierRow = {
   description: string | null;
   productCount: number;
   purchaseOrderCount: number;
+  paymentCount: number;
   createdAt: string;
   updatedAt: string;
 };

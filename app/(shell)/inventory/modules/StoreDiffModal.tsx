@@ -6,7 +6,10 @@ import CategoryPicker from './CategoryPicker';
 import ClampedHtml from './ClampedHtml';
 import ProductStatusSelect from './ProductStatusSelect';
 import StoreDiffFieldRow, { StoreValuePreview } from './StoreDiffFieldRow';
-import StoreDiffImagesRow from './StoreDiffImagesRow';
+import StoreActionConfirmDialog from './StoreActionConfirmDialog';
+import StoreDiffImagesSection from './StoreDiffImagesSection';
+import StoreImagePickerModal from './StoreImagePickerModal';
+import StoreImageUploadModal from './StoreImageUploadModal';
 import StoreDiffVariantsSummary from './StoreDiffVariantsSummary';
 import StoreDiffVariantsTable from './StoreDiffVariantsTable';
 import { useStoreDiff } from './hooks/useStoreDiff';
@@ -29,26 +32,27 @@ type StoreDiffModalProps = {
  */
 export default function StoreDiffModal({ product, listing, storeListings, onClose }: StoreDiffModalProps) {
   const d = useStoreDiff({ product, listing, storeListings });
-  const hasVariantDiffs = d.diff.variants.length > 0;
 
-  if (d.diff.total === 0) {
+  // Nothing to show only when the product isn't on the store at all; an in-sync listing still opens
+  // so its images and variants can be edited directly.
+  if (!listing.found) {
     return (
-      <ModalShell title={`${listing.storeName} — In sync`} onClose={onClose} compact>
+      <ModalShell title={`${listing.storeName} — Not published`} onClose={onClose} compact>
         <div className="p-6 text-center">
-          <p className="text-[12px] text-inventory-text-muted">
-            No differences found — this listing already matches the system product.
-          </p>
+          <p className="text-[12px] text-inventory-text-muted">This product is not on the store yet.</p>
         </div>
       </ModalShell>
     );
   }
 
   return (
+    <>
     <ModalShell
-      title={`${listing.storeName} — ${d.diff.total} difference${d.diff.total === 1 ? '' : 's'}`}
+      title={d.diff.total === 0 ? `${listing.storeName} — In sync` : `${listing.storeName} — ${d.diff.total} difference${d.diff.total === 1 ? '' : 's'}`}
       onClose={onClose}
       extraWide
       compact
+      disableBackdropClose
       footer={
         d.confirmOpen ? (
           <ConfirmVariantsSave onCancel={d.cancelConfirm} onConfirm={d.confirmSave} saving={d.savingKey === 'variants' || d.savingKey === 'all'} />
@@ -67,6 +71,11 @@ export default function StoreDiffModal({ product, listing, storeListings, onClos
       }
     >
       <div className="space-y-[10px] p-[10px]">
+        {d.diff.total === 0 && (
+          <p className="rounded-[8px] border border-inventory-success/35 bg-inventory-success/[8%] px-[8px] py-[6px] text-[11px] text-inventory-success-hover">
+            Every field matches the system product. You can still edit images and variants directly below.
+          </p>
+        )}
         {d.diff.fields.length > 0 && (
           <section className="space-y-[6px]">
             <h4 className="text-[9.5px] font-bold uppercase tracking-[0.4px] text-inventory-text-subtle">Product details</h4>
@@ -126,27 +135,19 @@ export default function StoreDiffModal({ product, listing, storeListings, onClos
           </section>
         )}
 
-        {d.diff.images && (
-          <section className="space-y-[6px]">
-            <StoreDiffImagesRow
-              diff={d.diff.images}
-              systemImages={product.images}
-              storeImages={listing.images}
-              onSave={d.saveImages}
-              saving={d.savingKey === 'images'}
-            />
-          </section>
-        )}
+        <section className="space-y-[6px]">
+          <StoreDiffImagesSection product={product} listing={d.liveListing} rows={d.diff.rows} actions={d.images} savingKey={d.savingKey} />
+        </section>
 
-        {hasVariantDiffs && (
+        {d.diff.rows.length > 0 && (
           <section className="space-y-[6px]">
             <StoreDiffVariantsTable
               rows={d.diff.rows}
               systemImages={product.images}
               storeImages={listing.images}
               stockDefaults={d.stockDefaults}
-              edits={d.edits}
-              setEdit={d.setEdit}
+              actions={d.variantActions}
+              savingKey={d.savingKey}
               onSave={d.saveVariants}
               saving={d.savingKey === 'variants'}
             />
@@ -155,6 +156,19 @@ export default function StoreDiffModal({ product, listing, storeListings, onClos
         )}
       </div>
     </ModalShell>
+    {d.images.picker?.mode === 'add' && (
+      <StoreImagePickerModal
+        systemImages={product.images}
+        saving={d.savingKey === 'images:add'}
+        onSubmit={d.images.submitAdd}
+        onClose={d.images.closePicker}
+      />
+    )}
+    {d.images.picker?.mode === 'upload' && (
+      <StoreImageUploadModal image={d.images.picker.image} saving={false} onSubmit={d.images.submitUpload} onClose={d.images.closePicker} />
+    )}
+    <StoreActionConfirmDialog confirm={d.confirm} />
+    </>
   );
 }
 

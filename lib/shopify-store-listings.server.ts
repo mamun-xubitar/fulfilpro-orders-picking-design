@@ -16,6 +16,8 @@ export type StoreListingVariant = {
   /** This store's live MediaImage id for the variant, if one is assigned — lets the publish/
    * bulk-update modals prefill their per-variant image picker from what's actually on Shopify. */
   imageId: string | null;
+  /** The variant's inventory item gid — needed to set its Available quantity directly. */
+  inventoryItemId: string | null;
 };
 
 export type StoreListingCollection = { id: string; title: string; handle: string; automated: boolean };
@@ -62,6 +64,7 @@ type ShopifyProductVariantByHandleNode = {
   inventoryQuantity: number | null;
   selectedOptions: { name: string; value: string }[];
   media: { nodes: { id: string }[] };
+  inventoryItem?: { id: string } | null;
 };
 
 type ShopifyCollectionNode = { id: string; title: string; handle: string; ruleSet: { appliedDisjunctively: boolean } | null };
@@ -115,6 +118,7 @@ const PRODUCT_BY_HANDLE_QUERY = `
           inventoryQuantity
           selectedOptions { name value }
           media(first: 1) { nodes { id } }
+          inventoryItem { id }
         }
       }
       collections(first: 50) {
@@ -156,6 +160,7 @@ const PRODUCT_BY_ID_QUERY = `
             inventoryQuantity
             selectedOptions { name value }
             media(first: 1) { nodes { id } }
+          inventoryItem { id }
           }
         }
         collections(first: 50) {
@@ -184,6 +189,7 @@ const PRODUCT_VARIANTS_BULK_UPDATE_MUTATION = `
         inventoryQuantity
         selectedOptions { name value }
         media(first: 1) { nodes { id } }
+          inventoryItem { id }
       }
       userErrors {
         field
@@ -205,6 +211,7 @@ function toVariant(node: ShopifyProductVariantByHandleNode): StoreListingVariant
     optionValues: node.selectedOptions.map((o) => o.value),
     inventoryQuantity: node.inventoryQuantity,
     imageId: node.media.nodes[0]?.id ?? null,
+    inventoryItemId: node.inventoryItem?.id ?? null,
   };
 }
 

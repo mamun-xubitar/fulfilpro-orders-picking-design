@@ -299,7 +299,7 @@ export async function createApp(
               redirect_url_allowlist: [`${appUrl.replace(/\/$/, '')}/api/shopify-auth-callback`],
               scopes:
                 process.env.SHOPIFY_SCOPES ||
-                'read_products,write_products,read_orders,write_orders,read_fulfillments,write_fulfillments,read_merchant_managed_fulfillment_orders,write_merchant_managed_fulfillment_orders,read_inventory,write_inventory,read_locations,write_locations,read_customers',
+                'read_products,write_products,read_orders,write_orders,read_fulfillments,write_fulfillments,read_merchant_managed_fulfillment_orders,write_merchant_managed_fulfillment_orders,read_inventory,write_inventory,read_locations,write_locations,read_customers,read_files,write_files',
             },
           },
         ],
@@ -470,7 +470,7 @@ export async function updateAppScopes(
           redirect_url_allowlist: [`${appUrl.replace(/\/$/, '')}/api/shopify-auth-callback`],
           scopes:
             process.env.SHOPIFY_SCOPES ? [...process.env.SHOPIFY_SCOPES.split(","), ...(process.env.EXTRA_SCOPES || "").split(",")].join(",") :
-            'read_products,write_products,read_orders,write_orders,read_fulfillments,write_fulfillments,read_merchant_managed_fulfillment_orders,write_merchant_managed_fulfillment_orders,read_inventory,write_inventory,read_locations,write_locations,read_customers,read_all_orders',
+            'read_products,write_products,read_orders,write_orders,read_fulfillments,write_fulfillments,read_merchant_managed_fulfillment_orders,write_merchant_managed_fulfillment_orders,read_inventory,write_inventory,read_locations,write_locations,read_customers,read_all_orders,read_files,write_files',
         },
       },
     ],

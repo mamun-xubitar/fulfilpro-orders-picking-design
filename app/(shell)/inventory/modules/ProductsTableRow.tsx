@@ -2,6 +2,7 @@
 
 import { truncate } from '@/lib/utils/common';
 import { PRODUCT_STATUS_BADGES } from './constants';
+import { useInventoryAccess } from './InventoryAccess';
 import { VerifiedBadge } from './ProductFieldsPanel';
 import { Eye, Trash } from './icons';
 import { availableStockOf, stockValueOf, totalStockOf } from './hooks/useProductsTable';
@@ -18,6 +19,7 @@ type ProductsTableRowProps = {
 };
 
 export default function ProductsTableRow({ product, selected, onToggleSelect, onView, onRequestDelete, onToggleOmit }: ProductsTableRowProps) {
+  const { canEdit } = useInventoryAccess();
   const badge = PRODUCT_STATUS_BADGES[product.status] ?? PRODUCT_STATUS_BADGES.DRAFT;
 
   return (
@@ -80,15 +82,19 @@ export default function ProductsTableRow({ product, selected, onToggleSelect, on
           >
             <Eye className="h-3 w-3" />
           </button>
-          <button
-            type="button"
-            title="Delete product"
-            onClick={() => onRequestDelete(product.id, product.name)}
-            className="flex h-[22px] w-[22px] items-center justify-center rounded-[6px] text-inventory-text-subtle transition-colors duration-150 hover:bg-inventory-danger/10 hover:text-inventory-danger-hover cursor-pointer"
-          >
-            <Trash className="h-3 w-3" />
-          </button>
-          <OmitSwitch omitted={product.omitted} onChange={(next) => onToggleOmit(product.id, next)} />
+          {canEdit && (
+            <>
+              <button
+                type="button"
+                title="Delete product"
+                onClick={() => onRequestDelete(product.id, product.name)}
+                className="flex h-[22px] w-[22px] items-center justify-center rounded-[6px] text-inventory-text-subtle transition-colors duration-150 hover:bg-inventory-danger/10 hover:text-inventory-danger-hover cursor-pointer"
+              >
+                <Trash className="h-3 w-3" />
+              </button>
+              <OmitSwitch omitted={product.omitted} onChange={(next) => onToggleOmit(product.id, next)} />
+            </>
+          )}
         </div>
       </td>
     </tr>

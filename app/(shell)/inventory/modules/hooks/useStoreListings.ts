@@ -52,7 +52,7 @@ export function useStoreListings(productId: string | null) {
 
   const loading = fetching && !!productId;
 
-  const sync = async () => {
+  const runSync = async (silent: boolean) => {
     if (!productId) return;
     setSyncing(true);
     try {
@@ -60,13 +60,17 @@ export function useStoreListings(productId: string | null) {
       const json = (await res.json()) as ApiEnvelope<{ listings: StoreListingResult[] }>;
       if (!res.ok || !json.success) throw new Error(json.message || 'Failed to sync store listings');
       setListings(json.data!.listings);
-      toast.success('Store listings synced');
+      if (!silent) toast.success('Store listings synced');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to sync store listings');
     } finally {
       setSyncing(false);
     }
   };
+
+  const sync = () => runSync(false);
+  /** Same refresh without the success toast — for callers that already toasted their own result. */
+  const syncQuiet = () => runSync(true);
 
   const savePrices = async (storeId: string, productGid: string, variants: { id: string; price: number }[]): Promise<boolean> => {
     if (!productId) return false;
@@ -144,7 +148,7 @@ export function useStoreListings(productId: string | null) {
     }
   };
 
-  return { listings, loading, syncing, savingStoreId, sync, savePrices, setMargin };
+  return { listings, loading, syncing, savingStoreId, sync, syncQuiet, savePrices, setMargin };
 }
 
 export type StoreListingsState = ReturnType<typeof useStoreListings>;

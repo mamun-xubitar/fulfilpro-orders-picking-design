@@ -3,6 +3,7 @@
 import { ModalShell } from '@/components/ModalShell';
 import { storePriceFromMargin } from '@/lib/inventory/store-price';
 import { Pencil } from './icons';
+import { useInventoryAccess } from './InventoryAccess';
 import { WIZARD_BODY_CLASS, WIZARD_BTN_SECONDARY, WIZARD_CARD_CLASS } from './modalStyles';
 import { isPublished } from './storeDraft';
 import type { PricingForm, StoreListingResult } from './types';
@@ -25,6 +26,7 @@ type StoreMarginViewModalProps = {
  * (the panel's "+" button), never here.
  */
 export default function StoreMarginViewModal({ listings, savedForm, values, onEditPrice, onClose }: StoreMarginViewModalProps) {
+  const { canEdit } = useInventoryAccess();
   const pricing = pricingFormToInputs(savedForm);
   const overridden = listings.filter((l) => values[l.storeId] != null);
 
@@ -58,7 +60,7 @@ export default function StoreMarginViewModal({ listings, savedForm, values, onEd
                     </span>
                     <span className="shrink-0 text-[11px] font-bold leading-none tabular-nums text-inventory-text">{margin}%</span>
                   </div>
-                  {published ? (
+                  {published && canEdit ? (
                     <button
                       type="button"
                       onClick={() => onEditPrice(l)}

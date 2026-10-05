@@ -4,8 +4,9 @@ import { useState } from 'react';
 import ColourSizeModal from './colourSize/ColourSizeModal';
 import { STATUS_LEGEND } from './constants';
 import type { InventoryPage } from './hooks/useInventoryPage';
-import { Adjust, Expand, Plus, Trash } from './icons';
-import { BTN_XS } from './MainImagePanel';
+import { Adjust, Expand, MapPin, Plus, Trash } from './icons';
+import { useInventoryAccess } from './InventoryAccess';
+import { BTN_XS, ICONBTN_XS } from './MainImagePanel';
 import VariantSizeDropdown from './VariantSizeDropdown';
 
 type VariantsMatrixToolbarProps = {
@@ -16,6 +17,7 @@ type VariantsMatrixToolbarProps = {
 };
 
 export default function VariantsMatrixToolbar({ p, fullView }: VariantsMatrixToolbarProps) {
+  const { canEdit } = useInventoryAccess();
   const { matrix } = p;
   const [colourSizeOpen, setColourSizeOpen] = useState(false);
 
@@ -41,13 +43,21 @@ export default function VariantsMatrixToolbar({ p, fullView }: VariantsMatrixToo
       {/* Full view has its own exit via the modal's own close (×) — no separate "exit" action
           needed here once inside it. */}
       {!fullView && (
-        <button type="button" onClick={p.openMatrixFullView} className={BTN_XS}>
+        <button type="button" onClick={p.openMatrixFullView} title="Full view" aria-label="Full view" className={ICONBTN_XS}>
           <Expand className="h-3 w-3" />
-          Full view
         </button>
       )}
 
       <span className="mx-[2px] h-[18px] w-px bg-inventory-border" aria-hidden="true" />
+
+      <input
+        type="search"
+        value={matrix.search}
+        onChange={(e) => matrix.setSearch(e.target.value)}
+        placeholder="Search SKU, barcode, colour, size…"
+        aria-label="Search variants"
+        className="h-[22px] w-[210px] rounded-[7px] border border-inventory-border-strong bg-inventory-surface px-[7px] text-[10.5px] leading-none outline-none placeholder:text-inventory-text-subtle focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring"
+      />
 
       <VariantSizeDropdown size={matrix.sizeFilter} />
 
@@ -95,6 +105,8 @@ export default function VariantsMatrixToolbar({ p, fullView }: VariantsMatrixToo
           Apply to selected colours
         </button>
         */}
+        {canEdit && (
+          <>
         <button
           type="button"
           onClick={adjustSelected}
@@ -107,13 +119,25 @@ export default function VariantsMatrixToolbar({ p, fullView }: VariantsMatrixToo
         </button>
         <button
           type="button"
+          onClick={p.bulkLocations.openModal}
+          disabled={matrix.selectedIds.size === 0}
+          title="Sets the locations of the selected variants"
+          aria-label="Set locations"
+          className="flex h-[22px] items-center gap-1 rounded-[6px] border border-inventory-border-strong bg-inventory-surface px-[6px] text-[10px] font-bold leading-none text-inventory-text-muted transition-colors duration-150 hover:bg-inventory-surface-hover disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+        >
+          <MapPin className="h-3 w-3" />
+          {matrix.selectedIds.size > 0 ? `(${matrix.selectedIds.size})` : ''}
+        </button>
+        <button
+          type="button"
           onClick={matrix.requestBulkDelete}
           disabled={matrix.selectedIds.size === 0}
           title="Deletes the selected variants"
+          aria-label="Delete selected variants"
           className="flex h-[22px] items-center gap-1 rounded-[6px] border border-inventory-danger/30 bg-inventory-danger/10 px-[6px] text-[10px] font-bold leading-none text-inventory-danger transition-colors duration-150 hover:bg-inventory-danger/15 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
         >
           <Trash className="h-3 w-3" />
-          Delete{matrix.selectedIds.size > 0 ? ` (${matrix.selectedIds.size})` : ''}
+          {matrix.selectedIds.size > 0 ? `(${matrix.selectedIds.size})` : ''}
         </button>
         <button
           type="button"
@@ -123,7 +147,7 @@ export default function VariantsMatrixToolbar({ p, fullView }: VariantsMatrixToo
           className="flex h-[22px] items-center gap-1 rounded-[6px] bg-inventory-success px-[6px] text-[10px] font-bold leading-none text-white transition-colors duration-150 hover:bg-inventory-success-hover disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
         >
           <Plus className="h-3 w-3" />
-          Create PO
+          PO
         </button>
 
         <span className="mx-[2px] h-[18px] w-px bg-inventory-border" aria-hidden="true" />
@@ -132,6 +156,8 @@ export default function VariantsMatrixToolbar({ p, fullView }: VariantsMatrixToo
           <Plus className="h-3 w-3" />
           Colour / size
         </SecondaryButton>
+          </>
+        )}
       </div>
 
       {colourSizeOpen && p.product && (

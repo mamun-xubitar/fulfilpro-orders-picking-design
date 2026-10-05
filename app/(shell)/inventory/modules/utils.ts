@@ -71,7 +71,13 @@ export function computeVariant(v: VariantRow): VariantComputed {
 /** The variant fields the matrix lets an admin edit directly. Computed cells (available,
  * stockValue, status, incoming) and read-only ones (buyPrice, allocatedFromOrders) are
  * deliberately absent — they're never part of a draft. */
-const VARIANT_DRAFT_FIELDS = ['sku', 'barcode', 'colour', 'size', 'stockOnHand', 'allocated', 'trigger', 'sellPrice'] as const;
+const VARIANT_DRAFT_FIELDS = ['sku', 'barcode', 'colour', 'size', 'stockOnHand', 'allocated', 'trigger', 'sellPrice', 'locations'] as const;
+
+/** A draft diff as the variant PATCH body — `locations` (objects, for display) travel as `locationIds`. */
+export function variantPatchBody(changes: Partial<VariantRow>): Record<string, unknown> {
+  const { locations, ...rest } = changes;
+  return locations ? { ...rest, locationIds: locations.map((l) => l.id) } : { ...rest };
+}
 
 /** The minimal diff between a draft and the server's row — the exact PATCH body to send, and
  * empty when the row is clean (a value typed then typed back to the original disarms Save,
@@ -86,7 +92,12 @@ export function variantDraftChanges(server: VariantRow, draft: Partial<VariantRo
     if (!(field in draft)) continue;
     const next = draft[field];
     if (next === undefined) continue;
-    if ((server[field] ?? '') === (next ?? '')) continue;
+    if (field === 'locations') {
+      // A set, compared by id: reordering or re-picking the same locations isn't a change.
+      const before = new Set(server.locations.map((l) => l.id));
+      const after = draft.locations ?? [];
+      if (before.size === after.length && after.every((l) => before.has(l.id))) continue;
+    } else if ((server[field] ?? '') === (next ?? '')) continue;
     (changed as Record<string, unknown>)[field] = next;
   }
   return changed;
@@ -600,41 +611,4 @@ export function buildPoEmail(po: PoEmailSource): { subject: string; body: string
 
 export function buildMailtoHref({ to, subject, body }: { to: string; subject: string; body: string }): string {
   return `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-}
-
-// — Stocktake count sheet —
-
-export function buildCountSheetDocument(product: ProductRecord, items: { colour: string; size: string; sku: string | null; expectedQty: number }[]): string {
-  return `
-  <!doctype html>
-  <html>
-    <head>
-      <title>Count sheet — ${escapeHtml(product.name)}</title>
-      <style>
-        * { box-sizing: border-box; }
-        body { margin: 0; padding: 24px; color: #111; background: #fff; font-family: Arial, Helvetica, sans-serif; font-size: 13px; }
-        h1 { font-size: 16px; margin: 0 0 4px; }
-        p { margin: 0 0 16px; color: #555; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #ddd; }
-        th { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: #555; border-bottom: 2px solid #111; }
-        @media print { @page { margin: 16mm; } }
-      </style>
-    </head>
-    <body>
-      <h1>Count sheet — ${escapeHtml(product.name)}</h1>
-      <p>${escapeHtml(product.itemNo)} · ${items.length} lines</p>
-      <table>
-        <thead><tr><th>Colour</th><th>Size</th><th>SKU</th><th>Expected</th><th>Counted</th></tr></thead>
-        <tbody>
-          ${items.map((i) => `<tr><td>${escapeHtml(i.colour)}</td><td>${escapeHtml(i.size)}</td><td>${escapeHtml(i.sku ?? '-')}</td><td>${i.expectedQty}</td><td></td></tr>`).join('')}
-        </tbody>
-      </table>
-    </body>
-  </html>
-`;
-}
-
-function escapeHtml(value: string): string {
-  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
