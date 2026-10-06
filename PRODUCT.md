@@ -90,7 +90,7 @@ The main workflows, one per shell route:
 ## Capabilities and Constraints
 
 - Next.js 16 App Router with Turbopack, React 19, TypeScript strict, Tailwind CSS v4,
-  PostgreSQL via Prisma 7. Architecture rules live in `PATTERN.md` and are binding.
+  PostgreSQL via Prisma 7. Architecture rules live in `ARCHITECTURE.md` and are binding.
 - Route handlers stay thin; business logic lives in `controllers/`, all DB access in
   `models/`. Client data fetching goes through the `useRequest` hook, with toast feedback.
 - Self-hosted, run under PM2 (`npm start` on port 9090) — not a Vercel deployment.

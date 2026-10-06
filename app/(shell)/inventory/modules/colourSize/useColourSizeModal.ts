@@ -89,7 +89,7 @@ type UseColourSizeModalArgs = {
 /**
  * Drives the Colour & size adjustment modal — the single entry point for adding/removing colours
  * and sizes and (re)generating a product's variants from them, replacing the old preset quick-add
- * modals and Product details' own colour/size fields. See PATTERN.md's three-move pattern; this
+ * modals and Product details' own colour/size fields. See ARCHITECTURE.md's three-move pattern; this
  * hook is the "state + handlers" layer for ColourSizeModal.tsx.
  */
 export function useColourSizeModal({ product, optionLibrary, locationOptions, onApplied, onClose }: UseColourSizeModalArgs) {

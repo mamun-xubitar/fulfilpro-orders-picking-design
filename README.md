@@ -16,7 +16,7 @@ app.
 
 > Product model, roles, and principles: [PRODUCT.md](PRODUCT.md) ·
 > Visual design system: [DESIGN.md](DESIGN.md) ·
-> Code architecture (binding): [PATTERN.md](PATTERN.md)
+> Code architecture (binding): [ARCHITECTURE.md](ARCHITECTURE.md)
 
 ---
 
@@ -209,7 +209,7 @@ proxy.ts                Role → allowed route gate
 
 ## Conventions & quality gates
 
-- **Layering is binding** ([PATTERN.md](PATTERN.md)). Route handlers call controllers and return
+- **Layering is binding** ([ARCHITECTURE.md](ARCHITECTURE.md)). Route handlers call controllers and return
   `apiSuccess` / `apiError`. Controllers hold the logic and return plain objects. Models are the
   only place Prisma is called. Pages are thin and render `modules/index.tsx`, and client fetching
   goes through `useRequest`.
@@ -233,6 +233,7 @@ npm run lint
 |---|---|
 | [PRODUCT.md](PRODUCT.md) | Users and roles, product purpose, workflows, terminology, product principles |
 | [DESIGN.md](DESIGN.md) | Visual design system — colors, type, layout, components, the two UI skins |
-| [PATTERN.md](PATTERN.md) | Backend/frontend architecture rules, naming, the module decomposition pattern |
-| [CLAUDE.md](CLAUDE.md) / [AGENTS.md](AGENTS.md) | Guidance for AI coding agents working in this repo |
-| [INSTRUCTIONS.md](INSTRUCTIONS.md) | Behavioral guidelines for code changes |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | System overview (processes, auth, data model, Shopify), backend/frontend rules, naming, the module decomposition pattern |
+| [AGENTS.md](AGENTS.md) | Guidance for AI coding agents: commands, Next.js 16 caveats, product guardrails |
+| [INSTRUCTIONS.md](INSTRUCTIONS.md) | Behavioral guidelines for code changes (imported by AGENTS.md) |
+| [CLAUDE.md](CLAUDE.md) / [CODEX.md](CODEX.md) | Claude Code / Codex entry points; both import AGENTS.md and ARCHITECTURE.md |
