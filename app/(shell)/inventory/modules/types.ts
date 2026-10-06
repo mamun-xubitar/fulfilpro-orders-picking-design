@@ -25,6 +25,7 @@ export type VariantRow = {
   barcode: string | null;
   colour: string;
   size: string;
+  /** Σ of `locations[].quantity` while the variant has any location; otherwise its unassigned stock. */
   stockOnHand: number;
   /** Weighted average of received PO unit cost; falls back to the stored per-variant price. Read-only. */
   buyPrice: number;
@@ -42,8 +43,8 @@ export type VariantRow = {
   /** The one image from the product's pool this variant is linked to, Shopify-style — several
    * variants may point at the same image. Null when unlinked. */
   imageId: string | null;
-  /** Where the variant is kept — any number of locations. */
-  locations: { id: string; name: string }[];
+  /** Where the variant is kept — any number of locations, A→Z, with the stock held at each. */
+  locations: { id: string; name: string; quantity: number }[];
 };
 
 /** Below / near / above the reorder trigger. Drives row tint, badge and legend. */
@@ -357,6 +358,8 @@ export type PurchaseOrderItemRecord = {
   quantity: number;
   receivedQuantity: number;
   unitCost: number | null;
+  /** The linked variant's locations, A→Z — where a receipt can be put away. */
+  locations: { id: string; name: string }[];
 };
 
 export type PurchaseOrderRecord = {
@@ -433,13 +436,11 @@ export type StocktakeItemRecord = {
   sku: string | null;
   locationId: string | null;
   locationName: string | null;
-  /** Stock on hand when the stocktake was created. */
+  /** Stock at the line's location (or the variant's unassigned stock) when the stocktake was created. */
   expectedQty?: number;
-  /** Stock on hand right now. */
+  /** The same figure right now. */
   systemQty?: number;
   countedQty: number | null;
-  /** Locations the variant has now with no line here — such a variant is skipped on sync. */
-  uncoveredLocations: number;
 };
 
 export type StocktakeRecord = {
@@ -495,8 +496,12 @@ export type AdjustmentLineRecord = {
   size: string;
   sku: string | null;
   delta: number;
-  /** Null for old adjustments, and for non-admins (who don't see stock on hand). */
+  /** Stock at the line's location just before the change. Null for old adjustments, and for
+   * non-admins (who don't see stock on hand). */
   stockBefore: number | null;
+  /** Where the change landed; null for a variant with no location and for older lines. */
+  locationId: string | null;
+  locationName: string | null;
   reason: StockAdjustmentReasonValue;
   note: string | null;
 };

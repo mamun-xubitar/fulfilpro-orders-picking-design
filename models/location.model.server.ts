@@ -1,4 +1,5 @@
 import prisma from '@/lib/prisma.server';
+import { assignLocations, setLocationStock, StockError } from '@/lib/inventory-stock.server';
 
 export type LocationRow = {
   id: string;
@@ -79,27 +80,29 @@ export class LocationModel {
     return prisma.inventoryLocation.count({ where: { id: { in: ids } } });
   }
 
-  /** Replaces one variant's location set. */
-  async setVariantLocations(variantId: string, locationIds: string[]) {
-    await prisma.$transaction([
-      prisma.supplierProductVariantLocation.deleteMany({ where: { variantId, locationId: { notIn: locationIds } } }),
-      prisma.supplierProductVariantLocation.createMany({ data: locationIds.map((locationId) => ({ variantId, locationId })), skipDuplicates: true }),
-    ]);
+  /** Replaces one variant's locations and the stock held at each — see setLocationStock. */
+  async setVariantLocationStock(variantId: string, entries: { locationId: string; quantity: number }[]) {
+    await prisma.$transaction((tx) => setLocationStock(tx, variantId, entries));
   }
 
   /** Bulk: `add` keeps each variant's existing locations and adds `locationIds`; `replace` makes
-   * `locationIds` exactly each variant's set (an empty list clears them). */
+   * `locationIds` exactly each variant's set (an empty list clears them). All-or-nothing: refused
+   * when a location being dropped still holds stock. */
   async bulkSetVariantLocations(variantIds: string[], locationIds: string[], mode: 'add' | 'replace') {
-    const ops = [];
-    if (mode === 'replace') {
-      ops.push(prisma.supplierProductVariantLocation.deleteMany({ where: { variantId: { in: variantIds }, locationId: { notIn: locationIds } } }));
-    }
-    ops.push(
-      prisma.supplierProductVariantLocation.createMany({
-        data: variantIds.flatMap((variantId) => locationIds.map((locationId) => ({ variantId, locationId }))),
-        skipDuplicates: true,
-      })
-    );
-    await prisma.$transaction(ops);
+    await prisma.$transaction(async (tx) => {
+      const locations = await tx.inventoryLocation.findMany({ where: { id: { in: locationIds } }, select: { id: true, name: true } });
+      const namesById = new Map(locations.map((l) => [l.id, l.name]));
+      const variants = await tx.supplierProductVariant.findMany({ where: { id: { in: variantIds } }, select: { id: true, colour: true, size: true } });
+      const refused: string[] = [];
+      for (const v of variants) {
+        try {
+          await assignLocations(tx, v.id, locationIds, namesById, mode);
+        } catch (error) {
+          if (!(error instanceof StockError)) throw error;
+          refused.push(`${[v.colour, v.size].filter(Boolean).join(' / ') || 'Variant'}: ${error.message}`);
+        }
+      }
+      if (refused.length > 0) throw new StockError(refused.join('; '));
+    });
   }
 }

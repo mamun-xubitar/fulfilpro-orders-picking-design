@@ -30,8 +30,12 @@ export type AdjustmentLineRow = {
   size: string;
   sku: string | null;
   delta: number;
-  /** Stock on hand just before the change; null for adjustments recorded before batches existed. */
+  /** Stock at the line's location (or the variant's unassigned stock) just before the change. Older
+   * lines hold the variant's whole stock on hand; null for adjustments recorded before batches existed. */
   stockBefore: number | null;
+  /** Where the change landed; null for a variant with no location and for older lines. */
+  locationId: string | null;
+  locationName: string | null;
   reason: StockAdjustmentReason;
   note: string | null;
 };
@@ -141,6 +145,8 @@ export class StockAdjustmentModel {
             variantId: true,
             delta: true,
             stockBefore: true,
+            locationId: true,
+            locationName: true,
             reason: true,
             note: true,
             variant: { select: { colour: true, size: true, sku: true, position: true } },
@@ -149,7 +155,7 @@ export class StockAdjustmentModel {
       },
     });
     if (!row) return null;
-    const lines = [...row.lines].sort((a, b) => a.variant.position - b.variant.position);
+    const lines = [...row.lines].sort((a, b) => a.variant.position - b.variant.position || (a.locationName ?? '').localeCompare(b.locationName ?? ''));
     return {
       ...toSummary(row),
       lines: lines.map((l) => ({
@@ -160,6 +166,8 @@ export class StockAdjustmentModel {
         sku: l.variant.sku,
         delta: l.delta,
         stockBefore: l.stockBefore,
+        locationId: l.locationId,
+        locationName: l.locationName,
         reason: l.reason,
         note: l.note,
       })),

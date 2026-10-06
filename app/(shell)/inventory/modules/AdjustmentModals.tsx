@@ -30,7 +30,7 @@ function NewAdjustmentModal({ a, variants }: { a: ReturnType<typeof useAdjustmen
       compact
       onClose={a.closeModal}
       wide
-      maxWidthClass="max-w-[720px]"
+      maxWidthClass="max-w-[820px]"
       bodyClassName={WIZARD_BODY_CLASS}
       footer={
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -67,7 +67,7 @@ function NewAdjustmentModal({ a, variants }: { a: ReturnType<typeof useAdjustmen
           <AdjustmentChipsStrip a={a} />
 
           <div className="max-h-[calc(60vh/var(--page-zoom,1))] overflow-x-auto overflow-y-auto thin-scroll rounded-lg border border-inventory-border">
-            <table className="w-full min-w-[560px] border-collapse text-[11px] leading-none">
+            <table className="w-full min-w-[660px] border-collapse text-[11px] leading-none">
               <thead className="sticky top-0 bg-inventory-surface-muted">
                 <tr className="border-b border-inventory-border text-left text-[10px] font-bold uppercase tracking-[0.4px] text-inventory-text-subtle">
                   <th className="w-8 px-2 py-1">
@@ -83,6 +83,7 @@ function NewAdjustmentModal({ a, variants }: { a: ReturnType<typeof useAdjustmen
                     />
                   </th>
                   <th className="whitespace-nowrap px-2 py-1">Variant</th>
+                  <th className="whitespace-nowrap px-2 py-1">Location</th>
                   <th className="whitespace-nowrap px-2 py-1 text-right">On hand</th>
                   <th className="whitespace-nowrap px-2 py-1">Adjustment</th>
                   <th className="whitespace-nowrap px-2 py-1">Reason</th>
@@ -148,6 +149,8 @@ function AdjustmentRow({ a, v }: { a: ReturnType<typeof useAdjustments>; v: Vari
   const saving = a.savingIds.has(v.id);
   const error = a.rowErrors[v.id];
   const selected = a.selectedIds.has(v.id);
+  // A located variant is adjusted at one location; "On hand" is the stock there.
+  const location = v.locations.find((l) => l.id === row?.locationId);
 
   return (
     <tr className="border-b border-inventory-divider align-top last:border-0 transition-colors duration-150 hover:bg-inventory-surface-hover">
@@ -161,7 +164,27 @@ function AdjustmentRow({ a, v }: { a: ReturnType<typeof useAdjustments>; v: Vari
         />
       </td>
       <td className="px-2 py-1 text-inventory-text-muted">{variantTitle(v)}</td>
-      <td className="px-2 py-1 text-right tabular-nums text-inventory-text-subtle">{v.stockOnHand}</td>
+      <td className="px-2 py-1">
+        {v.locations.length > 0 ? (
+          <select
+            value={row?.locationId ?? ''}
+            onChange={(e) => a.setRowField(v.id, { locationId: e.target.value })}
+            aria-label={`Location for ${variantTitle(v)}`}
+            className="h-[22px] w-28 rounded-[6px] border border-inventory-border-strong px-[6px] text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring cursor-pointer"
+          >
+            {v.locations.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.name}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <span title="No location — adjusts the unassigned stock" className="text-inventory-text-subtle">
+            —
+          </span>
+        )}
+      </td>
+      <td className="px-2 py-1 text-right tabular-nums text-inventory-text-subtle">{location ? location.quantity : v.stockOnHand}</td>
       <td className="px-2 py-1">
         <input
           type="number"

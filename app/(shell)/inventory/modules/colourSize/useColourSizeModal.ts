@@ -22,6 +22,9 @@ export type VariantDraftRow = {
   /** True when this combo isn't among the product's current variants yet. */
   isNew: boolean;
   stockOnHand: number;
+  /** An existing variant kept at locations: its stock on hand is the sum of them, set per location
+   * in the Variants table — shown here read-only. */
+  stockLocked: boolean;
   /** null on a brand-new combo nobody has typed a trigger for yet — shown blank, and left out of
    * the apply request so the server falls back to the store's low-stock threshold, same as
    * reconcileVariants. */
@@ -189,12 +192,14 @@ export function useColourSizeModal({ product, optionLibrary, onApplied, onClose 
         const key = keyOf(colour, size);
         const existing = existingByKey.get(key);
         const typed = values[key];
+        const stockLocked = !!existing && existing.locations.length > 0;
         rows.push({
           key,
           colour,
           size,
           isNew: !existing,
-          stockOnHand: typed?.stockOnHand ?? existing?.stockOnHand ?? 0,
+          stockOnHand: stockLocked ? existing.stockOnHand : (typed?.stockOnHand ?? existing?.stockOnHand ?? 0),
+          stockLocked,
           trigger: typed?.trigger ?? existing?.trigger ?? null,
         });
       }
@@ -219,6 +224,7 @@ export function useColourSizeModal({ product, optionLibrary, onApplied, onClose 
     setValues((prev) => {
       const next = { ...prev };
       for (const row of variants) {
+        if (field === 'stockOnHand' && row.stockLocked) continue;
         const base = next[row.key] ?? { stockOnHand: row.stockOnHand, trigger: row.trigger };
         next[row.key] = { ...base, [field]: value };
       }

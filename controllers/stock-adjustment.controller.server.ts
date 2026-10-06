@@ -71,11 +71,12 @@ export class StockAdjustmentController {
     const rawItems = Array.isArray(value.items) ? value.items : [value];
 
     const errors: string[] = [];
-    const parsed: { variantId: string; delta: number; reason: StockAdjustmentReason; note: string | null }[] = [];
+    const parsed: { variantId: string; locationId: string | null; delta: number; reason: StockAdjustmentReason; note: string | null }[] = [];
     for (const raw of rawItems) {
       if (!raw || typeof raw !== 'object') continue;
       const item = raw as Record<string, unknown>;
       const variantId = typeof item.variantId === 'string' ? item.variantId.trim() : '';
+      const locationId = typeof item.locationId === 'string' && item.locationId.trim() ? item.locationId.trim() : null;
       const delta = Number(item.delta);
       const reasonRaw = typeof item.reason === 'string' ? item.reason : '';
       const note = typeof item.note === 'string' ? upperTrim(item.note) : '';
@@ -92,7 +93,7 @@ export class StockAdjustmentController {
         errors.push(`reason: Select a reason for ${variantId}`);
         continue;
       }
-      parsed.push({ variantId, delta: Math.trunc(delta), reason: reasonRaw as StockAdjustmentReason, note: note || null });
+      parsed.push({ variantId, locationId, delta: Math.trunc(delta), reason: reasonRaw as StockAdjustmentReason, note: note || null });
     }
     if (parsed.length === 0) {
       return { error: { message: 'Validation failed', errors: errors.length ? errors : ['items: No valid adjustments to save'], status: 400 } };
@@ -100,16 +101,30 @@ export class StockAdjustmentController {
 
     const variants = await prisma.supplierProductVariant.findMany({
       where: { id: { in: parsed.map((p) => p.variantId) } },
-      select: { id: true, supplierProductId: true, stockOnHand: true },
+      select: { id: true, supplierProductId: true, stockOnHand: true, locations: { select: { locationId: true, quantity: true, location: { select: { name: true } } } } },
     });
     const variantById = new Map(variants.map((v) => [v.id, v]));
 
+    // A variant with locations is adjusted at one of them; one without adjusts its unassigned stock.
+    // Several lines may hit the same spot, so the "below 0" check runs on the running total.
+    const running = new Map<string, number>();
     for (const item of parsed) {
       const variant = variantById.get(item.variantId);
       if (!variant || variant.supplierProductId !== supplierProductId) return { error: { message: 'Variant not found', status: 404 } };
-      if (variant.stockOnHand + item.delta < 0) {
-        return { error: { message: 'Validation failed', errors: [`delta: This would take ${variant.id} below 0`], status: 400 } };
+      let available = variant.stockOnHand;
+      let where = '';
+      if (variant.locations.length > 0) {
+        const location = variant.locations.find((l) => l.locationId === item.locationId);
+        if (!location) return { error: { message: 'Pick one of the variant’s locations', errors: [`locationId: Pick one of ${variant.id}'s locations`], status: 400 } };
+        available = location.quantity;
+        where = ` at ${location.location.name}`;
+      } else {
+        item.locationId = null;
       }
+      const key = `${variant.id}:${item.locationId ?? ''}`;
+      const after = (running.get(key) ?? available) + item.delta;
+      if (after < 0) return { error: { message: 'Validation failed', errors: [`delta: This would take ${variant.id}${where} below 0`], status: 400 } };
+      running.set(key, after);
     }
 
     const actor = { id: session?.user?.id ?? '', name: session?.user?.name ?? session?.user?.email ?? 'Unknown' };

@@ -108,9 +108,9 @@ function DetailsRowSkeleton() {
 
 const MATRIX_HEADERS = ['Size', 'Variant', 'Location', 'Stock on hand', 'Allocated', 'Available', 'Incoming', 'Status', 'Buy price', 'Sell price', 'Stock value', 'Actions'];
 // The Variant tab shows every column; the compact Products card drops SKU / Barcode and Trigger.
-const FULL_HEADERS = [...MATRIX_HEADERS.slice(0, 3), 'SKU / Barcode', ...MATRIX_HEADERS.slice(3, 7), 'Trigger', ...MATRIX_HEADERS.slice(7)];
+const FULL_HEADERS = [...MATRIX_HEADERS.slice(0, 2), 'SKU / Barcode', ...MATRIX_HEADERS.slice(2, 7), 'Trigger', ...MATRIX_HEADERS.slice(7)];
 const COMPACT_CELLS: SkeletonCell[] = ['check', 'stack', 'text', 'num', 'num', 'num', 'num', 'badge', 'num', 'num', 'num', { kind: 'actions', count: 2 }];
-const FULL_CELLS: SkeletonCell[] = ['check', 'stack', 'text', 'text', 'num', 'num', 'num', 'num', 'num', 'badge', 'num', 'num', 'num', { kind: 'actions', count: 2 }];
+const FULL_CELLS: SkeletonCell[] = ['check', 'stack', 'text', 'text', 'num', 'num', 'num', 'num', 'num', 'num', 'badge', 'num', 'num', 'num', { kind: 'actions', count: 2 }];
 
 function MatrixSkeleton({ tall }: { tall?: boolean }) {
   const headers = tall ? FULL_HEADERS : MATRIX_HEADERS;

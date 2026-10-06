@@ -8,7 +8,8 @@ import type { AdjustmentBatchRecord, ProductRecord, StockAdjustmentReasonValue }
 
 const REASONS: StockAdjustmentReasonValue[] = ['DAMAGED', 'LOST', 'FOUND', 'RETURN', 'CORRECTION', 'OTHER'];
 
-type AdjustmentRowState = { delta: string; reason: StockAdjustmentReasonValue; note: string };
+/** `locationId` is where the change lands: one of the variant's locations, or '' for a variant with none. */
+type AdjustmentRowState = { delta: string; reason: StockAdjustmentReasonValue; note: string; locationId: string };
 
 type UseAdjustmentsArgs = {
   product: ProductRecord | null;
@@ -40,7 +41,8 @@ export function useAdjustments({ product, onSaved }: UseAdjustmentsArgs) {
     const targetIds = ids && ids.length > 0 ? ids : product.variants.map((v) => v.id);
     setVariantIds(targetIds);
     setSelectedIds(new Set());
-    setRows(Object.fromEntries(targetIds.map((id) => [id, { delta: '', reason: 'CORRECTION' as StockAdjustmentReasonValue, note: '' }])));
+    const firstLocation = new Map(product.variants.map((v) => [v.id, v.locations[0]?.id ?? '']));
+    setRows(Object.fromEntries(targetIds.map((id) => [id, { delta: '', reason: 'CORRECTION' as StockAdjustmentReasonValue, note: '', locationId: firstLocation.get(id) ?? '' }])));
     setRowErrors({});
     setModalOpen(true);
   };
@@ -90,7 +92,9 @@ export function useAdjustments({ product, onSaved }: UseAdjustmentsArgs) {
 
   const dirtyCount = variantIds.filter((id) => selectedIds.has(id) && rows[id]?.delta && Number(rows[id]?.delta) !== 0).length;
 
-  const postAdjustments = async (items: { variantId: string; delta: number; reason: StockAdjustmentReasonValue; note?: string }[]): Promise<ProductRecord | null> => {
+  const postAdjustments = async (
+    items: { variantId: string; locationId?: string; delta: number; reason: StockAdjustmentReasonValue; note?: string }[]
+  ): Promise<ProductRecord | null> => {
     const res = await fetch(`/api/inventory/catalog/${product!.id}/adjustments`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -117,7 +121,7 @@ export function useAdjustments({ product, onSaved }: UseAdjustmentsArgs) {
     });
     setSavingIds((prev) => new Set(prev).add(variantId));
     try {
-      const updated = await postAdjustments([{ variantId, delta, reason: row.reason, note: row.note || undefined }]);
+      const updated = await postAdjustments([{ variantId, locationId: row.locationId || undefined, delta, reason: row.reason, note: row.note || undefined }]);
       toast.success('Stock adjusted');
       setRowField(variantId, { delta: '' });
       if (updated) onSaved(updated);
@@ -140,7 +144,7 @@ export function useAdjustments({ product, onSaved }: UseAdjustmentsArgs) {
       .filter((id) => selectedIds.has(id))
       .map((variantId) => ({ variantId, row: rows[variantId] }))
       .filter(({ row }) => row?.delta && Number(row.delta) !== 0)
-      .map(({ variantId, row }) => ({ variantId, delta: Number(row.delta), reason: row.reason, note: row.note || undefined }));
+      .map(({ variantId, row }) => ({ variantId, locationId: row.locationId || undefined, delta: Number(row.delta), reason: row.reason, note: row.note || undefined }));
 
     if (items.length === 0) {
       toast.info('Enter a quantity change for at least one selected row');

@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import type { Prisma as PrismaTypes } from '@prisma/client';
 import prisma from '@/lib/prisma.server';
+import { addStock, takeStock } from '@/lib/inventory-stock.server';
 
 type Tx = PrismaTypes.TransactionClient;
 
@@ -51,15 +52,16 @@ async function adjustVariantAllocated(tx: Tx, variantId: string, delta: number, 
   });
 }
 
+/** Moves a hub variant's physical stock by `delta` and logs it. Orders carry no location, so stock
+ * leaving comes out of the fullest location first (never below 0), and stock coming back goes to the
+ * variant's first location — see lib/inventory-stock.server.ts. Both row-lock the variant, so
+ * concurrent webhook deliveries touching it serialise. */
 async function adjustVariantStock(tx: Tx, variantId: string, delta: number, message: string) {
-  const rows = await tx.$queryRaw<{ supplierProductId: string }[]>`
-    UPDATE "SupplierProductVariant"
-    SET "stockOnHand" = GREATEST(0, "stockOnHand" + ${delta}), "updatedAt" = NOW()
-    WHERE "id" = ${variantId}
-    RETURNING "supplierProductId"`;
-  if (rows.length === 0) return;
+  const found = delta < 0 ? await takeStock(tx, variantId, -delta) : (await addStock(tx, variantId, null, delta)) !== null;
+  if (!found) return;
+  const { supplierProductId } = await tx.supplierProductVariant.findUniqueOrThrow({ where: { id: variantId }, select: { supplierProductId: true } });
   await tx.inventoryActivity.create({
-    data: { supplierProductId: rows[0].supplierProductId, variantId, type: 'order_stock', message, actorId: ACTOR.id, actorName: ACTOR.name },
+    data: { supplierProductId, variantId, type: 'order_stock', message, actorId: ACTOR.id, actorName: ACTOR.name },
   });
 }
 

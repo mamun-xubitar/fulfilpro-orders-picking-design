@@ -24,7 +24,7 @@ export default function VariantListColumn({ variants, onChange, onFillAll }: Var
         <h4 className="text-[11px] font-bold uppercase leading-none tracking-[0.4px] text-inventory-text-muted">Variants</h4>
         <div>
           <p className="mb-[2px] text-[9px] font-bold uppercase leading-none tracking-[0.3px] text-inventory-text-subtle">Stock on hand</p>
-          <ColumnFillInput label="Stock on hand" rowCount={variants.length} min={0} integerOnly onApply={(v) => onFillAll('stockOnHand', v)} />
+          <ColumnFillInput label="Stock on hand" rowCount={variants.filter((r) => !r.stockLocked).length} min={0} integerOnly onApply={(v) => onFillAll('stockOnHand', v)} />
         </div>
         <div>
           <p className="mb-[2px] text-[9px] font-bold uppercase leading-none tracking-[0.3px] text-inventory-text-subtle">Trigger</p>
@@ -63,8 +63,10 @@ export default function VariantListColumn({ variants, onChange, onFillAll }: Var
               step={1}
               value={row.stockOnHand}
               onChange={(e) => onChange(row.key, 'stockOnHand', Math.max(0, Math.trunc(Number(e.target.value) || 0)))}
+              readOnly={row.stockLocked}
+              title={row.stockLocked ? 'Total across locations — set per location in the Variants table' : undefined}
               aria-label={`Stock on hand for ${variantTitle(row)}`}
-              className="h-[22px] w-full min-w-0 rounded-[6px] border border-inventory-border-strong pl-[6px] pr-[10px] text-right text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring"
+              className="h-[22px] w-full min-w-0 rounded-[6px] border border-inventory-border-strong pl-[6px] pr-[10px] text-right text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring read-only:cursor-default read-only:bg-inventory-surface-muted read-only:text-inventory-text-muted"
             />
             <input
               type="number"

@@ -3,6 +3,7 @@
 import { ModalShell } from '@/components/ModalShell';
 import { formatAdjustmentNumber } from '@/lib/inventory/adjustment-number';
 import { AdjustmentNumber, NetQty, ReasonBadge, REASON_LABELS } from './AdjustmentBits';
+import { locationChipClass } from './LocationPickerMenu';
 import type { AdjustmentDetailState } from './hooks/useAdjustmentDetail';
 import { Bone, SkeletonRows } from './Skeleton';
 import { WIZARD_BODY_CLASS, WIZARD_BTN_SECONDARY, WIZARD_CARD_CLASS } from './modalStyles';
@@ -74,6 +75,7 @@ export default function AdjustmentDetailModal({ detail, onOpenProduct }: Adjustm
                   <tr className="border-b border-inventory-border text-left text-[10px] font-bold uppercase tracking-[0.4px] text-inventory-text-subtle">
                     <th className="whitespace-nowrap px-2 py-1">Variant</th>
                     <th className="whitespace-nowrap px-2 py-1">SKU</th>
+                    <th className="whitespace-nowrap px-2 py-1">Location</th>
                     {showStock && <th className="whitespace-nowrap px-2 py-1 text-right">Before</th>}
                     <th className="whitespace-nowrap px-2 py-1 text-right">Change</th>
                     {showStock && <th className="whitespace-nowrap px-2 py-1 text-right">After</th>}
@@ -86,6 +88,15 @@ export default function AdjustmentDetailModal({ detail, onOpenProduct }: Adjustm
                     <tr key={line.id} className="border-b border-inventory-divider last:border-0 hover:bg-inventory-surface-hover">
                       <td className="whitespace-nowrap px-2 py-1.5 text-inventory-text">{variantTitle(line)}</td>
                       <td className="whitespace-nowrap px-2 py-1.5 text-inventory-text-subtle">{line.sku ?? '—'}</td>
+                      <td className="whitespace-nowrap px-2 py-1.5">
+                        {line.locationName ? (
+                          <span className={`inline-flex items-center rounded-[4px] border px-[4px] py-[1px] text-[9px] font-semibold ${locationChipClass(line.locationId ?? line.locationName)}`}>
+                            {line.locationName}
+                          </span>
+                        ) : (
+                          <span className="text-inventory-text-subtle">—</span>
+                        )}
+                      </td>
                       {showStock && <td className="px-2 py-1.5 text-right tabular-nums text-inventory-text-muted">{line.stockBefore ?? '—'}</td>}
                       <td className="px-2 py-1.5 text-right">
                         <NetQty value={line.delta} />
@@ -137,13 +148,14 @@ function DetailSkeleton() {
             <tr className="border-b border-inventory-border text-left text-[10px] font-bold uppercase tracking-[0.4px] text-inventory-text-subtle">
               <th className="px-2 py-1">Variant</th>
               <th className="px-2 py-1">SKU</th>
+              <th className="px-2 py-1">Location</th>
               <th className="px-2 py-1 text-right">Change</th>
               <th className="px-2 py-1">Reason</th>
               <th className="px-2 py-1">Note</th>
             </tr>
           </thead>
           <tbody>
-            <SkeletonRows rows={4} cells={['text', 'text', 'num', 'text', 'text']} />
+            <SkeletonRows rows={4} cells={['text', 'text', 'badge', 'num', 'text', 'text']} />
           </tbody>
         </table>
       </div>

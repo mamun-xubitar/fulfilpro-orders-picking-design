@@ -2,6 +2,7 @@ import prisma from '@/lib/prisma.server';
 import { formatPoNumber } from '@/lib/inventory/po-number';
 import { Prisma, PoPaymentStatus, PurchaseOrderStatus } from '@prisma/client';
 import { toPoPaymentRow, type PoPaymentRow } from '@/models/po-payment.model.server';
+import { addStock } from '@/lib/inventory-stock.server';
 
 export type PurchaseOrderItemRow = {
   id: string;
@@ -14,6 +15,8 @@ export type PurchaseOrderItemRow = {
   quantity: number;
   receivedQuantity: number;
   unitCost: number | null;
+  /** The linked variant's locations, A→Z — where a receipt can be put away. */
+  locations: { id: string; name: string }[];
 };
 
 export type PurchaseOrderRow = {
@@ -48,7 +51,7 @@ export type PurchaseOrderRow = {
 export type PoPricingSnapshot = { currencyCode: string; exchangeRate: number; buyingPrice: number; freight: number; misc: number };
 
 const itemsInclude = {
-  items: { include: { variant: { select: { colour: true, size: true } } } },
+  items: { include: { variant: { select: { colour: true, size: true, locations: { select: { location: { select: { id: true, name: true } } } } } } } },
   payment: true,
   supplierProduct: { select: { itemNo: true, pricing: { select: { currencyCode: true, exchangeRate: true, buyingPrice: true, freight: true, misc: true } } } },
 } as const;
@@ -215,13 +218,13 @@ export class PurchaseOrderModel {
   }
 
   /**
-   * Applies received quantities to the hub catalogue: bumps stock on hand for each existing
-   * variant, and creates a new variant when the receipt references a colour/size the catalogue
+   * Applies received quantities to the hub catalogue: adds stock at the receipt's location (the
+   * variant's first location when none is given, its unassigned stock when it has none), and creates a new variant when the receipt references a colour/size the catalogue
    * doesn't have yet (e.g. the supplier substituted or added an item).
    */
   async receive(
     id: string,
-    receipts: Array<{ itemId?: string; variantId?: string; colour?: string; size?: string; sku?: string | null; quantity: number; unitCost?: number | null }>,
+    receipts: Array<{ itemId?: string; variantId?: string; colour?: string; size?: string; sku?: string | null; locationId?: string | null; quantity: number; unitCost?: number | null }>,
     actor: { id: string; name: string }
   ) {
     return prisma.$transaction(async (tx) => {
@@ -262,10 +265,8 @@ export class PurchaseOrderModel {
         }
 
         if (variantId) {
-          await tx.supplierProductVariant.update({
-            where: { id: variantId },
-            data: { stockOnHand: { increment: receipt.quantity }, ...(unitCost !== null && { buyPrice: unitCost }) },
-          });
+          await addStock(tx, variantId, receipt.locationId ?? null, receipt.quantity);
+          if (unitCost !== null) await tx.supplierProductVariant.update({ where: { id: variantId }, data: { buyPrice: unitCost } });
         }
       }
 
@@ -353,6 +354,7 @@ function toPurchaseOrderRow(row: PurchaseOrderWithItems): PurchaseOrderRow {
       quantity: item.quantity,
       receivedQuantity: item.receivedQuantity,
       unitCost: item.unitCost !== null ? Number(item.unitCost) : null,
+      locations: (item.variant?.locations ?? []).map((l) => l.location).sort((a, b) => a.name.localeCompare(b.name)),
     })),
   };
 }

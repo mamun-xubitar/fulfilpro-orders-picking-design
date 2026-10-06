@@ -104,7 +104,7 @@ export default function StocktakeCountModal({ detail }: { detail: StocktakeDetai
                       )}
                     </td>
                     {detail.isAdmin && (
-                      <td title="Stock on hand now, for the whole variant across its locations" className="px-2 py-1 text-right tabular-nums text-inventory-text-muted">
+                      <td title={item.locationName ? `Stock at ${item.locationName} now` : 'Unassigned stock on hand now'} className="px-2 py-1 text-right tabular-nums text-inventory-text-muted">
                         {item.systemQty ?? '—'}
                       </td>
                     )}

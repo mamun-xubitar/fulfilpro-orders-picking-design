@@ -13,6 +13,7 @@ export type SupplierProductVariantRow = {
   barcode: string | null;
   colour: string;
   size: string;
+  /** Σ of `locations[].quantity` while the variant has any location; otherwise its unassigned stock. */
   stockOnHand: number;
   /** Weighted average of unitCost across received PurchaseOrderItems; falls back to the stored column when nothing has been received. */
   buyPrice: number;
@@ -28,8 +29,8 @@ export type SupplierProductVariantRow = {
   incomingLots: IncomingLotRow[];
   /** One image from the product's pool, Shopify-style. Several variants may point at the same image. */
   imageId: string | null;
-  /** Where the variant is kept — any number of locations, A→Z. */
-  locations: { id: string; name: string }[];
+  /** Where the variant is kept — any number of locations, A→Z, with the stock held at each. */
+  locations: { id: string; name: string; quantity: number }[];
 };
 
 export type SupplierProductImageRow = { id: string; url: string; altText: string | null; colour: string | null };
@@ -128,7 +129,7 @@ const catalogueInclude = {
   inventoryCategory: { select: { id: true, name: true } },
   variants: {
     orderBy: { position: 'asc' as const },
-    include: { locations: { select: { location: { select: { id: true, name: true } } } } },
+    include: { locations: { select: { quantity: true, location: { select: { id: true, name: true } } } } },
   },
   images: { orderBy: { position: 'asc' as const } },
   pricing: true,
@@ -896,7 +897,7 @@ export class SupplierProductModel {
           incoming: incomingLots.reduce((sum, lot) => sum + lot.quantity, 0),
           incomingLots,
           imageId: v.imageId,
-          locations: v.locations.map((l) => l.location).sort((a, b) => a.name.localeCompare(b.name)),
+          locations: v.locations.map((l) => ({ ...l.location, quantity: l.quantity })).sort((a, b) => a.name.localeCompare(b.name)),
         };
       }),
       pricing: row.pricing

@@ -73,10 +73,27 @@ export function computeVariant(v: VariantRow): VariantComputed {
  * deliberately absent — they're never part of a draft. */
 const VARIANT_DRAFT_FIELDS = ['sku', 'barcode', 'colour', 'size', 'stockOnHand', 'allocated', 'trigger', 'sellPrice', 'locations'] as const;
 
-/** A draft diff as the variant PATCH body — `locations` (objects, for display) travel as `locationIds`. */
+/** A draft diff as the variant PATCH body — `locations` travel as `locationStock` (each location
+ * with the stock held there). A located variant's stock on hand is the sum of its locations, so a
+ * drafted `stockOnHand` only goes along while the variant ends up with no location. */
 export function variantPatchBody(changes: Partial<VariantRow>): Record<string, unknown> {
-  const { locations, ...rest } = changes;
-  return locations ? { ...rest, locationIds: locations.map((l) => l.id) } : { ...rest };
+  const { locations, stockOnHand, ...rest } = changes;
+  if (!locations) return stockOnHand === undefined ? { ...rest } : { ...rest, stockOnHand };
+  return {
+    ...rest,
+    locationStock: locations.map((l) => ({ locationId: l.id, quantity: l.quantity })),
+    ...(locations.length === 0 && stockOnHand !== undefined ? { stockOnHand } : {}),
+  };
+}
+
+/** A row with its unsaved draft overlaid. A located variant's stock on hand is always the sum of its
+ * locations, so it's recomputed from the drafted locations rather than drafted itself; dropping
+ * every location leaves the unassigned stock it had (0 when it had locations — removal needs 0). */
+export function applyVariantDraft(server: VariantRow, draft: Partial<VariantRow>): VariantRow {
+  const row = { ...server, ...draft };
+  if (row.locations.length > 0) row.stockOnHand = row.locations.reduce((sum, l) => sum + l.quantity, 0);
+  else if (draft.locations && draft.stockOnHand === undefined) row.stockOnHand = server.locations.length === 0 ? server.stockOnHand : 0;
+  return row;
 }
 
 /** The minimal diff between a draft and the server's row — the exact PATCH body to send, and
@@ -93,10 +110,11 @@ export function variantDraftChanges(server: VariantRow, draft: Partial<VariantRo
     const next = draft[field];
     if (next === undefined) continue;
     if (field === 'locations') {
-      // A set, compared by id: reordering or re-picking the same locations isn't a change.
-      const before = new Set(server.locations.map((l) => l.id));
+      // A set compared by id, plus the stock at each: reordering or re-picking the same locations
+      // with the same quantities isn't a change.
+      const before = new Map(server.locations.map((l) => [l.id, l.quantity]));
       const after = draft.locations ?? [];
-      if (before.size === after.length && after.every((l) => before.has(l.id))) continue;
+      if (before.size === after.length && after.every((l) => before.get(l.id) === l.quantity)) continue;
     } else if ((server[field] ?? '') === (next ?? '')) continue;
     (changed as Record<string, unknown>)[field] = next;
   }

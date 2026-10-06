@@ -2,6 +2,7 @@ import { parse } from 'csv-parse/sync';
 import { deriveColorFromName } from '@/lib/inventory/colour';
 import { sanitizeHtml } from '@/lib/sanitize-html';
 import type { Prisma } from '@prisma/client';
+import { setVariantTotal } from '@/lib/inventory-stock.server';
 
 export type DetectedFileType = 'product' | 'po' | 'unknown';
 
@@ -317,12 +318,13 @@ export async function upsertParsedProductVariants(
         data: {
           sku: row.sku,
           barcode: row.barcode,
-          stockOnHand: row.stockOnHand,
           sellPrice: row.sellPrice,
           ...(row.buyPrice !== undefined && { buyPrice: row.buyPrice }),
           ...(imageId !== undefined && { imageId }),
         },
       });
+      // The file only carries a total: a located variant gets the difference at its locations.
+      await setVariantTotal(tx, existing.id, row.stockOnHand);
       updated++;
     } else {
       await tx.supplierProductVariant.create({

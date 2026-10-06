@@ -17,7 +17,7 @@ type VariantsMatrixTableProps = {
    * keep the common case compact — both are still reachable (and editable) via Full view. */
   showAllColumns?: boolean;
   /** The Variant tab: the table is the page's main content, so it gets a taller scroll area than the
-   * compact inline card. */
+   * compact inline card — capped to the viewport height left below the bars above it. */
   tall?: boolean;
 };
 
@@ -34,7 +34,10 @@ const NUMERIC_HEADERS = [
 // Past this many body rows the table scrolls internally instead of growing the page —
 // header + 8 body rows + totals footer = 10 rows visible at once (sticky header/footer).
 const SCROLL_THRESHOLD = 8;
-const TALL_SCROLL_THRESHOLD = 16;
+// The Variant tab caps the table at the viewport height (zoom-aware, like the modals) minus the
+// shell header (60px) and what sits above / below it: page padding, module tabs, product toolbar
+// and the table's own toolbar (~8rem). It always scrolls internally rather than by row count.
+const TALL_MAX_H = 'max-h-[calc((100vh_-_60px)/var(--page-zoom,1)_-_8rem)]';
 
 // `border-collapse` means a sticky cell's own border doesn't paint (the border lives on the
 // adjacent cell instead), so the header/footer's separating line is an inset box-shadow instead.
@@ -50,16 +53,15 @@ const STICKY_FOOTER_TD = 'sticky bottom-0 z-10 bg-[#f9f1fa] shadow-[inset_0_1px_
 export default function VariantsMatrixTable({ matrix, locations, fillHeight, showAllColumns, tall }: VariantsMatrixTableProps) {
   const { canEdit } = useInventoryAccess();
   const { rows, totals } = matrix;
-  const scrollable = rows.length > (tall ? TALL_SCROLL_THRESHOLD : SCROLL_THRESHOLD);
+  const scrollable = tall || rows.length > SCROLL_THRESHOLD;
   const numericHeaders = NUMERIC_HEADERS.filter((h) => showAllColumns || h.key !== 'trigger');
-  // Size, Variant, [SKU / Barcode], numeric columns, Status, Buy price, Sell price, Stock value,
-  // Actions — 13 in full view, 11 inline (SKU/Barcode and Trigger dropped). The 7 accounts for the
-  // always-shown non-numeric columns: Size, Variant, Status, Buy price, Sell price, Stock value,
-  // Actions. Colour is now a separate panel beside the table, not a column.
+  // Size, Variant, [SKU / Barcode], Location, Stock on hand, the other numeric columns, Status, Buy
+  // price, Sell price, Stock value, Actions — 8 always-shown non-numeric columns (Location included),
+  // plus SKU / Barcode in full view. Colour is a separate panel beside the table, not a column.
   const columnCount = 8 + numericHeaders.length + (showAllColumns ? 1 : 0);
 
   return (
-    <div className={`thin-scroll ${fillHeight ? 'h-full overflow-y-auto overflow-x-auto' : scrollable ? `${tall ? 'max-h-[26rem]' : 'max-h-[12.5rem]'} overflow-y-auto overflow-x-auto` : 'overflow-x-auto'}`}>
+    <div className={`thin-scroll ${fillHeight ? 'h-full overflow-y-auto overflow-x-auto' : scrollable ? `${tall ? TALL_MAX_H : 'max-h-[12.5rem]'} overflow-y-auto overflow-x-auto` : 'overflow-x-auto'}`}>
       <table className="w-full min-w-5xl border-collapse">
         <thead>
           <tr className="border-b border-inventory-border bg-inventory-surface-muted">
@@ -76,16 +78,16 @@ export default function VariantsMatrixTable({ matrix, locations, fillHeight, sho
               </label>
             </th>
             <Th align="left">Variant</Th>
-            <Th align="left">Location</Th>
             {showAllColumns && <Th align="left">SKU / Barcode</Th>}
+            <Th align="left">Location</Th>
             {numericHeaders.map((h) => (
               <Th key={h.key} align="right">
-                <span className="flex items-center justify-end gap-[4px]">
+                <span className="flex flex-col items-end gap-[3px]">
                   <span>{h.label}</span>
                   {canEdit && (h.key === 'stockOnHand' || h.key === 'allocated') && (
                     <span className="inline-block w-[64px] min-w-0">
                       <ColumnFillInput
-                        label={h.label}
+                        label={h.key === 'stockOnHand' && rows.some((r) => r.locations.length > 0) ? 'Stock on hand at each location' : h.label}
                         rowCount={rows.length}
                         step="1"
                         min={0}
@@ -100,7 +102,7 @@ export default function VariantsMatrixTable({ matrix, locations, fillHeight, sho
             <Th align="center">Status</Th>
             <Th align="right">Buy price</Th>
             <Th align="right">
-              <span className="flex items-center justify-end gap-[4px]">
+              <span className="flex flex-col items-end gap-[3px]">
                 <span>Sell price</span>
                 {canEdit && (
                   <span className="inline-block w-[64px] min-w-0">
@@ -154,8 +156,8 @@ export default function VariantsMatrixTable({ matrix, locations, fillHeight, sho
                 {rows.length} row{rows.length === 1 ? '' : 's'}
                 {matrix.hiddenCount > 0 && <span className="text-inventory-text-subtle"> · {matrix.hiddenCount} hidden</span>}
               </td>
-              <td className={STICKY_FOOTER_TD} />
               {showAllColumns && <td className={STICKY_FOOTER_TD} />}
+              <td className={STICKY_FOOTER_TD} />
               <TotalCell value={formatNumber(totals.totalStock)} />
               <TotalCell value={formatNumber(totals.allocated)} />
               <TotalCell value={formatNumber(totals.availableStock)} className="text-inventory-success-hover" />

@@ -14,13 +14,11 @@ export type StocktakeItemRow = {
   sku: string | null;
   locationId: string | null;
   locationName: string | null;
-  /** Stock on hand when the stocktake was created. */
+  /** Stock at the line's location (or the variant's unassigned stock) when the stocktake was created. */
   expectedQty: number;
-  /** Stock on hand right now. */
+  /** The same figure right now. */
   systemQty: number;
   countedQty: number | null;
-  /** Locations the variant has now that this stocktake has no line for — a variant with any can't be synced. */
-  uncoveredLocations: number;
 };
 
 export type StocktakeRow = {
@@ -52,7 +50,7 @@ const include = {
   supplierProduct: { select: { name: true, itemNo: true } },
   items: {
     include: {
-      variant: { select: { colour: true, size: true, sku: true, stockOnHand: true, position: true, locations: { select: { locationId: true } } } },
+      variant: { select: { colour: true, size: true, sku: true, stockOnHand: true, position: true, locations: { select: { locationId: true, quantity: true } } } },
     },
   },
 };
@@ -64,16 +62,16 @@ export class StocktakeModel {
       const variantIds = [...new Set(lines.map((l) => l.variantId))];
       const variants = await tx.supplierProductVariant.findMany({
         where: { supplierProductId, id: { in: variantIds } },
-        select: { id: true, stockOnHand: true },
+        select: { id: true, stockOnHand: true, locations: { select: { locationId: true, quantity: true } } },
       });
-      const stockByVariant = new Map(variants.map((v) => [v.id, v.stockOnHand]));
+      const variantById = new Map(variants.map((v) => [v.id, v]));
       const locations = await tx.inventoryLocation.findMany({
         where: { id: { in: lines.flatMap((l) => (l.locationId ? [l.locationId] : [])) } },
         select: { id: true, name: true },
       });
       const nameByLocation = new Map(locations.map((l) => [l.id, l.name]));
 
-      const valid = lines.filter((l) => stockByVariant.has(l.variantId));
+      const valid = lines.filter((l) => variantById.has(l.variantId));
       const allCounted = valid.length > 0 && valid.every((l) => l.countedQty !== null);
       const anyCounted = valid.some((l) => l.countedQty !== null);
       const row = await tx.stocktake.create({
@@ -88,7 +86,7 @@ export class StocktakeModel {
               variantId: l.variantId,
               locationId: l.locationId && nameByLocation.has(l.locationId) ? l.locationId : null,
               locationName: l.locationId ? (nameByLocation.get(l.locationId) ?? null) : null,
-              expectedQty: stockByVariant.get(l.variantId) ?? 0,
+              expectedQty: lineStock(variantById.get(l.variantId)!, l.locationId),
               countedQty: l.countedQty,
             })),
           },
@@ -180,9 +178,10 @@ export class StocktakeModel {
   }
 
   /**
-   * Sets each variant's stock on hand to the sum of its counted lines. Locations are tags only, so
-   * a variant is skipped unless the stocktake counted every line and covers every location the
-   * variant has now — one shelf's count says nothing about the total.
+   * Sets the stock at each counted line's location to its count (the unassigned stock of a variant
+   * with no location, for a line without one). A line is skipped when it has no count, or when its
+   * location no longer matches the variant — the location was removed, or a location-less line's
+   * variant has since been given locations.
    */
   async sync(id: string, actor: Actor): Promise<{ stocktake: StocktakeRow; result: StocktakeSyncResult }> {
     return prisma.$transaction(async (tx) => {
@@ -190,26 +189,26 @@ export class StocktakeModel {
       const variantIds = [...new Set(stocktake.items.map((i) => i.variantId))];
       const variants = await tx.supplierProductVariant.findMany({
         where: { id: { in: variantIds } },
-        select: { id: true, stockOnHand: true, locations: { select: { locationId: true } } },
+        select: { id: true, stockOnHand: true, locations: { select: { locationId: true, quantity: true } } },
       });
+      const variantById = new Map(variants.map((v) => [v.id, v]));
 
       const reference = formatStocktakeNumber(stocktake.number);
       const result: StocktakeSyncResult = { adjusted: 0, unchanged: 0, skipped: 0 };
       const adjustLines: AdjustmentLineInput[] = [];
-      for (const variant of variants) {
-        const lines = stocktake.items.filter((i) => i.variantId === variant.id);
-        const countedLocationIds = new Set(lines.flatMap((l) => (l.locationId ? [l.locationId] : [])));
-        const coversLocations = variant.locations.every((l) => countedLocationIds.has(l.locationId));
-        if (!lines.every((l) => l.countedQty !== null) || !coversLocations) {
+      for (const line of stocktake.items) {
+        const variant = variantById.get(line.variantId);
+        const matches = variant && (line.locationId ? variant.locations.some((l) => l.locationId === line.locationId) : variant.locations.length === 0);
+        if (!variant || !matches || line.countedQty === null) {
           result.skipped++;
           continue;
         }
-        const counted = lines.reduce((sum, l) => sum + (l.countedQty ?? 0), 0);
-        if (counted === variant.stockOnHand) {
+        const current = lineStock(variant, line.locationId);
+        if (line.countedQty === current) {
           result.unchanged++;
           continue;
         }
-        adjustLines.push({ variantId: variant.id, delta: counted - variant.stockOnHand, reason: 'CORRECTION', note: `STOCKTAKE ${reference}` });
+        adjustLines.push({ variantId: variant.id, locationId: line.locationId, delta: line.countedQty - current, reason: 'CORRECTION', note: `STOCKTAKE ${reference}` });
         result.adjusted++;
       }
       // The counts become stock on hand as one adjustment, so a sync shows up in the Adjustments tab.
@@ -223,7 +222,7 @@ export class StocktakeModel {
           supplierProductId: stocktake.supplierProductId,
           type: 'stocktake_completed',
           adjustmentBatchId: batch?.id ?? null,
-          message: `Stocktake ${reference} synced — ${result.adjusted} variant${result.adjusted === 1 ? '' : 's'} adjusted${result.skipped > 0 ? `, ${result.skipped} skipped (not fully counted)` : ''}`,
+          message: `Stocktake ${reference} synced — ${result.adjusted} line${result.adjusted === 1 ? '' : 's'} adjusted${result.skipped > 0 ? `, ${result.skipped} skipped` : ''}`,
           actorId: actor.id,
           actorName: actor.name,
         },
@@ -244,13 +243,14 @@ export class StocktakeModel {
   }
 }
 
+/** The stock a counting line stands for: the quantity at its location, or the variant's unassigned
+ * stock on hand for a line without one. */
+function lineStock(variant: { stockOnHand: number; locations: { locationId: string; quantity: number }[] }, locationId: string | null): number {
+  if (!locationId) return variant.stockOnHand;
+  return variant.locations.find((l) => l.locationId === locationId)?.quantity ?? 0;
+}
+
 function toRow(row: StocktakeWithItems): StocktakeRow {
-  const countedLocations = new Map<string, Set<string>>();
-  for (const i of row.items) {
-    const set = countedLocations.get(i.variantId) ?? new Set<string>();
-    if (i.locationId) set.add(i.locationId);
-    countedLocations.set(i.variantId, set);
-  }
   const items = [...row.items]
     .sort((a, b) => a.variant.position - b.variant.position || (a.locationName ?? '').localeCompare(b.locationName ?? ''))
     .map((i) => ({
@@ -262,9 +262,8 @@ function toRow(row: StocktakeWithItems): StocktakeRow {
       locationId: i.locationId,
       locationName: i.locationName,
       expectedQty: i.expectedQty,
-      systemQty: i.variant.stockOnHand,
+      systemQty: lineStock(i.variant, i.locationId),
       countedQty: i.countedQty,
-      uncoveredLocations: i.variant.locations.filter((l) => !countedLocations.get(i.variantId)?.has(l.locationId)).length,
     }));
   return {
     id: row.id,

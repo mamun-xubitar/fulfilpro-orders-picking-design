@@ -64,7 +64,7 @@ export default function PurchaseOrdersTab({ tab, suppliers, onReceive, onPay, on
             </div>
           }
         >
-          <p className="mb-2 text-[12px] text-inventory-text-muted">Every outstanding line is received in full, at its own unit cost, and added to stock on hand.</p>
+          <p className="mb-2 text-[12px] text-inventory-text-muted">Every outstanding line is received in full, at its own unit cost, and added to stock on hand at the variant’s first location.</p>
           <ul className="max-h-48 divide-y divide-inventory-divider overflow-y-auto thin-scroll rounded-lg border border-inventory-border text-[11px]">
             {tab.receivable.map((po) => (
               <li key={po.id} className="flex items-center justify-between gap-2 px-2 py-1.5">

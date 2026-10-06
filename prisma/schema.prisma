@@ -1020,22 +1020,29 @@ model PurchaseOrderPaymentHistory {
 }
 
 /**
- * A physical place variants are kept (a shelf, bin, rack). Tags only — a variant belongs to any
- * number of locations and its single stock-on-hand is not split between them.
+ * A physical place variants are kept (a shelf, bin, rack). A variant belongs to any number of
+ * locations and holds its own quantity at each (SupplierProductVariantLocation.quantity).
  */
 model InventoryLocation {
-  id             String                           @id @default(uuid())
-  name           String                           @unique
-  description    String?
-  variants       SupplierProductVariantLocation[]
-  stocktakeItems StocktakeItem[]
+  id               String                           @id @default(uuid())
+  name             String                           @unique
+  description      String?
+  variants         SupplierProductVariantLocation[]
+  stocktakeItems   StocktakeItem[]
+  stockAdjustments StockAdjustment[]
   createdAt      DateTime                         @default(now())
   updatedAt      DateTime                         @updatedAt
 }
 
+/**
+ * A variant's stock at one location. While a variant has any of these, its stockOnHand is kept equal
+ * to the sum of their quantities (see lib/inventory-stock.server.ts); a variant with none holds its
+ * stockOnHand unassigned.
+ */
 model SupplierProductVariantLocation {
   variantId  String
   locationId String
+  quantity   Int                    @default(0)
   createdAt  DateTime               @default(now())
   variant    SupplierProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
   location   InventoryLocation      @relation(fields: [locationId], references: [id], onDelete: Restrict)
@@ -1240,8 +1247,8 @@ model Stocktake {
 
 /**
  * One counting line: a variant at one of its locations (or the lone line of a variant with no
- * location). expectedQty is the variant's stock on hand when the stocktake was created — the same
- * on every line of that variant, since stock is not split between locations.
+ * location). expectedQty is the stock at that location when the stocktake was created (the
+ * variant's unassigned stock on hand for a line with no location).
  */
 model StocktakeItem {
   id           String                 @id @default(uuid())
@@ -1303,19 +1310,27 @@ model StockAdjustment {
   supplierProductId String
   variantId         String
   delta             Int
-  /// Stock on hand just before this change; null on adjustments recorded before batches existed.
+  /// Stock at `locationId` (or the variant's unassigned stock on hand when it has none) just before
+  /// this change. Older rows hold the variant's whole stock on hand; null before batches existed.
   stockBefore       Int?
+  /// Where the change landed; null for a variant with no location and for rows recorded before
+  /// stock was held per location.
+  locationId        String?
+  /// Snapshot so the history still reads right after a location is renamed or deleted.
+  locationName      String?
   reason            StockAdjustmentReason
   note              String?
   actorId           String
   actorName         String
   supplierProduct   SupplierProduct        @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
   variant           SupplierProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  location          InventoryLocation?     @relation(fields: [locationId], references: [id], onDelete: SetNull)
   createdAt         DateTime               @default(now())
 
   @@index([supplierProductId, createdAt])
   @@index([variantId])
   @@index([batchId])
+  @@index([locationId])
 }
 
 model InventoryActivity {

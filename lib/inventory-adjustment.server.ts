@@ -1,9 +1,12 @@
 import type { Prisma, StockAdjustmentReason, StockAdjustmentSource } from '@prisma/client';
 import { formatAdjustmentNumber } from '@/lib/inventory/adjustment-number';
+import { addStock } from '@/lib/inventory-stock.server';
 
 type Tx = Prisma.TransactionClient;
 
-export type AdjustmentLineInput = { variantId: string; delta: number; reason: StockAdjustmentReason; note: string | null };
+/** `locationId` is where the change lands — null puts it at the variant's first location, or on its
+ * unassigned stock when it has none. */
+export type AdjustmentLineInput = { variantId: string; locationId: string | null; delta: number; reason: StockAdjustmentReason; note: string | null };
 
 /** "Black / M", "Black" (colour-only), "M" (size-only), or "—" (neither axis). */
 function variantTitle(colour: string, size: string): string {
@@ -11,7 +14,7 @@ function variantTitle(colour: string, size: string): string {
 }
 
 /**
- * Applies the lines to stock on hand and records them as ONE adjustment (a StockAdjustmentBatch) with
+ * Applies the lines to stock (each at its own location) and records them as ONE adjustment (a StockAdjustmentBatch) with
  * ONE activity entry, inside the caller's transaction — used by the adjustment modal and by a
  * stocktake sync so both land in the Adjustments tab the same way.
  */
@@ -36,10 +39,19 @@ export async function recordAdjustmentBatch(
   let net = 0;
   const titles: string[] = [];
   for (const line of lines) {
-    const variant = await tx.supplierProductVariant.findUniqueOrThrow({ where: { id: line.variantId }, select: { colour: true, size: true, stockOnHand: true } });
-    await tx.supplierProductVariant.update({ where: { id: line.variantId }, data: { stockOnHand: { increment: line.delta } } });
+    const variant = await tx.supplierProductVariant.findUniqueOrThrow({ where: { id: line.variantId }, select: { colour: true, size: true } });
+    const move = await addStock(tx, line.variantId, line.locationId, line.delta);
     await tx.stockAdjustment.create({
-      data: { ...line, batchId: batch.id, supplierProductId, stockBefore: variant.stockOnHand, actorId: actor.id, actorName: actor.name },
+      data: {
+        ...line,
+        batchId: batch.id,
+        supplierProductId,
+        locationId: move?.locationId ?? null,
+        locationName: move?.locationName ?? null,
+        stockBefore: move?.before ?? null,
+        actorId: actor.id,
+        actorName: actor.name,
+      },
     });
     net += line.delta;
     titles.push(variantTitle(variant.colour, variant.size));
