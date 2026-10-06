@@ -1,5 +1,5 @@
 import prisma from '@/lib/prisma.server';
-import { assignLocations, setLocationStock, StockError } from '@/lib/inventory-stock.server';
+import { assignLocations, describeHolding, setLocationStock, StockError } from '@/lib/inventory-stock.server';
 
 export type LocationRow = {
   id: string;
@@ -93,16 +93,24 @@ export class LocationModel {
       const locations = await tx.inventoryLocation.findMany({ where: { id: { in: locationIds } }, select: { id: true, name: true } });
       const namesById = new Map(locations.map((l) => [l.id, l.name]));
       const variants = await tx.supplierProductVariant.findMany({ where: { id: { in: variantIds } }, select: { id: true, colour: true, size: true } });
-      const refused: string[] = [];
+      // Variants refused for the same reason (same locations holding the same stock) are reported once.
+      const refused = new Map<string, { labels: string[]; error: StockError }>();
       for (const v of variants) {
         try {
           await assignLocations(tx, v.id, locationIds, namesById, mode);
         } catch (error) {
           if (!(error instanceof StockError)) throw error;
-          refused.push(`${[v.colour, v.size].filter(Boolean).join(' / ') || 'Variant'}: ${error.message}`);
+          const group = refused.get(error.message) ?? { labels: [], error };
+          group.labels.push([v.colour, v.size].filter(Boolean).join(' / ') || 'Variant');
+          refused.set(error.message, group);
         }
       }
-      if (refused.length > 0) throw new StockError(refused.join('; '));
+      if (refused.size === 0) return;
+      const groups = [...refused.values()].map(({ labels, error }) => {
+        const who = labels.length <= 3 ? labels.join(', ') : `${labels.length} variants`;
+        return error.holding.length > 0 ? `${who}: ${describeHolding(error.holding)}` : `${who}: ${error.message}`;
+      });
+      throw new StockError(`Can’t remove locations that still hold stock — set them to 0 first. ${groups.join('; ')}.`);
     });
   }
 }

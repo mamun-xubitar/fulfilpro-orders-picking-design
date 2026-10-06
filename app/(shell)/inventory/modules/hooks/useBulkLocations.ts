@@ -18,8 +18,13 @@ export function useBulkLocations({ product, selectedIds, onSaved, onDone }: Args
   const [openFor, setOpenFor] = useState<string | null>(null);
   const [mode, setMode] = useState<'add' | 'replace'>('add');
   const [locationIds, setLocationIds] = useState<string[]>([]);
-  const { request, loading, errors } = useRequest<ProductRecord>();
+  const { request, loading, errors, setErrors } = useRequest<ProductRecord>();
   const open = product !== null && openFor === product.id;
+
+  const close = () => {
+    setOpenFor(null);
+    setErrors({});
+  };
 
   const save = () => {
     if (!product) return;
@@ -30,7 +35,7 @@ export function useBulkLocations({ product, selectedIds, onSaved, onDone }: Args
       successMessage: 'Locations updated',
       onSuccess: ({ data }) => {
         onSaved(data);
-        setOpenFor(null);
+        close();
         onDone();
       },
     });
@@ -49,9 +54,10 @@ export function useBulkLocations({ product, selectedIds, onSaved, onDone }: Args
       if (!product) return;
       setMode('add');
       setLocationIds([]);
+      setErrors({});
       setOpenFor(product.id);
     },
-    close: () => setOpenFor(null),
+    close,
     save,
   };
 }

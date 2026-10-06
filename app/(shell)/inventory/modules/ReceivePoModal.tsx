@@ -8,7 +8,7 @@ import type { usePurchaseOrder } from './hooks/usePurchaseOrder';
 import { SPINNER, WIZARD_BODY_CLASS, WIZARD_BTN_FINISH, WIZARD_BTN_SECONDARY, WIZARD_CARD_CLASS } from './modalStyles';
 import { formatDate, formatMoney, formatPoNumber, poAveragePrice } from './utils';
 
-const GRID_COLS = 'grid-cols-[minmax(0,1fr)_6rem_4.5rem_4rem_4rem_4rem_4.5rem_7rem_5.5rem_7rem]';
+const GRID_COLS = 'grid-cols-[minmax(0,1fr)_6rem_4.5rem_4rem_4rem_4rem_4.5rem_5.5rem_7rem]';
 
 export default function ReceivePoModal({ po }: { po: ReturnType<typeof usePurchaseOrder> }) {
   const target = po.receiveTarget!;
@@ -89,8 +89,30 @@ export default function ReceivePoModal({ po }: { po: ReturnType<typeof usePurcha
 
         <p className="text-[12px] text-inventory-text-muted">Enter the quantity received for each item. Leave 0 for items not yet shipped — receive again later for partial deliveries.</p>
 
-        <div className="max-h-80 overflow-y-auto thin-scroll rounded-lg border border-inventory-border">
-          <div className={`grid ${GRID_COLS} items-center gap-2 border-b border-inventory-border bg-inventory-surface-muted px-2 py-1 text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-inventory-text-subtle`}>
+        <div className="flex items-center gap-2">
+          <label htmlFor="receive-location" className="text-[11px] font-semibold text-inventory-text-muted">
+            Location
+          </label>
+          {po.receiveLocationOptions.length > 0 ? (
+            <select
+              id="receive-location"
+              value={po.receiveLocationId}
+              onChange={(e) => po.setReceiveLocationId(e.target.value)}
+              className="h-[22px] w-44 cursor-pointer rounded-[6px] border border-inventory-border-strong px-[6px] text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring"
+            >
+              {po.receiveLocationOptions.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span className="text-[11px] text-inventory-text-subtle">Unassigned stock — these variants have no location</span>
+          )}
+        </div>
+
+        <div className="rounded-lg border border-inventory-border">
+          <div className={`sticky top-[-1rem] z-10 grid ${GRID_COLS} items-center gap-2 border-b border-inventory-border bg-inventory-surface-muted px-2 py-1 text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-inventory-text-subtle`}>
             <span className="flex min-h-[16px] items-center">Variant</span>
             <span className="flex min-h-[16px] items-center">Supplier SKU</span>
             <span className="flex min-h-[16px] items-center">Colour</span>
@@ -98,7 +120,6 @@ export default function ReceivePoModal({ po }: { po: ReturnType<typeof usePurcha
             <span className="flex min-h-[16px] items-center justify-end text-right">Ordered</span>
             <span className="flex min-h-[16px] items-center justify-end text-right">Received</span>
             <span className="flex min-h-[16px] items-center justify-end text-right">Outstanding</span>
-            <span className="flex min-h-[16px] items-center">Location</span>
             <span className="flex min-h-[16px] items-center justify-end text-right">Unit cost</span>
             <span className="flex items-center justify-end gap-[4px] whitespace-nowrap">
               <span>Receive qty</span>
@@ -135,24 +156,6 @@ export default function ReceivePoModal({ po }: { po: ReturnType<typeof usePurcha
                     <span className="text-right tabular-nums text-inventory-text-subtle">{item.quantity}</span>
                     <span className="text-right tabular-nums text-inventory-text-subtle">{item.receivedQuantity}</span>
                     <span className="text-right tabular-nums font-medium text-inventory-text-muted">{remaining}</span>
-                    {item.locations.length > 0 ? (
-                      <select
-                        value={po.receiveLocation[item.id] ?? item.locations[0].id}
-                        onChange={(e) => po.setReceiveItemLocation(item.id, e.target.value)}
-                        aria-label={`Location for ${item.variantTitle}`}
-                        className="h-[22px] w-full min-w-0 cursor-pointer rounded-[7px] border border-inventory-border-strong px-[6px] text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring"
-                      >
-                        {item.locations.map((l) => (
-                          <option key={l.id} value={l.id}>
-                            {l.name}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <span title="No location — received into unassigned stock" className="truncate text-inventory-text-subtle">
-                        —
-                      </span>
-                    )}
                     <div className="relative w-full min-w-0">
                       <span className="pointer-events-none absolute inset-y-0 left-[6px] flex items-center text-[11px] text-inventory-text-subtle">$</span>
                       <input

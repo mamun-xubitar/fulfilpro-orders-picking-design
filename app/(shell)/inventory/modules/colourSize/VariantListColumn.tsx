@@ -2,11 +2,13 @@
 
 import { deriveColorFromName, resolveSwatch } from '@/lib/inventory/colour';
 import ColumnFillInput from '../ColumnFillInput';
+import type { LocationOption } from '../hooks/useLocations';
 import { variantTitle } from '../utils';
 import type { VariantDraftRow } from './useColourSizeModal';
 
 type VariantListColumnProps = {
   variants: VariantDraftRow[];
+  location: { id: string; set: (id: string) => void; options: LocationOption[] };
   onChange: (key: string, field: 'stockOnHand' | 'trigger', value: number) => void;
   onFillAll: (field: 'stockOnHand' | 'trigger', value: number) => void;
 };
@@ -17,11 +19,29 @@ type VariantListColumnProps = {
  * the Create PO modal's Qty column (`ColumnFillInput`): typing and confirming sets every visible
  * row at once.
  */
-export default function VariantListColumn({ variants, onChange, onFillAll }: VariantListColumnProps) {
+export default function VariantListColumn({ variants, location, onChange, onFillAll }: VariantListColumnProps) {
   return (
     <div className="flex max-h-[300px] min-h-0 flex-col rounded-[8px] border border-inventory-border bg-inventory-surface md:h-full md:max-h-none">
-      <div className="grid grid-cols-[minmax(0,1fr)_5.5rem_5.5rem] items-center gap-[6px] border-b border-inventory-border px-[8px] py-[6px]">
+      <div className="grid grid-cols-[minmax(0,1fr)_6.5rem_5.5rem_5.5rem] items-center gap-[6px] border-b border-inventory-border px-[8px] py-[6px]">
         <h4 className="text-[11px] font-bold uppercase leading-none tracking-[0.4px] text-inventory-text-muted">Variants</h4>
+        <div>
+          <label htmlFor="colour-size-location" className="mb-[2px] block text-[9px] font-bold uppercase leading-none tracking-[0.3px] text-inventory-text-subtle">
+            Location
+          </label>
+          <select
+            id="colour-size-location"
+            value={location.id}
+            onChange={(e) => location.set(e.target.value)}
+            className="h-[22px] w-full min-w-0 rounded-[6px] border border-inventory-border-strong px-[4px] text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring cursor-pointer"
+          >
+            {location.options.length === 0 && <option value="">No locations</option>}
+            {location.options.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.name}
+              </option>
+            ))}
+          </select>
+        </div>
         <div>
           <p className="mb-[2px] text-[9px] font-bold uppercase leading-none tracking-[0.3px] text-inventory-text-subtle">Stock on hand</p>
           <ColumnFillInput label="Stock on hand" rowCount={variants.filter((r) => !r.stockLocked).length} min={0} integerOnly onApply={(v) => onFillAll('stockOnHand', v)} />
@@ -39,7 +59,7 @@ export default function VariantListColumn({ variants, onChange, onFillAll }: Var
         {variants.map((row) => (
           <div
             key={row.key}
-            className={`grid grid-cols-[minmax(0,1fr)_5.5rem_5.5rem] items-center gap-[6px] px-[8px] py-[5px] hover:bg-inventory-surface-hover ${row.isNew ? 'bg-inventory-success/[12%]' : ''}`}
+            className={`grid grid-cols-[minmax(0,1fr)_6.5rem_5.5rem_5.5rem] items-center gap-[6px] px-[8px] py-[5px] hover:bg-inventory-surface-hover ${row.isNew ? 'bg-inventory-success/[12%]' : ''}`}
           >
             <span className="flex min-w-0 items-center gap-[6px]">
               {row.colour && (
@@ -57,6 +77,9 @@ export default function VariantListColumn({ variants, onChange, onFillAll }: Var
                 </span>
               )}
             </span>
+            <span className="line-clamp-1 break-words text-[10.5px] text-inventory-text-subtle" title={row.locationLabel ?? undefined}>
+              {row.locationLabel ?? '—'}
+            </span>
             <input
               type="number"
               min={0}
@@ -64,7 +87,7 @@ export default function VariantListColumn({ variants, onChange, onFillAll }: Var
               value={row.stockOnHand}
               onChange={(e) => onChange(row.key, 'stockOnHand', Math.max(0, Math.trunc(Number(e.target.value) || 0)))}
               readOnly={row.stockLocked}
-              title={row.stockLocked ? 'Total across locations — set per location in the Variants table' : undefined}
+              title={row.stockLocked ? 'Kept at several locations — pick a location to edit its stock' : undefined}
               aria-label={`Stock on hand for ${variantTitle(row)}`}
               className="h-[22px] w-full min-w-0 rounded-[6px] border border-inventory-border-strong pl-[6px] pr-[10px] text-right text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring read-only:cursor-default read-only:bg-inventory-surface-muted read-only:text-inventory-text-muted"
             />

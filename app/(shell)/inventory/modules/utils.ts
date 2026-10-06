@@ -28,8 +28,31 @@ export function variantTitle(v: { colour: string; size: string }): string {
   return parts.length > 0 ? parts.join(' / ') : 'Default Title';
 }
 
+/** Where a stock adjustment made with `locationId` selected lands for this variant: its stock at
+ * that location, its unassigned stock when it has no location at all, or nowhere ('absent') when it
+ * is kept elsewhere only. */
+export type AdjustTarget = { kind: 'unassigned' } | { kind: 'location'; id: string; name: string; quantity: number } | { kind: 'absent' };
+
+export function adjustTarget(v: Pick<VariantRow, 'locations'>, locationId: string): AdjustTarget {
+  if (v.locations.length === 0) return { kind: 'unassigned' };
+  const at = v.locations.find((l) => l.id === locationId);
+  return at ? { kind: 'location', id: at.id, name: at.name, quantity: at.quantity } : { kind: 'absent' };
+}
+
 export function getAvailable(v: VariantRow): number {
   return v.stockOnHand - v.allocated;
+}
+
+/** The non-zero quantities that block deleting a variant, e.g. ["Stock 5", "Incoming 10"] —
+ * empty when the variant is safe to delete. */
+export function deleteBlockers(v: VariantRow): string[] {
+  const figures: [string, number][] = [
+    ['Stock', v.stockOnHand],
+    ['Allocated', v.allocated],
+    ['Available', getAvailable(v)],
+    ['Incoming', v.incoming],
+  ];
+  return figures.filter(([, n]) => n > 0).map(([label, n]) => `${label} ${n}`);
 }
 
 export function getStockValue(v: VariantRow): number {

@@ -434,6 +434,10 @@ export class SupplierProductController {
     if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
     if (!(await model.exists(id))) return { error: { message: 'Product not found', status: 404 } };
 
+    if ((await model.countUndeletableVariants(id, [variantId])) > 0) {
+      return { error: { message: 'This variant still has stock, allocated or incoming quantity — clear it before deleting', status: 409 } };
+    }
+
     const removed = await model.deleteVariant(id, variantId);
     if (!removed) return { error: { message: 'Variant not found', status: 404 } };
 
@@ -478,6 +482,16 @@ export class SupplierProductController {
     const value = (body ?? {}) as Record<string, unknown>;
     const variantIds = Array.isArray(value.variantIds) ? (value.variantIds as unknown[]).filter((v): v is string => typeof v === 'string') : [];
     if (variantIds.length === 0) return { error: { message: 'Validation failed', errors: ['variantIds: Select at least one variant'], status: 400 } };
+
+    const blocked = await model.countUndeletableVariants(id, variantIds);
+    if (blocked > 0) {
+      return {
+        error: {
+          message: `${blocked} selected variant${blocked === 1 ? ' still has' : 's still have'} stock, allocated or incoming quantity — clear it before deleting`,
+          status: 409,
+        },
+      };
+    }
 
     const count = await model.deleteVariants(id, variantIds);
     if (count === 0) return { error: { message: 'No matching variants found', status: 404 } };
@@ -553,7 +567,13 @@ export class SupplierProductController {
     }
     if (errors.length) return { error: { message: 'Validation failed', errors, status: 400 } };
 
-    await model.applyOptions(id, { mode, colours, sizes, values });
+    // Where the variants this creates are kept; omitted = unassigned stock.
+    const locationId = typeof value.locationId === 'string' && value.locationId.trim() ? value.locationId.trim() : null;
+    if (locationId && (await locationModel.countExisting([locationId])) !== 1) {
+      return { error: { message: 'Validation failed', errors: ['locationId: Pick an existing location'], status: 400 } };
+    }
+
+    await model.applyOptions(id, { mode, colours, sizes, values, locationId });
 
     const variantCount = colours.length > 0 ? colours.length * Math.max(sizes.length, 1) : sizes.length;
     await model.logActivity(

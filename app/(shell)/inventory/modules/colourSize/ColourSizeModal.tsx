@@ -1,6 +1,7 @@
 'use client';
 
 import { MODAL_FOOTER_BTN_DANGER, MODAL_FOOTER_BTN_SECONDARY, ModalActions, ModalShell } from '@/components/ModalShell';
+import type { LocationOption } from '../hooks/useLocations';
 import type { OptionLibraryState } from '../hooks/useOptionLibrary';
 import { WIZARD_BODY_CLASS } from '../modalStyles';
 import type { ProductRecord } from '../types';
@@ -11,6 +12,7 @@ import { useColourSizeModal } from './useColourSizeModal';
 type ColourSizeModalProps = {
   product: ProductRecord;
   optionLibrary: OptionLibraryState;
+  locationOptions: LocationOption[];
   onApplied: (product: ProductRecord) => void;
   onClose: () => void;
 };
@@ -23,8 +25,8 @@ type ColourSizeModalProps = {
  * anything to the product — see useColourSizeModal for the state and SupplierProductModel.applyOptions
  * for what each does server-side.
  */
-export default function ColourSizeModal({ product, optionLibrary, onApplied, onClose }: ColourSizeModalProps) {
-  const m = useColourSizeModal({ product, optionLibrary, onApplied, onClose });
+export default function ColourSizeModal({ product, optionLibrary, locationOptions, onApplied, onClose }: ColourSizeModalProps) {
+  const m = useColourSizeModal({ product, optionLibrary, locationOptions, onApplied, onClose });
 
   return (
     <ModalShell
@@ -75,7 +77,7 @@ export default function ColourSizeModal({ product, optionLibrary, onApplied, onC
         </div>
       }
     >
-      <div className="grid grid-cols-1 gap-[8px] md:h-[420px] md:grid-cols-[1fr_1fr_1.6fr]">
+      <div className="grid grid-cols-1 gap-[8px] md:h-[420px] md:grid-cols-[minmax(0,0.9fr)_minmax(0,0.9fr)_minmax(0,2.2fr)]">
         <OptionColumn
           kind="colour"
           title="Colour"
@@ -106,7 +108,7 @@ export default function ColourSizeModal({ product, optionLibrary, onApplied, onC
           onRemove={m.size.remove}
           onSave={m.size.save}
         />
-        <VariantListColumn variants={m.variants} onChange={m.setVariantValue} onFillAll={m.fillAll} />
+        <VariantListColumn variants={m.variants} location={m.location} onChange={m.setVariantValue} onFillAll={m.fillAll} />
       </div>
 
       {m.replaceConfirmOpen && (

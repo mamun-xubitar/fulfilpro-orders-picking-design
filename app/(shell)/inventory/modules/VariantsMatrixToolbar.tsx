@@ -164,6 +164,7 @@ export default function VariantsMatrixToolbar({ p, fullView }: VariantsMatrixToo
         <ColourSizeModal
           product={p.product}
           optionLibrary={p.optionLibrary}
+          locationOptions={p.locations.options}
           onApplied={p.onVariantSaved}
           onClose={() => setColourSizeOpen(false)}
         />

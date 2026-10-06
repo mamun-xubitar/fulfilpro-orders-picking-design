@@ -47,7 +47,7 @@ export default function OptionColumn({
 
   return (
     <div className="flex max-h-[300px] min-h-0 flex-col rounded-[8px] border border-inventory-border bg-inventory-surface md:h-full md:max-h-none">
-      <div className="flex items-center gap-[6px] border-b border-inventory-border px-[8px] py-[6px]">
+      <div className="relative flex items-center gap-[6px] border-b border-inventory-border px-[8px] py-[6px]">
         <input
           type="checkbox"
           checked={allChecked}
@@ -67,7 +67,7 @@ export default function OptionColumn({
         >
           Save
         </button>
-        <div className="relative">
+        <div>
           <button
             type="button"
             onClick={() => setFindOpen((v) => !v)}

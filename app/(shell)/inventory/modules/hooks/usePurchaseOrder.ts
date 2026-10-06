@@ -17,6 +17,13 @@ type UsePurchaseOrderArgs = {
  * PurchaseOrderModel.create. */
 const DEFAULT_SHIPPING_REMARK = 'NF.{orderNumber}, color: , size: , quantity: , made in china.';
 
+/** The locations the PO's lines are kept at, deduped, A→Z — what the Receive modal's Location dropdown offers. */
+function receiveLocationOptions(items: PurchaseOrderRecord['items']): { id: string; name: string }[] {
+  const byId = new Map<string, string>();
+  for (const item of items) for (const l of item.locations) byId.set(l.id, l.name);
+  return [...byId].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+}
+
 export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
   const [supplierOptions, setSupplierOptions] = useState<SupplierOption[]>([]);
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrderRecord[]>([]);
@@ -36,8 +43,9 @@ export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
   const [receiveTarget, setReceiveTarget] = useState<PurchaseOrderRecord | null>(null);
   const [receiveQty, setReceiveQty] = useState<Record<string, string>>({});
   const [receiveCost, setReceiveCost] = useState<Record<string, string>>({});
-  /** Where each line is put away — defaults to the variant's first location; absent when it has none. */
-  const [receiveLocation, setReceiveLocation] = useState<Record<string, string>>({});
+  /** The one location the receipt is put away at. Lines whose variant isn't kept there fall back to
+   * their own first location; lines with no location receive into unassigned stock. */
+  const [receiveLocationId, setReceiveLocationId] = useState('');
   const { request: requestReceive, loading: receiving } = useRequest<{ purchaseOrder: PurchaseOrderRecord; product: ProductRecord | null }>();
   // Bumped after a successful receive — a receipt can create a new (non-primary) supplier link,
   // so the Suppliers tab's Products Count needs to refetch even though this hook has no direct
@@ -175,7 +183,7 @@ export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
     setReceiveTarget(po);
     setReceiveQty(Object.fromEntries(po.items.map((item) => [item.id, String(Math.max(0, item.quantity - item.receivedQuantity))])));
     setReceiveCost(Object.fromEntries(po.items.map((item) => [item.id, item.unitCost !== null ? String(item.unitCost) : ''])));
-    setReceiveLocation(Object.fromEntries(po.items.flatMap((item) => (item.locations.length > 0 ? [[item.id, item.locations[0].id]] : []))));
+    setReceiveLocationId(receiveLocationOptions(po.items)[0]?.id ?? '');
   };
   const closeReceive = () => setReceiveTarget(null);
   const getReceiveQtyError = (value: string | undefined, remaining: number): string | null => {
@@ -191,7 +199,6 @@ export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
     setReceiveQty((prev) => ({ ...prev, [itemId]: value }));
   };
   const setReceiveItemCost = (itemId: string, value: string) => setReceiveCost((prev) => ({ ...prev, [itemId]: value }));
-  const setReceiveItemLocation = (itemId: string, locationId: string) => setReceiveLocation((prev) => ({ ...prev, [itemId]: locationId }));
   /** Bulk column fill for the Receive PO modal's Receive qty header (item 8) — each row still
    * clamps to its own remaining (quantity - receivedQuantity), same as a per-row edit. */
   const setAllReceiveQty = (value: number) => {
@@ -221,7 +228,9 @@ export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
       .map(([itemId, v]) => {
         const costInput = receiveCost[itemId];
         const unitCost = costInput !== undefined && costInput !== '' && Number.isFinite(Number(costInput)) ? Number(costInput) : undefined;
-        return { itemId, quantity: Number(v), unitCost, locationId: receiveLocation[itemId] };
+        const itemLocations = receiveTarget.items.find((item) => item.id === itemId)?.locations ?? [];
+        const locationId = itemLocations.some((l) => l.id === receiveLocationId) ? receiveLocationId : itemLocations[0]?.id;
+        return { itemId, quantity: Number(v), unitCost, locationId };
       });
     if (receipts.length === 0) {
       toast.error('Enter a quantity to receive');
@@ -233,7 +242,11 @@ export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
       data: { receipts },
       successMessage: 'Inventory received',
       onSuccess: ({ data }) => {
-        setReceiveTarget(null);
+        // Keep the modal open on the updated PO so its received/remaining figures are current;
+        // quantities re-seed to the new remaining, cost and location stay as entered.
+        const po = data.purchaseOrder;
+        setReceiveTarget(po);
+        setReceiveQty(Object.fromEntries(po.items.map((item) => [item.id, String(Math.max(0, item.quantity - item.receivedQuantity))])));
         loadPurchaseOrders();
         if (data.product) onSaved(data.product);
         setReceivedNonce((n) => n + 1);
@@ -280,8 +293,9 @@ export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
     setAllReceiveQty,
     receiveCost,
     setReceiveItemCost,
-    receiveLocation,
-    setReceiveItemLocation,
+    receiveLocationId,
+    setReceiveLocationId,
+    receiveLocationOptions: receiveTarget ? receiveLocationOptions(receiveTarget.items) : [],
     receiving,
     submitReceive,
     receivedNonce,

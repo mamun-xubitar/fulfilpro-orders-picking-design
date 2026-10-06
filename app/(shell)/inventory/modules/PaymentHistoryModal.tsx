@@ -45,12 +45,11 @@ export default function PaymentHistoryModal({ payment, onClose }: { payment: PoP
               <th className={`${TH} text-right`}>Rate</th>
               <th className={`${TH} text-right`}>Buying</th>
               <th className={`${TH} text-right`}>Freight / Misc</th>
-              <th className={`${TH} text-right`}>Total (AUD)</th>
             </tr>
           </thead>
           <tbody>
             {history === null ? (
-              <SkeletonRows rows={3} cells={['text', 'text', 'text', 'badge', 'num', 'num', 'num', 'num']} />
+              <SkeletonRows rows={3} cells={['text', 'text', 'text', 'badge', 'num', 'num', 'num']} />
             ) : (
               history.map((h) => (
                 <tr key={h.id} className="border-b border-inventory-divider last:border-0">
@@ -65,7 +64,6 @@ export default function PaymentHistoryModal({ payment, onClose }: { payment: PoP
                   <td className="px-2 py-1.5 text-right tabular-nums text-inventory-text-muted">
                     {formatMoney(h.freight)} / {formatMoney(h.misc)}
                   </td>
-                  <td className="px-2 py-1.5 text-right font-semibold tabular-nums text-inventory-text">${formatMoney(h.totalAud)}</td>
                 </tr>
               ))
             )}

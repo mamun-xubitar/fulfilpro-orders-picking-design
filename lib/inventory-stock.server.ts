@@ -11,7 +11,18 @@ type Tx = Prisma.TransactionClient;
  */
 
 /** A refused stock write — the message is safe to show the admin as-is. */
-export class StockError extends Error {}
+export class StockError extends Error {
+  /** The locations that refused the write (set when it was a still-holding-stock refusal). */
+  constructor(message: string, readonly holding: LocationStock[] = []) {
+    super(message);
+  }
+}
+
+/** "RAJSHSHI (100)", "RAJSHSHI (100) and RANGPUR (50)", "A (1), B (2) and C (3)". */
+export function describeHolding(holding: LocationStock[]): string {
+  const parts = holding.map((l) => `${l.name} (${l.quantity})`);
+  return parts.length <= 1 ? parts.join('') : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
+}
 
 export type LocationStock = { locationId: string; name: string; quantity: number };
 
@@ -105,7 +116,7 @@ export async function setLocationStock(tx: Tx, variantId: string, entries: { loc
   const nextIds = new Set(entries.map((e) => e.locationId));
   const holding = current.filter((l) => !nextIds.has(l.locationId) && l.quantity > 0);
   if (holding.length > 0) {
-    throw new StockError(`${holding.map((l) => `${l.name} still holds ${l.quantity}`).join(', ')} — set it to 0 before removing the location`);
+    throw new StockError(`${describeHolding(holding)} still ${holding.length === 1 ? 'holds' : 'hold'} stock — set to 0 before removing`, holding);
   }
   await tx.supplierProductVariantLocation.deleteMany({ where: { variantId, locationId: { notIn: [...nextIds] } } });
   for (const { locationId, quantity } of entries) {

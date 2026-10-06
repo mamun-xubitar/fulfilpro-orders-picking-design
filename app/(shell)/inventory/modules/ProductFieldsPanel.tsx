@@ -16,6 +16,7 @@ import SupplierMultiSelect from './SupplierMultiSelect';
 import { Check, Document } from './icons';
 import type { useProductDetails } from './hooks/useProductDetails';
 import type { useSuppliers } from './hooks/useSuppliers';
+import type { LocationOption } from './hooks/useLocations';
 import type { OptionLibraryState } from './hooks/useOptionLibrary';
 import type { InventoryCategoriesState } from './hooks/useInventoryCategories';
 import { useItemNoAvailability } from './hooks/useItemNoAvailability';
@@ -25,6 +26,7 @@ type ProductFieldsPanelProps = {
   details: ReturnType<typeof useProductDetails>;
   supplierOptions: SupplierOption[];
   optionLibrary: OptionLibraryState;
+  locationOptions: LocationOption[];
   inventoryCategories: InventoryCategoriesState;
   suppliers: ReturnType<typeof useSuppliers>;
   /** The Colour & size adjustment modal (opened from the Sizes/Colours "+" buttons) needs the
@@ -39,7 +41,7 @@ type ProductFieldsPanelProps = {
 /** Always editable — every field is a live input; Save is the only action, disabled until the
  * draft differs from what's saved (see useProductDetails' `dirty`). Two-column field grid
  * (design 6), with Shopify Category and the hub Category paired side by side in one row. */
-export default function ProductFieldsPanel({ details: d, supplierOptions, optionLibrary, inventoryCategories, suppliers, product, onOptionsApplied, embedded }: ProductFieldsPanelProps) {
+export default function ProductFieldsPanel({ details: d, supplierOptions, optionLibrary, locationOptions, inventoryCategories, suppliers, product, onOptionsApplied, embedded }: ProductFieldsPanelProps) {
   const itemNoAvailability = useItemNoAvailability(d.form.itemNo, d.productId ?? undefined);
   const [colourSizeOpen, setColourSizeOpen] = useState(false);
   // Read-only for non-admins: the wizard (embedded) is admin-only, so it never hits this.
@@ -127,6 +129,7 @@ export default function ProductFieldsPanel({ details: d, supplierOptions, option
         <ColourSizeModal
           product={product}
           optionLibrary={optionLibrary}
+          locationOptions={locationOptions}
           onApplied={onOptionsApplied}
           onClose={() => setColourSizeOpen(false)}
         />

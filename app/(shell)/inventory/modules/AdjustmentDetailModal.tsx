@@ -27,7 +27,7 @@ export default function AdjustmentDetailModal({ detail, onOpenProduct }: Adjustm
       maxWidthClass="max-w-[720px]"
       title={adjustment ? `Adjustment ${formatAdjustmentNumber(adjustment.number)}` : 'Adjustment'}
       onClose={detail.close}
-      bodyClassName={WIZARD_BODY_CLASS}
+      bodyClassName={`${WIZARD_BODY_CLASS} !overflow-y-hidden`}
       footer={
         <div className="flex justify-end">
           <button type="button" onClick={detail.close} className={WIZARD_BTN_SECONDARY}>
@@ -69,7 +69,7 @@ export default function AdjustmentDetailModal({ detail, onOpenProduct }: Adjustm
               </Field>
             </dl>
 
-            <div className="max-h-[calc(55vh/var(--page-zoom,1))] overflow-auto thin-scroll rounded-lg border border-inventory-border">
+            <div className="max-h-[calc((100dvh_-_20rem)/var(--page-zoom,1))] overflow-auto thin-scroll rounded-lg border border-inventory-border">
               <table className="w-full min-w-[520px] border-collapse text-[11px] leading-none">
                 <thead className="sticky top-0 bg-inventory-surface-muted">
                   <tr className="border-b border-inventory-border text-left text-[10px] font-bold uppercase tracking-[0.4px] text-inventory-text-subtle">
