@@ -1,0 +1,443 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-06T05:42:59.573Z",
+  "title": "Design System: FulfilPro",
+  "extensions": {
+    "colorMeta": {
+      "shell-primary": {
+        "role": "primary",
+        "displayName": "Dispatch Blue",
+        "tonalRamp": [
+          "#172554",
+          "#1e3a8a",
+          "#1d4ed8",
+          "#2563eb",
+          "#3b82f6",
+          "#93c5fd",
+          "#dbeafe",
+          "#eff6ff"
+        ]
+      },
+      "shell-sidebar": {
+        "role": "neutral",
+        "displayName": "Floor Charcoal",
+        "tonalRamp": [
+          "#030712",
+          "#111827",
+          "#374151",
+          "#4b5563",
+          "#6b7280",
+          "#d1d5db",
+          "#f3f4f6",
+          "#f9fafb"
+        ]
+      },
+      "shell-surface": {
+        "role": "neutral",
+        "displayName": "Paper White",
+        "tonalRamp": [
+          "#030712",
+          "#111827",
+          "#374151",
+          "#4b5563",
+          "#6b7280",
+          "#d1d5db",
+          "#f3f4f6",
+          "#f9fafb"
+        ]
+      },
+      "shell-surface-muted": {
+        "role": "neutral",
+        "displayName": "Bench Gray",
+        "tonalRamp": [
+          "#030712",
+          "#111827",
+          "#374151",
+          "#4b5563",
+          "#6b7280",
+          "#d1d5db",
+          "#f3f4f6",
+          "#f9fafb"
+        ]
+      },
+      "shell-border": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "tonalRamp": [
+          "#030712",
+          "#111827",
+          "#374151",
+          "#4b5563",
+          "#6b7280",
+          "#d1d5db",
+          "#f3f4f6",
+          "#f9fafb"
+        ]
+      },
+      "shell-danger": {
+        "role": "semantic",
+        "displayName": "Danger Red",
+        "tonalRamp": [
+          "#450a0a",
+          "#7f1d1d",
+          "#b91c1c",
+          "#dc2626",
+          "#ef4444",
+          "#fca5a5",
+          "#fee2e2",
+          "#fef2f2"
+        ]
+      },
+      "shell-warning-ink": {
+        "role": "semantic",
+        "displayName": "Pending Amber",
+        "tonalRamp": [
+          "#451a03",
+          "#78350f",
+          "#92400e",
+          "#d97706",
+          "#f59e0b",
+          "#fcd34d",
+          "#fef3c7",
+          "#fffbeb"
+        ]
+      },
+      "shell-success-ink": {
+        "role": "semantic",
+        "displayName": "Fulfilled Green",
+        "tonalRamp": [
+          "#052e16",
+          "#14532d",
+          "#15803d",
+          "#16a34a",
+          "#22c55e",
+          "#86efac",
+          "#dcfce7",
+          "#f0fdf4"
+        ]
+      },
+      "inventory-primary": {
+        "role": "primary",
+        "displayName": "Hub Violet",
+        "canonical": "var(--inventory-primary)",
+        "tonalRamp": [
+          "oklch(22% 0.12 285)",
+          "oklch(32% 0.17 285)",
+          "oklch(42% 0.21 285)",
+          "oklch(50% 0.23 285)",
+          "oklch(62% 0.18 285)",
+          "oklch(75% 0.12 285)",
+          "oklch(86% 0.07 285)",
+          "oklch(95% 0.03 285)"
+        ]
+      },
+      "inventory-secondary": {
+        "role": "secondary",
+        "displayName": "Ledger Blue",
+        "canonical": "var(--inventory-secondary)",
+        "tonalRamp": [
+          "#172554",
+          "#1e3a8a",
+          "#1d4ed8",
+          "#2563eb",
+          "#3b82f6",
+          "#93c5fd",
+          "#dbeafe",
+          "#eff6ff"
+        ]
+      },
+      "inventory-accent": {
+        "role": "secondary",
+        "displayName": "Marigold",
+        "canonical": "var(--inventory-accent)",
+        "tonalRamp": [
+          "#451a03",
+          "#78350f",
+          "#92400e",
+          "#d97706",
+          "#f59e0b",
+          "#fcd34d",
+          "#fef3c7",
+          "#fffbeb"
+        ]
+      },
+      "inventory-bg": {
+        "role": "neutral",
+        "displayName": "Lavender Canvas",
+        "canonical": "var(--inventory-bg)",
+        "tonalRamp": [
+          "oklch(22% 0.04 285)",
+          "oklch(33% 0.04 285)",
+          "oklch(45% 0.04 285)",
+          "oklch(58% 0.04 285)",
+          "oklch(70% 0.04 285)",
+          "oklch(83% 0.035 285)",
+          "oklch(93% 0.02 285)",
+          "oklch(97% 0.01 285)"
+        ]
+      },
+      "inventory-text": {
+        "role": "neutral",
+        "displayName": "Hub Ink",
+        "canonical": "var(--inventory-text)",
+        "tonalRamp": [
+          "oklch(22% 0.04 285)",
+          "oklch(33% 0.04 285)",
+          "oklch(45% 0.04 285)",
+          "oklch(58% 0.04 285)",
+          "oklch(70% 0.04 285)",
+          "oklch(83% 0.035 285)",
+          "oklch(93% 0.02 285)",
+          "oklch(97% 0.01 285)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "page-title": {
+        "displayName": "Page title",
+        "purpose": "Shell header page heading."
+      },
+      "dialog-title": {
+        "displayName": "Dialog title",
+        "purpose": "ModalShell header (14px when compact)."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Shell working size: tables, forms, nav, buttons."
+      },
+      "label": {
+        "displayName": "Label / meta",
+        "purpose": "Field labels, timestamps, helper text."
+      },
+      "table-header": {
+        "displayName": "Table header",
+        "purpose": "Uppercase tracked shell table headers."
+      },
+      "inventory-body": {
+        "displayName": "Inventory body",
+        "purpose": "Dense hub buttons, chips, cells."
+      },
+      "inventory-tab": {
+        "displayName": "Inventory tab",
+        "purpose": "Module tab strip labels."
+      },
+      "numeric": {
+        "displayName": "Numeric",
+        "purpose": "Quantities, money, counts — tabular figures."
+      }
+    },
+    "shadows": [
+      {
+        "name": "resting-card",
+        "value": "0 1px 2px 0 rgb(0 0 0 / 0.05)",
+        "purpose": "Shell cards and table wrappers (shadow-sm)."
+      },
+      {
+        "name": "inventory",
+        "value": "0 1px 2px rgba(40, 30, 90, 0.06), 0 1px 3px rgba(40, 30, 90, 0.08)",
+        "purpose": "Inventory panels, active tab, wizard cards."
+      },
+      {
+        "name": "inventory-md",
+        "value": "0 8px 20px rgba(40, 30, 90, 0.14), 0 2px 6px rgba(40, 30, 90, 0.08)",
+        "purpose": "Compact (inventory) modals."
+      },
+      {
+        "name": "hover-lift",
+        "value": "0 4px 16px rgba(0,0,0,.08)",
+        "purpose": "Store cards on hover."
+      },
+      {
+        "name": "popover",
+        "value": "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)",
+        "purpose": "Menus, dropdowns (shadow-lg)."
+      },
+      {
+        "name": "overlay",
+        "value": "0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)",
+        "purpose": "Shell dialogs (shadow-xl)."
+      },
+      {
+        "name": "blocking",
+        "value": "0 25px 50px -12px rgb(0 0 0 / 0.25)",
+        "purpose": "Access-restricted / session-blocking card (shadow-2xl)."
+      }
+    ],
+    "motion": [
+      {
+        "name": "control-transition",
+        "value": "150ms ease",
+        "purpose": "Color/background change on buttons, nav items, chips."
+      },
+      {
+        "name": "sidebar-collapse",
+        "value": "200ms ease",
+        "purpose": "Sidebar width/transform and main-content margin."
+      },
+      {
+        "name": "inventory-dialog-fade",
+        "value": "180ms ease-out",
+        "purpose": "Inventory modal scrim fade-in."
+      },
+      {
+        "name": "inventory-pop-in",
+        "value": "200ms cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Inventory dialog / dropdown entrance (4px rise, 0.98 scale)."
+      },
+      {
+        "name": "inventory-shimmer",
+        "value": "1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite, 70ms row stagger",
+        "purpose": "Skeleton bones; becomes a 2.2s opacity breathe under reduced motion."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "md",
+        "value": "768px",
+        "purpose": "Sidebar becomes fixed (drawer below)."
+      },
+      {
+        "name": "xl",
+        "value": "1280px",
+        "purpose": "Inventory locks to a no-page-scroll workspace."
+      },
+      {
+        "name": "sidebar-collapse",
+        "value": "1500px",
+        "purpose": "Sidebar auto-collapses to an icon rail below this width."
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button (Shell)",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The shell's single action button: Dispatch Blue, 8px radius, 14px medium.",
+      "html": "<button class=\"ds-btn-primary\">Confirm fulfilment</button>",
+      "css": ".ds-btn-primary{background:#2563eb;color:#fff;padding:8px 16px;border:0;border-radius:8px;font:500 14px/20px Arial,Helvetica,sans-serif;cursor:pointer;transition:background-color .15s}.ds-btn-primary:hover{background:#1d4ed8}.ds-btn-primary:focus-visible{outline:none;box-shadow:0 0 0 2px #fff,0 0 0 4px #3b82f6}.ds-btn-primary:disabled{opacity:.6;cursor:not-allowed}"
+    },
+    {
+      "name": "Secondary Button (Shell)",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Cancel / neutral action: white with a gray-300 hairline.",
+      "html": "<button class=\"ds-btn-secondary\">Cancel</button>",
+      "css": ".ds-btn-secondary{background:#fff;color:#4b5563;padding:8px 12px;border:1px solid #d1d5db;border-radius:8px;font:600 14px/20px Arial,Helvetica,sans-serif;cursor:pointer;transition:background-color .15s}.ds-btn-secondary:hover{background:#f9fafb}.ds-btn-secondary:focus-visible{outline:none;box-shadow:0 0 0 2px #3b82f6}"
+    },
+    {
+      "name": "Text Input (Shell)",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Standard form field with a 2px blue focus ring.",
+      "html": "<label class=\"ds-field\"><span class=\"ds-field-label\">Tracking number</span><input class=\"ds-input\" placeholder=\"e.g. 1Z999AA10123456784\"></label>",
+      "css": ".ds-field{display:flex;flex-direction:column;gap:4px;font-family:Arial,Helvetica,sans-serif;width:280px}.ds-field-label{font-size:12px;font-weight:500;color:#374151}.ds-input{width:100%;border:1px solid #d1d5db;border-radius:8px;padding:8px 12px;font-size:14px;color:#111827;background:#fff}.ds-input::placeholder{color:#9ca3af}.ds-input:focus{outline:none;box-shadow:0 0 0 2px #3b82f6}"
+    },
+    {
+      "name": "Sidebar Navigation",
+      "kind": "nav",
+      "refersTo": "nav-item",
+      "description": "Floor Charcoal rail with a solid blue active pill.",
+      "html": "<nav class=\"ds-nav\"><span class=\"ds-nav-brand\">FulfilPro</span><a class=\"ds-nav-item ds-active\" href=\"#\"><svg width=\"20\" height=\"20\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2\"/></svg>Orders</a><a class=\"ds-nav-item\" href=\"#\"><svg width=\"20\" height=\"20\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z\"/></svg>Decoration<span class=\"ds-count\">3</span></a></nav>",
+      "css": ".ds-nav{background:#111827;width:240px;padding:12px 8px;display:flex;flex-direction:column;gap:4px;font-family:Arial,Helvetica,sans-serif}.ds-nav-brand{color:#60a5fa;font-weight:700;font-size:18px;padding:4px 12px 12px}.ds-nav-item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:8px;color:#d1d5db;font-size:14px;font-weight:500;text-decoration:none;transition:background-color .15s,color .15s}.ds-nav-item:hover{background:#374151;color:#fff}.ds-nav-item.ds-active{background:#2563eb;color:#fff}.ds-count{margin-left:auto;min-width:16px;height:16px;padding:0 4px;border-radius:9999px;background:#ef4444;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center}"
+    },
+    {
+      "name": "Status Badges",
+      "kind": "chip",
+      "refersTo": "chip-status",
+      "description": "Tinted pill + darker ink: state is always color and a word.",
+      "html": "<div class=\"ds-badges\"><span class=\"ds-badge ds-pending\">Pending</span><span class=\"ds-badge ds-ok\">Fulfilled</span><span class=\"ds-badge ds-fail\">Failed</span></div>",
+      "css": ".ds-badges{display:flex;gap:6px;font-family:Arial,Helvetica,sans-serif}.ds-badge{border-radius:9999px;padding:2px 8px;font-size:12px;font-weight:600;border:1px solid transparent}.ds-pending{background:#fef3c7;color:#92400e;border-color:#fde68a}.ds-ok{background:#dcfce7;color:#15803d;border-color:#bbf7d0}.ds-fail{background:#fef2f2;color:#dc2626;border-color:#fecaca}"
+    },
+    {
+      "name": "Card (Shell)",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "White form/table container, gray-200 hairline, resting shadow.",
+      "html": "<section class=\"ds-card\"><h3 class=\"ds-card-title\">Access window</h3><p class=\"ds-card-body\">Staff can sign in Mon–Fri, 07:00–18:00 Australia/Sydney.</p></section>",
+      "css": ".ds-card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:20px;box-shadow:0 1px 2px rgba(0,0,0,.05);font-family:Arial,Helvetica,sans-serif;max-width:360px}.ds-card-title{margin:0 0 6px;font-size:16px;font-weight:600;color:#111827}.ds-card-body{margin:0;font-size:14px;color:#6b7280}"
+    },
+    {
+      "name": "Inventory Module Tabs",
+      "kind": "nav",
+      "refersTo": "inventory-tab",
+      "description": "Violet-tinted strip of 9px uppercase tab pills.",
+      "html": "<nav class=\"ds-inv-tabs\"><button class=\"ds-inv-tab ds-active\">Variant</button><button class=\"ds-inv-tab\">Products</button><button class=\"ds-inv-tab\">Purchase Orders</button><button class=\"ds-inv-tab\">Stocktake</button></nav>",
+      "css": ".ds-inv-tabs{display:flex;gap:2px;padding:2px 4px;border-radius:10px;border:1px solid rgb(91 63 214/.25);background:rgb(91 63 214/.06);box-shadow:0 1px 2px rgba(40,30,90,.06),0 1px 3px rgba(40,30,90,.08);font-family:Arial,Helvetica,sans-serif}.ds-inv-tab{border:0;background:transparent;border-radius:6px;padding:6px;font-size:9px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;line-height:1;color:#5b3fd6;cursor:pointer;transition:color .2s,background-color .2s,box-shadow .2s}.ds-inv-tab:hover{background:#fff;color:#4a2fbf}.ds-inv-tab.ds-active{background:#5b3fd6;color:#fff}"
+    },
+    {
+      "name": "Inventory Footer Buttons",
+      "kind": "button",
+      "refersTo": "inventory-button-primary",
+      "description": "28px, 11px bold compact pair used in every inventory modal footer.",
+      "html": "<div class=\"ds-inv-footer\"><button class=\"ds-inv-btn ds-inv-sec\">Cancel</button><button class=\"ds-inv-btn ds-inv-pri\">Save product</button></div>",
+      "css": ".ds-inv-footer{display:flex;gap:8px;font-family:Arial,Helvetica,sans-serif}.ds-inv-btn{height:28px;padding:0 12px;border-radius:7px;font-size:11px;font-weight:700;line-height:1;cursor:pointer;transition:background-color .15s}.ds-inv-sec{background:#fff;color:#524e6e;border:1px solid #aea7cc}.ds-inv-sec:hover{background:#f1eef9}.ds-inv-pri{background:#5b3fd6;color:#fff;border:0}.ds-inv-pri:hover{background:#4a2fbf}.ds-inv-btn:focus-visible{outline:none;box-shadow:0 0 0 2px #c9bdf7}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Dispatch Floor",
+    "overview": "FulfilPro is the screen a warehouse, a print table, and an admin desk all share. The North Star\nis a well-run dispatch floor. Lots of work is visible at once. Every bay is labelled. You can\ntell where an order is from across the room, without opening it. Density is a feature here, not\nclutter: a picker or decorator scanning a queue mid-task needs the row to say *allocated / picked /\ndecorated / packed / fulfilled / delivered* by itself. Chrome stays neutral so that status color\ncarries the meaning.\n\nThe system ships as **two skins** that share one shell (dark sidebar, white 60px header) and one\nfont. The **Shell skin** covers every route except Inventory: Orders, Decoration, Picking List,\nBack In Stock, Tasks, Messages, Tracking, Stores, Users, Settings, and Profile. It is built\ndirectly from Tailwind's default gray and blue palette, at comfortable 14px density with 8px\nrounded controls. The **Inventory skin** covers `app/(shell)/inventory` only. It is a namespaced\n`inventory-*` token set with a violet primary on a lavender canvas. It runs at a much tighter\n11px density with 28px controls, has a page-level zoom control, and gives each panel its own\naccent hue so a crowded hub screen reads as separate zones. The two skins never mix inside one\nsurface.\n\nThe app is light-only (no dark mode), and operators may use it on a shop-floor tablet as well as\na desktop. Copy protection (`user-select: none`) on the order, decoration, and picking surfaces\nis a deliberate product decision. It is not a styling bug.",
+    "keyCharacteristics": [
+      "Neutral chrome, semantic color: blue or violet means \"act here\", and red, amber, and green mean state.",
+      "Two skins: Shell (gray/blue, `text-sm`) everywhere, and Inventory (violet tokens, 11px) on the hub catalogue.",
+      "Tables and queues first. Cards hold forms and settings, not decoration.",
+      "Flat surfaces with hairline borders and light shadows. Heavy shadows are reserved for overlays.",
+      "One system sans (Arial), with weight doing the hierarchy work instead of size."
+    ],
+    "rules": [
+      {
+        "name": "The Status-Owns-Color Rule",
+        "body": "Outside the one action hue, saturated color means state, and nothing else. Never use red, amber, or green for decoration, and never show a state with gray alone.",
+        "section": "colors"
+      },
+      {
+        "name": "The Skin Boundary Rule",
+        "body": "`inventory-*` tokens are only used under `app/(shell)/inventory` (plus the modals and portals it opens, which use the `compact` ModalShell). Shell routes use the Tailwind gray/blue utilities. Don't mix the two skins on one surface.",
+        "section": "colors"
+      },
+      {
+        "name": "The One-Zone-One-Hue Rule",
+        "body": "Each Inventory section hue is assigned to exactly one panel. Don't reuse a hue for a different panel, and don't use section hues for state.",
+        "section": "colors"
+      },
+      {
+        "name": "The Weight-Not-Size Rule",
+        "body": "Only a few sizes are in use (`text-sm` and `text-xs` make up about 90% of the type). To make something stand out, raise the weight or darken the gray. Don't introduce a new size.",
+        "section": "typography"
+      },
+      {
+        "name": "The Tabular Numbers Rule",
+        "body": "Any number that sits in a column or changes in place (stock, money, counts, zoom) uses `tabular-nums`.",
+        "section": "typography"
+      },
+      {
+        "name": "The Shadow-Means-Floating Rule",
+        "body": "A resting surface gets a border and at most `shadow-sm` (or shadow-inventory). Anything at `shadow-lg` or above has to be a real overlay: a menu, dialog, or toast.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** pick the skin by route: Tailwind gray/blue utilities outside Inventory, and `inventory-*`",
+      "**Do** show every order, product, or stock state as a colored badge with a text label (Status-Owns-Color).",
+      "**Do** use `text-sm` for shell body text and `text-xs` for labels and meta, and add emphasis with weight.",
+      "**Do** build dialogs with `ModalShell` and `ModalActions` (pass `compact` in Inventory) instead of hand-rolled overlays.",
+      "**Do** give inputs the standard `rounded-lg border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500` treatment and show errors inline below the field.",
+      "**Do** keep `cursor-pointer`, a 150ms color transition, and a 60%-opacity disabled state on every interactive control.",
+      "**Do** keep Inventory surfaces inside the 1280×800 no-page-scroll budget, with long lists scrolling inside their panel (`thin-scroll`).",
+      "**Do** use `tabular-nums` for quantities, money, and counts."
+    ],
+    "donts": [
+      "**Don't** use `inventory-*` tokens on shell routes, or raw Tailwind violet or indigo inside Inventory in place of its tokens.",
+      "**Don't** add a second action hue to either skin. Blue (shell) and violet (inventory) are the only \"click here\" colors.",
+      "**Don't** use red, amber, or green for decoration or emphasis. Those colors mean state.",
+      "**Don't** put `shadow-lg` or larger on resting cards or panels. Those shadows are for overlays.",
+      "**Don't** remove the copy-protection classes (`protected-orders-page`, `[data-protected]`) from order, decoration, or picking surfaces. They are a product decision.",
+      "**Don't** add new type sizes or a display font for emphasis. Use weight and gray value.",
+      "**Don't** reuse an Inventory section hue (`inventory-sec-*`) for a different panel or for status."
+    ]
+  }
+}

@@ -2,18 +2,20 @@
 
 import { ModalShell } from '@/components/ModalShell';
 import type { useAdjustments } from './hooks/useAdjustments';
+import { SkeletonRows } from './Skeleton';
 import { SPINNER, WIZARD_BODY_CLASS, WIZARD_BTN_PRIMARY, WIZARD_BTN_SECONDARY, WIZARD_CARD_CLASS } from './modalStyles';
 import AnimatedStepBody from './newProduct/AnimatedStepBody';
+import { AdjustmentNumber, NetQty, ReasonBadge, VIEW_BTN } from './AdjustmentBits';
 import type { VariantRow } from './types';
 import { formatDate, variantTitle } from './utils';
 
-type AdjustmentModalsProps = { adjustments: ReturnType<typeof useAdjustments>; variants: VariantRow[] };
+type AdjustmentModalsProps = { adjustments: ReturnType<typeof useAdjustments>; variants: VariantRow[]; onView: (id: string) => void };
 
-export default function AdjustmentModals({ adjustments: a, variants }: AdjustmentModalsProps) {
+export default function AdjustmentModals({ adjustments: a, variants, onView }: AdjustmentModalsProps) {
   return (
     <>
       {a.modalOpen && <NewAdjustmentModal a={a} variants={variants} />}
-      {a.historyOpen && <AdjustmentHistoryModal a={a} />}
+      {a.historyOpen && <AdjustmentHistoryModal a={a} onView={onView} />}
     </>
   );
 }
@@ -206,27 +208,54 @@ function AdjustmentRow({ a, v }: { a: ReturnType<typeof useAdjustments>; v: Vari
   );
 }
 
-function AdjustmentHistoryModal({ a }: { a: ReturnType<typeof useAdjustments> }) {
+function AdjustmentHistoryModal({ a, onView }: { a: ReturnType<typeof useAdjustments>; onView: (id: string) => void }) {
   return (
     <ModalShell disableBackdropClose title="Adjustment history" compact onClose={a.closeHistory} wide>
-      {a.loadingHistory ? (
-        <p className="py-6 text-center text-[11px] text-inventory-text-subtle">Loading...</p>
-      ) : a.history.length === 0 ? (
+      {!a.loadingHistory && a.history.length === 0 ? (
         <p className="py-6 text-center text-[11px] text-inventory-text-subtle">No adjustments recorded yet.</p>
       ) : (
-        <ul className="max-h-96 divide-y divide-inventory-divider overflow-y-auto thin-scroll">
-          {a.history.map((row) => (
-            <li key={row.id} className="flex items-center justify-between gap-2 py-1.5 text-[11px]">
-              <span className="min-w-0 truncate text-inventory-text-muted">
-                {variantTitle(row)} · {row.reason.toLowerCase()} {row.note ? `— ${row.note}` : ''}
-              </span>
-              <span className={`shrink-0 font-semibold tabular-nums ${row.delta > 0 ? 'text-inventory-success-hover' : 'text-inventory-danger'}`}>
-                {row.delta > 0 ? '+' : ''}
-                {row.delta} <span className="font-normal text-inventory-text-subtle">· {formatDate(row.createdAt)}</span>
-              </span>
-            </li>
-          ))}
-        </ul>
+        <div className="max-h-96 overflow-auto thin-scroll rounded-lg border border-inventory-border">
+          <table className="w-full min-w-[460px] border-collapse text-[11px] leading-none">
+            <thead className="sticky top-0 bg-inventory-surface-muted">
+              <tr className="border-b border-inventory-border text-left text-[10px] font-bold uppercase tracking-[0.4px] text-inventory-text-subtle">
+                <th className="px-2 py-1">Adjustment</th>
+                <th className="px-2 py-1">Date</th>
+                <th className="px-2 py-1 text-right">Variants</th>
+                <th className="px-2 py-1 text-right">Net change</th>
+                <th className="px-2 py-1">Reason</th>
+                <th className="px-2 py-1">By</th>
+                <th className="px-2 py-1" />
+              </tr>
+            </thead>
+            <tbody aria-busy={a.loadingHistory}>
+              {a.loadingHistory ? (
+                <SkeletonRows rows={5} cells={['text', 'text', 'num', 'num', 'badge', 'text', { kind: 'actions', count: 1 }]} />
+              ) : (
+                a.history.map((row) => (
+                  <tr key={row.id} className="border-b border-inventory-divider last:border-0 hover:bg-inventory-surface-hover">
+                    <td className="whitespace-nowrap px-2 py-1.5">
+                      <AdjustmentNumber adjustment={row} />
+                    </td>
+                    <td className="whitespace-nowrap px-2 py-1.5 text-inventory-text-subtle">{formatDate(row.createdAt)}</td>
+                    <td className="px-2 py-1.5 text-right tabular-nums text-inventory-text-muted">{row.lineCount}</td>
+                    <td className="px-2 py-1.5 text-right">
+                      <NetQty value={row.netQty} />
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <ReasonBadge reason={row.reason} />
+                    </td>
+                    <td className="whitespace-nowrap px-2 py-1.5 text-inventory-text-subtle">{row.actorName}</td>
+                    <td className="px-2 py-1.5 text-right">
+                      <button type="button" onClick={() => onView(row.id)} aria-label={`View adjustment ${row.number}`} className={VIEW_BTN}>
+                        View
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       )}
     </ModalShell>
   );

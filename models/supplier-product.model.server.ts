@@ -780,7 +780,7 @@ export class SupplierProductModel {
           })
         : Promise.resolve([]),
       productIds.length
-        ? prisma.stockAdjustment.groupBy({
+        ? prisma.stockAdjustmentBatch.groupBy({
             by: ['supplierProductId'],
             where: { supplierProductId: { in: productIds }, createdAt: { gte: startOfMonth() } },
             _count: { id: true },
@@ -840,7 +840,7 @@ export class SupplierProductModel {
     const allocatedBySku = new Map(allocatedRows.map((r) => [r.sku!, r._sum.netQuantity ?? 0]));
 
     const lastAdjustmentRows = productIds.length
-      ? await prisma.stockAdjustment.findMany({
+      ? await prisma.stockAdjustmentBatch.findMany({
           where: { supplierProductId: { in: productIds } },
           distinct: ['supplierProductId'],
           orderBy: { createdAt: 'desc' },

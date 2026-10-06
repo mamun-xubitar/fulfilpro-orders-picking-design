@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { MODAL_FOOTER_BTN_SECONDARY, ModalShell } from '@/components/ModalShell';
 import useRequest from '@/hooks/useRequest';
+import { Bone } from './Skeleton';
 import type { SupplierRow } from './hooks/useSuppliers';
 import { formatDate } from './utils';
 
@@ -53,8 +54,8 @@ export default function SupplierDetailsModal({ supplierId, onClose, onOpenPurcha
         <div className="grid grid-cols-2 gap-x-4 gap-y-3" aria-busy={loading} aria-label="Loading supplier details">
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="space-y-[6px]">
-              <div className="h-[10px] w-16 animate-pulse rounded bg-inventory-border" />
-              <div className="h-[14px] w-full max-w-[160px] animate-pulse rounded bg-inventory-border" />
+              <Bone className="h-[9px] w-16" />
+              <Bone className="h-[13px] w-full max-w-[160px]" />
             </div>
           ))}
         </div>

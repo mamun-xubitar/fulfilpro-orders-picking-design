@@ -292,7 +292,6 @@ export type ModuleTabId =
   | 'adjustments'
   | 'suppliers'
   | 'payments'
-  | 'reports'
   | 'history';
 
 export type TabDef<T extends string> = {
@@ -467,14 +466,55 @@ export type StocktakeSyncSummary = { adjusted: number; unchanged: number; skippe
 
 export type StockAdjustmentReasonValue = 'DAMAGED' | 'LOST' | 'FOUND' | 'RETURN' | 'CORRECTION' | 'OTHER';
 
-export type StockAdjustmentRecord = {
+export type StockAdjustmentSourceValue = 'MANUAL' | 'STOCKTAKE';
+
+/** One adjustment — a saved batch of variant lines — as listed in the Adjustments tab and a
+ * product's history. The lines themselves load with the View modal (AdjustmentBatchDetail). */
+export type AdjustmentBatchRecord = {
+  id: string;
+  /** Shown as ADJ-0001 (formatAdjustmentNumber). */
+  number: number;
+  source: StockAdjustmentSourceValue;
+  /** The stocktake's ST-0007 when `source` is STOCKTAKE. */
+  reference: string | null;
+  createdAt: string;
+  supplierProductId: string;
+  productName: string;
+  itemNo: string;
+  actorName: string;
+  lineCount: number;
+  netQty: number;
+  /** The reason every line shares, or MIXED. */
+  reason: StockAdjustmentReasonValue | 'MIXED';
+};
+
+export type AdjustmentLineRecord = {
   id: string;
   variantId: string;
   colour: string;
   size: string;
+  sku: string | null;
   delta: number;
+  /** Null for old adjustments, and for non-admins (who don't see stock on hand). */
+  stockBefore: number | null;
   reason: StockAdjustmentReasonValue;
   note: string | null;
+};
+
+export type AdjustmentBatchDetail = AdjustmentBatchRecord & { lines: AdjustmentLineRecord[] };
+
+// — History —
+
+/** One row of the History tab (InventoryActivity), with the product it belongs to. */
+export type InventoryActivityRecord = {
+  id: string;
+  type: string;
+  message: string;
   actorName: string;
   createdAt: string;
+  /** Set on adjustment entries — the History tab's View opens that adjustment. */
+  adjustmentBatchId: string | null;
+  supplierProductId: string;
+  productName: string;
+  itemNo: string;
 };

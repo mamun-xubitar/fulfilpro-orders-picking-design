@@ -4,9 +4,11 @@ import { usePageHeading } from '@/components/PageHeadingContext';
 import Pagination from '@/components/Pagination';
 import { useZoom } from '@/components/ZoomContext';
 import { useEffect } from 'react';
+import AdjustmentsTab from './AdjustmentsTab';
 import BottomPanels from './BottomPanels';
 import ComingSoon from './ComingSoon';
 import { InventoryAccessProvider, useInventoryAccess } from './InventoryAccess';
+import HistoryTab from './HistoryTab';
 import InventoryGlobals from './InventoryGlobals';
 import InventoryModals from './InventoryModals';
 import LocationsTab from './LocationsTab';
@@ -14,6 +16,7 @@ import PaymentsTab from './PaymentsTab';
 import PurchaseOrdersTab from './PurchaseOrdersTab';
 import ModuleTabs from './ModuleTabs';
 import ProductDetailsTab from './ProductDetailsTab';
+import ProductPageSkeleton from './ProductPageSkeleton';
 import ProductsBulkModals from './ProductsBulkModals';
 import ProductsSelectionBar from './ProductsSelectionBar';
 import ProductsTable from './ProductsTable';
@@ -59,7 +62,7 @@ function InventoryPageBody() {
       className="inventory-theme flex-1 space-y-2 bg-inventory-bg p-2 xl:flex xl:h-[calc(100vh-60px)] xl:min-h-0 xl:flex-col xl:space-y-0 xl:overflow-hidden xl:gap-2"
       style={{ zoom: `${zoomPercent}%`, '--page-zoom': zoomPercent / 100 } as React.CSSProperties}
     >
-      <ModuleTabs active={p.moduleTab} onChange={p.setModuleTab} right={isProductTab ? <InventoryGlobals p={p} /> : undefined} />
+      <ModuleTabs active={p.moduleTab} onChange={p.setModuleTab} right={<InventoryGlobals p={p} />} />
 
       {/* The product toolbar sits above every tab: it picks which product the Variant / Products
           tabs show, and a pick made from any other tab jumps to the Variant tab. */}
@@ -90,10 +93,14 @@ function InventoryPageBody() {
         <LocationsTab locations={p.locations} />
       ) : p.moduleTab === 'stocktake' ? (
         <StocktakesTab tab={p.stocktakesTab} detail={p.stocktakeDetail} />
+      ) : p.moduleTab === 'adjustments' ? (
+        <AdjustmentsTab tab={p.adjustmentsTab} onOpenProduct={p.openProductInVariants} onView={p.adjustmentDetail.openAdjustment} />
+      ) : p.moduleTab === 'history' ? (
+        <HistoryTab tab={p.historyTab} onOpenProduct={p.openProductInVariants} onViewAdjustment={p.adjustmentDetail.openAdjustment} />
       ) : !isProductTab ? (
         <ComingSoon label={moduleTab.label} blurb={moduleTab.blurb} />
       ) : p.showSkeleton ? (
-        <LoadingState />
+        <ProductPageSkeleton variant={p.moduleTab === 'variants' ? 'variants' : 'products'} />
       ) : !p.product ? (
         <EmptyState />
       ) : p.moduleTab === 'variants' ? (
@@ -109,35 +116,6 @@ function InventoryPageBody() {
       {p.nav.allRecords && <ProductsBulkModals table={p.productsTable} />}
       <InventoryModals {...p} />
     </main>
-  );
-}
-
-function LoadingState() {
-  return (
-    <div className="space-y-2">
-      <div className="h-8 animate-pulse rounded-[10px] border border-inventory-border bg-inventory-surface-muted" />
-
-      {/* Mirrors ProductDetailsTab's item-7 column order: Image, Details, Pricing, Stock
-          summary, Online stores. */}
-      <div className="grid grid-cols-1 gap-[5px] md:grid-cols-2 xl:grid-cols-[150px_minmax(0,1.6fr)_minmax(0,1.15fr)_170px_200px]">
-        <div className="h-[285px] animate-pulse rounded-xl border border-inventory-border bg-inventory-surface-muted" />
-        <div className="h-[285px] animate-pulse rounded-xl border border-inventory-border bg-inventory-surface-muted" />
-        <div className="h-[285px] animate-pulse rounded-xl border border-inventory-border bg-inventory-surface-muted" />
-        <div className="h-[285px] animate-pulse rounded-xl border border-inventory-border bg-inventory-surface-muted" />
-        <div className="h-[285px] animate-pulse rounded-xl border border-inventory-border bg-inventory-surface-muted" />
-      </div>
-
-      <div className="rounded-xl border border-inventory-border bg-inventory-surface shadow-inventory">
-        <div className="m-2 h-6 animate-pulse rounded bg-inventory-surface-muted" />
-        <div className="m-2 h-40 animate-pulse rounded bg-inventory-surface-muted" />
-      </div>
-
-      <div className="grid grid-cols-1 gap-[5px] md:grid-cols-2 xl:h-24 xl:grid-cols-5">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} className="h-24 animate-pulse rounded-[10px] border border-inventory-border bg-inventory-surface-muted xl:h-full" />
-        ))}
-      </div>
-    </div>
   );
 }
 

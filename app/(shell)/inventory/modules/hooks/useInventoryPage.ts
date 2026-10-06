@@ -4,7 +4,10 @@ import { useMemo, useState } from 'react';
 import useRequest from '@/hooks/useRequest';
 import { isValidHandle } from '@/lib/inventory/handle';
 import { summariseVariants } from '../utils';
+import { useAdjustmentDetail } from './useAdjustmentDetail';
 import { useAdjustments } from './useAdjustments';
+import { useAdjustmentsTab } from './useAdjustmentsTab';
+import { useHistoryTab } from './useHistoryTab';
 import { useCatalogData } from './useCatalogData';
 import { useImportExport } from './useImportExport';
 import { useImportProducts } from './useImportProducts';
@@ -153,6 +156,9 @@ export function useInventoryPage() {
   const stocktakesTab = useStocktakesTab({ enabled: moduleTab === 'stocktake', refreshKey: stocktakeNonce });
   const stocktakeDetail = useStocktakeDetail({ isAdmin: stocktakesTab.isAdmin, onChanged: stocktakesTab.refresh, onSynced: onStocktakeSynced });
   const adjustments = useAdjustments({ product, onSaved: onProductSaved });
+  const adjustmentDetail = useAdjustmentDetail();
+  const adjustmentsTab = useAdjustmentsTab({ enabled: moduleTab === 'adjustments' });
+  const historyTab = useHistoryTab({ enabled: moduleTab === 'history' });
   const importExport = useImportExport({ product, onSaved: onProductSaved });
   const productsTable = useProductsTable({ enabled: data.allRecords, verifiedOnly: nav.verifiedOnly, quickFilter: nav.quickFilter, onView: moduleTab === 'products' ? nav.viewProduct : openProductInVariants, onCounts: data.syncCounts, onDeleted: bumpSupplierRefresh });
   const importProducts = useImportProducts({ supplierOptions: po.supplierOptions, onImported: () => { data.refresh(); productsTable.refresh(); bumpSupplierRefresh(); } });
@@ -235,6 +241,9 @@ export function useInventoryPage() {
     stocktakesTab,
     stocktakeDetail,
     adjustments,
+    adjustmentDetail,
+    adjustmentsTab,
+    historyTab,
     suppliers,
     importExport,
     importProducts,

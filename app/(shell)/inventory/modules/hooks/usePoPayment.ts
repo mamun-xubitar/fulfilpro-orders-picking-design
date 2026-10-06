@@ -67,8 +67,8 @@ export function usePoPayment({ globals, onSaved }: Args) {
   const [form, setForm] = useState<PayForm | null>(null);
   const [history, setHistory] = useState<PoPaymentHistoryRecord[]>([]);
   const { request, loading: saving, errors } = useRequest<{ payment: PoPaymentRecord; history: PoPaymentHistoryRecord[] }>();
-  const { request: requestPo } = useRequest<PurchaseOrderRecord>();
-  const { request: requestHistory } = useRequest<{ payment: PoPaymentRecord | null; history: PoPaymentHistoryRecord[] }>();
+  const { request: requestPo, loading: opening } = useRequest<PurchaseOrderRecord>();
+  const { request: requestHistory, loading: loadingHistory } = useRequest<{ payment: PoPaymentRecord | null; history: PoPaymentHistoryRecord[] }>();
 
   const open = (po: PurchaseOrderRecord) => {
     setTarget(po);
@@ -122,7 +122,7 @@ export function usePoPayment({ globals, onSaved }: Args) {
     });
   };
 
-  return { target, form, history, quantity, totals, errors, saving, open, close, set, save, openById, isEdit: Boolean(target?.payment), isPaid: form?.status === 'PAID' };
+  return { target, form, history, loadingHistory, opening, quantity, totals, errors, saving, open, close, set, save, openById, isEdit: Boolean(target?.payment), isPaid: form?.status === 'PAID' };
 }
 
 export type PoPaymentState = ReturnType<typeof usePoPayment>;

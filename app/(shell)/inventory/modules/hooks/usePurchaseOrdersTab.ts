@@ -35,6 +35,8 @@ export function usePurchaseOrdersTab({ enabled, refreshKey, onChanged }: Args) {
   const [rows, setRows] = useState<PurchaseOrderRecord[]>([]);
   const [pagination, setPagination] = useState<PaginationState>(EMPTY_PAGINATION);
   const [initialLoading, setInitialLoading] = useState(true);
+  // Which query `rows` belong to — a refetch of the same query keeps showing them instead of a skeleton.
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
   const { request: requestList, loading } = useRequest<{ purchaseOrders: PurchaseOrderRecord[]; pagination: PaginationState }>();
 
   const [searchInput, setSearchInputState] = useState('');
@@ -84,6 +86,7 @@ export function usePurchaseOrdersTab({ enabled, refreshKey, onChanged }: Args) {
     setPage(1);
   };
 
+  const queryKey = JSON.stringify({ search, ...filters, sort, dir, page, pageSize });
   const load = () => {
     if (!enabled) return;
     requestList({
@@ -95,6 +98,7 @@ export function usePurchaseOrdersTab({ enabled, refreshKey, onChanged }: Args) {
         setRows(data.purchaseOrders);
         setPagination(data.pagination);
         setInitialLoading(false);
+        setLoadedKey(queryKey);
       },
     });
   };
@@ -233,6 +237,7 @@ export function usePurchaseOrdersTab({ enabled, refreshKey, onChanged }: Args) {
     pageNumbers: buildPageNumbers(pagination.page, pagination.totalPages),
     loading,
     initialLoading,
+    showSkeleton: initialLoading || (loading && loadedKey !== queryKey),
     searchInput,
     setSearchInput,
     filters,

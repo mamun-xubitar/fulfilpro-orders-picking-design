@@ -4,6 +4,7 @@ import { ModalShell } from '@/components/ModalShell';
 import { formatStocktakeNumber } from '@/lib/inventory/stocktake-number';
 import { locationChipClass } from './LocationPickerMenu';
 import { STOCKTAKE_STATUS_LABELS } from './StocktakesTable';
+import { Bone, SkeletonRows } from './Skeleton';
 import { SPINNER, WIZARD_BODY_CLASS, WIZARD_BTN_FINISH, WIZARD_BTN_PRIMARY, WIZARD_BTN_SECONDARY, WIZARD_CARD_CLASS } from './modalStyles';
 import type { StocktakeDetailState } from './hooks/useStocktakeDetail';
 import { formatDate, variantTitle } from './utils';
@@ -54,7 +55,25 @@ export default function StocktakeCountModal({ detail }: { detail: StocktakeDetai
       }
     >
       {!record ? (
-        <div className="h-40 animate-pulse rounded-[10px] bg-inventory-surface-muted" />
+        <div className={WIZARD_CARD_CLASS} aria-busy="true" aria-label="Loading stocktake">
+          <Bone className="mb-3 h-[10px] w-[70%] max-w-[420px]" />
+          <div className="overflow-hidden rounded-lg border border-inventory-border">
+            <table className="w-full border-collapse text-[11px] leading-none">
+              <thead>
+                <tr className="border-b border-inventory-border bg-inventory-surface-muted text-left text-[10px] font-bold uppercase tracking-[0.4px] text-inventory-text-subtle">
+                  <th className="px-2 py-1">Colour / Size</th>
+                  <th className="px-2 py-1">SKU</th>
+                  <th className="px-2 py-1">Location</th>
+                  {detail.isAdmin && <th className="px-2 py-1 text-right">Quantity</th>}
+                  <th className="px-2 py-1 text-right">Counted</th>
+                </tr>
+              </thead>
+              <tbody>
+                <SkeletonRows rows={6} cellClassName="px-2 py-1" cells={detail.isAdmin ? ['text', 'text', 'badge', 'num', 'input'] : ['text', 'text', 'badge', 'input']} />
+              </tbody>
+            </table>
+          </div>
+        </div>
       ) : (
         <div className={WIZARD_CARD_CLASS}>
           <p className="mb-2 text-[12px] text-inventory-text-muted">

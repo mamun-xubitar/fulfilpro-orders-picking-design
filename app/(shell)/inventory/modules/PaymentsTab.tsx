@@ -2,6 +2,7 @@
 
 import Pagination from '@/components/Pagination';
 import PaymentHistoryModal from './PaymentHistoryModal';
+import { SkeletonRows, type SkeletonCell } from './Skeleton';
 import SortableTh from './SortableTh';
 import { PAYMENT_PAGE_SIZE_OPTIONS, type PaymentSortKey, type PaymentsTabState } from './hooks/usePaymentsTab';
 import { Search } from './icons';
@@ -12,6 +13,7 @@ import { formatDate, formatMoney, formatPoNumber } from './utils';
 const CONTROL =
   'h-[24px] rounded-[7px] border border-inventory-border-strong bg-inventory-surface px-[6px] text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring cursor-pointer';
 const COLUMN_COUNT = 11;
+const SKELETON: SkeletonCell[] = ['stack', 'text', 'text', 'text', 'badge', 'text', 'num', 'num', 'num', 'num', { kind: 'actions', count: 2 }];
 const ACTION_BTN =
   'h-[20px] rounded-[6px] border border-inventory-border-strong bg-inventory-surface px-[6px] text-[9px] font-bold text-inventory-text-muted transition-colors duration-150 hover:bg-inventory-surface-hover cursor-pointer';
 
@@ -74,7 +76,7 @@ export default function PaymentsTab({ tab, suppliers, onEdit, onOpenSupplier }: 
       </div>
 
       <div className="overflow-x-auto thin-scroll">
-        <table className="w-full min-w-[980px] border-collapse text-[11px] leading-none">
+        <table aria-busy={tab.loading || tab.initialLoading} className="w-full min-w-[980px] border-collapse text-[11px] leading-none">
           <thead>
             <tr className="border-b border-inventory-border bg-inventory-surface-muted">
               {th('Updated', 'updatedAt')}
@@ -91,16 +93,8 @@ export default function PaymentsTab({ tab, suppliers, onEdit, onOpenSupplier }: 
             </tr>
           </thead>
           <tbody>
-            {tab.initialLoading ? (
-              Array.from({ length: 6 }).map((_, i) => (
-                <tr key={i} className="border-b border-inventory-divider last:border-0">
-                  {Array.from({ length: COLUMN_COUNT }).map((__, j) => (
-                    <td key={j} className="px-2 py-2">
-                      <div className="h-3 animate-pulse rounded bg-inventory-surface-muted" />
-                    </td>
-                  ))}
-                </tr>
-              ))
+            {tab.showSkeleton ? (
+              <SkeletonRows rows={tab.rows.length || 8} cells={SKELETON} />
             ) : tab.rows.length === 0 ? (
               <tr>
                 <td colSpan={COLUMN_COUNT} className="px-2 py-10 text-center text-[11px] text-inventory-text-subtle">

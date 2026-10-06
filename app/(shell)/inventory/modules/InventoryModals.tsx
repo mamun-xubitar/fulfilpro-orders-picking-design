@@ -1,6 +1,7 @@
 'use client';
 
 import { MODAL_FOOTER_BTN_DANGER, MODAL_FOOTER_BTN_SECONDARY, ModalShell } from '@/components/ModalShell';
+import AdjustmentDetailModal from './AdjustmentDetailModal';
 import AdjustmentModals from './AdjustmentModals';
 import BulkUpdateStoresModal from './BulkUpdateStoresModal';
 import EditImagesModal from './EditImagesModal';
@@ -158,7 +159,8 @@ export default function InventoryModals(p: InventoryPage) {
       <StocktakeModal stocktake={p.stocktake} />
       <StocktakeCountModal detail={p.stocktakeDetail} />
       <StocktakeConfirmDialogs detail={p.stocktakeDetail} />
-      <AdjustmentModals adjustments={p.adjustments} variants={variants} />
+      <AdjustmentModals adjustments={p.adjustments} variants={variants} onView={p.adjustmentDetail.openAdjustment} />
+      <AdjustmentDetailModal detail={p.adjustmentDetail} onOpenProduct={p.openProductInVariants} />
       <ImportModal importExport={p.importExport} />
       <ImportProductsModal importProducts={p.importProducts} suppliers={p.supplierOptions} />
       <SupplierModal suppliers={p.suppliers} />

@@ -1,5 +1,6 @@
 import prisma from '@/lib/prisma.server';
 import { formatStocktakeNumber } from '@/lib/inventory/stocktake-number';
+import { recordAdjustmentBatch, type AdjustmentLineInput } from '@/lib/inventory-adjustment.server';
 import { Prisma, type StocktakeStatus } from '@prisma/client';
 
 export const STOCKTAKE_SORT_KEYS = ['number', 'createdAt', 'productName', 'status', 'countedAt', 'completedAt'] as const;
@@ -192,7 +193,9 @@ export class StocktakeModel {
         select: { id: true, stockOnHand: true, locations: { select: { locationId: true } } },
       });
 
+      const reference = formatStocktakeNumber(stocktake.number);
       const result: StocktakeSyncResult = { adjusted: 0, unchanged: 0, skipped: 0 };
+      const adjustLines: AdjustmentLineInput[] = [];
       for (const variant of variants) {
         const lines = stocktake.items.filter((i) => i.variantId === variant.id);
         const countedLocationIds = new Set(lines.flatMap((l) => (l.locationId ? [l.locationId] : [])));
@@ -206,15 +209,21 @@ export class StocktakeModel {
           result.unchanged++;
           continue;
         }
-        await tx.supplierProductVariant.update({ where: { id: variant.id }, data: { stockOnHand: counted } });
+        adjustLines.push({ variantId: variant.id, delta: counted - variant.stockOnHand, reason: 'CORRECTION', note: `STOCKTAKE ${reference}` });
         result.adjusted++;
       }
+      // The counts become stock on hand as one adjustment, so a sync shows up in the Adjustments tab.
+      const batch =
+        adjustLines.length > 0
+          ? await recordAdjustmentBatch(tx, { supplierProductId: stocktake.supplierProductId, source: 'STOCKTAKE', reference, lines: adjustLines, actor, skipActivity: true })
+          : null;
 
       await tx.inventoryActivity.create({
         data: {
           supplierProductId: stocktake.supplierProductId,
           type: 'stocktake_completed',
-          message: `Stocktake ${formatStocktakeNumber(stocktake.number)} synced — ${result.adjusted} variant${result.adjusted === 1 ? '' : 's'} adjusted${result.skipped > 0 ? `, ${result.skipped} skipped (not fully counted)` : ''}`,
+          adjustmentBatchId: batch?.id ?? null,
+          message: `Stocktake ${reference} synced — ${result.adjusted} variant${result.adjusted === 1 ? '' : 's'} adjusted${result.skipped > 0 ? `, ${result.skipped} skipped (not fully counted)` : ''}`,
           actorId: actor.id,
           actorName: actor.name,
         },

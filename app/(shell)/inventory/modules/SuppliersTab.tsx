@@ -5,7 +5,10 @@ import Pagination from '@/components/Pagination';
 import type { useSuppliers } from './hooks/useSuppliers';
 import { Pencil, Plus, Search, Trash, Users } from './icons';
 import { useInventoryAccess } from './InventoryAccess';
+import { SkeletonRows, type SkeletonCell } from './Skeleton';
 import { formatDate } from './utils';
+
+const SKELETON: SkeletonCell[] = ['text', 'text', 'text', 'num', 'num', 'num', 'text', { kind: 'actions', count: 2 }];
 
 type SuppliersTabProps = {
   suppliers: ReturnType<typeof useSuppliers>;
@@ -52,7 +55,7 @@ export default function SuppliersTab({ suppliers: s, onOpenPurchaseOrders, onOpe
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-[11px] leading-none">
+        <table aria-busy={s.loading || s.initialLoading} className="w-full border-collapse text-[11px] leading-none">
           <thead>
             <tr className="border-b border-inventory-border text-left text-[10px] font-bold uppercase tracking-[0.4px] text-inventory-text-subtle">
               <th className="px-2 py-1">Name</th>
@@ -66,8 +69,8 @@ export default function SuppliersTab({ suppliers: s, onOpenPurchaseOrders, onOpe
             </tr>
           </thead>
           <tbody>
-            {s.initialLoading ? (
-              <SkeletonRows />
+            {s.showSkeleton ? (
+              <SkeletonRows rows={s.rows.length || 6} cells={SKELETON} />
             ) : s.rows.length === 0 ? (
               <tr>
                 <td colSpan={8} className="px-2 py-8 text-center text-[11px] text-inventory-text-subtle">
@@ -162,21 +165,5 @@ export default function SuppliersTab({ suppliers: s, onOpenPurchaseOrders, onOpe
         </ModalShell>
       )}
     </div>
-  );
-}
-
-function SkeletonRows() {
-  return (
-    <>
-      {Array.from({ length: 5 }).map((_, i) => (
-        <tr key={i} className="border-b border-inventory-divider last:border-0">
-          {Array.from({ length: 8 }).map((__, j) => (
-            <td key={j} className="px-2 py-1.5">
-              <div className="h-3 animate-pulse rounded bg-inventory-surface-muted" />
-            </td>
-          ))}
-        </tr>
-      ))}
-    </>
   );
 }

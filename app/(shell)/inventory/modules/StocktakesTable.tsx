@@ -3,6 +3,7 @@
 import { formatStocktakeNumber } from '@/lib/inventory/stocktake-number';
 import { useInventoryAccess } from './InventoryAccess';
 import SortableTh from './SortableTh';
+import { SkeletonRows, type SkeletonCell } from './Skeleton';
 import type { StocktakeDetailState } from './hooks/useStocktakeDetail';
 import type { StocktakeSortKey, StocktakesTabState } from './hooks/useStocktakesTab';
 import type { StocktakeRecord, StocktakeStatusValue } from './types';
@@ -23,6 +24,7 @@ const STATUS_BADGES: Record<StocktakeStatusValue, string> = {
 };
 
 const COLUMN_COUNT = 8;
+const SKELETON: SkeletonCell[] = ['text', 'stack', 'num', 'badge', 'text', 'text', 'text', { kind: 'actions', count: 2 }];
 const ACTION_BTN =
   'h-[20px] rounded-[6px] border border-inventory-border-strong bg-inventory-surface px-[6px] text-[9px] font-bold text-inventory-text-muted transition-colors duration-150 hover:bg-inventory-surface-hover cursor-pointer';
 
@@ -35,7 +37,7 @@ export default function StocktakesTable({ tab, detail }: StocktakesTableProps) {
 
   return (
     <div className="overflow-x-auto thin-scroll">
-      <table className="w-full min-w-[900px] border-collapse text-[11px] leading-none">
+      <table aria-busy={tab.loading || tab.initialLoading} className="w-full min-w-[900px] border-collapse text-[11px] leading-none">
         <thead>
           <tr className="border-b border-inventory-border bg-inventory-surface-muted">
             {th('Stocktake', 'number')}
@@ -49,8 +51,8 @@ export default function StocktakesTable({ tab, detail }: StocktakesTableProps) {
           </tr>
         </thead>
         <tbody>
-          {tab.initialLoading ? (
-            <SkeletonRows />
+          {tab.showSkeleton ? (
+            <SkeletonRows rows={tab.rows.length || 8} cells={SKELETON} />
           ) : tab.rows.length === 0 ? (
             <tr>
               <td colSpan={COLUMN_COUNT} className="px-2 py-10 text-center text-[11px] text-inventory-text-subtle">
@@ -133,21 +135,5 @@ function StocktakeRow({ row, tab, detail }: { row: StocktakeRecord } & Stocktake
         </div>
       </td>
     </tr>
-  );
-}
-
-function SkeletonRows() {
-  return (
-    <>
-      {Array.from({ length: 6 }).map((_, i) => (
-        <tr key={i} className="border-b border-inventory-divider last:border-0">
-          {Array.from({ length: COLUMN_COUNT }).map((__, j) => (
-            <td key={j} className="px-2 py-2">
-              <div className="h-3 animate-pulse rounded bg-inventory-surface-muted" />
-            </td>
-          ))}
-        </tr>
-      ))}
-    </>
   );
 }

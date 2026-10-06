@@ -36,6 +36,8 @@ export function useLocations({ refreshKey, onChanged }: UseLocationsArgs) {
   const [rows, setRows] = useState<LocationRow[]>([]);
   const [pagination, setPagination] = useState<PaginationState>(EMPTY_PAGINATION);
   const [initialLoading, setInitialLoading] = useState(true);
+  // Which query `rows` belong to — a refetch of the same query keeps showing them instead of a skeleton.
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
   const { request: requestList, loading: listLoading } = useRequest<{ locations: LocationRow[]; pagination: PaginationState }>();
   const { request: requestOptions } = useRequest<{ locations: LocationOption[] }>();
   const [options, setOptions] = useState<LocationOption[]>([]);
@@ -50,6 +52,7 @@ export function useLocations({ refreshKey, onChanged }: UseLocationsArgs) {
     debounceRef.current = setTimeout(() => setPage(1), 300);
   };
 
+  const queryKey = JSON.stringify({ search: searchInput, page, pageSize: PAGE_SIZE });
   const load = () => {
     requestList({
       url: '/api/inventory/locations',
@@ -60,6 +63,7 @@ export function useLocations({ refreshKey, onChanged }: UseLocationsArgs) {
         setRows(data.locations);
         setPagination(data.pagination);
         setInitialLoading(false);
+        setLoadedKey(queryKey);
       },
     });
   };
@@ -144,6 +148,7 @@ export function useLocations({ refreshKey, onChanged }: UseLocationsArgs) {
     pageNumbers: buildPageNumbers(pagination.page, pagination.totalPages),
     loading: listLoading,
     initialLoading,
+    showSkeleton: initialLoading || (listLoading && loadedKey !== queryKey),
     searchInput,
     setSearchInput,
     goToPage: setPage,

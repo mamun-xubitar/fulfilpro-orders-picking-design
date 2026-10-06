@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { ModalShell } from '@/components/ModalShell';
 import type { GlobalStoreMarginsState } from './hooks/useGlobalStoreMargins';
 import { Close, Plus } from './icons';
+import { Bone } from './Skeleton';
 import { SPINNER, WIZARD_BODY_CLASS, WIZARD_BTN_PRIMARY, WIZARD_BTN_SECONDARY, WIZARD_CARD_CLASS } from './modalStyles';
 
 type GlobalStoreMarginModalProps = {
@@ -107,7 +108,17 @@ export default function GlobalStoreMarginModal({ state, onClose }: GlobalStoreMa
           </div>
         )}
 
-        {added.length === 0 && !adding ? (
+        {state.loading && state.stores.length === 0 ? (
+          <div className="space-y-1.5" aria-busy="true" aria-label="Loading stores">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="flex items-center gap-[4px]" style={{ '--i': i } as React.CSSProperties}>
+                <Bone className="h-[9px] flex-1 max-w-[55%]" />
+                <Bone className="ml-auto h-[22px] w-[62px] rounded-[7px]" />
+                <Bone className="h-[18px] w-[18px] rounded-full" />
+              </div>
+            ))}
+          </div>
+        ) : added.length === 0 && !adding ? (
           <p className="py-3 text-center text-[11px] text-inventory-text-subtle">No store margins set. Use + to add one.</p>
         ) : (
           <div className="space-y-1.5">

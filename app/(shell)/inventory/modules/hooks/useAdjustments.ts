@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { toast } from 'react-toastify';
 import useRequest from '@/hooks/useRequest';
 import { ADJUSTMENT_PRESETS } from '../constants';
-import type { ProductRecord, StockAdjustmentRecord, StockAdjustmentReasonValue } from '../types';
+import type { AdjustmentBatchRecord, ProductRecord, StockAdjustmentReasonValue } from '../types';
 
 const REASONS: StockAdjustmentReasonValue[] = ['DAMAGED', 'LOST', 'FOUND', 'RETURN', 'CORRECTION', 'OTHER'];
 
@@ -27,8 +27,8 @@ export function useAdjustments({ product, onSaved }: UseAdjustmentsArgs) {
   const [savingAll, setSavingAll] = useState(false);
 
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [history, setHistory] = useState<StockAdjustmentRecord[]>([]);
-  const { request: requestHistory, loading: loadingHistory } = useRequest<{ adjustments: StockAdjustmentRecord[] }>();
+  const [history, setHistory] = useState<AdjustmentBatchRecord[]>([]);
+  const { request: requestHistory, loading: loadingHistory } = useRequest<{ adjustments: AdjustmentBatchRecord[] }>();
 
   /** Opens the modal for the given variants, or every variant on the product when omitted
    * (the "New adjustment" entry point in Bottom panels vs. the matrix's "Adjust Stock" button).
@@ -150,7 +150,7 @@ export function useAdjustments({ product, onSaved }: UseAdjustmentsArgs) {
     setSavingAll(true);
     try {
       const updated = await postAdjustments(items);
-      toast.success(`${items.length} adjustment${items.length === 1 ? '' : 's'} saved`);
+      toast.success(items.length === 1 ? 'Stock adjusted' : `Adjustment saved — ${items.length} variants`);
       setModalOpen(false);
       if (updated) onSaved(updated);
     } catch (err) {

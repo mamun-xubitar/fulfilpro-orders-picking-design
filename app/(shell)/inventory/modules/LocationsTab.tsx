@@ -6,9 +6,11 @@ import { locationChipClass } from './LocationPickerMenu';
 import type { LocationsState } from './hooks/useLocations';
 import { Pencil, Plus, Search, Trash } from './icons';
 import { useInventoryAccess } from './InventoryAccess';
+import { SkeletonRows, type SkeletonCell } from './Skeleton';
 import { formatDate } from './utils';
 
 const TH = 'px-2 py-1';
+const SKELETON: SkeletonCell[] = ['text', 'text', 'num', 'text', { kind: 'actions', count: 2 }];
 
 /** The Location module tab — every location with how many variants are kept there. Mirrors
  * SuppliersTab: search, add, edit, delete (refused while variants are still assigned). */
@@ -41,7 +43,7 @@ export default function LocationsTab({ locations: l }: { locations: LocationsSta
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-[11px] leading-none">
+        <table aria-busy={l.loading || l.initialLoading} className="w-full border-collapse text-[11px] leading-none">
           <thead>
             <tr className="border-b border-inventory-border text-left text-[10px] font-bold uppercase tracking-[0.4px] text-inventory-text-subtle">
               <th className={TH}>Name</th>
@@ -52,8 +54,8 @@ export default function LocationsTab({ locations: l }: { locations: LocationsSta
             </tr>
           </thead>
           <tbody>
-            {l.initialLoading ? (
-              <SkeletonRows />
+            {l.showSkeleton ? (
+              <SkeletonRows rows={l.rows.length || 6} cells={SKELETON} />
             ) : l.rows.length === 0 ? (
               <tr>
                 <td colSpan={5} className="px-2 py-8 text-center text-[11px] text-inventory-text-subtle">
@@ -120,21 +122,5 @@ export default function LocationsTab({ locations: l }: { locations: LocationsSta
         </ModalShell>
       )}
     </div>
-  );
-}
-
-function SkeletonRows() {
-  return (
-    <>
-      {Array.from({ length: 5 }).map((_, i) => (
-        <tr key={i} className="border-b border-inventory-divider last:border-0">
-          {Array.from({ length: 5 }).map((__, j) => (
-            <td key={j} className="px-2 py-1.5">
-              <div className="h-3 animate-pulse rounded bg-inventory-surface-muted" />
-            </td>
-          ))}
-        </tr>
-      ))}
-    </>
   );
 }

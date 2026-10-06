@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { MODAL_FOOTER_BTN_SECONDARY, ModalShell } from '@/components/ModalShell';
 import useRequest from '@/hooks/useRequest';
+import { SkeletonRows } from './Skeleton';
 import type { PoPaymentHistoryRecord, PoPaymentListRecord } from './types';
 import { formatDate, formatMoney, formatPoNumber } from './utils';
 
@@ -34,7 +35,7 @@ export default function PaymentHistoryModal({ payment, onClose }: { payment: PoP
       }
     >
       <div className="max-h-[min(24rem,60vh)] overflow-auto thin-scroll rounded-lg border border-inventory-border">
-        <table className="w-full min-w-[620px] border-collapse text-[11px] leading-none">
+        <table aria-busy={history === null} className="w-full min-w-[620px] border-collapse text-[11px] leading-none">
           <thead>
             <tr className="border-b border-inventory-border bg-inventory-surface-muted text-left">
               <th className={TH}>When</th>
@@ -49,11 +50,7 @@ export default function PaymentHistoryModal({ payment, onClose }: { payment: PoP
           </thead>
           <tbody>
             {history === null ? (
-              <tr>
-                <td colSpan={8} className="px-2 py-6 text-center text-inventory-text-subtle">
-                  Loading…
-                </td>
-              </tr>
+              <SkeletonRows rows={3} cells={['text', 'text', 'text', 'badge', 'num', 'num', 'num', 'num']} />
             ) : (
               history.map((h) => (
                 <tr key={h.id} className="border-b border-inventory-divider last:border-0">

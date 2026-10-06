@@ -1092,6 +1092,7 @@ model SupplierProduct {
   purchaseOrders      PurchaseOrder[]
   stocktakes          Stocktake[]
   adjustments         StockAdjustment[]
+  adjustmentBatches   StockAdjustmentBatch[]
   activity            InventoryActivity[]
   storeListings       SupplierProductStoreListing[]
   createdAt           DateTime                      @default(now())
@@ -1271,11 +1272,39 @@ enum StockAdjustmentReason {
   OTHER
 }
 
+enum StockAdjustmentSource {
+  MANUAL
+  STOCKTAKE
+}
+
+/// One save of the adjustment modal (or one stocktake sync): the "main" adjustment, shown as ADJ-0001.
+/// Its `lines` are the per-variant changes.
+model StockAdjustmentBatch {
+  id                String                @id @default(uuid())
+  number            Int                   @unique @default(autoincrement())
+  supplierProductId String
+  source            StockAdjustmentSource @default(MANUAL)
+  /// Display reference of the stocktake that produced it, e.g. ST-0007.
+  reference         String?
+  actorId           String
+  actorName         String
+  supplierProduct   SupplierProduct       @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
+  lines             StockAdjustment[]
+  createdAt         DateTime              @default(now())
+
+  @@index([supplierProductId, createdAt])
+  @@index([createdAt])
+}
+
 model StockAdjustment {
   id                String                 @id @default(uuid())
+  batchId           String
+  batch             StockAdjustmentBatch   @relation(fields: [batchId], references: [id], onDelete: Cascade)
   supplierProductId String
   variantId         String
   delta             Int
+  /// Stock on hand just before this change; null on adjustments recorded before batches existed.
+  stockBefore       Int?
   reason            StockAdjustmentReason
   note              String?
   actorId           String
@@ -1286,6 +1315,7 @@ model StockAdjustment {
 
   @@index([supplierProductId, createdAt])
   @@index([variantId])
+  @@index([batchId])
 }
 
 model InventoryActivity {
@@ -1296,6 +1326,8 @@ model InventoryActivity {
   message           String
   actorId           String?
   actorName         String
+  /// Set on `stock_adjusted` / `stocktake_completed` entries so History can open the adjustment's lines.
+  adjustmentBatchId String?
   supplierProduct   SupplierProduct @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
   createdAt         DateTime        @default(now())
 
