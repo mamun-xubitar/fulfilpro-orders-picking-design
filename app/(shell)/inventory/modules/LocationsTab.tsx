@@ -14,7 +14,7 @@ const SKELETON: SkeletonCell[] = ['text', 'text', 'num', 'text', { kind: 'action
 
 /** The Location module tab — every location with how many variants are kept there. Mirrors
  * SuppliersTab: search, add, edit, delete (refused while variants are still assigned). */
-export default function LocationsTab({ locations: l }: { locations: LocationsState }) {
+export default function LocationsTab({ locations: l, onOpenStoreLocations }: { locations: LocationsState; onOpenStoreLocations: () => void }) {
   const { canEdit } = useInventoryAccess();
   return (
     <div className="overflow-hidden rounded-xl border border-inventory-border bg-inventory-surface shadow-sm">
@@ -30,6 +30,15 @@ export default function LocationsTab({ locations: l }: { locations: LocationsSta
             className="h-[24px] w-full rounded-[7px] border border-inventory-border-strong pl-7 pr-2 text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring"
           />
         </div>
+        {canEdit && (
+          <button
+            type="button"
+            onClick={onOpenStoreLocations}
+            className="flex h-[22px] items-center gap-1 whitespace-nowrap rounded-[6px] border border-inventory-border-strong bg-inventory-surface px-[6px] text-[10px] font-bold leading-none text-inventory-text-muted shadow-sm transition-colors duration-150 hover:bg-inventory-surface-hover cursor-pointer"
+          >
+            Store locations
+          </button>
+        )}
         {canEdit && (
           <button
             type="button"

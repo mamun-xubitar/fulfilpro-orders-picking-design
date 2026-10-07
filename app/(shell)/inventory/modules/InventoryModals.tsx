@@ -22,6 +22,7 @@ import { ChevronLeft, ChevronRight, Close } from './icons';
 import { SPINNER, WIZARD_BODY_CLASS, WIZARD_BTN_PRIMARY, WIZARD_BTN_SECONDARY, WIZARD_CARD_CLASS } from './modalStyles';
 import BulkLocationModal from './BulkLocationModal';
 import LocationModal from './LocationModal';
+import StoreLocationsModal from './StoreLocationsModal';
 import NewProductWizard from './newProduct/NewProductWizard';
 import PayPoModal from './PayPoModal';
 import SupplierDetailsModal from './SupplierDetailsModal';
@@ -35,6 +36,7 @@ export default function InventoryModals(p: InventoryPage) {
     <>
       {p.newProductOpen && <NewProductWizard p={p} />}
       <LocationModal locations={p.locations} />
+      <StoreLocationsModal storeLocations={p.storeLocations} locations={p.locations.options} />
       <PayPoModal pay={p.payment} globals={p.globals} />
       {p.supplierDetailId && (
         <SupplierDetailsModal supplierId={p.supplierDetailId} onClose={p.closeSupplierDetails} onOpenPurchaseOrders={p.openPurchaseOrdersFor} onOpenPayments={p.openPaymentsFor} />

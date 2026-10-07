@@ -94,6 +94,9 @@ type ShopifyOrderByIdResult = {
         product: {
           id: string;
         } | null;
+        variant: {
+          id: string;
+        } | null;
         discountedUnitPriceSet: {
           shopMoney: {
             amount: string;
@@ -221,6 +224,9 @@ const ORDER_BY_ID_QUERY = `
             url
           }
           product {
+            id
+          }
+          variant {
             id
           }
           discountedUnitPriceSet {
@@ -362,6 +368,7 @@ function toShopifyOrderPayload(order: NonNullable<ShopifyOrderByIdResult['order'
         title: lineItem.title,
         sku: lineItem.sku,
         product_id: lineItem.product?.id ? getLegacyId(lineItem.product.id) : null,
+        variant_id: lineItem.variant?.id ? getLegacyId(lineItem.variant.id) : null,
         variant_title: lineItem.variantTitle,
         image: lineItem.image?.url ? { src: lineItem.image.url, url: lineItem.image.url } : null,
         vendor: lineItem.vendor,

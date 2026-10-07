@@ -73,6 +73,7 @@ model Store {
   inventoryAllocations        InventoryAllocation[]
   processedFulfillments       ProcessedFulfillmentEvent[]
   processedRefunds            ProcessedRefundEvent[]
+  locations                   StoreLocation[]
 
   @@index([status])
   @@index([partnerStoreId])
@@ -1043,8 +1044,31 @@ model InventoryLocation {
   variants         SupplierProductVariantLocation[]
   stocktakeItems   StocktakeItem[]
   stockAdjustments StockAdjustment[]
+  storeLocations   StoreLocation[]
   createdAt      DateTime                         @default(now())
   updatedAt      DateTime                         @updatedAt
+}
+
+/**
+ * One Shopify location of a connected store, mapped (by an admin) to the hub InventoryLocation whose
+ * stock that store's fulfilments and returns at this location move. Synced from Shopify; unmapped
+ * (or unknown) locations fall back to the variant's fullest / first location.
+ */
+model StoreLocation {
+  id                  String             @id @default(uuid())
+  storeId             String
+  /// Shopify's numeric location id as a string — the `location_id` webhooks carry (not the gid).
+  shopifyLocationId   String
+  name                String
+  active              Boolean            @default(true)
+  inventoryLocationId String?
+  store               Store              @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  inventoryLocation   InventoryLocation? @relation(fields: [inventoryLocationId], references: [id], onDelete: SetNull)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  @@unique([storeId, shopifyLocationId])
+  @@index([inventoryLocationId])
 }
 
 /**

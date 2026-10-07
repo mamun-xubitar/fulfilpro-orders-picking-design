@@ -90,7 +90,7 @@ function InventoryPageBody() {
       ) : p.moduleTab === 'payments' ? (
         <PaymentsTab tab={p.paymentsTab} suppliers={p.supplierOptions} onEdit={p.payment.openById} onOpenSupplier={p.openSupplierDetails} />
       ) : p.moduleTab === 'locations' ? (
-        <LocationsTab locations={p.locations} />
+        <LocationsTab locations={p.locations} onOpenStoreLocations={p.storeLocations.openModal} />
       ) : p.moduleTab === 'stocktake' ? (
         <StocktakesTab tab={p.stocktakesTab} detail={p.stocktakeDetail} />
       ) : p.moduleTab === 'adjustments' ? (

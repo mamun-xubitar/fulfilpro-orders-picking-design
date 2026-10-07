@@ -206,11 +206,26 @@ export class OrderModel {
     storeId: string;
   }) {
     const number = params.payload.order_number;
-    if (!number) return { marked: false as const, id: null as string | null };
-    const existing = await prisma.order.findUnique({
-      where: { storeId_number: { storeId: params.storeId, number } },
-      select: { id: true, canceled: true },
-    });
+    let existing = number
+      ? await prisma.order.findUnique({
+          where: { storeId_number: { storeId: params.storeId, number } },
+          select: { id: true, canceled: true },
+        })
+      : null;
+    if (!existing && params.payload.id) {
+      // Payload without order_number — resolve the local order through the
+      // allocation ledger, whose rows are keyed by the Shopify order id.
+      const allocation = await prisma.inventoryAllocation.findFirst({
+        where: { storeId: params.storeId, shopifyOrderId: String(params.payload.id), orderId: { not: null } },
+        select: { orderId: true },
+      });
+      if (allocation?.orderId) {
+        existing = await prisma.order.findUnique({
+          where: { id: allocation.orderId },
+          select: { id: true, canceled: true },
+        });
+      }
+    }
     if (!existing) return { marked: false as const, id: null as string | null };
     const rawCancelledAt =
       params.payload.cancelled_at ?? params.payload.canceled_at ?? null;

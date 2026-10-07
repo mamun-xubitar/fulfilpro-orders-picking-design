@@ -81,17 +81,21 @@ export async function addStock(tx: Tx, variantId: string, locationId: string | n
   return { locationId: target.locationId, locationName: target.name, before: target.quantity };
 }
 
-/** Takes `qty` out of the variant — from the location holding the most first, spilling into the
- * next — never below 0. Used where the stock leaves without a location of its own (fulfilment). */
-export async function takeStock(tx: Tx, variantId: string, qty: number): Promise<boolean> {
-  if (!(await lockVariant(tx, variantId))) return false;
+/** Takes `qty` out of the variant — from `preferLocationId` first when the variant has it (an order
+ * fulfilled at a mapped store location), then from the location holding the most, spilling into the
+ * next — never below 0. Resolves to what was taken at each location ([] for a variant with no
+ * location), or null when the variant doesn't exist. */
+export async function takeStock(tx: Tx, variantId: string, qty: number, preferLocationId: string | null = null): Promise<LocationStock[] | null> {
+  if (!(await lockVariant(tx, variantId))) return null;
   const locations = await variantLocationStock(tx, variantId);
   if (locations.length === 0) {
     await tx.$executeRaw`UPDATE "SupplierProductVariant" SET "stockOnHand" = GREATEST(0, "stockOnHand" - ${qty}), "updatedAt" = NOW() WHERE "id" = ${variantId}`;
-    return true;
+    return [];
   }
+  const ordered = [...locations].sort((a, b) => (a.locationId === preferLocationId ? -1 : b.locationId === preferLocationId ? 1 : b.quantity - a.quantity));
+  const taken: LocationStock[] = [];
   let remaining = qty;
-  for (const l of [...locations].sort((a, b) => b.quantity - a.quantity)) {
+  for (const l of ordered) {
     if (remaining <= 0) break;
     const take = Math.min(remaining, Math.max(0, l.quantity));
     if (take === 0) continue;
@@ -99,10 +103,11 @@ export async function takeStock(tx: Tx, variantId: string, qty: number): Promise
       where: { variantId_locationId: { variantId, locationId: l.locationId } },
       data: { quantity: { decrement: take } },
     });
+    taken.push({ locationId: l.locationId, name: l.name, quantity: take });
     remaining -= take;
   }
   await syncVariantTotal(tx, variantId);
-  return true;
+  return taken;
 }
 
 /**

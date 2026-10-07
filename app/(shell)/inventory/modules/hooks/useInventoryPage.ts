@@ -14,6 +14,7 @@ import { useImportProducts } from './useImportProducts';
 import { useBulkLocations } from './useBulkLocations';
 import { useInventoryCategories } from './useInventoryCategories';
 import { useLocations } from './useLocations';
+import { useStoreLocations } from './useStoreLocations';
 import { useOptionLibrary } from './useOptionLibrary';
 import { useProductDetails } from './useProductDetails';
 import { useProductImageMutations } from './useProductImageMutations';
@@ -115,6 +116,7 @@ export function useInventoryPage() {
   };
   const matrix = useVariantsMatrix({ product, sizes: details.sizes, quickFilter: data.quickFilter, onVariantSaved });
   const locations = useLocations({ refreshKey: locationRefreshNonce, onChanged: data.refresh });
+  const storeLocations = useStoreLocations();
   const bulkLocations = useBulkLocations({
     product,
     selectedIds: matrix.selectedIds,
@@ -226,6 +228,7 @@ export function useInventoryPage() {
     details,
     matrix,
     locations,
+    storeLocations,
     bulkLocations,
     po,
     poTab,
