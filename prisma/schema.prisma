@@ -898,8 +898,8 @@ enum PurchaseOrderStatus {
 }
 
 model PurchaseOrder {
-  id                  String                @id @default(uuid())
-  number              Int                   @unique @default(autoincrement())
+  id                  String                 @id @default(uuid())
+  number              Int                    @unique @default(autoincrement())
   /**
    * Supplier's or internal free-text reference. Optional; not unique.
    */
@@ -909,7 +909,7 @@ model PurchaseOrder {
   poEmail             String
   supplierProductId   String
   productTitle        String
-  status              PurchaseOrderStatus   @default(REQUESTED)
+  status              PurchaseOrderStatus    @default(REQUESTED)
   deliveryDate        DateTime?
   poRemark            String?
   shippingRemark      String?
@@ -918,20 +918,21 @@ model PurchaseOrder {
    * seeds from before any payment exists. Null only on POs created before the snapshot existed.
    */
   pricingCurrencyCode String?
-  pricingExchangeRate Decimal?              @db.Decimal(14, 6)
-  pricingBuyingPrice  Decimal?              @db.Decimal(14, 2)
-  pricingFreight      Decimal?              @db.Decimal(14, 2)
-  pricingMisc         Decimal?              @db.Decimal(14, 2)
+  pricingExchangeRate Decimal?               @db.Decimal(14, 6)
+  pricingBuyingPrice  Decimal?               @db.Decimal(14, 2)
+  pricingFreight      Decimal?               @db.Decimal(14, 2)
+  pricingMisc         Decimal?               @db.Decimal(14, 2)
   createdById         String
   createdByName       String
   statusUpdatedById   String?
   statusUpdatedByName String?
   statusUpdatedAt     DateTime?
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime              @updatedAt
-  supplier            Supplier              @relation(fields: [supplierId], references: [id], onDelete: Restrict)
-  supplierProduct     SupplierProduct       @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+  supplier            Supplier               @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  supplierProduct     SupplierProduct        @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
   items               PurchaseOrderItem[]
+  receipts            PurchaseOrderReceipt[]
   payment             PurchaseOrderPayment?
 
   @@index([supplierProductId, createdAt])
@@ -952,6 +953,18 @@ model PurchaseOrderItem {
   variant          SupplierProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
 
   @@unique([purchaseOrderId, variantId])
+  @@index([purchaseOrderId])
+}
+
+/// One stock receipt against a PO — where it was put away. `locationName` is a snapshot (null = unassigned stock) so the PO's printout survives a location being renamed or deleted.
+model PurchaseOrderReceipt {
+  id              String        @id @default(uuid())
+  purchaseOrderId String
+  locationName    String?
+  quantity        Int
+  createdAt       DateTime      @default(now())
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+
   @@index([purchaseOrderId])
 }
 

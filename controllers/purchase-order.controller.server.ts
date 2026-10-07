@@ -246,19 +246,25 @@ export class PurchaseOrderController {
   }
 
   /** Receives every outstanding line, in full and at its own unit cost, of each selected PO.
-   * POs that are cancelled or already fully received are skipped, not failed. */
+   * Each PO's lines are put away at its `locationIds[poId]` when the variant is kept there, else at
+   * the variant's own first location. POs that are cancelled or already fully received are skipped, not failed. */
   async bulkReceive(body: unknown, session: Session) {
     if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
     const value = (body ?? {}) as Record<string, unknown>;
     const ids = Array.isArray(value.ids) ? [...new Set((value.ids as unknown[]).filter((v): v is string => typeof v === 'string'))].slice(0, 100) : [];
     if (ids.length === 0) return { error: { message: 'Validation failed', errors: ['ids: Select at least one purchase order'], status: 400 } };
+    const locationIds = value.locationIds && typeof value.locationIds === 'object' ? (value.locationIds as Record<string, unknown>) : {};
 
     const orders = await model.findManyByIds(ids);
     let received = 0;
     let skipped = 0;
     const failed: string[] = [];
     for (const po of orders) {
-      const receipts = po.items.filter((i) => i.quantity > i.receivedQuantity).map((i) => ({ itemId: i.id, quantity: i.quantity - i.receivedQuantity }));
+      const chosen = locationIds[po.id];
+      const locationId = typeof chosen === 'string' && chosen.trim() ? chosen.trim() : null;
+      const receipts = po.items
+        .filter((i) => i.quantity > i.receivedQuantity)
+        .map((i) => ({ itemId: i.id, quantity: i.quantity - i.receivedQuantity, locationId: i.locations.some((l) => l.id === locationId) ? locationId : i.locations[0]?.id }));
       if (po.status === 'CANCELLED' || receipts.length === 0) {
         skipped++;
         continue;

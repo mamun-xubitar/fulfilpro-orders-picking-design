@@ -5,11 +5,11 @@ import { MODAL_FOOTER_BTN_PRIMARY, MODAL_FOOTER_BTN_SECONDARY, ModalShell } from
 import { formatColourName } from '@/lib/inventory/colour';
 import { STATUS_BADGES } from './PurchaseOrdersPanel';
 import { Printer } from './icons';
-import { printPurchaseOrders } from './poPrint';
+import { paidLabel, printPurchaseOrders, receivedLabel } from './poPrint';
 import type { PurchaseOrderRecord } from './types';
 import { formatDate, formatMoney, formatPoNumber, poAveragePrice } from './utils';
 
-const GRID_COLS = 'grid-cols-[minmax(0,1fr)_7rem_5.5rem_4.5rem_4.5rem_4.5rem_5rem_6.5rem]';
+const GRID_COLS = 'grid-cols-[minmax(0,1fr)_7rem_5.5rem_4.5rem_4.5rem_4.5rem_5rem_8rem]';
 
 type ViewPoModalProps = { po: PurchaseOrderRecord; onClose: () => void };
 
@@ -74,8 +74,22 @@ export default function ViewPoModal({ po, onClose }: ViewPoModalProps) {
               <dd className="inline">{formatDate(po.createdAt)}</dd>
             </div>
             <div>
+              <dt className="inline text-inventory-text-subtle">Received: </dt>
+              <dd className="inline">{receivedLabel(po)}</dd>
+            </div>
+            {po.receivedLocations.length > 0 && (
+              <div>
+                <dt className="inline text-inventory-text-subtle">Received at: </dt>
+                <dd className="inline">{po.receivedLocations.map((l) => `${l.name} (${l.quantity})`).join(', ')}</dd>
+              </div>
+            )}
+            <div>
+              <dt className="inline text-inventory-text-subtle">Paid: </dt>
+              <dd className="inline">{paidLabel(po)}</dd>
+            </div>
+            <div>
               <dt className="inline text-inventory-text-subtle">Avg unit cost: </dt>
-              <dd className="inline">{avgPrice !== null ? `$${formatMoney(avgPrice)}` : '—'}</dd>
+              <dd className="inline">{avgPrice !== null ? `$${formatMoney(avgPrice)} AUD` : '—'}</dd>
             </div>
             <div>
               <dt className="inline text-inventory-text-subtle">PO Remark: </dt>
@@ -97,7 +111,7 @@ export default function ViewPoModal({ po, onClose }: ViewPoModalProps) {
             <span className="flex min-h-[16px] items-center justify-end text-right">Ordered</span>
             <span className="flex min-h-[16px] items-center justify-end text-right">Received</span>
             <span className="flex min-h-[16px] items-center justify-end text-right">Outstanding</span>
-            <span className="flex min-h-[16px] items-center justify-end text-right">Unit cost</span>
+            <span className="flex min-h-[16px] items-center justify-end text-right">Unit cost (AUD)</span>
           </div>
           <div className="divide-y divide-inventory-border">
             {po.items.map((item) => {

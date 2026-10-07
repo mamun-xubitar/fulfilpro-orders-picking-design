@@ -6,6 +6,7 @@ import useRequest from '@/hooks/useRequest';
 import { buildPageNumbers, type PaginationState } from '@/hooks/usePagination';
 import { printPurchaseOrders } from '../poPrint';
 import type { PurchaseOrderRecord, PurchaseOrderStatusValue } from '../types';
+import { receiveLocationOptions } from './usePurchaseOrder';
 
 export type PoSortKey = 'number' | 'createdAt' | 'deliveryDate' | 'supplierName' | 'productTitle' | 'status';
 export type PayFilter = '' | 'PAID' | 'UNPAID';
@@ -170,13 +171,19 @@ export function usePurchaseOrdersTab({ enabled, refreshKey, onChanged }: Args) {
 
   const [receiveConfirmOpen, setReceiveConfirmOpen] = useState(false);
   const [bulkReceiving, setBulkReceiving] = useState(false);
-  const receivable = targetRows.filter((r) => r.status !== 'CANCELLED' && r.items.some((i) => i.quantity > i.receivedQuantity));
+  /** Where each PO's receipt is put away, by PO id; variants not kept there use their own first location. */
+  const [receiveLocationIds, setReceiveLocationIds] = useState<Record<string, string>>({});
+  const isReceivable = (r: PurchaseOrderRecord) => r.status !== 'CANCELLED' && r.items.some((i) => i.quantity > i.receivedQuantity);
+  const receivable = targetRows.filter(isReceivable);
   const openReceiveConfirm = async () => {
+    let rowsToReceive = selectedRows;
     if (selectAllFilters) {
       const resolved = await resolveTargets();
       if (!resolved) return;
       setMatchingRows(resolved);
+      rowsToReceive = resolved;
     }
+    setReceiveLocationIds(Object.fromEntries(rowsToReceive.filter(isReceivable).map((r) => [r.id, receiveLocationOptions(r.items)[0]?.id ?? ''])));
     setReceiveConfirmOpen(true);
   };
   const closeReceiveConfirm = () => {
@@ -192,10 +199,11 @@ export function usePurchaseOrdersTab({ enabled, refreshKey, onChanged }: Args) {
     let errorMessage = '';
     try {
       for (let i = 0; i < ids.length; i += API_BATCH) {
+        const batch = ids.slice(i, i + API_BATCH);
         const res = await fetch('/api/inventory/purchase-orders/bulk-receive', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ids: ids.slice(i, i + API_BATCH) }),
+          body: JSON.stringify({ ids: batch, locationIds: Object.fromEntries(batch.map((id) => [id, receiveLocationIds[id]]).filter(([, locationId]) => locationId)) }),
         });
         const json = (await res.json()) as ApiEnvelope<{ received: number; skipped: number; failed: string[] }>;
         if (!res.ok || !json.success || !json.data) throw new Error(json.message || 'Could not receive the selected purchase orders');
@@ -267,6 +275,8 @@ export function usePurchaseOrdersTab({ enabled, refreshKey, onChanged }: Args) {
     clearSelection,
     saveRemark,
     receivable,
+    receiveLocationIds,
+    setReceiveLocation: (poId: string, locationId: string) => setReceiveLocationIds((prev) => ({ ...prev, [poId]: locationId })),
     receiveConfirmOpen,
     openReceiveConfirm,
     closeReceiveConfirm,

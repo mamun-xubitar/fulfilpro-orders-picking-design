@@ -18,9 +18,21 @@ function costBlock(po: PurchaseOrderRecord): string {
     ['Buying price', `${formatMoney(source.buyingPrice)} ${source.currencyCode} / unit`],
     ['Freight / Misc', `$${formatMoney(source.freight)} / $${formatMoney(source.misc)} AUD`],
     ['Total landed', `$${formatMoney(total)} AUD`],
-    ...(po.payment ? [['Payment', po.payment.status === 'PAID' ? `Paid${po.payment.paidAt ? ` ${formatDate(po.payment.paidAt)}` : ''}` : 'Unpaid']] : []),
   ];
   return `<table class="kv">${rows.map(([k, v]) => `<tr><th>${escapeHtml(k)}</th><td>${escapeHtml(v)}</td></tr>`).join('')}</table>`;
+}
+
+export function receivedLabel(po: PurchaseOrderRecord): string {
+  if (po.status === 'CANCELLED') return 'Cancelled';
+  if (po.status === 'RECEIVED') return 'Yes';
+  if (po.status === 'REQUESTED') return 'No';
+  const received = po.items.reduce((sum, i) => sum + i.receivedQuantity, 0);
+  const ordered = po.items.reduce((sum, i) => sum + i.quantity, 0);
+  return `Partially (${received} of ${ordered} units)`;
+}
+
+export function paidLabel(po: PurchaseOrderRecord): string {
+  return po.payment?.status === 'PAID' ? `Paid${po.payment.paidAt ? ` ${formatDate(po.payment.paidAt)}` : ''}` : 'Not paid';
 }
 
 function poSection(po: PurchaseOrderRecord): string {
@@ -35,7 +47,9 @@ function poSection(po: PurchaseOrderRecord): string {
     ['PO email', po.poEmail],
     ['Reference', po.referenceNumber || '-'],
     ['Delivery date', formatDate(po.deliveryDate)],
-    ['Status', po.status.replace('_', ' ')],
+    ['Received', receivedLabel(po)],
+    ...(po.receivedLocations.length > 0 ? [['Received at', po.receivedLocations.map((l) => `${l.name} (${l.quantity})`).join(', ')]] : []),
+    ['Paid', paidLabel(po)],
     ['Created', formatDate(po.createdAt)],
   ];
   return `
@@ -44,7 +58,7 @@ function poSection(po: PurchaseOrderRecord): string {
       <p class="sub">${escapeHtml(po.itemNo)}</p>
       <table class="kv">${meta.map(([k, v]) => `<tr><th>${escapeHtml(k)}</th><td>${escapeHtml(v)}</td></tr>`).join('')}</table>
       <table class="lines">
-        <thead><tr><th>Variant</th><th>Supplier SKU</th><th class="n">Ordered</th><th class="n">Received</th><th class="n">Unit cost</th></tr></thead>
+        <thead><tr><th>Variant</th><th>Supplier SKU</th><th class="n">Ordered</th><th class="n">Received</th><th class="n">Unit cost (AUD)</th></tr></thead>
         <tbody>${lines}</tbody>
       </table>
       ${costBlock(po)}

@@ -18,7 +18,7 @@ type UsePurchaseOrderArgs = {
 const DEFAULT_SHIPPING_REMARK = 'NF.{orderNumber}, color: , size: , quantity: , made in china.';
 
 /** The locations the PO's lines are kept at, deduped, A→Z — what the Receive modal's Location dropdown offers. */
-function receiveLocationOptions(items: PurchaseOrderRecord['items']): { id: string; name: string }[] {
+export function receiveLocationOptions(items: PurchaseOrderRecord['items']): { id: string; name: string }[] {
   const byId = new Map<string, string>();
   for (const item of items) for (const l of item.locations) byId.set(l.id, l.name);
   return [...byId].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));

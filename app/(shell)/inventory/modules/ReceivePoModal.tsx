@@ -74,7 +74,7 @@ export default function ReceivePoModal({ po }: { po: ReturnType<typeof usePurcha
             </div>
             <div>
               <dt className="inline text-inventory-text-subtle">Avg unit cost: </dt>
-              <dd className="inline">{avgPrice !== null ? `$${formatMoney(avgPrice)}` : '—'}</dd>
+              <dd className="inline">{avgPrice !== null ? `$${formatMoney(avgPrice)} AUD` : '—'}</dd>
             </div>
             <div>
               <dt className="inline text-inventory-text-subtle">PO Remark: </dt>

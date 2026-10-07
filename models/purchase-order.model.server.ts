@@ -40,6 +40,8 @@ export type PurchaseOrderRow = {
   createdAt: string;
   updatedAt: string;
   items: PurchaseOrderItemRow[];
+  /** Where the PO's receipts were put away, A→Z, totalled per location; empty until something is received (and for POs received before receipts were recorded). */
+  receivedLocations: { name: string; quantity: number }[];
   /** The hub product's item number. */
   itemNo: string;
   /** What has been paid / is to be paid for this PO; null until a payment is first saved. */
@@ -52,6 +54,7 @@ export type PoPricingSnapshot = { currencyCode: string; exchangeRate: number; bu
 
 const itemsInclude = {
   items: { include: { variant: { select: { colour: true, size: true, locations: { select: { location: { select: { id: true, name: true } } } } } } } },
+  receipts: { select: { locationName: true, quantity: true } },
   payment: true,
   supplierProduct: { select: { itemNo: true, pricing: { select: { currencyCode: true, exchangeRate: true, buyingPrice: true, freight: true, misc: true } } } },
 } as const;
@@ -265,7 +268,8 @@ export class PurchaseOrderModel {
         }
 
         if (variantId) {
-          await addStock(tx, variantId, receipt.locationId ?? null, receipt.quantity);
+          const move = await addStock(tx, variantId, receipt.locationId ?? null, receipt.quantity);
+          await tx.purchaseOrderReceipt.create({ data: { purchaseOrderId: id, locationName: move?.locationName ?? null, quantity: receipt.quantity } });
           if (unitCost !== null) await tx.supplierProductVariant.update({ where: { id: variantId }, data: { buyPrice: unitCost } });
         }
       }
@@ -302,6 +306,12 @@ export class PurchaseOrderModel {
       return toPurchaseOrderRow(row);
     });
   }
+}
+
+function receivedLocations(receipts: PurchaseOrderWithItems['receipts']): PurchaseOrderRow['receivedLocations'] {
+  const byName = new Map<string, number>();
+  for (const r of receipts) byName.set(r.locationName ?? 'Unassigned', (byName.get(r.locationName ?? 'Unassigned') ?? 0) + r.quantity);
+  return [...byName].map(([name, quantity]) => ({ name, quantity })).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 function toPurchaseOrderRow(row: PurchaseOrderWithItems): PurchaseOrderRow {
@@ -344,6 +354,7 @@ function toPurchaseOrderRow(row: PurchaseOrderWithItems): PurchaseOrderRow {
           misc: Number(row.supplierProduct.pricing.misc),
         }
       : null,
+    receivedLocations: receivedLocations(row.receipts),
     items: row.items.map((item) => ({
       id: item.id,
       variantId: item.variantId,

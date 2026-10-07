@@ -377,6 +377,8 @@ export type PurchaseOrderRecord = {
   shippingRemark: string | null;
   createdAt: string;
   items: PurchaseOrderItemRecord[];
+  /** Where the PO's receipts were put away, totalled per location; empty until received. */
+  receivedLocations: { name: string; quantity: number }[];
   itemNo: string;
   /** Null until a payment is first saved for this PO. */
   payment: PoPaymentRecord | null;
