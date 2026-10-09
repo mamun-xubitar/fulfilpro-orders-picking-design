@@ -3,6 +3,7 @@ import { sendAppMail } from '@/lib/email.server';
 import { createNotification } from '@/lib/notifications.server';
 import { refreshTrackingAndApply } from '@/lib/background-jobs.server';
 import { normalizeUserIdList } from '@/lib/email-rules.server';
+import { extractTrackingUrlForNumber } from '@/models/tracking.model.server';
 
 export async function runPendingShipmentCheck(now: Date) {
   const settings = await prisma.appSettings.findUnique({
@@ -106,7 +107,7 @@ export async function runPickupReminderCheck(now: Date) {
       status: 'AvailableForPickup',
       availableForPickupAt: { not: null },
     },
-    include: { order: { select: { cusEmail: true, number: true } } },
+    include: { order: { select: { cusEmail: true, number: true, fulfillmentItems: true } } },
   });
 
   if (candidates.length === 0) return;
@@ -137,6 +138,8 @@ export async function runPickupReminderCheck(now: Date) {
       const html = buildPickupReminderEmail({
         orderNumber: String(tracking.order.number),
         trackingNumber: tracking.trackingNumber,
+        trackingUrl: extractTrackingUrlForNumber(tracking.order.fulfillmentItems, tracking.trackingNumber)
+          || `https://t.17track.net/en#nums=${encodeURIComponent(tracking.trackingNumber)}`,
         availableSince: pickupDate,
         dayOffset: offset,
       });
@@ -194,6 +197,7 @@ function buildPendingAlertEmail(items: Array<{
 function buildPickupReminderEmail(params: {
   orderNumber: string;
   trackingNumber: string;
+  trackingUrl: string;
   availableSince: Date;
   dayOffset: number;
 }) {
@@ -204,7 +208,7 @@ function buildPickupReminderEmail(params: {
       <table style="border-collapse:collapse;width:100%;font-size:13px;margin-top:12px;">
         <tbody>
           <tr><td style="${TD}font-weight:600;">Order</td><td style="${TD}">#${escapeHtml(params.orderNumber)}</td></tr>
-          <tr><td style="${TD}font-weight:600;">Tracking Number</td><td style="${TD}">${escapeHtml(params.trackingNumber)}</td></tr>
+          <tr><td style="${TD}font-weight:600;">Tracking Number</td><td style="${TD}"><a href="${escapeHtml(params.trackingUrl)}" target="_blank" rel="noopener noreferrer" style="color:#2563eb;">${escapeHtml(params.trackingNumber)}</a></td></tr>
           <tr><td style="${TD}font-weight:600;">Available Since</td><td style="${TD}">${params.availableSince.toDateString()}</td></tr>
         </tbody>
       </table>

@@ -381,7 +381,7 @@ function getPeriodStartDate(period: 'week' | 'month' | 'year'): Date | null {
   return weekStart;
 }
 
-function extractTrackingUrlForNumber(fulfillmentItems: unknown, trackingNumber: string): string | null {
+export function extractTrackingUrlForNumber(fulfillmentItems: unknown, trackingNumber: string): string | null {
   if (!fulfillmentItems || typeof fulfillmentItems !== 'object') return null;
   const items = fulfillmentItems as Record<string, unknown>;
   const confirmations = Array.isArray(items.confirmations) ? items.confirmations : [];
