@@ -124,8 +124,8 @@ export default function StocktakeModal({ stocktake }: { stocktake: StocktakeStat
                       )}
                     </td>
                     {canEdit && (
-                      <td title="Stock on hand now, for the whole variant across its locations" className="px-2 py-1 text-right tabular-nums text-inventory-text-muted">
-                        {variant.stockOnHand}
+                      <td title={location ? `Stock at ${location.name} now` : 'Unassigned stock on hand now'} className="px-2 py-1 text-right tabular-nums text-inventory-text-muted">
+                        {location ? location.quantity : variant.stockOnHand}
                       </td>
                     )}
                     <td className="px-2 py-1 text-right">

@@ -25,6 +25,8 @@ export function usePaymentsTab({ enabled, refreshKey }: Args) {
   const [rows, setRows] = useState<PoPaymentListRecord[]>([]);
   const [pagination, setPagination] = useState<PaginationState>(EMPTY_PAGINATION);
   const [initialLoading, setInitialLoading] = useState(true);
+  // Which query `rows` belong to — a refetch of the same query keeps showing them instead of a skeleton.
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
   const { request, loading } = useRequest<{ payments: PoPaymentListRecord[]; pagination: PaginationState }>();
 
   const [searchInput, setSearchInputState] = useState('');
@@ -70,6 +72,7 @@ export function usePaymentsTab({ enabled, refreshKey }: Args) {
     setPage(1);
   };
 
+  const queryKey = JSON.stringify({ search, ...filters, sort, dir, page, pageSize });
   const load = () => {
     if (!enabled) return;
     request({
@@ -81,6 +84,7 @@ export function usePaymentsTab({ enabled, refreshKey }: Args) {
         setRows(data.payments);
         setPagination(data.pagination);
         setInitialLoading(false);
+        setLoadedKey(queryKey);
       },
     });
   };
@@ -95,6 +99,7 @@ export function usePaymentsTab({ enabled, refreshKey }: Args) {
     pageNumbers: buildPageNumbers(pagination.page, pagination.totalPages),
     loading,
     initialLoading,
+    showSkeleton: initialLoading || (loading && loadedKey !== queryKey),
     searchInput,
     setSearchInput,
     filters,

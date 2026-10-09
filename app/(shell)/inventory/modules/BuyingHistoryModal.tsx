@@ -39,7 +39,7 @@ export default function BuyingHistoryModal({ purchaseOrders, onClose, onReceive 
                   <Th align="left">Supplier</Th>
                   <Th align="center">Status</Th>
                   <Th align="right">Qty</Th>
-                  <Th align="right">Avg cost</Th>
+                  <Th align="right">Avg cost (AUD)</Th>
                   <Th align="right">Total value</Th>
                   <Th align="right">Actions</Th>
                 </tr>

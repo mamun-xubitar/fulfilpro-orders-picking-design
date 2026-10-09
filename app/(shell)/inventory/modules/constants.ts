@@ -2,7 +2,7 @@ import type { ModuleTabId, ProductStatusValue, QuickFilterId, TabDef, VariantSta
 
 // Item 5: the child/sub-tab strip (formerly PRODUCT_TABS — Details/Variants/Purchase
 // info/Suppliers/Images/Notes/Documents/History) is gone. Only the primary tabs remain, with
-// History promoted here as its own primary tab (ComingSoon for now).
+// History promoted here as its own primary tab.
 export const MODULE_TABS: TabDef<ModuleTabId>[] = [
   { id: 'variants', label: 'Variant', blurb: 'Variants, stock and the product they belong to.' },
   { id: 'products', label: 'Products', blurb: 'Browse and maintain the product catalogue.' },
@@ -13,7 +13,6 @@ export const MODULE_TABS: TabDef<ModuleTabId>[] = [
   { id: 'adjustments', label: 'Adjustments', blurb: 'Record and review manual stock corrections.' },
   { id: 'suppliers', label: 'Suppliers', blurb: 'Manage supplier records and their product links.' },
   { id: 'payments', label: 'Payments', blurb: 'Track supplier invoices and settlements.' },
-  { id: 'reports', label: 'Reports', blurb: 'Stock valuation, movement and margin reporting.' },
   { id: 'history', label: 'History', blurb: 'Every change made across the product catalogue.' },
 ];
 
@@ -86,3 +85,32 @@ export function productStatusLabel(status: string): string {
  * type: every whole number 1-10, then even steps up to 20 — mirrored to negative and positive. */
 const ADJUSTMENT_MAGNITUDES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20];
 export const ADJUSTMENT_PRESETS = [...ADJUSTMENT_MAGNITUDES.slice().reverse().map((n) => -n), ...ADJUSTMENT_MAGNITUDES];
+
+/** Display labels for InventoryActivity.type — the History tab's type filter and badges. A type
+ * not listed here (e.g. one written by a newer feature) is shown as its raw value. */
+export const ACTIVITY_TYPE_LABELS: Record<string, string> = {
+  created: 'Created',
+  imported: 'Imported',
+  details_updated: 'Details updated',
+  pricing_updated: 'Pricing updated',
+  price_applied: 'Price applied',
+  variant_updated: 'Variant updated',
+  variant_image_updated: 'Variant image',
+  variant_deleted: 'Variant deleted',
+  image_added: 'Image added',
+  image_removed: 'Image removed',
+  status_updated: 'Status updated',
+  verified_updated: 'Verified updated',
+  omitted_updated: 'Omitted updated',
+  store_edited: 'Store edited',
+  store_published: 'Store published',
+  stock_adjusted: 'Stock adjusted',
+  po_received: 'PO received',
+  stocktake_completed: 'Stocktake synced',
+  order_allocation: 'Order allocation',
+  order_stock: 'Order stock',
+};
+
+export function activityTypeLabel(type: string): string {
+  return ACTIVITY_TYPE_LABELS[type] ?? type;
+}

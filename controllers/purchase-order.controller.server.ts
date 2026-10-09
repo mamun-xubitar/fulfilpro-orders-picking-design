@@ -191,7 +191,7 @@ export class PurchaseOrderController {
 
     const errors: string[] = [];
     const itemById = new Map(po.items.map((item) => [item.id, item]));
-    const receipts: Array<{ itemId?: string; colour?: string; size?: string; sku?: string | null; quantity: number; unitCost?: number | null }> = [];
+    const receipts: Array<{ itemId?: string; colour?: string; size?: string; sku?: string | null; locationId?: string | null; quantity: number; unitCost?: number | null }> = [];
 
     for (const raw of rawReceipts) {
       if (!raw || typeof raw !== 'object') continue;
@@ -199,6 +199,7 @@ export class PurchaseOrderController {
       const itemId = typeof r.itemId === 'string' ? r.itemId.trim() : '';
       const colour = typeof r.colour === 'string' ? r.colour.trim() : '';
       const size = typeof r.size === 'string' ? r.size.trim() : '';
+      const locationId = typeof r.locationId === 'string' && r.locationId.trim() ? r.locationId.trim() : null;
       const quantity = Number(r.quantity);
       let unitCost: number | null | undefined;
       if (r.unitCost !== undefined && r.unitCost !== null && r.unitCost !== '') {
@@ -225,7 +226,11 @@ export class PurchaseOrderController {
           errors.push(`quantity: Cannot receive more than the ${remaining} unit(s) outstanding for this item`);
           continue;
         }
-        receipts.push({ itemId, colour: colour || undefined, size: size || undefined, sku: typeof r.sku === 'string' ? r.sku : null, quantity: Math.trunc(quantity), unitCost });
+        if (locationId && !item.locations.some((l) => l.id === locationId)) {
+          errors.push(`locationId: Pick one of ${item.variantTitle}'s locations`);
+          continue;
+        }
+        receipts.push({ itemId, colour: colour || undefined, size: size || undefined, sku: typeof r.sku === 'string' ? r.sku : null, locationId, quantity: Math.trunc(quantity), unitCost });
       } else if (colour && size) {
         receipts.push({ colour, size, sku: typeof r.sku === 'string' ? r.sku : null, quantity: Math.trunc(quantity), unitCost });
       } else {
@@ -241,19 +246,25 @@ export class PurchaseOrderController {
   }
 
   /** Receives every outstanding line, in full and at its own unit cost, of each selected PO.
-   * POs that are cancelled or already fully received are skipped, not failed. */
+   * Each PO's lines are put away at its `locationIds[poId]` when the variant is kept there, else at
+   * the variant's own first location. POs that are cancelled or already fully received are skipped, not failed. */
   async bulkReceive(body: unknown, session: Session) {
     if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
     const value = (body ?? {}) as Record<string, unknown>;
     const ids = Array.isArray(value.ids) ? [...new Set((value.ids as unknown[]).filter((v): v is string => typeof v === 'string'))].slice(0, 100) : [];
     if (ids.length === 0) return { error: { message: 'Validation failed', errors: ['ids: Select at least one purchase order'], status: 400 } };
+    const locationIds = value.locationIds && typeof value.locationIds === 'object' ? (value.locationIds as Record<string, unknown>) : {};
 
     const orders = await model.findManyByIds(ids);
     let received = 0;
     let skipped = 0;
     const failed: string[] = [];
     for (const po of orders) {
-      const receipts = po.items.filter((i) => i.quantity > i.receivedQuantity).map((i) => ({ itemId: i.id, quantity: i.quantity - i.receivedQuantity }));
+      const chosen = locationIds[po.id];
+      const locationId = typeof chosen === 'string' && chosen.trim() ? chosen.trim() : null;
+      const receipts = po.items
+        .filter((i) => i.quantity > i.receivedQuantity)
+        .map((i) => ({ itemId: i.id, quantity: i.quantity - i.receivedQuantity, locationId: i.locations.some((l) => l.id === locationId) ? locationId : i.locations[0]?.id }));
       if (po.status === 'CANCELLED' || receipts.length === 0) {
         skipped++;
         continue;

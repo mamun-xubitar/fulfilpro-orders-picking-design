@@ -1,18 +1,22 @@
 import { Prisma } from '@prisma/client';
 import type { Prisma as PrismaTypes } from '@prisma/client';
 import prisma from '@/lib/prisma.server';
+import { addStock, takeStock, StockError, type StockMove } from '@/lib/inventory-stock.server';
 
 type Tx = PrismaTypes.TransactionClient;
 
 const ACTOR = { id: null, name: 'Shopify webhook' };
 
 /** Order-line shape common to both the REST-ish webhook payload and the GraphQL-derived
- * ShopifyOrderPayload the app already uses for orders/create and orders/updated. */
-export type OrderLineItemInput = { id: string | number; sku?: string | null; quantity?: number | null };
+ * ShopifyOrderPayload the app already uses for orders/create and orders/updated.
+ * `shopifyVariantId` — the store variant's Shopify legacy id (REST `variant_id`); lets the line
+ * match its hub variant through the publish-time mapping even when neither side has a SKU. */
+export type OrderLineItemInput = { id: string | number; sku?: string | null; quantity?: number | null; shopifyVariantId?: string | number | null };
 
 export type FulfillmentLineInput = { lineItemId: string | number; quantity: number };
 
-export type RefundLineInput = { lineItemId: string | number; quantity: number; restockType?: string | null };
+/** `locationId` — the hub location mapped to the Shopify location the refund restocked at (null: none / unmapped). */
+export type RefundLineInput = { lineItemId: string | number; quantity: number; restockType?: string | null; locationId?: string | null };
 
 type RestockKind = 'CANCEL' | 'RETURN' | 'LEGACY' | 'NO_RESTOCK';
 
@@ -51,26 +55,67 @@ async function adjustVariantAllocated(tx: Tx, variantId: string, delta: number, 
   });
 }
 
-async function adjustVariantStock(tx: Tx, variantId: string, delta: number, message: string) {
-  const rows = await tx.$queryRaw<{ supplierProductId: string }[]>`
-    UPDATE "SupplierProductVariant"
-    SET "stockOnHand" = GREATEST(0, "stockOnHand" + ${delta}), "updatedAt" = NOW()
-    WHERE "id" = ${variantId}
-    RETURNING "supplierProductId"`;
-  if (rows.length === 0) return;
+/** Moves a hub variant's physical stock by `delta` and logs where it landed. `locationId` is the hub
+ * location mapped to the Shopify location the fulfilment / return happened at (StoreLocation).
+ * Stock leaving comes out of that location first, then the fullest others (never below 0); stock
+ * coming back goes to it when the variant is kept there. With no mapping (or the variant not kept
+ * at the mapped location) stock leaves fullest-first and comes back to the variant's first
+ * location — see lib/inventory-stock.server.ts. Both row-lock the variant, so concurrent webhook
+ * deliveries touching it serialise. */
+async function adjustVariantStock(tx: Tx, variantId: string, delta: number, message: string, locationId: string | null) {
+  let where: string;
+  if (delta < 0) {
+    const taken = await takeStock(tx, variantId, -delta, locationId);
+    if (!taken) return;
+    where = taken.length === 1 ? taken[0].name : taken.map((l) => `${l.name} ${l.quantity}`).join(', ');
+  } else {
+    // Only target the mapped location when the variant is kept there — addStock refuses a location
+    // the variant doesn't have, and a refusal would fail (and endlessly retry) the webhook.
+    const kept = locationId
+      ? await tx.supplierProductVariantLocation.findUnique({ where: { variantId_locationId: { variantId, locationId } }, select: { locationId: true } })
+      : null;
+    let move: StockMove | null;
+    try {
+      move = await addStock(tx, variantId, kept ? locationId : null, delta);
+    } catch (error) {
+      // The kept-check runs outside addStock's row lock, so the location row can vanish in
+      // between — fall back to the first location / unassigned stock instead of failing the
+      // delivery. addStock only refuses when the variant still has locations, so the fallback
+      // cannot re-throw.
+      if (!(error instanceof StockError)) throw error;
+      move = await addStock(tx, variantId, null, delta);
+    }
+    if (!move) return;
+    where = move.locationName ?? '';
+  }
+  const { supplierProductId } = await tx.supplierProductVariant.findUniqueOrThrow({ where: { id: variantId }, select: { supplierProductId: true } });
   await tx.inventoryActivity.create({
-    data: { supplierProductId: rows[0].supplierProductId, variantId, type: 'order_stock', message, actorId: ACTOR.id, actorName: ACTOR.name },
+    data: { supplierProductId, variantId, type: 'order_stock', message: where ? `${message} · ${where}` : message, actorId: ACTOR.id, actorName: ACTOR.name },
   });
 }
 
-/** Finds the hub variant a Shopify order line refers to — SKU string equality, the same join
- * SupplierProductModel already uses for its allocatedFromOrders hint (there is no variant-level
- * id on the order line items the app fetches from Shopify). A blank or unmatched SKU still gets
- * an InventoryAllocation row, just with `variantId: null` — nothing to move, but the order/line
- * is still on the books. */
-async function findVariantBySku(tx: Tx, sku: string | null): Promise<string | null> {
+/** Finds the hub variant a Shopify order line refers to. Preferred join: the store variant's
+ * Shopify id against the gid the publish flow recorded per store variant
+ * (SupplierProductStoreVariant.variantGid, scoped to this store's listing) — works even when
+ * neither side has a SKU. Falls back to SKU string equality, scoped to variants published to
+ * this store (a duplicated SKU elsewhere in the hub must not win) and ordered oldest-first so
+ * the match is deterministic. An unmatched line still gets an InventoryAllocation row, just
+ * with `variantId: null` — nothing to move, but the order/line is still on the books. */
+export async function findVariantForLine(tx: Tx, storeId: string, shopifyVariantId: string | number | null | undefined, sku: string | null): Promise<string | null> {
+  const legacyVariantId = shopifyVariantId == null ? '' : String(shopifyVariantId).trim();
+  if (legacyVariantId) {
+    const storeVariant = await tx.supplierProductStoreVariant.findFirst({
+      where: { variantGid: `gid://shopify/ProductVariant/${legacyVariantId}`, listing: { storeId } },
+      select: { variantId: true },
+    });
+    if (storeVariant) return storeVariant.variantId;
+  }
   if (!sku) return null;
-  const variant = await tx.supplierProductVariant.findFirst({ where: { sku }, select: { id: true } });
+  const variant = await tx.supplierProductVariant.findFirst({
+    where: { sku, storeVariants: { some: { listing: { storeId } } } },
+    orderBy: { createdAt: 'asc' },
+    select: { id: true },
+  });
   return variant?.id ?? null;
 }
 
@@ -110,7 +155,7 @@ export async function allocateForOrder(args: {
       });
       if (existing) return;
 
-      const variantId = await findVariantBySku(tx, sku);
+      const variantId = await findVariantForLine(tx, storeId, item.shopifyVariantId, sku);
       await tx.inventoryAllocation.create({
         data: { storeId, orderId: localOrderId, shopifyOrderId, orderNumber, lineItemId, sku, variantId, quantity, state: 'ALLOCATED' },
       });
@@ -137,11 +182,11 @@ export async function reconcileForOrder(args: {
 }) {
   const { storeId, localOrderId, shopifyOrderId, orderNumber, lineItems } = args;
 
-  const incoming = new Map<string, { sku: string | null; quantity: number }>();
+  const incoming = new Map<string, { sku: string | null; quantity: number; shopifyVariantId: string | number | null }>();
   for (const item of lineItems) {
     const quantity = Math.max(0, Math.floor(Number(item.quantity ?? 0)));
     if (quantity === 0) continue;
-    incoming.set(String(item.id), { sku: item.sku?.trim() || null, quantity });
+    incoming.set(String(item.id), { sku: item.sku?.trim() || null, quantity, shopifyVariantId: item.shopifyVariantId ?? null });
   }
 
   // Upsert incoming lines.
@@ -151,7 +196,7 @@ export async function reconcileForOrder(args: {
         where: { storeId_shopifyOrderId_lineItemId: { storeId, shopifyOrderId, lineItemId } },
       });
       if (!row) {
-        const variantId = await findVariantBySku(tx, next.sku);
+        const variantId = await findVariantForLine(tx, storeId, next.shopifyVariantId, next.sku);
         await tx.inventoryAllocation.create({
           data: {
             storeId,
@@ -174,7 +219,7 @@ export async function reconcileForOrder(args: {
       // SKU changed — move the outstanding commitment to the new variant.
       if ((row.sku ?? null) !== next.sku) {
         const outstanding = Math.max(0, row.quantity - row.fulfilledQuantity - row.releasedQuantity);
-        const nextVariantId = await findVariantBySku(tx, next.sku);
+        const nextVariantId = await findVariantForLine(tx, storeId, next.shopifyVariantId, next.sku);
         await tx.inventoryAllocation.update({
           where: { id: row.id },
           data: { sku: next.sku, variantId: nextVariantId, quantity: next.quantity },
@@ -264,8 +309,19 @@ export async function releaseForOrder(args: { storeId: string; shopifyOrderId: s
  * Idempotent per Shopify fulfilment id: the same fulfilment re-delivered via fulfillments/create
  * + fulfillments/update (fresh webhook ids, same `fulfillmentId`) moves stock exactly once.
  * Handles partial fulfilment: only the newly fulfilled units (capped at what's still outstanding
- * on the line) move. */
-export async function applyFulfillment(args: { storeId: string; shopifyOrderId: string; fulfillmentId?: string | number | null; lines: FulfillmentLineInput[] }) {
+ * on the line) move. `storeCreatedAt` is the store's connection date — a fulfilment whose line
+ * sits on a later-dated order without a ledger row means allocation was outrun or failed, so the
+ * delivery is failed for Shopify to re-deliver (see the !row branch below). */
+export async function applyFulfillment(args: {
+  storeId: string;
+  shopifyOrderId: string;
+  fulfillmentId?: string | number | null;
+  /** Hub location mapped to the Shopify location the fulfilment shipped from (null: unmapped). */
+  locationId?: string | null;
+  /** The store's connection date — orders older than it predate the allocation ledger. */
+  storeCreatedAt: Date;
+  lines: FulfillmentLineInput[];
+}) {
   const fulfillmentKey = args.fulfillmentId == null ? null : String(args.fulfillmentId);
 
   for (const line of args.lines) {
@@ -278,9 +334,21 @@ export async function applyFulfillment(args: { storeId: string; shopifyOrderId: 
         const row = await tx.inventoryAllocation.findUnique({
           where: { storeId_shopifyOrderId_lineItemId: { storeId: args.storeId, shopifyOrderId: args.shopifyOrderId, lineItemId } },
         });
-        // No ledger row yet (e.g. fulfilment arrived before the order was
-        // allocated) — record nothing so a later re-delivery can still apply.
-        if (!row) return;
+        // No ledger row yet. When the line belongs to a local order created after the store was
+        // connected, the fulfilment merely outran (or its orders/create failed ahead of)
+        // allocation — throw so the delivery is failed and Shopify re-delivers once the row
+        // exists. Older or unknown orders are outside the ledger; retrying could never
+        // allocate them, so those stay acknowledged.
+        if (!row) {
+          const line = await tx.orderLineItem.findFirst({
+            where: { storeId: args.storeId, lineItemId },
+            select: { order: { select: { orderedAt: true } } },
+          });
+          if (line?.order.orderedAt && line.order.orderedAt >= args.storeCreatedAt) {
+            throw new Error(`Fulfilment arrived before allocation — order #${args.shopifyOrderId} line ${lineItemId}`);
+          }
+          return;
+        }
         if (fulfillmentKey) {
           await tx.processedFulfillmentEvent.create({
             data: { storeId: args.storeId, shopifyOrderId: args.shopifyOrderId, fulfillmentId: fulfillmentKey, lineItemId, status: 'applied', appliedQty: wanted },
@@ -298,7 +366,7 @@ export async function applyFulfillment(args: { storeId: string; shopifyOrderId: 
         });
         if (row.variantId) {
           await adjustVariantAllocated(tx, row.variantId, -qty, `Fulfilled ${qty} — order #${row.orderNumber ?? row.shopifyOrderId}`);
-          await adjustVariantStock(tx, row.variantId, -qty, `Fulfilled ${qty} — order #${row.orderNumber ?? row.shopifyOrderId}`);
+          await adjustVariantStock(tx, row.variantId, -qty, `Fulfilled ${qty} — order #${row.orderNumber ?? row.shopifyOrderId}`, args.locationId ?? null);
         }
       });
     } catch (error) {
@@ -313,7 +381,14 @@ export async function applyFulfillment(args: { storeId: string; shopifyOrderId: 
  * "cancelled") — puts the units back into stock and back into allocated, since the order line is
  * still open and expected to ship again (Shopify reopens the fulfilment order). Only reverses
  * a fulfilment this ledger previously applied (tracked by fulfilment id); otherwise a no-op. */
-export async function reverseFulfillment(args: { storeId: string; shopifyOrderId: string; fulfillmentId?: string | number | null; lines: FulfillmentLineInput[] }) {
+export async function reverseFulfillment(args: {
+  storeId: string;
+  shopifyOrderId: string;
+  fulfillmentId?: string | number | null;
+  /** Hub location mapped to the Shopify location the fulfilment shipped from (null: unmapped). */
+  locationId?: string | null;
+  lines: FulfillmentLineInput[];
+}) {
   const fulfillmentKey = args.fulfillmentId == null ? null : String(args.fulfillmentId);
 
   for (const line of args.lines) {
@@ -346,7 +421,7 @@ export async function reverseFulfillment(args: { storeId: string; shopifyOrderId
       await tx.inventoryAllocation.update({ where: { id: row.id }, data: { fulfilledQuantity: nextFulfilled, state: 'ALLOCATED' } });
       if (row.variantId) {
         await adjustVariantAllocated(tx, row.variantId, qty, `Fulfilment cancelled — ${qty} re-allocated for order #${row.orderNumber ?? row.shopifyOrderId}`);
-        await adjustVariantStock(tx, row.variantId, qty, `Fulfilment cancelled — ${qty} restored for order #${row.orderNumber ?? row.shopifyOrderId}`);
+        await adjustVariantStock(tx, row.variantId, qty, `Fulfilment cancelled — ${qty} restored for order #${row.orderNumber ?? row.shopifyOrderId}`, args.locationId ?? null);
       }
     });
   }
@@ -417,7 +492,7 @@ export async function applyRefund(args: {
         if (refundable <= 0 && releasable <= 0) return;
         if (refundable > 0) {
           await tx.inventoryAllocation.update({ where: { id: row.id }, data: { refundedQuantity: row.refundedQuantity + refundable } });
-          await adjustVariantStock(tx, row.variantId, refundable, `Refunded ${refundable} restocked (return) — order #${row.orderNumber ?? row.shopifyOrderId}`);
+          await adjustVariantStock(tx, row.variantId, refundable, `Refunded ${refundable} restocked (return) — order #${row.orderNumber ?? row.shopifyOrderId}`, line.locationId ?? null);
         }
         if (releasable > 0) {
           await tx.inventoryAllocation.update({ where: { id: row.id }, data: { releasedQuantity: row.releasedQuantity + releasable } });

@@ -1,6 +1,7 @@
 import prisma from '@/lib/prisma.server';
 import { OrderModel, type ShopifyOrderPayload } from '@/models/order.model.server';
 import { linkOrderLineItems } from '@/lib/product-order-link.server';
+import { allocateForOrder } from '@/lib/inventory-allocation.server';
 
 const SHOPIFY_API_VERSION = '2026-04';
 const SHOPIFY_ORDERS_PAGE_SIZE = 200;
@@ -114,6 +115,9 @@ type ShopifyGraphQLOrder = {
         url: string;
       } | null;
       product: {
+        id: string;
+      } | null;
+      variant: {
         id: string;
       } | null;
       discountedUnitPriceSet: {
@@ -245,6 +249,9 @@ const ORDERS_QUERY = `
             product {
               id
             }
+            variant {
+              id
+            }
             discountedUnitPriceSet {
               shopMoney {
                 amount
@@ -300,6 +307,7 @@ export async function syncConnectedStoreOrders(params?: {
       storeDomain: true,
       accessToken: true,
       lastSyncedAt: true,
+      createdAt: true,
     },
     orderBy: { createdAt: 'desc' },
   });
@@ -330,6 +338,30 @@ export async function syncConnectedStoreOrders(params?: {
               orderId: result.id,
               error: linkError,
             });
+          }
+
+          // Orders the webhook never saw (created while the store was disconnected, or its
+          // orders/create delivery was lost) are allocated here. Orders older than the store's
+          // connection predate the allocation ledger — no future fulfilment webhook will pair
+          // with the commitment, so allocating them would strand it forever. Idempotent per
+          // line: an order the webhook (or a previous sync pass) already allocated is left
+          // untouched, and a pass that failed midway re-allocates on the next run.
+          const historic = new Date(order.created_at) < store.createdAt;
+          if (!historic && !order.cancelled_at) {
+            try {
+              await allocateForOrder({
+                storeId: store.id,
+                localOrderId: result.id,
+                shopifyOrderId: String(order.id),
+                orderNumber: order.order_number ?? null,
+                lineItems: (order.line_items ?? []).map((li) => ({ id: li.id, sku: li.sku, quantity: li.quantity, shopifyVariantId: li.variant_id })),
+              });
+            } catch (allocateError) {
+              console.error('Failed to allocate inventory during order sync', {
+                orderId: result.id,
+                error: allocateError,
+              });
+            }
           }
         }
 
@@ -490,6 +522,7 @@ function toShopifyOrderPayload(order: ShopifyGraphQLOrder): ShopifyOrderPayload 
         title: lineItem.title,
         sku: lineItem.sku,
         product_id: lineItem.product?.id ? getLegacyId(lineItem.product.id) : null,
+        variant_id: lineItem.variant?.id ? getLegacyId(lineItem.variant.id) : null,
         variant_title: lineItem.variantTitle,
         image: lineItem.image?.url ? { src: lineItem.image.url, url: lineItem.image.url } : null,
         vendor: lineItem.vendor,

@@ -37,14 +37,14 @@ export default function PoItemsTable({ rows, quantities, skus, costs, onQuantity
         <span className="flex min-h-[16px] items-center">Variants</span>
         <span className="flex min-h-[16px] items-center justify-end text-right">Stock</span>
         <span className="flex min-h-[16px] items-center justify-end text-right">Supplier SKU</span>
-        <span className="flex items-center justify-end gap-[4px]">
+        <span className="flex flex-col items-end gap-[3px]">
           <span>Qty</span>
-          <span className={`${compact ? 'w-[48px]' : 'w-[64px]'} min-w-0`}>
+          <span className="w-full min-w-0">
             <ColumnFillInput label="Qty" rowCount={rows.length} onApply={onFillQuantities} />
           </span>
         </span>
-        <span className="flex min-h-[16px] items-center justify-end text-right">Cost</span>
-        <span className="flex min-h-[16px] items-center justify-end text-right">Total</span>
+        <span className="flex min-h-[16px] items-center justify-end text-right">Cost (AUD)</span>
+        <span className="flex min-h-[16px] items-center justify-end text-right">Total (AUD)</span>
       </div>
       <div className="divide-y divide-inventory-border">
         {rows.map((v) => {

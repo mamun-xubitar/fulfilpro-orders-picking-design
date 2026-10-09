@@ -6,22 +6,27 @@ import { useInventoryAccess } from './InventoryAccess';
 import { CellSave } from './VariantsMatrixCells';
 import type { LocationOption } from './hooks/useLocations';
 import { Plus } from './icons';
+import type { VariantRow } from './types';
 
 type VariantLocationCellProps = {
-  locations: LocationOption[];
+  locations: VariantRow['locations'];
+  /** The row's unassigned stock on hand — carried into the first location picked for a variant
+   * that had none, so tagging a location never changes the total. */
+  unassignedStock: number;
   options: LocationOption[];
   dirty: boolean;
   saving: boolean;
   label: string;
-  onChange: (locations: LocationOption[]) => void;
+  onChange: (locations: VariantRow['locations']) => void;
   onSave: () => void;
   onCreate: (name: string) => Promise<LocationOption | null>;
 };
 
-/** A variant's locations: one colour-coded chip per location, stacked like the Incoming column.
- * Clicking the stack (or "+") opens the searchable multi-select; edits are a draft until the
- * cell's own save button (or the row's Save) writes them. */
-export default function VariantLocationCell({ locations, options, dirty, saving, label, onChange, onSave, onCreate }: VariantLocationCellProps) {
+/** A variant's locations: one colour-coded chip per location, stacked like the Incoming column, with
+ * a "Total" line under several (beside the Stock on hand cell's total). Clicking the stack (or "+")
+ * opens the searchable multi-select; edits are a draft until the cell's own save button (or the
+ * row's Save) writes them. A kept location keeps its stock; a newly picked one starts at 0. */
+export default function VariantLocationCell({ locations, unassignedStock, options, dirty, saving, label, onChange, onSave, onCreate }: VariantLocationCellProps) {
   const [open, setOpen] = useState(false);
   const { canEdit } = useInventoryAccess();
   const anchorRef = useRef<HTMLButtonElement>(null);
@@ -58,6 +63,7 @@ export default function VariantLocationCell({ locations, options, dirty, saving,
               </span>
             ))
           )}
+          {locations.length > 1 && <span className="text-[9px] font-semibold leading-[15px] text-inventory-text-subtle">Total</span>}
         </button>
         <CellSave show={dirty} saving={saving} label={`Save ${label}`} onSave={onSave} />
       </div>
@@ -69,7 +75,16 @@ export default function VariantLocationCell({ locations, options, dirty, saving,
         selectedIds={locations.map((l) => l.id)}
         onChange={(ids, created) => {
           const lookup = created ? new Map(byId).set(created.id, created) : byId;
-          onChange(ids.map((id) => lookup.get(id)).filter((o): o is LocationOption => Boolean(o)));
+          const next = ids
+            .map((id) => {
+              const kept = locations.find((l) => l.id === id);
+              const option = lookup.get(id);
+              return kept ?? (option ? { id, name: option.name, quantity: 0 } : null);
+            })
+            .filter((l): l is VariantRow['locations'][number] => Boolean(l))
+            .sort((a, b) => a.name.localeCompare(b.name));
+          if (locations.length === 0 && next.length > 0) next[0] = { ...next[0], quantity: unassignedStock };
+          onChange(next);
         }}
         onCreate={onCreate}
       />

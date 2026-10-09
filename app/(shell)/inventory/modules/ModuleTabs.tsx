@@ -7,7 +7,7 @@ type ModuleTabsProps = {
   active: ModuleTabId;
   onChange: (id: ModuleTabId) => void;
   /** An optional trailing control (e.g. the store-wide pricing defaults) rendered on the right
-   * of the tab bar — used only on the Products module. */
+   * of the tab bar — shown on every tab. */
   right?: React.ReactNode;
 };
 

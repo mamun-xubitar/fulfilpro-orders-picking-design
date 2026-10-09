@@ -60,7 +60,7 @@ export default function PurchaseOrdersPanel({ po }: PurchaseOrdersPanelProps) {
                       >
                         {row.status.replace('_', ' ')}
                       </span>
-                      {avgPrice !== null && <span className="text-[9px] font-semibold leading-none text-inventory-text-subtle">Avg ${formatMoney(avgPrice)}</span>}
+                      {avgPrice !== null && <span className="text-[9px] font-semibold leading-none text-inventory-text-subtle">Avg ${formatMoney(avgPrice)} AUD</span>}
                     </div>
                     <p className="truncate text-[9px] leading-tight text-inventory-text-subtle">
                       {row.items.length} variant{row.items.length === 1 ? '' : 's'} · {formatDate(row.createdAt)}

@@ -1,5 +1,6 @@
 'use client';
 
+import { SkeletonRows, type SkeletonCell } from './Skeleton';
 import ProductsTableRow from './ProductsTableRow';
 import type { ProductsSortKey, useProductsTable } from './hooks/useProductsTable';
 import { formatCurrencyValue, formatNumber } from './utils';
@@ -23,6 +24,9 @@ const COLUMNS: { key: ProductsSortKey | null; label: string; align: 'left' | 'ri
   { key: 'stockValue', label: 'Stock value', align: 'right' },
   { key: 'createdAt', label: 'Created', align: 'left' },
 ];
+
+// One shape per column (select, COLUMNS, actions) so the placeholder rows read like the real ones.
+const SKELETON_CELLS: SkeletonCell[] = ['check', 'stack', 'text', 'text', 'text', 'text', 'badge', 'badge', 'num', 'num', 'num', 'num', 'text', { kind: 'actions', count: 3 }];
 
 export default function ProductsTable({ table, loading }: ProductsTableProps) {
   const colSpan = COLUMNS.length + 2; // + select + actions
@@ -48,7 +52,7 @@ export default function ProductsTable({ table, loading }: ProductsTableProps) {
           </tr>
         </thead>
         <tbody>
-          {loading && <SkeletonRows rowCount={table.products.length || 8} colSpan={colSpan} />}
+          {loading && <SkeletonRows cells={SKELETON_CELLS} rows={table.products.length || 8} />}
           {!loading && table.products.length === 0 && (
             <tr>
               <td colSpan={colSpan} className="py-12 text-center text-[11px] text-inventory-text-subtle">
@@ -127,21 +131,5 @@ function ColumnHeader({
         </svg>
       </button>
     </th>
-  );
-}
-
-function SkeletonRows({ rowCount, colSpan }: { rowCount: number; colSpan: number }) {
-  return (
-    <>
-      {Array.from({ length: rowCount }).map((_, i) => (
-        <tr key={i} className="border-b border-inventory-divider last:border-0">
-          {Array.from({ length: colSpan }).map((__, j) => (
-            <td key={j} className="px-2 py-1.5">
-              <div className="h-3 animate-pulse rounded bg-inventory-surface-muted" />
-            </td>
-          ))}
-        </tr>
-      ))}
-    </>
   );
 }

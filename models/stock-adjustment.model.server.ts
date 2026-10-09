@@ -1,84 +1,181 @@
 import prisma from '@/lib/prisma.server';
-import { StockAdjustmentReason } from '@prisma/client';
+import { recordAdjustmentBatch, type AdjustmentLineInput } from '@/lib/inventory-adjustment.server';
+import { Prisma, StockAdjustmentReason, StockAdjustmentSource } from '@prisma/client';
 
-/** "Black / M", "Black" (colour-only), "M" (size-only), or "—" (neither axis). */
-function variantTitle(colour: string, size: string): string {
-  return [colour, size].filter(Boolean).join(' / ') || '—';
-}
+export const ADJUSTMENT_SORT_KEYS = ['number', 'createdAt', 'productName', 'lineCount', 'actorName'] as const;
+export type AdjustmentSortKey = (typeof ADJUSTMENT_SORT_KEYS)[number];
 
-export type StockAdjustmentRow = {
+/** One adjustment (a saved batch of lines), as listed in the Adjustments tab and a product's history. */
+export type AdjustmentBatchRow = {
+  id: string;
+  number: number;
+  source: StockAdjustmentSource;
+  reference: string | null;
+  createdAt: string;
+  supplierProductId: string;
+  productName: string;
+  itemNo: string;
+  actorName: string;
+  lineCount: number;
+  /** Sum of every line's change. */
+  netQty: number;
+  /** The reason every line shares, or 'MIXED' when they differ. */
+  reason: StockAdjustmentReason | 'MIXED';
+};
+
+export type AdjustmentLineRow = {
   id: string;
   variantId: string;
   colour: string;
   size: string;
+  sku: string | null;
   delta: number;
+  /** Stock at the line's location (or the variant's unassigned stock) just before the change. Older
+   * lines hold the variant's whole stock on hand; null for adjustments recorded before batches existed. */
+  stockBefore: number | null;
+  /** Where the change landed; null for a variant with no location and for older lines. */
+  locationId: string | null;
+  locationName: string | null;
   reason: StockAdjustmentReason;
   note: string | null;
-  actorName: string;
-  createdAt: string;
 };
 
+export type AdjustmentBatchDetailRow = AdjustmentBatchRow & { lines: AdjustmentLineRow[] };
+
+const summaryInclude = {
+  supplierProduct: { select: { name: true, itemNo: true } },
+  lines: { select: { delta: true, reason: true } },
+} satisfies Prisma.StockAdjustmentBatchInclude;
+type BatchWithSummary = Prisma.StockAdjustmentBatchGetPayload<{ include: typeof summaryInclude }>;
+
+function toSummary(row: BatchWithSummary): AdjustmentBatchRow {
+  const reasons = new Set(row.lines.map((l) => l.reason));
+  return {
+    id: row.id,
+    number: row.number,
+    source: row.source,
+    reference: row.reference,
+    createdAt: row.createdAt.toISOString(),
+    supplierProductId: row.supplierProductId,
+    productName: row.supplierProduct.name,
+    itemNo: row.supplierProduct.itemNo,
+    actorName: row.actorName,
+    lineCount: row.lines.length,
+    netQty: row.lines.reduce((sum, l) => sum + l.delta, 0),
+    reason: reasons.size === 1 ? [...reasons][0] : 'MIXED',
+  };
+}
+
 export class StockAdjustmentModel {
-  async listForProduct(supplierProductId: string): Promise<StockAdjustmentRow[]> {
-    const rows = await prisma.stockAdjustment.findMany({
+  /** Every product's adjustments — the Adjustments tab. */
+  async listAll(params: {
+    search?: string;
+    reason?: StockAdjustmentReason;
+    dateFrom?: string;
+    dateTo?: string;
+    sort?: AdjustmentSortKey;
+    dir?: 'asc' | 'desc';
+    page: number;
+    pageSize: number;
+  }): Promise<{ adjustments: AdjustmentBatchRow[]; total: number }> {
+    const { search, reason, dateFrom, dateTo, sort = 'createdAt', dir = 'desc', page, pageSize } = params;
+    const where: Prisma.StockAdjustmentBatchWhereInput = {};
+    const and: Prisma.StockAdjustmentBatchWhereInput[] = [];
+
+    if (reason) and.push({ lines: { some: { reason } } });
+    if (dateFrom || dateTo) {
+      where.createdAt = {
+        ...(dateFrom ? { gte: new Date(`${dateFrom}T00:00:00.000Z`) } : {}),
+        ...(dateTo ? { lte: new Date(`${dateTo}T23:59:59.999Z`) } : {}),
+      };
+    }
+    const term = search?.trim();
+    if (term) {
+      const digits = term.replace(/\D/g, '');
+      and.push({
+        OR: [
+          { supplierProduct: { name: { contains: term, mode: 'insensitive' } } },
+          { supplierProduct: { itemNo: { contains: term, mode: 'insensitive' } } },
+          { actorName: { contains: term, mode: 'insensitive' } },
+          { reference: { contains: term, mode: 'insensitive' } },
+          { lines: { some: { note: { contains: term, mode: 'insensitive' } } } },
+          { lines: { some: { variant: { sku: { contains: term, mode: 'insensitive' } } } } },
+          { lines: { some: { variant: { colour: { contains: term, mode: 'insensitive' } } } } },
+          { lines: { some: { variant: { size: { contains: term, mode: 'insensitive' } } } } },
+          ...(digits ? [{ number: Number(digits) }] : []),
+        ],
+      });
+    }
+    if (and.length > 0) where.AND = and;
+
+    const orderBy: Prisma.StockAdjustmentBatchOrderByWithRelationInput[] =
+      sort === 'productName'
+        ? [{ supplierProduct: { name: dir } }, { number: 'desc' }]
+        : sort === 'lineCount'
+          ? [{ lines: { _count: dir } }, { number: 'desc' }]
+          : [{ [sort]: dir }, { number: 'desc' }];
+
+    const [rows, total] = await Promise.all([
+      prisma.stockAdjustmentBatch.findMany({ where, include: summaryInclude, orderBy, skip: (page - 1) * pageSize, take: pageSize }),
+      prisma.stockAdjustmentBatch.count({ where }),
+    ]);
+    return { adjustments: rows.map(toSummary), total };
+  }
+
+  /** A product's latest 50 adjustments — the Adjustments card's "View history". */
+  async listForProduct(supplierProductId: string): Promise<AdjustmentBatchRow[]> {
+    const rows = await prisma.stockAdjustmentBatch.findMany({
       where: { supplierProductId },
-      include: { variant: { select: { colour: true, size: true } } },
+      include: summaryInclude,
       orderBy: { createdAt: 'desc' },
       take: 50,
     });
-    return rows.map((r) => ({
-      id: r.id,
-      variantId: r.variantId,
-      colour: r.variant.colour,
-      size: r.variant.size,
-      delta: r.delta,
-      reason: r.reason,
-      note: r.note,
-      actorName: r.actorName,
-      createdAt: r.createdAt.toISOString(),
-    }));
+    return rows.map(toSummary);
   }
 
-  async create(data: {
-    supplierProductId: string;
-    variantId: string;
-    delta: number;
-    reason: StockAdjustmentReason;
-    note: string | null;
-    actorId: string;
-    actorName: string;
-  }): Promise<void> {
-    await this.createMany([data]);
-  }
-
-  /** Applies every adjustment in one transaction, so a multi-row save is all-or-nothing. */
-  async createMany(
-    items: {
-      supplierProductId: string;
-      variantId: string;
-      delta: number;
-      reason: StockAdjustmentReason;
-      note: string | null;
-      actorId: string;
-      actorName: string;
-    }[]
-  ): Promise<void> {
-    await prisma.$transaction(async (tx) => {
-      for (const data of items) {
-        await tx.supplierProductVariant.update({ where: { id: data.variantId }, data: { stockOnHand: { increment: data.delta } } });
-        await tx.stockAdjustment.create({ data });
-        const variant = await tx.supplierProductVariant.findUniqueOrThrow({ where: { id: data.variantId }, select: { colour: true, size: true } });
-        await tx.inventoryActivity.create({
-          data: {
-            supplierProductId: data.supplierProductId,
-            variantId: data.variantId,
-            type: 'stock_adjusted',
-            message: `${data.delta > 0 ? '+' : ''}${data.delta} on ${variantTitle(variant.colour, variant.size)} (${data.reason.toLowerCase()})`,
-            actorId: data.actorId,
-            actorName: data.actorName,
+  /** One adjustment with its lines, for the View modal. */
+  async findById(id: string): Promise<AdjustmentBatchDetailRow | null> {
+    const row = await prisma.stockAdjustmentBatch.findUnique({
+      where: { id },
+      include: {
+        supplierProduct: { select: { name: true, itemNo: true } },
+        lines: {
+          select: {
+            id: true,
+            variantId: true,
+            delta: true,
+            stockBefore: true,
+            locationId: true,
+            locationName: true,
+            reason: true,
+            note: true,
+            variant: { select: { colour: true, size: true, sku: true, position: true } },
           },
-        });
-      }
+        },
+      },
     });
+    if (!row) return null;
+    const lines = [...row.lines].sort((a, b) => a.variant.position - b.variant.position || (a.locationName ?? '').localeCompare(b.locationName ?? ''));
+    return {
+      ...toSummary(row),
+      lines: lines.map((l) => ({
+        id: l.id,
+        variantId: l.variantId,
+        colour: l.variant.colour,
+        size: l.variant.size,
+        sku: l.variant.sku,
+        delta: l.delta,
+        stockBefore: l.stockBefore,
+        locationId: l.locationId,
+        locationName: l.locationName,
+        reason: l.reason,
+        note: l.note,
+      })),
+    };
+  }
+
+  /** Applies every line and records them as one adjustment, in one transaction — all-or-nothing. */
+  async createBatch(args: { supplierProductId: string; lines: AdjustmentLineInput[]; actor: { id: string; name: string } }): Promise<void> {
+    await prisma.$transaction((tx) => recordAdjustmentBatch(tx, { ...args, source: 'MANUAL' }));
   }
 }

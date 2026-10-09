@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { toast } from 'react-toastify';
 import useRequest from '@/hooks/useRequest';
-import { getStatus, naturalCompare, quickFilterMatches, sortVariantsForDisplay, summariseVariants, variantDraftChanges, variantPatchBody } from '../utils';
+import { applyVariantDraft, getStatus, naturalCompare, quickFilterMatches, sortVariantsForDisplay, summariseVariants, variantDraftChanges, variantPatchBody } from '../utils';
 import type { ProductRecord, QuickFilterId, VariantRow, VariantStatus } from '../types';
 
 type MatrixFilters = {
@@ -113,7 +113,7 @@ export function useVariantsMatrix({ product, sizes, quickFilter, onVariantSaved 
   const variants = useMemo(() => {
     const base = product?.variants ?? [];
     if (Object.keys(drafts).length === 0) return base;
-    return base.map((v) => (drafts[v.id] ? { ...v, ...drafts[v.id] } : v));
+    return base.map((v) => (drafts[v.id] ? applyVariantDraft(v, drafts[v.id]) : v));
   }, [product, drafts]);
 
   // The exact PATCH body for each dirty row, keyed by variant id — computed by diffing every
@@ -177,9 +177,13 @@ export function useVariantsMatrix({ product, sizes, quickFilter, onVariantSaved 
 
   /** Bulk column fill (item 9) — writes `value` onto the given field for every currently
    * *visible* row (respecting the colour/size/status/zero-stock filters), same as if each row
-   * had been edited by hand. Each row keeps its own per-row Save; this only stages the drafts. */
+   * had been edited by hand. Each row keeps its own per-row Save; this only stages the drafts.
+   * Stock on hand fills every stock input: each location of a located row, or the unassigned stock. */
   const fillColumn = (field: 'stockOnHand' | 'allocated' | 'sellPrice', value: number) => {
-    for (const row of rows) setVariantEdit(row.id, { [field]: value });
+    for (const row of rows) {
+      if (field === 'stockOnHand' && row.locations.length > 0) setVariantEdit(row.id, { locations: row.locations.map((l) => ({ ...l, quantity: value })) });
+      else setVariantEdit(row.id, { [field]: value });
+    }
   };
 
   /** Drops one row's draft — used both after a successful save (the fresh server value is now

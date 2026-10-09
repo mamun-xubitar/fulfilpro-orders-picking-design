@@ -33,6 +33,8 @@ export function useStocktakesTab({ enabled, refreshKey }: Args) {
   const [rows, setRows] = useState<StocktakeRecord[]>([]);
   const [pagination, setPagination] = useState<PaginationState>(EMPTY_PAGINATION);
   const [initialLoading, setInitialLoading] = useState(true);
+  // Which query `rows` belong to — a refetch of the same query keeps showing them instead of a skeleton.
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
   const { request: requestList, loading } = useRequest<{ stocktakes: StocktakeRecord[]; pagination: PaginationState }>();
 
   const [searchInput, setSearchInputState] = useState('');
@@ -72,6 +74,7 @@ export function useStocktakesTab({ enabled, refreshKey }: Args) {
     setPage(1);
   };
 
+  const queryKey = JSON.stringify({ search, ...filters, sort, dir, page, pageSize });
   const load = () => {
     if (!enabled) return;
     requestList({
@@ -83,6 +86,7 @@ export function useStocktakesTab({ enabled, refreshKey }: Args) {
         setRows(data.stocktakes);
         setPagination(data.pagination);
         setInitialLoading(false);
+        setLoadedKey(queryKey);
       },
     });
   };
@@ -100,6 +104,7 @@ export function useStocktakesTab({ enabled, refreshKey }: Args) {
     pageNumbers: buildPageNumbers(pagination.page, pagination.totalPages),
     loading,
     initialLoading,
+    showSkeleton: initialLoading || (loading && loadedKey !== queryKey),
     searchInput,
     setSearchInput,
     filters,

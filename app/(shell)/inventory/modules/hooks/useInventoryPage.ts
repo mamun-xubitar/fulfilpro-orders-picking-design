@@ -4,13 +4,17 @@ import { useMemo, useState } from 'react';
 import useRequest from '@/hooks/useRequest';
 import { isValidHandle } from '@/lib/inventory/handle';
 import { summariseVariants } from '../utils';
+import { useAdjustmentDetail } from './useAdjustmentDetail';
 import { useAdjustments } from './useAdjustments';
+import { useAdjustmentsTab } from './useAdjustmentsTab';
+import { useHistoryTab } from './useHistoryTab';
 import { useCatalogData } from './useCatalogData';
 import { useImportExport } from './useImportExport';
 import { useImportProducts } from './useImportProducts';
 import { useBulkLocations } from './useBulkLocations';
 import { useInventoryCategories } from './useInventoryCategories';
 import { useLocations } from './useLocations';
+import { useStoreLocations } from './useStoreLocations';
 import { useOptionLibrary } from './useOptionLibrary';
 import { useProductDetails } from './useProductDetails';
 import { useProductImageMutations } from './useProductImageMutations';
@@ -112,6 +116,7 @@ export function useInventoryPage() {
   };
   const matrix = useVariantsMatrix({ product, sizes: details.sizes, quickFilter: data.quickFilter, onVariantSaved });
   const locations = useLocations({ refreshKey: locationRefreshNonce, onChanged: data.refresh });
+  const storeLocations = useStoreLocations();
   const bulkLocations = useBulkLocations({
     product,
     selectedIds: matrix.selectedIds,
@@ -153,6 +158,9 @@ export function useInventoryPage() {
   const stocktakesTab = useStocktakesTab({ enabled: moduleTab === 'stocktake', refreshKey: stocktakeNonce });
   const stocktakeDetail = useStocktakeDetail({ isAdmin: stocktakesTab.isAdmin, onChanged: stocktakesTab.refresh, onSynced: onStocktakeSynced });
   const adjustments = useAdjustments({ product, onSaved: onProductSaved });
+  const adjustmentDetail = useAdjustmentDetail();
+  const adjustmentsTab = useAdjustmentsTab({ enabled: moduleTab === 'adjustments' });
+  const historyTab = useHistoryTab({ enabled: moduleTab === 'history' });
   const importExport = useImportExport({ product, onSaved: onProductSaved });
   const productsTable = useProductsTable({ enabled: data.allRecords, verifiedOnly: nav.verifiedOnly, quickFilter: nav.quickFilter, onView: moduleTab === 'products' ? nav.viewProduct : openProductInVariants, onCounts: data.syncCounts, onDeleted: bumpSupplierRefresh });
   const importProducts = useImportProducts({ supplierOptions: po.supplierOptions, onImported: () => { data.refresh(); productsTable.refresh(); bumpSupplierRefresh(); } });
@@ -220,6 +228,7 @@ export function useInventoryPage() {
     details,
     matrix,
     locations,
+    storeLocations,
     bulkLocations,
     po,
     poTab,
@@ -235,6 +244,9 @@ export function useInventoryPage() {
     stocktakesTab,
     stocktakeDetail,
     adjustments,
+    adjustmentDetail,
+    adjustmentsTab,
+    historyTab,
     suppliers,
     importExport,
     importProducts,

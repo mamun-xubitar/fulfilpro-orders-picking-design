@@ -4,6 +4,7 @@ import { STATUS_BADGES } from './PurchaseOrdersPanel';
 import { Card, Eye, Pencil, Printer, Truck } from './icons';
 import { useInventoryAccess } from './InventoryAccess';
 import SortableTh from './SortableTh';
+import { SkeletonRows, type SkeletonCell } from './Skeleton';
 import type { PurchaseOrdersTabState, PoSortKey } from './hooks/usePurchaseOrdersTab';
 import type { PurchaseOrderRecord } from './types';
 import { formatCurrencyValue, formatDate, formatPoNumber } from './utils';
@@ -17,6 +18,7 @@ type PurchaseOrdersTableProps = {
 };
 
 const COLUMN_COUNT = 13;
+const PO_SKELETON: SkeletonCell[] = ['check', 'text', 'text', 'stack', 'text', 'text', 'badge', 'num', 'num', 'num', 'badge', 'input', { kind: 'actions', count: 3 }];
 const ICON_BTN = 'flex h-[20px] w-[20px] items-center justify-center rounded-[6px] transition-colors duration-150 cursor-pointer';
 const ACTION_BTN = `${ICON_BTN} border border-inventory-border-strong bg-inventory-surface text-inventory-text-muted hover:bg-inventory-surface-hover`;
 
@@ -32,7 +34,7 @@ export default function PurchaseOrdersTable({ tab, onReceive, onPay, onOpenSuppl
 
   return (
     <div className="overflow-x-auto thin-scroll">
-      <table className="w-full min-w-[1080px] border-collapse text-[11px] leading-none">
+      <table aria-busy={tab.loading || tab.initialLoading} className="w-full min-w-[1080px] border-collapse text-[11px] leading-none">
         <thead>
           <tr className="border-b border-inventory-border bg-inventory-surface-muted">
             <th className="w-7 px-2 py-1">
@@ -53,8 +55,8 @@ export default function PurchaseOrdersTable({ tab, onReceive, onPay, onOpenSuppl
           </tr>
         </thead>
         <tbody>
-          {tab.initialLoading ? (
-            <SkeletonRows />
+          {tab.showSkeleton ? (
+            <SkeletonRows rows={tab.rows.length || 8} cells={PO_SKELETON} />
           ) : tab.rows.length === 0 ? (
             <tr>
               <td colSpan={COLUMN_COUNT} className="px-2 py-10 text-center text-[11px] text-inventory-text-subtle">
@@ -167,21 +169,5 @@ function PoRow({ po, tab, onReceive, onPay, onOpenSupplier, onOpenProduct }: { p
         </div>
       </td>
     </tr>
-  );
-}
-
-function SkeletonRows() {
-  return (
-    <>
-      {Array.from({ length: 6 }).map((_, i) => (
-        <tr key={i} className="border-b border-inventory-divider last:border-0">
-          {Array.from({ length: COLUMN_COUNT }).map((__, j) => (
-            <td key={j} className="px-2 py-2">
-              <div className="h-3 animate-pulse rounded bg-inventory-surface-muted" />
-            </td>
-          ))}
-        </tr>
-      ))}
-    </>
   );
 }

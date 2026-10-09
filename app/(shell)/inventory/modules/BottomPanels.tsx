@@ -56,7 +56,20 @@ export default function BottomPanels({ p }: BottomPanelsProps) {
         </Actions>
       </Card>
 
-      <Card tone="activity" icon={<Activity className="h-3 w-3" />} title="Recent activity">
+      <Card
+        tone="activity"
+        icon={<Activity className="h-3 w-3" />}
+        title="Recent activity"
+        action={
+          <button
+            type="button"
+            onClick={() => p.setModuleTab('history')}
+            className="cursor-pointer text-[10px] font-bold leading-none text-inventory-sec-activity transition-opacity duration-150 hover:opacity-70 hover:underline"
+          >
+            Show history
+          </button>
+        }
+      >
         {product.activity.length === 0 ? (
           <p className="py-3 text-center text-[10px] text-inventory-text-subtle">No recent activity</p>
         ) : (
@@ -79,10 +92,10 @@ export default function BottomPanels({ p }: BottomPanelsProps) {
   );
 }
 
-function Card({ icon, title, tone, children }: { icon: React.ReactNode; title: string; tone: PanelTone; children: React.ReactNode }) {
+function Card({ icon, title, tone, action, children }: { icon: React.ReactNode; title: string; tone: PanelTone; action?: React.ReactNode; children: React.ReactNode }) {
   return (
     <section className={`flex min-h-0 flex-col rounded-[10px] border ${panelBorderClass(tone)} bg-inventory-surface shadow-inventory`}>
-      <PanelHeading tone={tone} icon={icon} title={title} />
+      <PanelHeading tone={tone} icon={icon} title={title} action={action} />
       <div className="flex min-h-0 flex-1 flex-col gap-[4px] p-[6px]">{children}</div>
     </section>
   );

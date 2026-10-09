@@ -118,6 +118,7 @@ export async function POST(request: NextRequest) {
       //     storeId: store.id,
       //     storeDomain: normalizedShop,
       //     accessToken: store.accessToken,
+      //     storeCreatedAt: store.createdAt,
       //   });
       //   break;
       // }
@@ -125,10 +126,10 @@ export async function POST(request: NextRequest) {
         await webhookController.handleOrderCancelled({ payload: payload as ShopifyOrderPayload, storeId: store.id });
         break;
       case 'fulfillments/create':
-        await webhookController.handleFulfillmentCreate({ payload: payload as ShopifyFulfillmentPayload, storeId: store.id });
+        await webhookController.handleFulfillmentCreate({ payload: payload as ShopifyFulfillmentPayload, storeId: store.id, storeCreatedAt: store.createdAt });
         break;
       case 'fulfillments/update':
-        await webhookController.handleFulfillmentUpdate({ payload: payload as ShopifyFulfillmentPayload, storeId: store.id });
+        await webhookController.handleFulfillmentUpdate({ payload: payload as ShopifyFulfillmentPayload, storeId: store.id, storeCreatedAt: store.createdAt });
         break;
       case 'refunds/create':
         await webhookController.handleRefundCreate({ payload: payload as ShopifyRefundPayload, storeId: store.id });

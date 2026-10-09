@@ -3,7 +3,8 @@
 import { useMemo, useState } from 'react';
 import useRequest from '@/hooks/useRequest';
 import { upperTrim } from '@/lib/utils/common';
-import { naturalCompare } from '../utils';
+import { adjustTarget, naturalCompare } from '../utils';
+import type { LocationOption } from '../hooks/useLocations';
 import type { OptionLibraryState } from '../hooks/useOptionLibrary';
 import type { ProductRecord } from '../types';
 
@@ -21,14 +22,24 @@ export type VariantDraftRow = {
   size: string;
   /** True when this combo isn't among the product's current variants yet. */
   isNew: boolean;
+  /** Stock on hand at the modal's chosen location (or the variant's total / unassigned stock when
+   * "No location" is chosen) — what Replace/Insert will write there. */
   stockOnHand: number;
+  /** What `stockOnHand` shows before anything is typed — compared against it to spot edits. */
+  baseStockOnHand: number;
+  /** "No location" chosen on an existing variant that is kept at locations: its stock is the sum
+   * of them, so it is shown read-only until a location is picked. */
+  stockLocked: boolean;
   /** null on a brand-new combo nobody has typed a trigger for yet — shown blank, and left out of
    * the apply request so the server falls back to the store's low-stock threshold, same as
    * reconcileVariants. */
   trigger: number | null;
+  /** The modal's chosen location, or — under "No location" — an existing variant's own locations.
+   * null when it has none. Display only. */
+  locationLabel: string | null;
 };
 
-type ValueEntry = { stockOnHand: number; trigger: number | null };
+type ValueEntry = { stockOnHand?: number; trigger?: number | null };
 
 function keyOf(colour: string, size: string): string {
   return `${colour.toLowerCase()}::${size.toUpperCase()}`;
@@ -70,6 +81,7 @@ function buildItems(library: { id: string; name: string }[], productNames: strin
 type UseColourSizeModalArgs = {
   product: ProductRecord;
   optionLibrary: OptionLibraryState;
+  locationOptions: LocationOption[];
   onApplied: (product: ProductRecord) => void;
   onClose: () => void;
 };
@@ -77,10 +89,10 @@ type UseColourSizeModalArgs = {
 /**
  * Drives the Colour & size adjustment modal — the single entry point for adding/removing colours
  * and sizes and (re)generating a product's variants from them, replacing the old preset quick-add
- * modals and Product details' own colour/size fields. See PATTERN.md's three-move pattern; this
+ * modals and Product details' own colour/size fields. See ARCHITECTURE.md's three-move pattern; this
  * hook is the "state + handlers" layer for ColourSizeModal.tsx.
  */
-export function useColourSizeModal({ product, optionLibrary, onApplied, onClose }: UseColourSizeModalArgs) {
+export function useColourSizeModal({ product, optionLibrary, locationOptions, onApplied, onClose }: UseColourSizeModalArgs) {
   const [colourItems, setColourItems] = useState<OptionItem[]>(() => buildItems(optionLibrary.colours, product.colours.map((c) => c.name)));
   const [sizeItems, setSizeItems] = useState<OptionItem[]>(() => buildItems(optionLibrary.sizes, product.sizes));
   const [colourInput, setColourInput] = useState('');
@@ -97,6 +109,17 @@ export function useColourSizeModal({ product, optionLibrary, onApplied, onClose 
   // checking/unchecking colours or sizes so a typed value isn't lost by an unrelated toggle.
   const [values, setValues] = useState<Record<string, ValueEntry>>({});
   const [replaceConfirmOpen, setReplaceConfirmOpen] = useState(false);
+  // Whose stock the Stock on hand column shows and edits: defaults to where the product's existing
+  // variants already are, else the first location, so one is always selected ('' only when no
+  // locations exist at all).
+  const [pickedLocationId, setLocationId] = useState(() => product.variants.find((v) => v.locations.length > 0)?.locations[0].id ?? '');
+  const locationId = pickedLocationId || locationOptions[0]?.id || '';
+  const locationName = locationOptions.find((l) => l.id === locationId)?.name ?? null;
+  // Typed stock belongs to the location it was typed against, so it's dropped on a switch.
+  const changeLocation = (id: string) => {
+    setLocationId(id);
+    setValues((prev) => Object.fromEntries(Object.entries(prev).map(([k, v]) => [k, { trigger: v.trigger }])));
+  };
   const { request: requestApply, loading: applying } = useRequest<ProductRecord>();
 
   const itemsFor = (kind: OptionKind) => (kind === 'colour' ? colourItems : sizeItems);
@@ -189,13 +212,19 @@ export function useColourSizeModal({ product, optionLibrary, onApplied, onClose 
         const key = keyOf(colour, size);
         const existing = existingByKey.get(key);
         const typed = values[key];
+        const target = existing && locationId ? adjustTarget(existing, locationId) : null;
+        const stockLocked = !locationId && !!existing && existing.locations.length > 0;
+        const baseStockOnHand = !existing ? 0 : target?.kind === 'location' ? target.quantity : target?.kind === 'absent' ? 0 : existing.stockOnHand;
         rows.push({
           key,
           colour,
           size,
           isNew: !existing,
-          stockOnHand: typed?.stockOnHand ?? existing?.stockOnHand ?? 0,
+          stockOnHand: stockLocked ? baseStockOnHand : (typed?.stockOnHand ?? baseStockOnHand),
+          baseStockOnHand,
+          stockLocked,
           trigger: typed?.trigger ?? existing?.trigger ?? null,
+          locationLabel: locationId ? locationName : existing ? existing.locations.map((l) => l.name).join(', ') || null : null,
         });
       }
     }
@@ -205,22 +234,18 @@ export function useColourSizeModal({ product, optionLibrary, onApplied, onClose 
     // product or the matrix's own size order.
     rows.sort((a, b) => naturalCompare(a.colour, b.colour) || naturalCompare(a.size, b.size));
     return rows;
-  }, [checkedColours, checkedSizes, product.variants, values]);
+  }, [checkedColours, checkedSizes, product.variants, values, locationId, locationName]);
 
   const setVariantValue = (key: string, field: 'stockOnHand' | 'trigger', value: number) => {
-    setValues((prev) => {
-      const row = variants.find((v) => v.key === key);
-      const base: ValueEntry = prev[key] ?? { stockOnHand: row?.stockOnHand ?? 0, trigger: row?.trigger ?? null };
-      return { ...prev, [key]: { ...base, [field]: value } };
-    });
+    setValues((prev) => ({ ...prev, [key]: { ...prev[key], [field]: value } }));
   };
 
   const fillAll = (field: 'stockOnHand' | 'trigger', value: number) => {
     setValues((prev) => {
       const next = { ...prev };
       for (const row of variants) {
-        const base = next[row.key] ?? { stockOnHand: row.stockOnHand, trigger: row.trigger };
-        next[row.key] = { ...base, [field]: value };
+        if (field === 'stockOnHand' && row.stockLocked) continue;
+        next[row.key] = { ...next[row.key], [field]: value };
       }
       return next;
     });
@@ -241,6 +266,7 @@ export function useColourSizeModal({ product, optionLibrary, onApplied, onClose 
       method: 'POST',
       data: {
         mode,
+        ...(locationId ? { locationId } : {}),
         colours: checkedColours,
         sizes: checkedSizes,
         values: variants.map((v) => ({
@@ -254,7 +280,7 @@ export function useColourSizeModal({ product, optionLibrary, onApplied, onClose 
       onSuccess: ({ data }) => {
         onApplied(data);
         setReplaceConfirmOpen(false);
-        onClose();
+        setValues({});
       },
     });
   };
@@ -268,7 +294,7 @@ export function useColourSizeModal({ product, optionLibrary, onApplied, onClose 
   // Only Replace writes typed stock/trigger onto combos that already exist — Insert skips them.
   const valuesChanged = product.variants.some((v) => {
     const row = previewByKey.get(keyOf(v.colour, v.size));
-    return !!row && (row.stockOnHand !== v.stockOnHand || (row.trigger !== null && row.trigger !== v.trigger));
+    return !!row && (row.stockOnHand !== row.baseStockOnHand || (row.trigger !== null && row.trigger !== v.trigger));
   });
 
   const insertDisabledReason = !hasChecked
@@ -314,6 +340,7 @@ export function useColourSizeModal({ product, optionLibrary, onApplied, onClose 
       save: () => saveToLibrary('size'),
       saving: sizeSaving || optionLibrary.saving,
     },
+    location: { id: locationId, set: changeLocation, options: locationOptions },
     variants,
     setVariantValue,
     fillAll,

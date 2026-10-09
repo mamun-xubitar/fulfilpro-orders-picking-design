@@ -6,7 +6,7 @@ import { formatColourName } from '@/lib/inventory/colour';
 import type { ProductRecord, StocktakeRecord, VariantRow } from '../types';
 
 /** One countable line: a variant at one of its locations (or the lone line of a variant with none). */
-export type StocktakeLine = { key: string; variant: VariantRow; location: { id: string; name: string } | null };
+export type StocktakeLine = { key: string; variant: VariantRow; location: VariantRow['locations'][number] | null };
 
 export type StocktakeFilters = { locationId: string; colour: string; size: string };
 const NO_FILTERS: StocktakeFilters = { locationId: '', colour: '', size: '' };

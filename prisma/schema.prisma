@@ -73,6 +73,7 @@ model Store {
   inventoryAllocations        InventoryAllocation[]
   processedFulfillments       ProcessedFulfillmentEvent[]
   processedRefunds            ProcessedRefundEvent[]
+  locations                   StoreLocation[]
 
   @@index([status])
   @@index([partnerStoreId])
@@ -898,8 +899,8 @@ enum PurchaseOrderStatus {
 }
 
 model PurchaseOrder {
-  id                  String                @id @default(uuid())
-  number              Int                   @unique @default(autoincrement())
+  id                  String                 @id @default(uuid())
+  number              Int                    @unique @default(autoincrement())
   /**
    * Supplier's or internal free-text reference. Optional; not unique.
    */
@@ -909,7 +910,7 @@ model PurchaseOrder {
   poEmail             String
   supplierProductId   String
   productTitle        String
-  status              PurchaseOrderStatus   @default(REQUESTED)
+  status              PurchaseOrderStatus    @default(REQUESTED)
   deliveryDate        DateTime?
   poRemark            String?
   shippingRemark      String?
@@ -918,20 +919,21 @@ model PurchaseOrder {
    * seeds from before any payment exists. Null only on POs created before the snapshot existed.
    */
   pricingCurrencyCode String?
-  pricingExchangeRate Decimal?              @db.Decimal(14, 6)
-  pricingBuyingPrice  Decimal?              @db.Decimal(14, 2)
-  pricingFreight      Decimal?              @db.Decimal(14, 2)
-  pricingMisc         Decimal?              @db.Decimal(14, 2)
+  pricingExchangeRate Decimal?               @db.Decimal(14, 6)
+  pricingBuyingPrice  Decimal?               @db.Decimal(14, 2)
+  pricingFreight      Decimal?               @db.Decimal(14, 2)
+  pricingMisc         Decimal?               @db.Decimal(14, 2)
   createdById         String
   createdByName       String
   statusUpdatedById   String?
   statusUpdatedByName String?
   statusUpdatedAt     DateTime?
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime              @updatedAt
-  supplier            Supplier              @relation(fields: [supplierId], references: [id], onDelete: Restrict)
-  supplierProduct     SupplierProduct       @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+  supplier            Supplier               @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  supplierProduct     SupplierProduct        @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
   items               PurchaseOrderItem[]
+  receipts            PurchaseOrderReceipt[]
   payment             PurchaseOrderPayment?
 
   @@index([supplierProductId, createdAt])
@@ -952,6 +954,18 @@ model PurchaseOrderItem {
   variant          SupplierProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
 
   @@unique([purchaseOrderId, variantId])
+  @@index([purchaseOrderId])
+}
+
+/// One stock receipt against a PO — where it was put away. `locationName` is a snapshot (null = unassigned stock) so the PO's printout survives a location being renamed or deleted.
+model PurchaseOrderReceipt {
+  id              String        @id @default(uuid())
+  purchaseOrderId String
+  locationName    String?
+  quantity        Int
+  createdAt       DateTime      @default(now())
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+
   @@index([purchaseOrderId])
 }
 
@@ -1020,22 +1034,52 @@ model PurchaseOrderPaymentHistory {
 }
 
 /**
- * A physical place variants are kept (a shelf, bin, rack). Tags only — a variant belongs to any
- * number of locations and its single stock-on-hand is not split between them.
+ * A physical place variants are kept (a shelf, bin, rack). A variant belongs to any number of
+ * locations and holds its own quantity at each (SupplierProductVariantLocation.quantity).
  */
 model InventoryLocation {
-  id             String                           @id @default(uuid())
-  name           String                           @unique
-  description    String?
-  variants       SupplierProductVariantLocation[]
-  stocktakeItems StocktakeItem[]
+  id               String                           @id @default(uuid())
+  name             String                           @unique
+  description      String?
+  variants         SupplierProductVariantLocation[]
+  stocktakeItems   StocktakeItem[]
+  stockAdjustments StockAdjustment[]
+  storeLocations   StoreLocation[]
   createdAt      DateTime                         @default(now())
   updatedAt      DateTime                         @updatedAt
 }
 
+/**
+ * One Shopify location of a connected store, mapped (by an admin) to the hub InventoryLocation whose
+ * stock that store's fulfilments and returns at this location move. Synced from Shopify; unmapped
+ * (or unknown) locations fall back to the variant's fullest / first location.
+ */
+model StoreLocation {
+  id                  String             @id @default(uuid())
+  storeId             String
+  /// Shopify's numeric location id as a string — the `location_id` webhooks carry (not the gid).
+  shopifyLocationId   String
+  name                String
+  active              Boolean            @default(true)
+  inventoryLocationId String?
+  store               Store              @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  inventoryLocation   InventoryLocation? @relation(fields: [inventoryLocationId], references: [id], onDelete: SetNull)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  @@unique([storeId, shopifyLocationId])
+  @@index([inventoryLocationId])
+}
+
+/**
+ * A variant's stock at one location. While a variant has any of these, its stockOnHand is kept equal
+ * to the sum of their quantities (see lib/inventory-stock.server.ts); a variant with none holds its
+ * stockOnHand unassigned.
+ */
 model SupplierProductVariantLocation {
   variantId  String
   locationId String
+  quantity   Int                    @default(0)
   createdAt  DateTime               @default(now())
   variant    SupplierProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
   location   InventoryLocation      @relation(fields: [locationId], references: [id], onDelete: Restrict)
@@ -1092,6 +1136,7 @@ model SupplierProduct {
   purchaseOrders      PurchaseOrder[]
   stocktakes          Stocktake[]
   adjustments         StockAdjustment[]
+  adjustmentBatches   StockAdjustmentBatch[]
   activity            InventoryActivity[]
   storeListings       SupplierProductStoreListing[]
   createdAt           DateTime                      @default(now())
@@ -1239,8 +1284,8 @@ model Stocktake {
 
 /**
  * One counting line: a variant at one of its locations (or the lone line of a variant with no
- * location). expectedQty is the variant's stock on hand when the stocktake was created — the same
- * on every line of that variant, since stock is not split between locations.
+ * location). expectedQty is the stock at that location when the stocktake was created (the
+ * variant's unassigned stock on hand for a line with no location).
  */
 model StocktakeItem {
   id           String                 @id @default(uuid())
@@ -1271,21 +1316,58 @@ enum StockAdjustmentReason {
   OTHER
 }
 
+enum StockAdjustmentSource {
+  MANUAL
+  STOCKTAKE
+}
+
+/// One save of the adjustment modal (or one stocktake sync): the "main" adjustment, shown as ADJ-0001.
+/// Its `lines` are the per-variant changes.
+model StockAdjustmentBatch {
+  id                String                @id @default(uuid())
+  number            Int                   @unique @default(autoincrement())
+  supplierProductId String
+  source            StockAdjustmentSource @default(MANUAL)
+  /// Display reference of the stocktake that produced it, e.g. ST-0007.
+  reference         String?
+  actorId           String
+  actorName         String
+  supplierProduct   SupplierProduct       @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
+  lines             StockAdjustment[]
+  createdAt         DateTime              @default(now())
+
+  @@index([supplierProductId, createdAt])
+  @@index([createdAt])
+}
+
 model StockAdjustment {
   id                String                 @id @default(uuid())
+  batchId           String
+  batch             StockAdjustmentBatch   @relation(fields: [batchId], references: [id], onDelete: Cascade)
   supplierProductId String
   variantId         String
   delta             Int
+  /// Stock at `locationId` (or the variant's unassigned stock on hand when it has none) just before
+  /// this change. Older rows hold the variant's whole stock on hand; null before batches existed.
+  stockBefore       Int?
+  /// Where the change landed; null for a variant with no location and for rows recorded before
+  /// stock was held per location.
+  locationId        String?
+  /// Snapshot so the history still reads right after a location is renamed or deleted.
+  locationName      String?
   reason            StockAdjustmentReason
   note              String?
   actorId           String
   actorName         String
   supplierProduct   SupplierProduct        @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
   variant           SupplierProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  location          InventoryLocation?     @relation(fields: [locationId], references: [id], onDelete: SetNull)
   createdAt         DateTime               @default(now())
 
   @@index([supplierProductId, createdAt])
   @@index([variantId])
+  @@index([batchId])
+  @@index([locationId])
 }
 
 model InventoryActivity {
@@ -1296,6 +1378,8 @@ model InventoryActivity {
   message           String
   actorId           String?
   actorName         String
+  /// Set on `stock_adjusted` / `stocktake_completed` entries so History can open the adjustment's lines.
+  adjustmentBatchId String?
   supplierProduct   SupplierProduct @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
   createdAt         DateTime        @default(now())
 

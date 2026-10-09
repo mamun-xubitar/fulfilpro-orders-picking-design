@@ -22,6 +22,7 @@ export default function ProductDetailsTab({ p }: { p: InventoryPage }) {
         details={p.details}
         supplierOptions={p.supplierOptions}
         optionLibrary={p.optionLibrary}
+        locationOptions={p.locations.options}
         inventoryCategories={p.inventoryCategories}
         suppliers={p.suppliers}
         product={p.product}

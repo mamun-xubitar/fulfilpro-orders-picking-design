@@ -1,7 +1,9 @@
 'use client';
 
 import { ModalShell } from '@/components/ModalShell';
+import PayPoSkeleton from './PayPoSkeleton';
 import { NumberInput, Row } from './PricingMarginPanel';
+import { Bone } from './Skeleton';
 import type { PoPaymentState } from './hooks/usePoPayment';
 import { SPINNER, WIZARD_BODY_CLASS, WIZARD_BTN_FINISH, WIZARD_BTN_PRIMARY, WIZARD_BTN_SECONDARY, WIZARD_CARD_CLASS } from './modalStyles';
 import type { InventoryGlobals } from './types';
@@ -18,7 +20,7 @@ const ACTION_LABELS: Record<string, string> = { created: 'Created', updated: 'Ed
  * is the whole order's landed cost in the base currency. */
 export default function PayPoModal({ pay, globals }: { pay: PoPaymentState; globals: InventoryGlobals }) {
   const { target, form } = pay;
-  if (!target || !form) return null;
+  if (!target || !form) return pay.opening ? <PayPoSkeleton onClose={pay.close} /> : null;
   const base = globals.baseCurrency;
   const paid = form.status === 'PAID';
 
@@ -126,6 +128,16 @@ export default function PayPoModal({ pay, globals }: { pay: PoPaymentState; glob
           </div>
           {pay.errors.general && <p className="col-span-2 text-[10px] text-inventory-danger">{pay.errors.general}</p>}
         </div>
+
+        {target.payment && pay.loadingHistory && (
+          <div className={WIZARD_CARD_CLASS} aria-busy="true" aria-label="Loading payment history">
+            <h4 className={LABEL}>History</h4>
+            <div className="space-y-[7px]">
+              <Bone className="h-[9px] w-[78%]" />
+              <Bone className="h-[9px] w-[62%]" />
+            </div>
+          </div>
+        )}
 
         {pay.history.length > 0 && (
           <div className={WIZARD_CARD_CLASS}>

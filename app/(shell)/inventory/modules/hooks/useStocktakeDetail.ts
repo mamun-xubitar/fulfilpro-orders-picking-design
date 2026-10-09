@@ -6,35 +6,19 @@ import useRequest from '@/hooks/useRequest';
 import { useInventoryAccess } from '../InventoryAccess';
 import type { ProductRecord, StocktakeItemRecord, StocktakeRecord, StocktakeSyncSummary } from '../types';
 
-/** The lines of one variant, rolled up for the admin's comparison. */
-export type VariantTally = {
-  variantId: string;
-  items: StocktakeItemRecord[];
-  /** Σ of the counted lines; null while any line is blank. */
-  counted: number | null;
-  /** Stock on hand when the stocktake was created. */
-  expected: number;
-  /** Stock on hand now. */
-  system: number;
-  /** Counted but not syncable: a line is blank, or a location of the variant has no line. */
-  partial: boolean;
-};
+/** What a sync would do with the counts as entered, line by line (each line is one location):
+ * lines whose count differs from the stock there now, and lines left blank, which are skipped. */
+export type SyncPreview = { adjusting: number; skipped: number };
 
-export function tallyVariants(items: StocktakeItemRecord[], counts: Record<string, string>): VariantTally[] {
-  const byVariant = new Map<string, StocktakeItemRecord[]>();
-  for (const item of items) byVariant.set(item.variantId, [...(byVariant.get(item.variantId) ?? []), item]);
-  return [...byVariant.entries()].map(([variantId, lines]) => {
-    const entered = lines.map((l) => (counts[l.id] ?? '').trim());
-    const complete = entered.every((v) => v !== '');
-    return {
-      variantId,
-      items: lines,
-      counted: complete ? entered.reduce((sum, v) => sum + (Number(v) || 0), 0) : null,
-      expected: lines[0].expectedQty ?? 0,
-      system: lines[0].systemQty ?? 0,
-      partial: !complete || lines[0].uncoveredLocations > 0,
-    };
-  });
+export function previewSync(items: StocktakeItemRecord[], counts: Record<string, string>): SyncPreview {
+  let adjusting = 0;
+  let skipped = 0;
+  for (const item of items) {
+    const entered = (counts[item.id] ?? '').trim();
+    if (entered === '') skipped++;
+    else if (Number(entered) !== (item.systemQty ?? 0)) adjusting++;
+  }
+  return { adjusting, skipped };
 }
 
 const toInputs = (items: StocktakeItemRecord[]) => Object.fromEntries(items.map((i) => [i.id, i.countedQty === null ? '' : String(i.countedQty)]));
@@ -117,7 +101,7 @@ export function useStocktakeDetail({ isAdmin, onChanged, onSynced }: Args) {
       onSuccess: ({ data }) => {
         setSyncOpen(false);
         apply(data.stocktake);
-        if (data.result.skipped > 0) toast.warn(`${data.result.skipped} variant${data.result.skipped === 1 ? ' was' : 's were'} skipped — not every location was counted.`);
+        if (data.result.skipped > 0) toast.warn(`${data.result.skipped} line${data.result.skipped === 1 ? ' was' : 's were'} skipped — not counted, or the location no longer matches the variant.`);
         onChanged();
         if (data.product) onSynced(data.product);
       },
@@ -140,7 +124,7 @@ export function useStocktakeDetail({ isAdmin, onChanged, onSynced }: Args) {
     });
   };
 
-  const tallies = isAdmin && record ? tallyVariants(record.items, counts) : [];
+  const syncPreview = isAdmin && record ? previewSync(record.items, counts) : { adjusting: 0, skipped: 0 };
 
   return {
     isAdmin,
@@ -157,7 +141,7 @@ export function useStocktakeDetail({ isAdmin, onChanged, onSynced }: Args) {
     dirty,
     save,
     saving,
-    tallies,
+    syncPreview,
     syncOpen,
     openSync: () => setSyncOpen(true),
     closeSync: () => setSyncOpen(false),

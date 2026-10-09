@@ -4,7 +4,7 @@ import { memo } from 'react';
 import VariantLocationCell from './VariantLocationCell';
 import { useInventoryAccess } from './InventoryAccess';
 import type { LocationOption } from './hooks/useLocations';
-import { IncomingCell, Num, NumCell, RowAction, SkuCell, VariantTitleCell } from './VariantsMatrixCells';
+import { IncomingCell, LocationStockCell, Num, NumCell, RowAction, SkuCell, VariantTitleCell } from './VariantsMatrixCells';
 import { STATUS_STYLES } from './constants';
 import { Check, Close, Trash } from './icons';
 import { computeVariant, formatCurrencyValue, formatMoney, formatNumber } from './utils';
@@ -80,15 +80,6 @@ function VariantsMatrixRow({
 
       <VariantTitleCell colour={variant.colour} size={variant.size} />
 
-      <VariantLocationCell
-        locations={variant.locations}
-        options={locationOptions}
-        label={`Locations for ${name}`}
-        onChange={(locations) => set({ locations })}
-        onCreate={onCreateLocation}
-        {...cell('locations')}
-      />
-
       {showAllColumns && (
         <SkuCell
           sku={variant.sku}
@@ -102,7 +93,26 @@ function VariantsMatrixRow({
         />
       )}
 
-      <NumCell value={variant.stockOnHand} label={`Stock on hand for ${name}`} {...cell('stockOnHand')} onChange={(stockOnHand) => set({ stockOnHand })} />
+      <VariantLocationCell
+        locations={variant.locations}
+        unassignedStock={variant.stockOnHand}
+        options={locationOptions}
+        label={`Locations for ${name}`}
+        onChange={(locations) => set({ locations })}
+        onCreate={onCreateLocation}
+        {...cell('locations')}
+      />
+
+      {variant.locations.length > 0 ? (
+        <LocationStockCell
+          locations={variant.locations}
+          label={`Stock on hand for ${name}`}
+          {...cell('locations')}
+          onChange={(locationId, quantity) => set({ locations: variant.locations.map((l) => (l.id === locationId ? { ...l, quantity } : l)) })}
+        />
+      ) : (
+        <NumCell value={variant.stockOnHand} label={`Stock on hand for ${name}`} {...cell('stockOnHand')} onChange={(stockOnHand) => set({ stockOnHand: Math.trunc(stockOnHand) })} />
+      )}
       <NumCell
         value={variant.allocated}
         label={`Allocated for ${name}`}

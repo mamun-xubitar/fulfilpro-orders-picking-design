@@ -6,8 +6,8 @@
 import { formatPoNumber } from '@/lib/inventory/po-number';
 import { Check } from './icons';
 import { useInventoryAccess } from './InventoryAccess';
-import { formatIncomingLot } from './utils';
-import type { IncomingLot } from './types';
+import { formatIncomingLot, formatNumber } from './utils';
+import type { IncomingLot, VariantRow } from './types';
 
 const CELL_CLASS = 'px-[4px] py-0';
 
@@ -101,6 +101,58 @@ export function NumCell({
           aria-label={label}
           className={`w-14 pr-[5px] text-right tabular-nums ${INPUT_BASE}`}
         />
+        <CellSave show={dirty} saving={saving} label={`Save ${label}`} onSave={onSave} />
+      </div>
+    </td>
+  );
+}
+
+/** Stock on hand of a variant kept at locations: one input per location, stacked in the Location
+ * cell's chip order (A→Z, same 15px rows) so each lines up with its chip, and — with several — the
+ * row's total under them, beside the Location cell's "Total" line. Every input edits the
+ * `locations` draft, so they share that field's one save. */
+export function LocationStockCell({
+  locations,
+  label,
+  dirty,
+  saving,
+  onSave,
+  onChange,
+}: {
+  locations: VariantRow['locations'];
+  label: string;
+  dirty: boolean;
+  saving: boolean;
+  onSave: () => void;
+  onChange: (locationId: string, quantity: number) => void;
+}) {
+  const { canEdit } = useInventoryAccess();
+  const total = locations.reduce((sum, l) => sum + l.quantity, 0);
+  return (
+    <td className={`${CELL_CLASS} text-right`}>
+      <div className="flex items-center justify-end gap-[2px]">
+        <div className="flex flex-col items-end gap-[2px]">
+          {locations.map((l) => (
+            <input
+              key={l.id}
+              type="number"
+              min={0}
+              step={1}
+              value={l.quantity}
+              onChange={(e) => onChange(l.id, Math.max(0, Math.trunc(Number(e.target.value) || 0)))}
+              onKeyDown={saveOnEnter(dirty, onSave)}
+              readOnly={!canEdit}
+              aria-label={`${label} at ${l.name}`}
+              title={l.name}
+              className={`w-14 pr-[5px] text-right tabular-nums ${INPUT_BASE}`}
+            />
+          ))}
+          {locations.length > 1 && (
+            <span title="Total across locations" className="block h-[15px] w-14 pr-[5px] text-right text-[10px] font-bold leading-[15px] tabular-nums text-inventory-text">
+              {formatNumber(total)}
+            </span>
+          )}
+        </div>
         <CellSave show={dirty} saving={saving} label={`Save ${label}`} onSave={onSave} />
       </div>
     </td>

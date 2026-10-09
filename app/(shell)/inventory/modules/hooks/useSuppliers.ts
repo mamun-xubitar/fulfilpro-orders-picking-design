@@ -39,6 +39,8 @@ export function useSuppliers({ onChanged, refreshKey }: UseSuppliersArgs) {
   const [rows, setRows] = useState<SupplierRow[]>([]);
   const [pagination, setPagination] = useState<PaginationState>(EMPTY_PAGINATION);
   const [initialLoading, setInitialLoading] = useState(true);
+  // Which query `rows` belong to — a refetch of the same query keeps showing them instead of a skeleton.
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
   const { request: requestList, loading: listLoading } = useRequest<{ suppliers: SupplierRow[]; pagination: PaginationState }>();
 
   const [searchInput, setSearchInputState] = useState('');
@@ -51,6 +53,7 @@ export function useSuppliers({ onChanged, refreshKey }: UseSuppliersArgs) {
     debounceRef.current = setTimeout(() => setPage(1), 300);
   };
 
+  const queryKey = JSON.stringify({ search: searchInput, page, pageSize: PAGE_SIZE });
   const load = (overrides?: { page?: number }) => {
     requestList({
       url: '/api/inventory/suppliers',
@@ -61,6 +64,7 @@ export function useSuppliers({ onChanged, refreshKey }: UseSuppliersArgs) {
         setRows(data.suppliers);
         setPagination(data.pagination);
         setInitialLoading(false);
+        setLoadedKey(queryKey);
       },
     });
   };
@@ -134,6 +138,7 @@ export function useSuppliers({ onChanged, refreshKey }: UseSuppliersArgs) {
     pageNumbers,
     loading: listLoading,
     initialLoading,
+    showSkeleton: initialLoading || (listLoading && loadedKey !== queryKey),
     searchInput,
     setSearchInput,
     goToPage: setPage,

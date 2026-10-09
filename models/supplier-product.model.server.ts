@@ -13,6 +13,7 @@ export type SupplierProductVariantRow = {
   barcode: string | null;
   colour: string;
   size: string;
+  /** Σ of `locations[].quantity` while the variant has any location; otherwise its unassigned stock. */
   stockOnHand: number;
   /** Weighted average of unitCost across received PurchaseOrderItems; falls back to the stored column when nothing has been received. */
   buyPrice: number;
@@ -28,8 +29,8 @@ export type SupplierProductVariantRow = {
   incomingLots: IncomingLotRow[];
   /** One image from the product's pool, Shopify-style. Several variants may point at the same image. */
   imageId: string | null;
-  /** Where the variant is kept — any number of locations, A→Z. */
-  locations: { id: string; name: string }[];
+  /** Where the variant is kept — any number of locations, A→Z, with the stock held at each. */
+  locations: { id: string; name: string; quantity: number }[];
 };
 
 export type SupplierProductImageRow = { id: string; url: string; altText: string | null; colour: string | null };
@@ -128,7 +129,7 @@ const catalogueInclude = {
   inventoryCategory: { select: { id: true, name: true } },
   variants: {
     orderBy: { position: 'asc' as const },
-    include: { locations: { select: { location: { select: { id: true, name: true } } } } },
+    include: { locations: { select: { quantity: true, location: { select: { id: true, name: true } } } } },
   },
   images: { orderBy: { position: 'asc' as const } },
   pricing: true,
@@ -508,8 +509,11 @@ export class SupplierProductModel {
       sizes: string[];
       /** Per-combo stock on hand / trigger typed in the modal — keyed by colour+size, matched
        * case-insensitively on colour. A combo missing from here falls back to 0 / the store's
-       * low-stock threshold, same as reconcileVariants. */
+       * low-stock threshold, same as reconcileVariants. With `locationId` set, stock on hand is the
+       * quantity at that location. */
       values: { colour: string; size: string; stockOnHand?: number; trigger?: number }[];
+      /** The location whose stock `values` describe, and where newly created variants are kept; null = unassigned. */
+      locationId: string | null;
     }
   ): Promise<void> {
     const current = await prisma.supplierProduct.findUnique({ where: { id: supplierProductId }, select: { sizes: true, colours: true } });
@@ -559,8 +563,32 @@ export class SupplierProductModel {
             await tx.supplierProductImage.update({ where: { id: img.id }, data: { colour: null } });
           }
         }
+        // Replace recreates every variant, so a combo that already existed gets its locations (and
+        // their stock) back — only combos new to the product land at the chosen location.
+        const previous = await tx.supplierProductVariant.findMany({
+          where: { supplierProductId },
+          select: { colour: true, size: true, locations: { select: { locationId: true, quantity: true } } },
+        });
+        const previousLocations = new Map(previous.map((v) => [`${v.colour.toLowerCase()}::${v.size}`, v.locations]));
         await tx.supplierProductVariant.deleteMany({ where: { supplierProductId } });
-        if (toCreate.length > 0) await tx.supplierProductVariant.createMany({ data: toCreate });
+        if (toCreate.length > 0) {
+          const created = await tx.supplierProductVariant.createManyAndReturn({ data: toCreate, select: { id: true, colour: true, size: true, stockOnHand: true } });
+          const links: Prisma.SupplierProductVariantLocationCreateManyInput[] = [];
+          for (const v of created) {
+            const kept = previousLocations.get(`${v.colour.toLowerCase()}::${v.size}`) ?? [];
+            if (kept.length > 0) {
+              // The typed stock is for the chosen location; every other location keeps its quantity.
+              const typed = data.locationId ? valuesByKey.get(`${v.colour.toLowerCase()}::${v.size}`)?.stockOnHand : undefined;
+              const quantities = new Map(kept.map((l) => [l.locationId, l.quantity]));
+              if (data.locationId && typed !== undefined && (quantities.has(data.locationId) || typed > 0)) quantities.set(data.locationId, typed);
+              for (const [locationId, quantity] of quantities) links.push({ variantId: v.id, locationId, quantity });
+              await tx.supplierProductVariant.update({ where: { id: v.id }, data: { stockOnHand: [...quantities.values()].reduce((sum, q) => sum + q, 0) } });
+            } else if (data.locationId) {
+              links.push({ variantId: v.id, locationId: data.locationId, quantity: v.stockOnHand });
+            }
+          }
+          if (links.length > 0) await tx.supplierProductVariantLocation.createMany({ data: links });
+        }
       });
       return;
     }
@@ -601,7 +629,12 @@ export class SupplierProductModel {
         existingKeys.add(key);
       }
     }
-    if (toCreate.length > 0) await prisma.supplierProductVariant.createMany({ data: toCreate });
+    if (toCreate.length === 0) return;
+    const created = await prisma.supplierProductVariant.createManyAndReturn({ data: toCreate, select: { id: true, stockOnHand: true } });
+    if (data.locationId) {
+      const locationId = data.locationId;
+      await prisma.supplierProductVariantLocation.createMany({ data: created.map((v) => ({ variantId: v.id, locationId, quantity: v.stockOnHand })) });
+    }
   }
 
   async upsertPricing(id: string, data: SupplierProductPricingRow): Promise<void> {
@@ -628,6 +661,30 @@ export class SupplierProductModel {
 
   /** Deletes one variant. The product's declared colours/sizes are left as they are — a colour or
    * size with no variants left simply shows unchecked in the Variants / stock panel. */
+  /** How many of the given variants of this product still hold stock, have stock allocated, or
+   * have unreceived quantity on an open PO — any of those blocks a delete. (Available is
+   * stock − allocated, so it's covered by the first two.) */
+  async countUndeletableVariants(supplierProductId: string, variantIds: string[]): Promise<number> {
+    return prisma.supplierProductVariant.count({
+      where: {
+        id: { in: variantIds },
+        supplierProductId,
+        OR: [
+          { stockOnHand: { gt: 0 } },
+          { allocated: { gt: 0 } },
+          {
+            purchaseOrderItems: {
+              some: {
+                purchaseOrder: { status: { in: [...OPEN_PO_STATUSES] } },
+                quantity: { gt: prisma.purchaseOrderItem.fields.receivedQuantity },
+              },
+            },
+          },
+        ],
+      },
+    });
+  }
+
   async deleteVariant(supplierProductId: string, variantId: string): Promise<boolean> {
     const result = await prisma.supplierProductVariant.deleteMany({ where: { id: variantId, supplierProductId } });
     return result.count > 0;
@@ -780,7 +837,7 @@ export class SupplierProductModel {
           })
         : Promise.resolve([]),
       productIds.length
-        ? prisma.stockAdjustment.groupBy({
+        ? prisma.stockAdjustmentBatch.groupBy({
             by: ['supplierProductId'],
             where: { supplierProductId: { in: productIds }, createdAt: { gte: startOfMonth() } },
             _count: { id: true },
@@ -840,7 +897,7 @@ export class SupplierProductModel {
     const allocatedBySku = new Map(allocatedRows.map((r) => [r.sku!, r._sum.netQuantity ?? 0]));
 
     const lastAdjustmentRows = productIds.length
-      ? await prisma.stockAdjustment.findMany({
+      ? await prisma.stockAdjustmentBatch.findMany({
           where: { supplierProductId: { in: productIds } },
           distinct: ['supplierProductId'],
           orderBy: { createdAt: 'desc' },
@@ -896,7 +953,7 @@ export class SupplierProductModel {
           incoming: incomingLots.reduce((sum, lot) => sum + lot.quantity, 0),
           incomingLots,
           imageId: v.imageId,
-          locations: v.locations.map((l) => l.location).sort((a, b) => a.name.localeCompare(b.name)),
+          locations: v.locations.map((l) => ({ ...l.location, quantity: l.quantity })).sort((a, b) => a.name.localeCompare(b.name)),
         };
       }),
       pricing: row.pricing

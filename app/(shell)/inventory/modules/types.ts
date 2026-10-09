@@ -25,6 +25,7 @@ export type VariantRow = {
   barcode: string | null;
   colour: string;
   size: string;
+  /** Σ of `locations[].quantity` while the variant has any location; otherwise its unassigned stock. */
   stockOnHand: number;
   /** Weighted average of received PO unit cost; falls back to the stored per-variant price. Read-only. */
   buyPrice: number;
@@ -42,8 +43,8 @@ export type VariantRow = {
   /** The one image from the product's pool this variant is linked to, Shopify-style — several
    * variants may point at the same image. Null when unlinked. */
   imageId: string | null;
-  /** Where the variant is kept — any number of locations. */
-  locations: { id: string; name: string }[];
+  /** Where the variant is kept — any number of locations, A→Z, with the stock held at each. */
+  locations: { id: string; name: string; quantity: number }[];
 };
 
 /** Below / near / above the reorder trigger. Drives row tint, badge and legend. */
@@ -292,7 +293,6 @@ export type ModuleTabId =
   | 'adjustments'
   | 'suppliers'
   | 'payments'
-  | 'reports'
   | 'history';
 
 export type TabDef<T extends string> = {
@@ -358,6 +358,8 @@ export type PurchaseOrderItemRecord = {
   quantity: number;
   receivedQuantity: number;
   unitCost: number | null;
+  /** The linked variant's locations, A→Z — where a receipt can be put away. */
+  locations: { id: string; name: string }[];
 };
 
 export type PurchaseOrderRecord = {
@@ -375,6 +377,8 @@ export type PurchaseOrderRecord = {
   shippingRemark: string | null;
   createdAt: string;
   items: PurchaseOrderItemRecord[];
+  /** Where the PO's receipts were put away, totalled per location; empty until received. */
+  receivedLocations: { name: string; quantity: number }[];
   itemNo: string;
   /** Null until a payment is first saved for this PO. */
   payment: PoPaymentRecord | null;
@@ -434,13 +438,11 @@ export type StocktakeItemRecord = {
   sku: string | null;
   locationId: string | null;
   locationName: string | null;
-  /** Stock on hand when the stocktake was created. */
+  /** Stock at the line's location (or the variant's unassigned stock) when the stocktake was created. */
   expectedQty?: number;
-  /** Stock on hand right now. */
+  /** The same figure right now. */
   systemQty?: number;
   countedQty: number | null;
-  /** Locations the variant has now with no line here — such a variant is skipped on sync. */
-  uncoveredLocations: number;
 };
 
 export type StocktakeRecord = {
@@ -467,14 +469,59 @@ export type StocktakeSyncSummary = { adjusted: number; unchanged: number; skippe
 
 export type StockAdjustmentReasonValue = 'DAMAGED' | 'LOST' | 'FOUND' | 'RETURN' | 'CORRECTION' | 'OTHER';
 
-export type StockAdjustmentRecord = {
+export type StockAdjustmentSourceValue = 'MANUAL' | 'STOCKTAKE';
+
+/** One adjustment — a saved batch of variant lines — as listed in the Adjustments tab and a
+ * product's history. The lines themselves load with the View modal (AdjustmentBatchDetail). */
+export type AdjustmentBatchRecord = {
+  id: string;
+  /** Shown as ADJ-0001 (formatAdjustmentNumber). */
+  number: number;
+  source: StockAdjustmentSourceValue;
+  /** The stocktake's ST-0007 when `source` is STOCKTAKE. */
+  reference: string | null;
+  createdAt: string;
+  supplierProductId: string;
+  productName: string;
+  itemNo: string;
+  actorName: string;
+  lineCount: number;
+  netQty: number;
+  /** The reason every line shares, or MIXED. */
+  reason: StockAdjustmentReasonValue | 'MIXED';
+};
+
+export type AdjustmentLineRecord = {
   id: string;
   variantId: string;
   colour: string;
   size: string;
+  sku: string | null;
   delta: number;
+  /** Stock at the line's location just before the change. Null for old adjustments, and for
+   * non-admins (who don't see stock on hand). */
+  stockBefore: number | null;
+  /** Where the change landed; null for a variant with no location and for older lines. */
+  locationId: string | null;
+  locationName: string | null;
   reason: StockAdjustmentReasonValue;
   note: string | null;
+};
+
+export type AdjustmentBatchDetail = AdjustmentBatchRecord & { lines: AdjustmentLineRecord[] };
+
+// — History —
+
+/** One row of the History tab (InventoryActivity), with the product it belongs to. */
+export type InventoryActivityRecord = {
+  id: string;
+  type: string;
+  message: string;
   actorName: string;
   createdAt: string;
+  /** Set on adjustment entries — the History tab's View opens that adjustment. */
+  adjustmentBatchId: string | null;
+  supplierProductId: string;
+  productName: string;
+  itemNo: string;
 };

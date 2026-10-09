@@ -1,6 +1,7 @@
 'use client';
 
 import { MODAL_FOOTER_BTN_DANGER, MODAL_FOOTER_BTN_SECONDARY, ModalShell } from '@/components/ModalShell';
+import AdjustmentDetailModal from './AdjustmentDetailModal';
 import AdjustmentModals from './AdjustmentModals';
 import BulkUpdateStoresModal from './BulkUpdateStoresModal';
 import EditImagesModal from './EditImagesModal';
@@ -21,10 +22,11 @@ import { ChevronLeft, ChevronRight, Close } from './icons';
 import { SPINNER, WIZARD_BODY_CLASS, WIZARD_BTN_PRIMARY, WIZARD_BTN_SECONDARY, WIZARD_CARD_CLASS } from './modalStyles';
 import BulkLocationModal from './BulkLocationModal';
 import LocationModal from './LocationModal';
+import StoreLocationsModal from './StoreLocationsModal';
 import NewProductWizard from './newProduct/NewProductWizard';
 import PayPoModal from './PayPoModal';
 import SupplierDetailsModal from './SupplierDetailsModal';
-import { formatMoney, variantTitle } from './utils';
+import { deleteBlockers, formatMoney, variantTitle } from './utils';
 
 export default function InventoryModals(p: InventoryPage) {
   const { gallery, pricing, imageMutations, matrix } = p;
@@ -34,6 +36,7 @@ export default function InventoryModals(p: InventoryPage) {
     <>
       {p.newProductOpen && <NewProductWizard p={p} />}
       <LocationModal locations={p.locations} />
+      <StoreLocationsModal storeLocations={p.storeLocations} locations={p.locations.options} />
       <PayPoModal pay={p.payment} globals={p.globals} />
       {p.supplierDetailId && (
         <SupplierDetailsModal supplierId={p.supplierDetailId} onClose={p.closeSupplierDetails} onOpenPurchaseOrders={p.openPurchaseOrdersFor} onOpenPayments={p.openPaymentsFor} />
@@ -133,7 +136,7 @@ export default function InventoryModals(p: InventoryPage) {
               <button
                 type="button"
                 onClick={matrix.confirmDeleteRow}
-                disabled={matrix.deleting}
+                disabled={matrix.deleting || deleteBlockers(matrix.deleteTarget).length > 0}
                 className={`flex-1 ${MODAL_FOOTER_BTN_DANGER}`}
               >
                 Delete variant
@@ -144,6 +147,11 @@ export default function InventoryModals(p: InventoryPage) {
           <p className="text-[12px] text-inventory-text-muted">
             This removes <strong className="font-semibold text-inventory-text">{variantTitle(matrix.deleteTarget)} </strong>
             {matrix.deleteTarget.sku ? ` (${matrix.deleteTarget.sku}) ` : ''} and its stock history. This can&apos;t be undone.
+            {deleteBlockers(matrix.deleteTarget).length > 0 && (
+              <span className="mt-2 block text-inventory-danger">
+                Can&apos;t delete — this variant still has {deleteBlockers(matrix.deleteTarget).join(', ')}. Clear these to 0 before deleting.
+              </span>
+            )}
           </p>
         </ModalShell>
       )}
@@ -158,7 +166,8 @@ export default function InventoryModals(p: InventoryPage) {
       <StocktakeModal stocktake={p.stocktake} />
       <StocktakeCountModal detail={p.stocktakeDetail} />
       <StocktakeConfirmDialogs detail={p.stocktakeDetail} />
-      <AdjustmentModals adjustments={p.adjustments} variants={variants} />
+      <AdjustmentModals adjustments={p.adjustments} variants={variants} onView={p.adjustmentDetail.openAdjustment} />
+      <AdjustmentDetailModal detail={p.adjustmentDetail} onOpenProduct={p.openProductInVariants} />
       <ImportModal importExport={p.importExport} />
       <ImportProductsModal importProducts={p.importProducts} suppliers={p.supplierOptions} />
       <SupplierModal suppliers={p.suppliers} />
@@ -168,6 +177,7 @@ export default function InventoryModals(p: InventoryPage) {
 
 function BulkDeleteVariantsModal({ p }: { p: InventoryPage }) {
   const { matrix } = p;
+  const stockedCount = (p.product?.variants ?? []).filter((v) => matrix.selectedIds.has(v.id) && deleteBlockers(v).length > 0).length;
   return (
     <ModalShell disableBackdropClose
       title="Delete selected variants?"
@@ -185,7 +195,7 @@ function BulkDeleteVariantsModal({ p }: { p: InventoryPage }) {
           <button
             type="button"
             onClick={matrix.confirmBulkDelete}
-            disabled={matrix.bulkDeleting}
+            disabled={matrix.bulkDeleting || stockedCount > 0}
             className={`flex-1 ${MODAL_FOOTER_BTN_DANGER}`}
           >
             {matrix.bulkDeleting ? 'Deleting...' : 'Delete variants'}
@@ -196,6 +206,12 @@ function BulkDeleteVariantsModal({ p }: { p: InventoryPage }) {
       <p className="text-[12px] text-inventory-text-muted">
         This removes <strong className="font-semibold text-inventory-text">{matrix.selectedIds.size}</strong> selected variant
         {matrix.selectedIds.size === 1 ? '' : 's'} and their stock history. This can&apos;t be undone.
+        {stockedCount > 0 && (
+          <span className="mt-2 block text-inventory-danger">
+            Can&apos;t delete — {stockedCount} selected variant{stockedCount === 1 ? ' still has' : 's still have'} Stock, Allocated, Available or Incoming quantity. Clear{' '}
+            {stockedCount === 1 ? 'it' : 'them'} to 0 or deselect {stockedCount === 1 ? 'it' : 'them'} before deleting.
+          </span>
+        )}
       </p>
     </ModalShell>
   );

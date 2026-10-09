@@ -7,9 +7,7 @@ import type { StocktakeDetailState } from './hooks/useStocktakeDetail';
 
 /** The two "are you sure?" dialogs of the count modal — sync into stock, and cancel. */
 export default function StocktakeConfirmDialogs({ detail }: { detail: StocktakeDetailState }) {
-  const syncable = detail.tallies.filter((t) => !t.partial);
-  const adjusting = syncable.filter((t) => t.counted !== t.system).length;
-  const skipped = detail.tallies.length - syncable.length;
+  const { adjusting, skipped } = detail.syncPreview;
 
   return (
     <>
@@ -34,15 +32,15 @@ export default function StocktakeConfirmDialogs({ detail }: { detail: StocktakeD
           }
         >
           <p className="text-[12px] text-inventory-text-muted">
-            Stock on hand is set to the counted total for{' '}
+            Each counted location is set to its count —{' '}
             <strong className="font-semibold text-inventory-text">
-              {adjusting} variant{adjusting === 1 ? '' : 's'}
-            </strong>
-            . This replaces the current system quantity and can&apos;t be undone from here.
+              {adjusting} line{adjusting === 1 ? '' : 's'}
+            </strong>{' '}
+            change. This replaces the current system quantity there and can&apos;t be undone from here.
           </p>
           {skipped > 0 && (
             <p className="mt-2 text-[11px] text-inventory-warning-ink">
-              {skipped} partial variant{skipped === 1 ? '' : 's'} will be skipped — every location must be counted to sync a variant.
+              {skipped} uncounted line{skipped === 1 ? '' : 's'} will be skipped — the stock at those locations stays as it is.
             </p>
           )}
         </ModalShell>

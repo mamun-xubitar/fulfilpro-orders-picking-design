@@ -27,7 +27,7 @@ export default function OptionFindPanel({ kind, items, onClose, onSelect, onRemo
 
   return (
     <div
-      className="absolute right-0 top-[24px] z-20 w-[220px] rounded-[8px] border border-inventory-border bg-inventory-surface shadow-lg"
+      className="absolute left-0 top-full z-20 mt-[2px] w-[220px] rounded-[8px] border border-inventory-border bg-inventory-surface shadow-lg"
       onMouseDown={(e) => e.stopPropagation()}
     >
       <div className="flex items-center gap-[4px] border-b border-inventory-border p-[6px]">

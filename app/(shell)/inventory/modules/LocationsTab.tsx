@@ -6,13 +6,15 @@ import { locationChipClass } from './LocationPickerMenu';
 import type { LocationsState } from './hooks/useLocations';
 import { Pencil, Plus, Search, Trash } from './icons';
 import { useInventoryAccess } from './InventoryAccess';
+import { SkeletonRows, type SkeletonCell } from './Skeleton';
 import { formatDate } from './utils';
 
 const TH = 'px-2 py-1';
+const SKELETON: SkeletonCell[] = ['text', 'text', 'num', 'text', { kind: 'actions', count: 2 }];
 
 /** The Location module tab — every location with how many variants are kept there. Mirrors
  * SuppliersTab: search, add, edit, delete (refused while variants are still assigned). */
-export default function LocationsTab({ locations: l }: { locations: LocationsState }) {
+export default function LocationsTab({ locations: l, onOpenStoreLocations }: { locations: LocationsState; onOpenStoreLocations: () => void }) {
   const { canEdit } = useInventoryAccess();
   return (
     <div className="overflow-hidden rounded-xl border border-inventory-border bg-inventory-surface shadow-sm">
@@ -31,6 +33,15 @@ export default function LocationsTab({ locations: l }: { locations: LocationsSta
         {canEdit && (
           <button
             type="button"
+            onClick={onOpenStoreLocations}
+            className="flex h-[22px] items-center gap-1 whitespace-nowrap rounded-[6px] border border-inventory-border-strong bg-inventory-surface px-[6px] text-[10px] font-bold leading-none text-inventory-text-muted shadow-sm transition-colors duration-150 hover:bg-inventory-surface-hover cursor-pointer"
+          >
+            Store locations
+          </button>
+        )}
+        {canEdit && (
+          <button
+            type="button"
             onClick={l.openCreate}
             className="flex h-[22px] items-center gap-1 whitespace-nowrap rounded-[6px] bg-inventory-success px-[6px] text-[10px] font-bold leading-none text-white shadow-sm transition-colors duration-150 hover:bg-inventory-success-hover cursor-pointer"
           >
@@ -41,7 +52,7 @@ export default function LocationsTab({ locations: l }: { locations: LocationsSta
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-[11px] leading-none">
+        <table aria-busy={l.loading || l.initialLoading} className="w-full border-collapse text-[11px] leading-none">
           <thead>
             <tr className="border-b border-inventory-border text-left text-[10px] font-bold uppercase tracking-[0.4px] text-inventory-text-subtle">
               <th className={TH}>Name</th>
@@ -52,8 +63,8 @@ export default function LocationsTab({ locations: l }: { locations: LocationsSta
             </tr>
           </thead>
           <tbody>
-            {l.initialLoading ? (
-              <SkeletonRows />
+            {l.showSkeleton ? (
+              <SkeletonRows rows={l.rows.length || 6} cells={SKELETON} />
             ) : l.rows.length === 0 ? (
               <tr>
                 <td colSpan={5} className="px-2 py-8 text-center text-[11px] text-inventory-text-subtle">
@@ -120,21 +131,5 @@ export default function LocationsTab({ locations: l }: { locations: LocationsSta
         </ModalShell>
       )}
     </div>
-  );
-}
-
-function SkeletonRows() {
-  return (
-    <>
-      {Array.from({ length: 5 }).map((_, i) => (
-        <tr key={i} className="border-b border-inventory-divider last:border-0">
-          {Array.from({ length: 5 }).map((__, j) => (
-            <td key={j} className="px-2 py-1.5">
-              <div className="h-3 animate-pulse rounded bg-inventory-surface-muted" />
-            </td>
-          ))}
-        </tr>
-      ))}
-    </>
   );
 }

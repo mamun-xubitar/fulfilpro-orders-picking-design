@@ -4,6 +4,7 @@ import { SupplierModel } from '@/models/supplier.model.server';
 import { LocationModel } from '@/models/location.model.server';
 import { InventoryCategoryModel } from '@/models/inventory-category.model.server';
 import { CurrencyRateModel } from '@/models/currency-rate.model.server';
+import { StockError } from '@/lib/inventory-stock.server';
 import { saveUploadedFile } from '@/lib/uploads.server';
 import { deriveColorFromName } from '@/lib/inventory/colour';
 import { isValidHandle, slugifyHandle } from '@/lib/inventory/handle';
@@ -371,10 +372,31 @@ export class SupplierProductController {
     if (typeof value.size === 'string' && value.size.trim() === '' && existingProduct.sizes.length > 0) {
       errors.push('size: Enter a size');
     }
-    let locationIds: string[] | undefined;
-    if ('locationIds' in value) {
-      locationIds = Array.isArray(value.locationIds) ? [...new Set((value.locationIds as unknown[]).filter((l): l is string => typeof l === 'string'))] : [];
-      if (locationIds.length > 0 && (await locationModel.countExisting(locationIds)) !== locationIds.length) errors.push('locationIds: Pick existing locations');
+    // The variant's locations and the stock held at each, replacing both wholesale.
+    let locationStock: { locationId: string; quantity: number }[] | undefined;
+    if ('locationStock' in value) {
+      locationStock = [];
+      const seen = new Set<string>();
+      for (const raw of Array.isArray(value.locationStock) ? (value.locationStock as unknown[]) : []) {
+        const entry = (raw ?? {}) as Record<string, unknown>;
+        if (typeof entry.locationId !== 'string' || seen.has(entry.locationId)) continue;
+        const quantity = Number(entry.quantity ?? 0);
+        if (!Number.isInteger(quantity) || quantity < 0) {
+          errors.push('locationStock: Enter a whole number of 0 or more at each location');
+          continue;
+        }
+        seen.add(entry.locationId);
+        locationStock.push({ locationId: entry.locationId, quantity });
+      }
+      if (locationStock.length > 0 && (await locationModel.countExisting([...seen])) !== locationStock.length) errors.push('locationStock: Pick existing locations');
+    }
+    // A located variant's stock on hand is the sum of its locations — it's only set directly while
+    // the variant has no location.
+    if (numeric.stockOnHand !== undefined) {
+      const variant = existingProduct.variants.find((v) => v.id === variantId);
+      const willHaveLocations = locationStock !== undefined ? locationStock.length > 0 : (variant?.locations.length ?? 0) > 0;
+      if (willHaveLocations) errors.push('stockOnHand: Set stock on hand per location');
+      else numeric.stockOnHand = Math.trunc(numeric.stockOnHand);
     }
     if (errors.length) return { error: { message: 'Validation failed', errors, status: 400 } };
 
@@ -382,6 +404,8 @@ export class SupplierProductController {
     let imageId: string | null | undefined;
 
     try {
+      // Locations first: dropping one that still holds stock is refused before anything is written.
+      if (locationStock !== undefined) await locationModel.setVariantLocationStock(variantId, locationStock);
       await model.updateVariant(variantId, {
         ...(typeof value.sku === 'string' ? { sku: value.sku.trim() || null } : {}),
         ...(typeof value.barcode === 'string' ? { barcode: value.barcode.trim() || null } : {}),
@@ -393,8 +417,8 @@ export class SupplierProductController {
         imageId = typeof value.imageId === 'string' && value.imageId.trim() ? value.imageId.trim() : null;
         await model.setVariantImage(id, variantId, imageId);
       }
-      if (locationIds !== undefined) await locationModel.setVariantLocations(variantId, locationIds);
     } catch (error) {
+      if (error instanceof StockError) return { error: { message: error.message, errors: [`locationStock: ${error.message}`], status: 400 } };
       return { error: { message: error instanceof Error ? error.message : 'Failed to update variant', status: 409 } };
     }
 
@@ -409,6 +433,10 @@ export class SupplierProductController {
   async deleteVariant(id: string, variantId: string, session: Session) {
     if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
     if (!(await model.exists(id))) return { error: { message: 'Product not found', status: 404 } };
+
+    if ((await model.countUndeletableVariants(id, [variantId])) > 0) {
+      return { error: { message: 'This variant still has stock, allocated or incoming quantity — clear it before deleting', status: 409 } };
+    }
 
     const removed = await model.deleteVariant(id, variantId);
     if (!removed) return { error: { message: 'Variant not found', status: 404 } };
@@ -437,7 +465,12 @@ export class SupplierProductController {
     if (locationIds.length > 0 && (await locationModel.countExisting(locationIds)) !== locationIds.length) errors.push('locationIds: Pick existing locations');
     if (errors.length) return { error: { message: 'Validation failed', errors, status: 400 } };
 
-    await locationModel.bulkSetVariantLocations(variantIds, locationIds, mode);
+    try {
+      await locationModel.bulkSetVariantLocations(variantIds, locationIds, mode);
+    } catch (error) {
+      if (error instanceof StockError) return { error: { message: error.message, errors: [`locationIds: ${error.message}`], status: 400 } };
+      throw error;
+    }
     await model.logActivity(id, `Locations updated on ${variantIds.length} variant${variantIds.length === 1 ? '' : 's'}`, 'variant_updated', actorFromSession(session));
     return { data: await model.findById(id), message: 'Locations updated' };
   }
@@ -449,6 +482,16 @@ export class SupplierProductController {
     const value = (body ?? {}) as Record<string, unknown>;
     const variantIds = Array.isArray(value.variantIds) ? (value.variantIds as unknown[]).filter((v): v is string => typeof v === 'string') : [];
     if (variantIds.length === 0) return { error: { message: 'Validation failed', errors: ['variantIds: Select at least one variant'], status: 400 } };
+
+    const blocked = await model.countUndeletableVariants(id, variantIds);
+    if (blocked > 0) {
+      return {
+        error: {
+          message: `${blocked} selected variant${blocked === 1 ? ' still has' : 's still have'} stock, allocated or incoming quantity — clear it before deleting`,
+          status: 409,
+        },
+      };
+    }
 
     const count = await model.deleteVariants(id, variantIds);
     if (count === 0) return { error: { message: 'No matching variants found', status: 404 } };
@@ -524,7 +567,13 @@ export class SupplierProductController {
     }
     if (errors.length) return { error: { message: 'Validation failed', errors, status: 400 } };
 
-    await model.applyOptions(id, { mode, colours, sizes, values });
+    // Where the variants this creates are kept; omitted = unassigned stock.
+    const locationId = typeof value.locationId === 'string' && value.locationId.trim() ? value.locationId.trim() : null;
+    if (locationId && (await locationModel.countExisting([locationId])) !== 1) {
+      return { error: { message: 'Validation failed', errors: ['locationId: Pick an existing location'], status: 400 } };
+    }
+
+    await model.applyOptions(id, { mode, colours, sizes, values, locationId });
 
     const variantCount = colours.length > 0 ? colours.length * Math.max(sizes.length, 1) : sizes.length;
     await model.logActivity(
