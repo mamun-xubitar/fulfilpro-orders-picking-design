@@ -1,5 +1,7 @@
 'use client';
 
+import { useState } from 'react';
+
 import { panelBorderClass } from './MainImagePanel';
 import VariantColourPanel from './VariantColourPanel';
 import VariantsMatrixTable from './VariantsMatrixTable';
@@ -20,13 +22,16 @@ type VariantsMatrixSectionProps = {
  * colour panel and table sit in one flex row so the panel is always exactly as tall as the table
  * beside it, in both placements. */
 export default function VariantsMatrixSection({ p, fullView, tall }: VariantsMatrixSectionProps) {
+  // The colour panel measures its own content (clamped 100–170px); 170 keeps the prerendered
+  // markup identical to the previous fixed-width layout until the first measurement lands.
+  const [colourPanelWidth, setColourPanelWidth] = useState(170);
   return (
     <section className={fullView ? 'flex h-full min-h-0 flex-col' : `rounded-xl border ${panelBorderClass('variants')} bg-inventory-surface shadow-sm`}>
       <VariantsMatrixToolbar p={p} fullView={fullView} />
       <div className={`flex ${fullView ? 'min-h-0 flex-1' : tall ? 'min-h-[14rem]' : 'min-h-[10rem]'}`}>
-        <div className="relative w-[170px] shrink-0 border-r border-inventory-border">
+        <div className="relative shrink-0 border-r border-inventory-border" style={{ width: colourPanelWidth }}>
           <div className="absolute inset-0">
-            <VariantColourPanel colour={p.matrix.colourFilter} />
+            <VariantColourPanel colour={p.matrix.colourFilter} onWidthChange={setColourPanelWidth} />
           </div>
         </div>
         <div className="min-w-0 flex-1">
