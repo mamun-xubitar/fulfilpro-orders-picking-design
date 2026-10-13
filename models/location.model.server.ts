@@ -1,5 +1,5 @@
 import prisma from '@/lib/prisma.server';
-import { assignLocations, describeHolding, setLocationStock, StockError } from '@/lib/inventory-stock.server';
+import { assignLocations, describeHolding, setLocationStock, type StockRemap, StockError } from '@/lib/inventory-stock.server';
 
 export type LocationRow = {
   id: string;
@@ -81,14 +81,14 @@ export class LocationModel {
   }
 
   /** Replaces one variant's locations and the stock held at each — see setLocationStock. */
-  async setVariantLocationStock(variantId: string, entries: { locationId: string; quantity: number }[]) {
-    await prisma.$transaction((tx) => setLocationStock(tx, variantId, entries));
+  async setVariantLocationStock(variantId: string, entries: { locationId: string; quantity: number }[], remap: StockRemap = {}) {
+    await prisma.$transaction((tx) => setLocationStock(tx, variantId, entries, remap));
   }
 
   /** Bulk: `add` keeps each variant's existing locations and adds `locationIds`; `replace` makes
-   * `locationIds` exactly each variant's set (an empty list clears them). All-or-nothing: refused
-   * when a location being dropped still holds stock. */
-  async bulkSetVariantLocations(variantIds: string[], locationIds: string[], mode: 'add' | 'replace') {
+   * `locationIds` exactly each variant's set (an empty list clears them). All-or-nothing: a
+   * dropped location holding stock is refused unless `remap` moves it into a survivor. */
+  async bulkSetVariantLocations(variantIds: string[], locationIds: string[], mode: 'add' | 'replace', remap: StockRemap = {}) {
     await prisma.$transaction(async (tx) => {
       const locations = await tx.inventoryLocation.findMany({ where: { id: { in: locationIds } }, select: { id: true, name: true } });
       const namesById = new Map(locations.map((l) => [l.id, l.name]));
@@ -97,7 +97,7 @@ export class LocationModel {
       const refused = new Map<string, { labels: string[]; error: StockError }>();
       for (const v of variants) {
         try {
-          await assignLocations(tx, v.id, locationIds, namesById, mode);
+          await assignLocations(tx, v.id, locationIds, namesById, mode, remap);
         } catch (error) {
           if (!(error instanceof StockError)) throw error;
           const group = refused.get(error.message) ?? { labels: [], error };

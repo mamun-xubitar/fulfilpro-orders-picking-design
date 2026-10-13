@@ -144,6 +144,34 @@ export function variantDraftChanges(server: VariantRow, draft: Partial<VariantRo
   return changed;
 }
 
+/** A removed location that still holds stock: single-variant form (one variant's own quantity). */
+export function removedHolding(serverLocations: VariantRow['locations'], nextLocations: VariantRow['locations']): VariantRow['locations'] {
+  const nextIds = new Set(nextLocations.map((l) => l.id));
+  return serverLocations.filter((l) => !nextIds.has(l.id) && l.quantity > 0).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export type BulkRemapNeed = { id: string; name: string; totalQty: number; variantCount: number };
+
+/** Removed locations holding stock across the selected variants (replace mode only) — one
+ * mapping row per removed location, with the summed stock that would move. */
+export function bulkRemovedHolding(variants: VariantRow[], selectedIds: Set<string> | string[], nextIds: string[], mode: 'add' | 'replace'): BulkRemapNeed[] {
+  if (mode !== 'replace') return [];
+  const keep = new Set(nextIds);
+  const selected = selectedIds instanceof Set ? selectedIds : new Set(selectedIds);
+  const totals = new Map<string, { name: string; totalQty: number; variantCount: number }>();
+  for (const v of variants) {
+    if (!selected.has(v.id)) continue;
+    for (const l of v.locations) {
+      if (keep.has(l.id) || l.quantity <= 0) continue;
+      const entry = totals.get(l.id) ?? { name: l.name, totalQty: 0, variantCount: 0 };
+      entry.totalQty += l.quantity;
+      entry.variantCount += 1;
+      totals.set(l.id, entry);
+    }
+  }
+  return [...totals.entries()].map(([id, e]) => ({ id, ...e })).sort((a, b) => a.name.localeCompare(b.name));
+}
+
 /** Folds the visible rows into the Stock Summary panel and the table totals row. */
 export function summariseVariants(rows: VariantRow[]): StockSummary {
   return rows.reduce<StockSummary>(

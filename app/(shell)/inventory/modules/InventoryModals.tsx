@@ -23,6 +23,7 @@ import { SPINNER, WIZARD_BODY_CLASS, WIZARD_BTN_PRIMARY, WIZARD_BTN_SECONDARY, W
 import BulkLocationModal from './BulkLocationModal';
 import LocationModal from './LocationModal';
 import StoreLocationsModal from './StoreLocationsModal';
+import VariantLocationRemapModal from './VariantLocationRemapModal';
 import NewProductWizard from './newProduct/NewProductWizard';
 import PayPoModal from './PayPoModal';
 import SupplierDetailsModal from './SupplierDetailsModal';
@@ -42,6 +43,16 @@ export default function InventoryModals(p: InventoryPage) {
         <SupplierDetailsModal supplierId={p.supplierDetailId} onClose={p.closeSupplierDetails} onOpenPurchaseOrders={p.openPurchaseOrdersFor} onOpenPayments={p.openPaymentsFor} />
       )}
       <BulkLocationModal bulk={p.bulkLocations} locations={p.locations} />
+      {matrix.pendingRemap && (
+        <VariantLocationRemapModal
+          pending={matrix.pendingRemap}
+          product={p.product}
+          saving={matrix.savingRowId === matrix.pendingRemap.variantId || matrix.savingCell?.startsWith(`${matrix.pendingRemap.variantId}:`) === true}
+          onCancel={matrix.cancelPendingRemap}
+          onTarget={matrix.setPendingRemapTarget}
+          onConfirm={matrix.confirmPendingRemap}
+        />
+      )}
 
       {p.matrixFullView && p.product && (
         <ModalShell disableBackdropClose title={`Variants / stock — ${p.product.name}`} compact onClose={p.closeMatrixFullView} fullScreen>
@@ -162,7 +173,7 @@ export default function InventoryModals(p: InventoryPage) {
         <DeleteProductModal p={p} />
       )}
 
-      <PoModals po={p.po} variants={variants} />
+      <PoModals po={p.po} variants={variants} locations={p.locations.options} />
       <StocktakeModal stocktake={p.stocktake} />
       <StocktakeCountModal detail={p.stocktakeDetail} />
       <StocktakeConfirmDialogs detail={p.stocktakeDetail} />

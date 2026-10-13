@@ -43,9 +43,10 @@ export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
   const [receiveTarget, setReceiveTarget] = useState<PurchaseOrderRecord | null>(null);
   const [receiveQty, setReceiveQty] = useState<Record<string, string>>({});
   const [receiveCost, setReceiveCost] = useState<Record<string, string>>({});
-  /** The one location the receipt is put away at. Lines whose variant isn't kept there fall back to
-   * their own first location; lines with no location receive into unassigned stock. */
-  const [receiveLocationId, setReceiveLocationId] = useState('');
+  /** Where each line is put away — any inventory location; one the variant isn't kept at yet is
+   * added to it on receipt. Only ticked lines are received. */
+  const [receiveLocations, setReceiveLocations] = useState<Record<string, string>>({});
+  const [receiveSelected, setReceiveSelected] = useState<Record<string, boolean>>({});
   const { request: requestReceive, loading: receiving } = useRequest<{ purchaseOrder: PurchaseOrderRecord; product: ProductRecord | null }>();
   // Bumped after a successful receive — a receipt can create a new (non-primary) supplier link,
   // so the Suppliers tab's Products Count needs to refetch even though this hook has no direct
@@ -183,7 +184,8 @@ export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
     setReceiveTarget(po);
     setReceiveQty(Object.fromEntries(po.items.map((item) => [item.id, String(Math.max(0, item.quantity - item.receivedQuantity))])));
     setReceiveCost(Object.fromEntries(po.items.map((item) => [item.id, item.unitCost !== null ? String(item.unitCost) : ''])));
-    setReceiveLocationId(receiveLocationOptions(po.items)[0]?.id ?? '');
+    setReceiveLocations({});
+    setReceiveSelected({});
   };
   const closeReceive = () => setReceiveTarget(null);
   const getReceiveQtyError = (value: string | undefined, remaining: number): string | null => {
@@ -199,6 +201,18 @@ export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
     setReceiveQty((prev) => ({ ...prev, [itemId]: value }));
   };
   const setReceiveItemCost = (itemId: string, value: string) => setReceiveCost((prev) => ({ ...prev, [itemId]: value }));
+  const setReceiveItemLocation = (itemId: string, locationId: string) => setReceiveLocations((prev) => ({ ...prev, [itemId]: locationId }));
+  const toggleReceiveItem = (itemId: string) => setReceiveSelected((prev) => ({ ...prev, [itemId]: !prev[itemId] }));
+  /** Header checkbox — ticks every line with something outstanding, or clears them all when they already are. */
+  const toggleAllReceive = () => {
+    if (!receiveTarget) return;
+    const receivable = receiveTarget.items.filter((item) => item.quantity > item.receivedQuantity);
+    const allOn = receivable.length > 0 && receivable.every((item) => receiveSelected[item.id]);
+    setReceiveSelected(allOn ? {} : Object.fromEntries(receivable.map((item) => [item.id, true])));
+  };
+  /** The bulk Location select — sets every ticked line's location. */
+  const setSelectedReceiveLocation = (locationId: string) =>
+    setReceiveLocations((prev) => ({ ...prev, ...Object.fromEntries(Object.keys(receiveSelected).filter((id) => receiveSelected[id]).map((id) => [id, locationId])) }));
   /** Bulk column fill for the Receive PO modal's Receive qty header (item 8) — each row still
    * clamps to its own remaining (quantity - receivedQuantity), same as a per-row edit. */
   const setAllReceiveQty = (value: number) => {
@@ -215,25 +229,28 @@ export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
 
   const submitReceive = () => {
     if (!receiveTarget) return;
-    for (const item of receiveTarget.items) {
+    const selected = receiveTarget.items.filter((item) => receiveSelected[item.id]);
+    for (const item of selected) {
       const remaining = Math.max(0, item.quantity - item.receivedQuantity);
       const err = getReceiveQtyError(receiveQty[item.id], remaining);
       if (err) {
         toast.error(`${item.variantTitle}: ${err}`);
         return;
       }
+      if (!receiveLocations[item.id]) {
+        toast.error(`${item.variantTitle}: Select a location`);
+        return;
+      }
     }
-    const receipts = Object.entries(receiveQty)
-      .filter(([, v]) => Number(v) > 0)
-      .map(([itemId, v]) => {
-        const costInput = receiveCost[itemId];
+    const receipts = selected
+      .filter((item) => Number(receiveQty[item.id]) > 0)
+      .map((item) => {
+        const costInput = receiveCost[item.id];
         const unitCost = costInput !== undefined && costInput !== '' && Number.isFinite(Number(costInput)) ? Number(costInput) : undefined;
-        const itemLocations = receiveTarget.items.find((item) => item.id === itemId)?.locations ?? [];
-        const locationId = itemLocations.some((l) => l.id === receiveLocationId) ? receiveLocationId : itemLocations[0]?.id;
-        return { itemId, quantity: Number(v), unitCost, locationId };
+        return { itemId: item.id, quantity: Number(receiveQty[item.id]), unitCost, locationId: receiveLocations[item.id] };
       });
     if (receipts.length === 0) {
-      toast.error('Enter a quantity to receive');
+      toast.error('Tick a variant and enter a quantity to receive');
       return;
     }
     requestReceive({
@@ -243,10 +260,11 @@ export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
       successMessage: 'Inventory received',
       onSuccess: ({ data }) => {
         // Keep the modal open on the updated PO so its received/remaining figures are current;
-        // quantities re-seed to the new remaining, cost and location stay as entered.
+        // quantities re-seed to the new remaining, cost and location stay as entered, ticks clear.
         const po = data.purchaseOrder;
         setReceiveTarget(po);
         setReceiveQty(Object.fromEntries(po.items.map((item) => [item.id, String(Math.max(0, item.quantity - item.receivedQuantity))])));
+        setReceiveSelected({});
         loadPurchaseOrders();
         if (data.product) onSaved(data.product);
         setReceivedNonce((n) => n + 1);
@@ -293,9 +311,12 @@ export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
     setAllReceiveQty,
     receiveCost,
     setReceiveItemCost,
-    receiveLocationId,
-    setReceiveLocationId,
-    receiveLocationOptions: receiveTarget ? receiveLocationOptions(receiveTarget.items) : [],
+    receiveLocations,
+    setReceiveItemLocation,
+    receiveSelected,
+    toggleReceiveItem,
+    toggleAllReceive,
+    setSelectedReceiveLocation,
     receiving,
     submitReceive,
     receivedNonce,

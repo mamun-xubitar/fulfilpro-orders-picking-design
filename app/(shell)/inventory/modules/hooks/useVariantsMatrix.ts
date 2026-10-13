@@ -3,8 +3,18 @@
 import { useMemo, useState } from 'react';
 import { toast } from 'react-toastify';
 import useRequest from '@/hooks/useRequest';
-import { applyVariantDraft, getStatus, naturalCompare, quickFilterMatches, sortVariantsForDisplay, summariseVariants, variantDraftChanges, variantPatchBody } from '../utils';
+import { applyVariantDraft, getStatus, naturalCompare, quickFilterMatches, removedHolding, sortVariantsForDisplay, summariseVariants, variantDraftChanges, variantPatchBody } from '../utils';
 import type { ProductRecord, QuickFilterId, VariantRow, VariantStatus } from '../types';
+
+export type LocationRemapPending = {
+  productId: string;
+  variantId: string;
+  /** 'row' for the row Save, otherwise the single field being saved. */
+  field: keyof VariantRow | 'row';
+  removed: { id: string; name: string; quantity: number }[];
+  destinations: { id: string; name: string }[];
+  remap: Record<string, string>;
+};
 
 type MatrixFilters = {
   status: VariantStatus | null;
@@ -199,24 +209,64 @@ export function useVariantsMatrix({ product, sizes, quickFilter, onVariantSaved 
 
   const revertRow = (variantId: string) => clearRowDraft(variantId);
 
-  const saveRow = (variantId: string) => {
-    const changes = dirtyById[variantId];
-    if (!product || !changes) return;
-    setSavingRowId(variantId);
+  // A location save that drops a holding location needs a mapping first — held here until the
+  // confirmation modal picks each removed location's destination.
+  const [pendingRemap, setPendingRemap] = useState<LocationRemapPending | null>(null);
+
+  /** Removed holding locations for this save, if the draft drops any with stock into survivors. */
+  const remapNeedFor = (variantId: string, changes: Partial<VariantRow> | undefined) => {
+    if (!product || !changes?.locations || changes.locations.length === 0) return null;
+    const server = product.variants.find((v) => v.id === variantId);
+    if (!server) return null;
+    const removed = removedHolding(server.locations, changes.locations);
+    if (removed.length === 0) return null;
+    return { removed, destinations: changes.locations.map((l) => ({ id: l.id, name: l.name })) };
+  };
+
+  const sendRowPatch = (variantId: string, body: Record<string, unknown>, field: keyof VariantRow | 'row') => {
+    if (!product) return;
+    if (field === 'row') setSavingRowId(variantId);
+    else setSavingCell(`${variantId}:${field}`);
     request({
       url: `/api/inventory/catalog/${product.id}/variants/${variantId}`,
       method: 'PATCH',
-      data: variantPatchBody(changes),
+      data: body,
       successMessage: 'Variant updated',
       onSuccess: ({ data }) => {
-        setSavingRowId(null);
+        if (field === 'row') setSavingRowId(null);
+        else setSavingCell(null);
         onVariantSaved(data);
-        clearRowDraft(variantId);
+        if (field === 'row') clearRowDraft(variantId);
+        else clearFieldDraft(variantId, field);
       },
-      // useRequest has no onSettled — savingRowId must be cleared on both branches, since a
+      // useRequest has no onSettled — saving indicators must be cleared on both branches, since a
       // validation/network failure leaves the draft in place for the admin to fix and retry.
-      onError: () => setSavingRowId(null),
+      onError: () => {
+        if (field === 'row') setSavingRowId(null);
+        else setSavingCell(null);
+      },
     });
+  };
+
+  const saveRow = (variantId: string, remap?: Record<string, string>) => {
+    const changes = dirtyById[variantId];
+    if (!product || !changes) return;
+    if (!remap) {
+      const need = remapNeedFor(variantId, changes);
+      if (need) {
+        const single = need.destinations.length === 1 ? need.destinations[0].id : undefined;
+        setPendingRemap({
+          productId: product.id,
+          variantId,
+          field: 'row',
+          removed: need.removed,
+          destinations: need.destinations,
+          remap: single ? Object.fromEntries(need.removed.map((r) => [r.id, single])) : {},
+        });
+        return;
+      }
+    }
+    sendRowPatch(variantId, remap ? { ...variantPatchBody(changes), remap } : variantPatchBody(changes), 'row');
   };
 
   /** Drops just one field of a row's draft — what a per-input save clears, leaving the row's other
@@ -235,23 +285,37 @@ export function useVariantsMatrix({ product, sizes, quickFilter, onVariantSaved 
 
   /** Saves a single input — the PATCH carries only that field, so the row's other unsaved edits
    * are neither sent nor lost. */
-  const saveField = (variantId: string, field: keyof VariantRow) => {
+  const saveField = (variantId: string, field: keyof VariantRow, remap?: Record<string, string>) => {
     const changes = dirtyById[variantId];
     if (!product || !changes || !(field in changes)) return;
-    const key = `${variantId}:${field}`;
-    setSavingCell(key);
-    request({
-      url: `/api/inventory/catalog/${product.id}/variants/${variantId}`,
-      method: 'PATCH',
-      data: variantPatchBody({ [field]: changes[field] } as Partial<VariantRow>),
-      successMessage: 'Variant updated',
-      onSuccess: ({ data }) => {
-        setSavingCell(null);
-        onVariantSaved(data);
-        clearFieldDraft(variantId, field);
-      },
-      onError: () => setSavingCell(null),
-    });
+    if (field === 'locations' && !remap) {
+      const need = remapNeedFor(variantId, { locations: changes.locations });
+      if (need) {
+        const single = need.destinations.length === 1 ? need.destinations[0].id : undefined;
+        setPendingRemap({
+          productId: product.id,
+          variantId,
+          field,
+          removed: need.removed,
+          destinations: need.destinations,
+          remap: single ? Object.fromEntries(need.removed.map((r) => [r.id, single])) : {},
+        });
+        return;
+      }
+    }
+    const body = variantPatchBody({ [field]: changes[field] } as Partial<VariantRow>);
+    sendRowPatch(variantId, remap && field === 'locations' ? { ...body, remap } : body, field);
+  };
+
+  const setPendingRemapTarget = (fromId: string, toId: string) =>
+    setPendingRemap((prev) => (prev ? { ...prev, remap: { ...prev.remap, [fromId]: toId } } : prev));
+  const cancelPendingRemap = () => setPendingRemap(null);
+  const confirmPendingRemap = () => {
+    if (!pendingRemap) return;
+    const { variantId, field, remap } = pendingRemap;
+    setPendingRemap(null);
+    if (field === 'row') saveRow(variantId, remap);
+    else saveField(variantId, field, remap);
   };
 
   const requestDeleteRow = (variant: VariantRow) => {
@@ -325,6 +389,10 @@ export function useVariantsMatrix({ product, sizes, quickFilter, onVariantSaved 
     revertRow,
     setVariantEdit,
     fillColumn,
+    pendingRemap: pendingRemap && product && pendingRemap.productId === product.id ? pendingRemap : null,
+    setPendingRemapTarget,
+    cancelPendingRemap,
+    confirmPendingRemap,
     deleteTarget,
     deleting,
     requestDeleteRow,

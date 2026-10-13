@@ -2,7 +2,7 @@ import prisma from '@/lib/prisma.server';
 import { formatPoNumber } from '@/lib/inventory/po-number';
 import { Prisma, PoPaymentStatus, PurchaseOrderStatus } from '@prisma/client';
 import { toPoPaymentRow, type PoPaymentRow } from '@/models/po-payment.model.server';
-import { addStock } from '@/lib/inventory-stock.server';
+import { addStock, assignLocations, variantLocationStock } from '@/lib/inventory-stock.server';
 
 export type PurchaseOrderItemRow = {
   id: string;
@@ -223,7 +223,8 @@ export class PurchaseOrderModel {
   /**
    * Applies received quantities to the hub catalogue: adds stock at the receipt's location (the
    * variant's first location when none is given, its unassigned stock when it has none), and creates a new variant when the receipt references a colour/size the catalogue
-   * doesn't have yet (e.g. the supplier substituted or added an item).
+   * doesn't have yet (e.g. the supplier substituted or added an item). A receipt location the
+   * variant isn't kept at yet is added to it first (any unassigned stock moves into it).
    */
   async receive(
     id: string,
@@ -268,6 +269,9 @@ export class PurchaseOrderModel {
         }
 
         if (variantId) {
+          if (receipt.locationId && !(await variantLocationStock(tx, variantId)).some((l) => l.locationId === receipt.locationId)) {
+            await assignLocations(tx, variantId, [receipt.locationId], new Map(), 'add');
+          }
           const move = await addStock(tx, variantId, receipt.locationId ?? null, receipt.quantity);
           await tx.purchaseOrderReceipt.create({ data: { purchaseOrderId: id, locationName: move?.locationName ?? null, quantity: receipt.quantity } });
           if (unitCost !== null) await tx.supplierProductVariant.update({ where: { id: variantId }, data: { buyPrice: unitCost } });

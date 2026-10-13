@@ -5,16 +5,17 @@ import AnimatedStepBody from './newProduct/AnimatedStepBody';
 import { SPINNER, WIZARD_BODY_CLASS, WIZARD_BTN_PRIMARY, WIZARD_BTN_SECONDARY, WIZARD_CARD_CLASS } from './modalStyles';
 import PoFormBody from './PoFormBody';
 import ReceivePoModal from './ReceivePoModal';
+import type { LocationOption } from './hooks/useLocations';
 import type { usePurchaseOrder } from './hooks/usePurchaseOrder';
 import type { VariantRow } from './types';
 
-type PoModalsProps = { po: ReturnType<typeof usePurchaseOrder>; variants: VariantRow[] };
+type PoModalsProps = { po: ReturnType<typeof usePurchaseOrder>; variants: VariantRow[]; locations: LocationOption[] };
 
-export default function PoModals({ po, variants }: PoModalsProps) {
+export default function PoModals({ po, variants, locations }: PoModalsProps) {
   return (
     <>
       {po.createOpen && <CreatePoModal po={po} variants={variants} />}
-      {po.receiveTarget && <ReceivePoModal po={po} />}
+      {po.receiveTarget && <ReceivePoModal po={po} locations={locations} />}
     </>
   );
 }

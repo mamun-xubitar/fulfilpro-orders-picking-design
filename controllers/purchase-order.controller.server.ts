@@ -1,12 +1,14 @@
 import prisma from '@/lib/prisma.server';
 import { PurchaseOrderModel, PO_SORT_KEYS, type PoSortKey } from '@/models/purchase-order.model.server';
 import { SupplierProductModel } from '@/models/supplier-product.model.server';
+import { LocationModel } from '@/models/location.model.server';
 import { upperTrim } from '@/lib/utils/common';
 import { PoPaymentStatus, PurchaseOrderStatus } from '@prisma/client';
 import { canReadInventory } from '@/lib/roles';
 
 const model = new PurchaseOrderModel();
 const productModel = new SupplierProductModel();
+const locationModel = new LocationModel();
 const STATUS_VALUES = new Set<string>(Object.values(PurchaseOrderStatus));
 
 type Session = { user?: { id?: string | null; name?: string | null; email?: string | null; role?: string | null } | null } | null;
@@ -226,10 +228,6 @@ export class PurchaseOrderController {
           errors.push(`quantity: Cannot receive more than the ${remaining} unit(s) outstanding for this item`);
           continue;
         }
-        if (locationId && !item.locations.some((l) => l.id === locationId)) {
-          errors.push(`locationId: Pick one of ${item.variantTitle}'s locations`);
-          continue;
-        }
         receipts.push({ itemId, colour: colour || undefined, size: size || undefined, sku: typeof r.sku === 'string' ? r.sku : null, locationId, quantity: Math.trunc(quantity), unitCost });
       } else if (colour && size) {
         receipts.push({ colour, size, sku: typeof r.sku === 'string' ? r.sku : null, quantity: Math.trunc(quantity), unitCost });
@@ -238,6 +236,10 @@ export class PurchaseOrderController {
       }
     }
     if (receipts.length === 0 && !errors.length) errors.push('receipts: Enter at least one quantity to receive');
+    const locationIds = [...new Set(receipts.map((r) => r.locationId).filter((l): l is string => !!l))];
+    if (locationIds.length && (await locationModel.countExisting(locationIds)) !== locationIds.length) {
+      errors.push('locationId: One or more locations no longer exist');
+    }
     if (errors.length) return { error: { message: 'Validation failed', errors, status: 400 } };
 
     const purchaseOrder = await model.receive(id, receipts, actorFromSession(session));

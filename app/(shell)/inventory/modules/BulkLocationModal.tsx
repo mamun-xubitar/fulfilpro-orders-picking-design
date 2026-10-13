@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react';
 import { ModalShell } from '@/components/ModalShell';
 import LocationPickerMenu, { locationChipClass } from './LocationPickerMenu';
+import LocationRemapFields from './LocationRemapFields';
 import type { BulkLocationsState } from './hooks/useBulkLocations';
 import type { LocationsState } from './hooks/useLocations';
 import { Close, Plus } from './icons';
@@ -22,7 +23,11 @@ export default function BulkLocationModal({ bulk, locations }: { bulk: BulkLocat
   if (!bulk.open) return null;
 
   const byId = new Map(locations.options.map((o) => [o.id, o]));
-  const disabled = bulk.saving || (bulk.mode === 'add' && bulk.locationIds.length === 0);
+  const showRemap = bulk.mode === 'replace' && bulk.remapNeeds.length > 0 && bulk.locationIds.length > 0;
+  // Clearing every location leaves nowhere to move the stock — say so instead of letting Apply fail.
+  const clearingStock = bulk.mode === 'replace' && bulk.remapNeeds.length > 0 && bulk.locationIds.length === 0;
+  const destinations = bulk.locationIds.map((id) => ({ id, name: byId.get(id)?.name ?? id }));
+  const disabled = bulk.saving || (bulk.mode === 'add' && bulk.locationIds.length === 0) || (showRemap && !bulk.remapComplete) || clearingStock;
 
   return (
     <ModalShell
@@ -88,7 +93,15 @@ export default function BulkLocationModal({ bulk, locations }: { bulk: BulkLocat
           </div>
           {bulk.errors.locationIds && <p className="mt-1 text-[10px] leading-tight text-inventory-danger">{bulk.errors.locationIds}</p>}
           {bulk.errors.general && <p className="mt-1 text-[10px] leading-tight text-inventory-danger">{bulk.errors.general}</p>}
+          {clearingStock && (
+            <p className="mt-1 text-[10px] leading-tight text-inventory-text-subtle">
+              {bulk.remapNeeds.map((n) => n.name).join(', ')} still {bulk.remapNeeds.length === 1 ? 'holds' : 'hold'} stock — pick at least one location to move it into.
+            </p>
+          )}
         </div>
+        {showRemap && (
+          <LocationRemapFields needs={bulk.remapNeeds.map((n) => ({ id: n.id, name: n.name, detail: n.detail }))} destinations={destinations} remap={bulk.remap} onChange={bulk.setRemapTarget} />
+        )}
       </div>
       <LocationPickerMenu
         anchorRef={anchorRef}
