@@ -8,8 +8,9 @@ import type { ProductRecord, StocktakeRecord, VariantRow } from '../types';
 /** One countable line: a variant at one of its locations (or the lone line of a variant with none). */
 export type StocktakeLine = { key: string; variant: VariantRow; location: VariantRow['locations'][number] | null };
 
-export type StocktakeFilters = { locationId: string; colour: string; size: string };
-const NO_FILTERS: StocktakeFilters = { locationId: '', colour: '', size: '' };
+/** Each filter is a multi-select; an empty list means "no filter". */
+export type StocktakeFilters = { locationIds: string[]; colours: string[]; sizes: string[] };
+const NO_FILTERS: StocktakeFilters = { locationIds: [], colours: [], sizes: [] };
 /** The location filter's "variants kept nowhere" option. */
 export const NO_LOCATION = '__none__';
 
@@ -21,10 +22,9 @@ export function buildStocktakeLines(product: ProductRecord | null): StocktakeLin
 }
 
 function matchesFilters(line: StocktakeLine, f: StocktakeFilters): boolean {
-  if (f.colour && line.variant.colour !== f.colour) return false;
-  if (f.size && line.variant.size !== f.size) return false;
-  if (f.locationId === NO_LOCATION) return line.location === null;
-  if (f.locationId) return line.location?.id === f.locationId;
+  if (f.colours.length > 0 && !f.colours.includes(line.variant.colour)) return false;
+  if (f.sizes.length > 0 && !f.sizes.includes(line.variant.size)) return false;
+  if (f.locationIds.length > 0) return f.locationIds.includes(line.location?.id ?? NO_LOCATION);
   return true;
 }
 
@@ -53,7 +53,7 @@ export function useStocktake({ product, onCreated }: UseStocktakeArgs) {
     setOpen(true);
   };
   const close = () => setOpen(false);
-  const setFilter = (key: keyof StocktakeFilters, value: string) => setFilters((prev) => ({ ...prev, [key]: value }));
+  const setFilter = (key: keyof StocktakeFilters, value: string[]) => setFilters((prev) => ({ ...prev, [key]: value }));
   const toggle = (key: string) => setSelected((prev) => ({ ...prev, [key]: !prev[key] }));
   const toggleAllVisible = () => setSelected((prev) => ({ ...prev, ...Object.fromEntries(visible.map((l) => [l.key, !allVisibleChecked])) }));
 

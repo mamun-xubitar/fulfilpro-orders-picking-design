@@ -40,6 +40,8 @@ export default function VariantsMatrixToolbar({ p, fullView }: VariantsMatrixToo
         {totalVariants} variant{totalVariants === 1 ? '' : 's'}
       </span>
 
+      <VariantSizeDropdown size={matrix.sizeFilter} />
+
       {/* Full view has its own exit via the modal's own close (×) — no separate "exit" action
           needed here once inside it. */}
       {!fullView && (
@@ -58,8 +60,6 @@ export default function VariantsMatrixToolbar({ p, fullView }: VariantsMatrixToo
         aria-label="Search variants"
         className="h-[22px] w-[210px] rounded-[7px] border border-inventory-border-strong bg-inventory-surface px-[7px] text-[10.5px] leading-none outline-none placeholder:text-inventory-text-subtle focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring"
       />
-
-      <VariantSizeDropdown size={matrix.sizeFilter} />
 
       <label className="flex cursor-pointer items-center gap-[4px] text-[10px] font-medium leading-none text-inventory-text-muted">
         <input

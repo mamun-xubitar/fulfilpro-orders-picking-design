@@ -25,6 +25,7 @@ import LocationModal from './LocationModal';
 import StoreLocationsModal from './StoreLocationsModal';
 import VariantLocationRemapModal from './VariantLocationRemapModal';
 import NewProductWizard from './newProduct/NewProductWizard';
+import BulkPayPoModal from './BulkPayPoModal';
 import PayPoModal from './PayPoModal';
 import SupplierDetailsModal from './SupplierDetailsModal';
 import { deleteBlockers, formatMoney, variantTitle } from './utils';
@@ -39,6 +40,7 @@ export default function InventoryModals(p: InventoryPage) {
       <LocationModal locations={p.locations} />
       <StoreLocationsModal storeLocations={p.storeLocations} locations={p.locations.options} />
       <PayPoModal pay={p.payment} globals={p.globals} />
+      <BulkPayPoModal bulk={p.bulkPay} globals={p.globals} />
       {p.supplierDetailId && (
         <SupplierDetailsModal supplierId={p.supplierDetailId} onClose={p.closeSupplierDetails} onOpenPurchaseOrders={p.openPurchaseOrdersFor} onOpenPayments={p.openPaymentsFor} />
       )}
@@ -173,7 +175,7 @@ export default function InventoryModals(p: InventoryPage) {
         <DeleteProductModal p={p} />
       )}
 
-      <PoModals po={p.po} variants={variants} locations={p.locations.options} />
+      <PoModals po={p.po} variants={p.po.createProduct?.variants ?? variants} locations={p.locations.options} />
       <StocktakeModal stocktake={p.stocktake} />
       <StocktakeCountModal detail={p.stocktakeDetail} />
       <StocktakeConfirmDialogs detail={p.stocktakeDetail} />

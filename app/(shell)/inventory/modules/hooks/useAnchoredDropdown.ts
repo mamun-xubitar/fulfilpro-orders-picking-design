@@ -80,9 +80,16 @@ export function useAnchoredDropdown({
       }
     };
     updatePosition();
-    // Re-measure on the next frame — on first open the menu isn't mounted yet, so the
-    // height above is a fallback; once mounted this corrects to the exact measured height.
-    const raf = requestAnimationFrame(updatePosition);
+    // Re-measure every frame while open — on first open the menu isn't mounted yet, so the
+    // height above is a fallback; once mounted this corrects to the exact measured height. It also
+    // follows an anchor that moves without a scroll/resize (e.g. a centred modal whose height
+    // changes as its content filters). setPosition bails out when nothing moved.
+    let raf = 0;
+    const tick = () => {
+      updatePosition();
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
     window.addEventListener('resize', updatePosition);
     window.addEventListener('scroll', updatePosition, true);
     return () => {

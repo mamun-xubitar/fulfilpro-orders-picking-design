@@ -30,6 +30,10 @@ export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
   const { request: requestList, loading: loadingList } = useRequest<{ purchaseOrders: PurchaseOrderRecord[] }>();
 
   const [createOpen, setCreateOpen] = useState(false);
+  /** A product other than the focused one the create form is open for — the Purchase Recommend
+   * tab raises a PO from its own rows without leaving the tab. */
+  const [createProduct, setCreateProduct] = useState<ProductRecord | null>(null);
+  const createTarget = createProduct ?? product;
   const [supplierId, setSupplierId] = useState('');
   const [deliveryDate, setDeliveryDate] = useState('');
   const [poRemark, setPoRemark] = useState('');
@@ -43,6 +47,7 @@ export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
   const [receiveTarget, setReceiveTarget] = useState<PurchaseOrderRecord | null>(null);
   const [receiveQty, setReceiveQty] = useState<Record<string, string>>({});
   const [receiveCost, setReceiveCost] = useState<Record<string, string>>({});
+  const [receiveRemark, setReceiveRemark] = useState<Record<string, string>>({});
   /** Where each line is put away — any inventory location; one the variant isn't kept at yet is
    * added to it on receipt. Only ticked lines are received. */
   const [receiveLocations, setReceiveLocations] = useState<Record<string, string>>({});
@@ -85,7 +90,8 @@ export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
   /** Resets every create-PO field for `variantIds` (or, given none, every variant on the
    * product) — split out from `openCreate` so the New Product wizard's Purchase order step can
    * seed the same form fields without also flipping on the standalone Create PO modal. */
-  const seedForm = (variantIds: string[]) => {
+  const seedForm = (variantIds: string[], forProduct?: ProductRecord) => {
+    const product = forProduct ?? createTarget;
     if (!product) return;
     setSupplierId(supplierOptions[0]?.id ?? '');
     setDeliveryDate('');
@@ -102,13 +108,17 @@ export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
     setCosts(Object.fromEntries(ids.map((id) => [id, seedCost])));
   };
 
-  const openCreate = (variantIds: string[]) => {
-    if (!product) return;
-    seedForm(variantIds);
+  const openCreate = (variantIds: string[], forProduct?: ProductRecord) => {
+    if (!forProduct && !product) return;
+    setCreateProduct(forProduct ?? null);
+    seedForm(variantIds, forProduct);
     setCreateOpen(true);
   };
 
-  const closeCreate = () => setCreateOpen(false);
+  const closeCreate = () => {
+    setCreateOpen(false);
+    setCreateProduct(null);
+  };
   const setQuantity = (variantId: string, value: string) => setQuantities((prev) => ({ ...prev, [variantId]: value }));
   const setSku = (variantId: string, value: string) => setSkus((prev) => ({ ...prev, [variantId]: value }));
   const setCost = (variantId: string, value: string) => setCosts((prev) => ({ ...prev, [variantId]: value }));
@@ -119,6 +129,7 @@ export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
   /** `after` fires once the PO is created — used by the New Product wizard to close itself only
    * on a confirmed save. */
   const saveAndSend = (after?: () => void) => {
+    const product = createTarget;
     if (!product) return;
     const supplier = supplierOptions.find((s) => s.id === supplierId);
     const items = Object.entries(quantities)
@@ -175,6 +186,9 @@ export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
         setCreateOpen(false);
         loadPurchaseOrders();
         if (data.product) onSaved(data.product);
+        // Raised for another product: refresh the tabs that show incoming stock and PO counts.
+        if (createProduct) setReceivedNonce((n) => n + 1);
+        setCreateProduct(null);
         after?.();
       },
     });
@@ -184,6 +198,7 @@ export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
     setReceiveTarget(po);
     setReceiveQty(Object.fromEntries(po.items.map((item) => [item.id, String(Math.max(0, item.quantity - item.receivedQuantity))])));
     setReceiveCost(Object.fromEntries(po.items.map((item) => [item.id, item.unitCost !== null ? String(item.unitCost) : ''])));
+    setReceiveRemark(Object.fromEntries(po.items.map((item) => [item.id, item.remark ?? ''])));
     setReceiveLocations({});
     setReceiveSelected({});
   };
@@ -201,6 +216,11 @@ export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
     setReceiveQty((prev) => ({ ...prev, [itemId]: value }));
   };
   const setReceiveItemCost = (itemId: string, value: string) => setReceiveCost((prev) => ({ ...prev, [itemId]: value }));
+  const setReceiveItemRemark = (itemId: string, value: string) => setReceiveRemark((prev) => ({ ...prev, [itemId]: value }));
+  const setAllReceiveRemark = (value: string) => {
+    if (!receiveTarget) return;
+    setReceiveRemark(Object.fromEntries(receiveTarget.items.map((item) => [item.id, value])));
+  };
   const setReceiveItemLocation = (itemId: string, locationId: string) => setReceiveLocations((prev) => ({ ...prev, [itemId]: locationId }));
   const toggleReceiveItem = (itemId: string) => setReceiveSelected((prev) => ({ ...prev, [itemId]: !prev[itemId] }));
   /** Header checkbox — ticks every line with something outstanding, or clears them all when they already are. */
@@ -247,7 +267,7 @@ export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
       .map((item) => {
         const costInput = receiveCost[item.id];
         const unitCost = costInput !== undefined && costInput !== '' && Number.isFinite(Number(costInput)) ? Number(costInput) : undefined;
-        return { itemId: item.id, quantity: Number(receiveQty[item.id]), unitCost, locationId: receiveLocations[item.id] };
+        return { itemId: item.id, quantity: Number(receiveQty[item.id]), unitCost, locationId: receiveLocations[item.id], remark: receiveRemark[item.id] ?? '' };
       });
     if (receipts.length === 0) {
       toast.error('Tick a variant and enter a quantity to receive');
@@ -261,10 +281,16 @@ export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
       onSuccess: ({ data }) => {
         // Keep the modal open on the updated PO so its received/remaining figures are current;
         // quantities re-seed to the new remaining, cost and location stay as entered, ticks clear.
+        // Once every line is fully received there is nothing left to do here, so it closes.
         const po = data.purchaseOrder;
-        setReceiveTarget(po);
-        setReceiveQty(Object.fromEntries(po.items.map((item) => [item.id, String(Math.max(0, item.quantity - item.receivedQuantity))])));
-        setReceiveSelected({});
+        if (po.items.every((item) => item.receivedQuantity >= item.quantity)) {
+          setReceiveTarget(null);
+        } else {
+          setReceiveTarget(po);
+          setReceiveQty(Object.fromEntries(po.items.map((item) => [item.id, String(Math.max(0, item.quantity - item.receivedQuantity))])));
+          setReceiveRemark(Object.fromEntries(po.items.map((item) => [item.id, item.remark ?? ''])));
+          setReceiveSelected({});
+        }
         loadPurchaseOrders();
         if (data.product) onSaved(data.product);
         setReceivedNonce((n) => n + 1);
@@ -279,6 +305,7 @@ export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
     loadingList,
     loadPurchaseOrders,
     createOpen,
+    createProduct,
     openCreate,
     seedForm,
     closeCreate,
@@ -311,6 +338,9 @@ export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
     setAllReceiveQty,
     receiveCost,
     setReceiveItemCost,
+    receiveRemark,
+    setReceiveItemRemark,
+    setAllReceiveRemark,
     receiveLocations,
     setReceiveItemLocation,
     receiveSelected,

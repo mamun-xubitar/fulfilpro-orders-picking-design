@@ -259,9 +259,9 @@ export function formatDate(iso: string | null): string {
   return new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
-/** "10 (28 Aug 2026)", or "10 (Date not set)" when the PO has no delivery date yet. */
+/** "10 (28/08/2026)", or "10 (Date not set)" when the PO has no delivery date yet. */
 export function formatIncomingLot(lot: IncomingLot): string {
-  const date = lot.date ? new Date(lot.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Date not set';
+  const date = lot.date ? formatDate(lot.date) : 'Date not set';
   return `${formatNumber(lot.quantity)} (${date})`;
 }
 

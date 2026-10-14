@@ -85,7 +85,10 @@ function PoRow({ po, tab, onReceive, onPay, onOpenSupplier, onOpenProduct }: { p
       <td className="px-2 py-1.5">
         <input type="checkbox" checked={selected} onChange={() => tab.toggle(po.id)} aria-label={`Select ${formatPoNumber(po.number)}`} className="h-3 w-3 cursor-pointer accent-inventory-primary" />
       </td>
-      <td className="whitespace-nowrap px-2 py-1.5 text-inventory-text-subtle">{formatDate(po.createdAt)}</td>
+      <td className="whitespace-nowrap px-2 py-1.5 text-inventory-text-subtle">
+        {formatDate(po.createdAt)}
+        <span className="mt-[2px] block text-[9.5px]">{po.createdByName}</span>
+      </td>
       <td className="whitespace-nowrap px-2 py-1.5 font-medium text-inventory-text">{formatPoNumber(po.number)}</td>
       <td className="max-w-[200px] px-2 py-1.5">
         <button

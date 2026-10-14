@@ -5,7 +5,7 @@ const CHECK_LABEL = 'inline-flex cursor-pointer items-center gap-1.5 whitespace-
 const CHECKBOX = 'h-3 w-3 cursor-pointer accent-inventory-primary';
 
 /** Bulk bar for the Purchase Orders tab — same two select-all checkboxes as the Products list. */
-export default function PoSelectionBar({ tab }: { tab: PurchaseOrdersTabState }) {
+export default function PoSelectionBar({ tab, onBulkPay }: { tab: PurchaseOrdersTabState; onBulkPay: () => void }) {
   const { canEdit } = useInventoryAccess();
   // In "all matching filters" mode the full rows are only fetched when an action runs, so
   // nothing is known to be receivable until then.
@@ -35,6 +35,17 @@ export default function PoSelectionBar({ tab }: { tab: PurchaseOrdersTabState })
           className="flex h-[22px] items-center rounded-[6px] bg-inventory-success px-[8px] text-[10px] font-bold leading-none text-white transition-colors duration-150 hover:bg-inventory-success-hover disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
         >
           Receive
+        </button>
+      )}
+      {canEdit && (
+        <button
+          type="button"
+          onClick={onBulkPay}
+          disabled={tab.resolving}
+          title="Pay the selected purchase orders in one go"
+          className="flex h-[22px] items-center rounded-[6px] bg-inventory-primary px-[8px] text-[10px] font-bold leading-none text-white transition-colors duration-150 hover:bg-inventory-primary-hover disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+        >
+          Bulk pay
         </button>
       )}
       <button

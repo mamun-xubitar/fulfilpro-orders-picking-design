@@ -17,7 +17,10 @@ type ColumnFillInputProps = {
   getConfirmWarning?: (pending: number) => string | null;
   /** When true, greys out the header input and blocks the confirm modal (e.g. while rows have errors). */
   disabled?: boolean;
-  onApply: (value: number) => void;
+  /** Number mode (default) applies via onApply; text / date modes apply the raw string via onApplyText. */
+  type?: 'number' | 'text' | 'date';
+  onApply?: (value: number) => void;
+  onApplyText?: (value: string) => void;
 };
 
 /**
@@ -26,9 +29,10 @@ type ColumnFillInputProps = {
  * one action instead of editing each row by hand). Cancelling, or blurring with the value
  * unchanged from what was last applied, does nothing.
  */
-export default function ColumnFillInput({ label, rowCount, step, min, integerOnly, getConfirmWarning, disabled, onApply }: ColumnFillInputProps) {
+export default function ColumnFillInput({ label, rowCount, step, min, integerOnly, getConfirmWarning, disabled, type = 'number', onApply, onApplyText }: ColumnFillInputProps) {
+  const isNumber = type === 'number';
   const [value, setValue] = useState('');
-  const [pending, setPending] = useState<number | null>(null);
+  const [pending, setPending] = useState<number | string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const handleBlur = () => {
@@ -36,6 +40,11 @@ export default function ColumnFillInput({ label, rowCount, step, min, integerOnl
     const trimmed = value.trim();
     if (trimmed === '') {
       setError(null);
+      return;
+    }
+    if (!isNumber) {
+      setError(null);
+      setPending(trimmed);
       return;
     }
     const parsed = Number(trimmed);
@@ -58,9 +67,9 @@ export default function ColumnFillInput({ label, rowCount, step, min, integerOnl
   return (
     <>
       <input
-        type="number"
-        step={step}
-        min={min}
+        type={type}
+        step={isNumber ? step : undefined}
+        min={isNumber ? min : undefined}
         value={value}
         disabled={disabled}
         onChange={(e) => {
@@ -71,7 +80,7 @@ export default function ColumnFillInput({ label, rowCount, step, min, integerOnl
         onKeyDown={(e) => {
           if (e.key === 'Enter') e.currentTarget.blur();
         }}
-        placeholder="Set all"
+        placeholder={type === 'date' ? undefined : 'Set all'}
         aria-label={`Set ${label} for every row`}
         aria-invalid={error !== null}
         title={disabled ? 'Fix row errors first' : (error ?? `Set ${label} for every visible row`)}
@@ -82,7 +91,7 @@ export default function ColumnFillInput({ label, rowCount, step, min, integerOnl
         pending !== null &&
         createPortal(
           (() => {
-            const warning = getConfirmWarning?.(pending) ?? null;
+            const warning = typeof pending === 'number' ? (getConfirmWarning?.(pending) ?? null) : null;
             return (
               // `normal-case text-left` + `whitespace-normal break-words` reset inherited header
               // styles: the header cells this input lives in (matrix `<th>`, PO grid headers) are
@@ -107,7 +116,8 @@ export default function ColumnFillInput({ label, rowCount, step, min, integerOnl
                         setValue('');
                       }}
                       onConfirm={() => {
-                        onApply(pending);
+                        if (typeof pending === 'number') onApply?.(pending);
+                        else onApplyText?.(pending);
                         setPending(null);
                         setValue('');
                       }}

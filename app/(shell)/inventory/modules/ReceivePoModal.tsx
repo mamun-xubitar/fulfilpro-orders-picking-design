@@ -91,32 +91,36 @@ export default function ReceivePoModal({ po, locations }: { po: ReturnType<typeo
           </dl>
         </div>
 
-        <p className="text-[12px] text-inventory-text-muted">Tick the variants to receive, choose a location for each, and enter the quantity received. Receive again later for partial deliveries.</p>
+        {/* The bulk-location controls share the always-present hint row (fixed min-height) so
+            appearing/disappearing as rows get ticked never shifts the table below. */}
+        <div className="flex min-h-[22px] flex-wrap items-center justify-between gap-2">
+          <p className="text-[12px] text-inventory-text-muted"><span className="font-bold">Check the variants to receive</span>, choose a location for each, and enter the quantity received. Receive again later for partial deliveries.</p>
+          {selected.length > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-semibold text-inventory-text-muted">{selected.length} selected</span>
+              <label htmlFor="receive-bulk-location" className="text-[11px] font-semibold text-inventory-text-muted">
+                Location
+              </label>
+              <select
+                id="receive-bulk-location"
+                value=""
+                onChange={(e) => e.target.value && po.setSelectedReceiveLocation(e.target.value)}
+                className={`w-44 ${RECEIVE_SELECT_CLASS}`}
+              >
+                <option value="">Set for selected…</option>
+                {locations.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
 
-        {selected.length > 0 && (
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] font-semibold text-inventory-text-muted">{selected.length} selected</span>
-            <label htmlFor="receive-bulk-location" className="text-[11px] font-semibold text-inventory-text-muted">
-              Location
-            </label>
-            <select
-              id="receive-bulk-location"
-              value=""
-              onChange={(e) => e.target.value && po.setSelectedReceiveLocation(e.target.value)}
-              className={`w-44 ${RECEIVE_SELECT_CLASS}`}
-            >
-              <option value="">Set for selected…</option>
-              {locations.map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        <div className="rounded-lg border border-inventory-border">
-          <div className={`sticky top-[-1rem] z-10 grid ${RECEIVE_GRID_COLS} items-center gap-2 border-b border-inventory-border bg-inventory-surface-muted px-2 py-1 text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-inventory-text-subtle`}>
+        <div className="thin-scroll max-h-[calc(60dvh/var(--page-zoom,1))] overflow-auto rounded-lg border border-inventory-border">
+          <div className="min-w-[64.5rem]">
+          <div className={`sticky top-0 z-10 grid ${RECEIVE_GRID_COLS} items-center gap-2 border-b border-inventory-border bg-inventory-surface-muted px-2 py-1 text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-inventory-text-subtle`}>
             <input
               type="checkbox"
               checked={allSelected}
@@ -135,11 +139,15 @@ export default function ReceivePoModal({ po, locations }: { po: ReturnType<typeo
             <span className="flex min-h-[16px] items-center justify-end text-right">Ordered</span>
             <span className="flex min-h-[16px] items-center justify-end text-right">Received</span>
             <span className="flex min-h-[16px] items-center justify-end text-right">Outstanding</span>
-            <span className="flex min-h-[16px] items-center justify-end text-right">Unit cost</span>
+            <span className="flex flex-col justify-center gap-[2px]">
+              <span className="flex min-h-[16px] items-center">Remark</span>
+              <ColumnFillInput label="Remark" type="text" rowCount={target.items.length} onApplyText={po.setAllReceiveRemark} />
+            </span>
+            <span className="flex min-h-[16px] items-center justify-end text-right">Unit cost (AUD)</span>
             <span className="flex min-h-[16px] items-center">Location</span>
-            <span className="flex items-center justify-end gap-[4px] whitespace-nowrap">
-              <span>Receive qty</span>
-              <span className="w-[64px] min-w-0">
+            <span className="flex flex-col justify-center gap-[2px]">
+              <span className="flex min-h-[16px] items-center justify-end text-right">Receive qty</span>
+              <span className="min-w-0">
                 <ColumnFillInput
                   label="Receive qty"
                   rowCount={target.items.length}
@@ -168,13 +176,16 @@ export default function ReceivePoModal({ po, locations }: { po: ReturnType<typeo
                 locationId={po.receiveLocations[item.id] ?? ''}
                 qty={po.receiveQty[item.id] ?? ''}
                 cost={po.receiveCost[item.id] ?? ''}
+                remark={po.receiveRemark[item.id] ?? ''}
                 qtyError={po.getReceiveQtyError(po.receiveQty[item.id], Math.max(0, item.quantity - item.receivedQuantity))}
                 onToggle={() => po.toggleReceiveItem(item.id)}
                 onLocationChange={(locationId) => po.setReceiveItemLocation(item.id, locationId)}
                 onQtyChange={(value) => po.setReceiveItemQty(item.id, value)}
                 onCostChange={(value) => po.setReceiveItemCost(item.id, value)}
+                onRemarkChange={(value) => po.setReceiveItemRemark(item.id, value)}
               />
             ))}
+          </div>
           </div>
         </div>
       </div>

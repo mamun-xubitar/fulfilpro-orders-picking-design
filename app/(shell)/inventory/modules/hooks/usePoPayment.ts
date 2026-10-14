@@ -24,7 +24,7 @@ const money = (n: number) => String(Math.round(n * 100) / 100);
 
 /** What the form starts as: the PO's saved payment when there is one (edit mode), otherwise the
  * product's own "Pricing & margin" figures (a first pay). */
-function seedForm(po: PurchaseOrderRecord, globals: InventoryGlobals): PayForm {
+export function seedForm(po: PurchaseOrderRecord, globals: InventoryGlobals): PayForm {
   if (po.payment) {
     const p = po.payment;
     return {

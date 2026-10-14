@@ -12,6 +12,7 @@
     "worker:decoration-digest": "tsx workers/decoration-digest.worker.ts",
     "worker:background": "tsx workers/background.worker.ts",
     "backfill:order-line-items": "tsx scripts/enqueue-backfill-order-line-items.ts",
+    "backfill:po-item-variants": "tsx scripts/backfill-po-item-variants.ts",
     "backfill:category-full-names": "tsx scripts/backfill-category-full-names.ts",
     "register-webhooks": "tsx scripts/register-shopify-webhooks.ts",
     "lint": "eslint",

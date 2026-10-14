@@ -23,9 +23,11 @@ import { useProductNavigation } from './useProductNavigation';
 import { useProductPricing } from './useProductPricing';
 import { useProductsTable } from './useProductsTable';
 import { usePaymentsTab } from './usePaymentsTab';
+import { useBulkPoPayment } from './useBulkPoPayment';
 import { usePoPayment } from './usePoPayment';
 import { usePurchaseOrder } from './usePurchaseOrder';
 import { usePurchaseOrdersTab } from './usePurchaseOrdersTab';
+import { usePurchaseRecommendTab } from './usePurchaseRecommendTab';
 import { useStocktake } from './useStocktake';
 import { useStocktakeDetail } from './useStocktakeDetail';
 import { useStocktakesTab } from './useStocktakesTab';
@@ -139,6 +141,18 @@ export function useInventoryPage() {
       bumpSupplierRefresh();
     },
   });
+  const bulkPay = useBulkPoPayment({
+    globals: data.globals,
+    onSaved: () => {
+      setPayNonce((n) => n + 1);
+      poTab.clearSelection();
+    },
+  });
+  /** Bulk pay for the selected POs — "all matching filters" is resolved to full rows first. */
+  const openBulkPay = async () => {
+    const rows = await poTab.resolveTargets();
+    if (rows) bulkPay.open(rows);
+  };
   const paymentsTab = usePaymentsTab({ enabled: moduleTab === 'payments', refreshKey: payNonce });
   const [supplierDetailId, setSupplierDetailId] = useState<string | null>(null);
   /** The Suppliers tab's PO / payment counts: jump to that tab already narrowed to the supplier. */
@@ -155,6 +169,7 @@ export function useInventoryPage() {
   // Bumped when a stocktake is created so the Stocktake tab's list refetches.
   const [stocktakeNonce, setStocktakeNonce] = useState(0);
   const stocktake = useStocktake({ product, onCreated: () => setStocktakeNonce((n) => n + 1) });
+  const recommendTab = usePurchaseRecommendTab({ enabled: moduleTab === 'purchase-recommend', refreshKey: po.receivedNonce + locationRefreshNonce + stocktakeNonce });
   const stocktakesTab = useStocktakesTab({ enabled: moduleTab === 'stocktake', refreshKey: stocktakeNonce });
   const stocktakeDetail = useStocktakeDetail({ isAdmin: stocktakesTab.isAdmin, onChanged: stocktakesTab.refresh, onSynced: onStocktakeSynced });
   const adjustments = useAdjustments({ product, onSaved: onProductSaved });
@@ -232,7 +247,10 @@ export function useInventoryPage() {
     bulkLocations,
     po,
     poTab,
+    recommendTab,
     payment,
+    bulkPay,
+    openBulkPay,
     paymentsTab,
     supplierDetailId,
     openProductInVariants,

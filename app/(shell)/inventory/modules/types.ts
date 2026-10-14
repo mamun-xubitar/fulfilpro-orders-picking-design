@@ -358,6 +358,7 @@ export type PurchaseOrderItemRecord = {
   quantity: number;
   receivedQuantity: number;
   unitCost: number | null;
+  remark: string | null;
   /** The linked variant's locations, A→Z — where a receipt can be put away. */
   locations: { id: string; name: string }[];
 };
@@ -376,9 +377,14 @@ export type PurchaseOrderRecord = {
   poRemark: string | null;
   shippingRemark: string | null;
   createdAt: string;
+  createdByName: string;
+  statusUpdatedByName: string | null;
+  statusUpdatedAt: string | null;
   items: PurchaseOrderItemRecord[];
   /** Where the PO's receipts were put away, totalled per location; empty until received. */
   receivedLocations: { name: string; quantity: number }[];
+  /** Distinct names of whoever received stock against this PO. */
+  receivedBy: string[];
   itemNo: string;
   /** Null until a payment is first saved for this PO. */
   payment: PoPaymentRecord | null;

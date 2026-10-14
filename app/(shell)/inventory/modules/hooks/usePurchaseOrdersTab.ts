@@ -268,6 +268,7 @@ export function usePurchaseOrdersTab({ enabled, refreshKey, onChanged }: Args) {
     hasSelection: selectAllFilters || selectedIds.length > 0,
     resolving,
     targetRows,
+    resolveTargets,
     allSelected,
     toggle,
     toggleAll,

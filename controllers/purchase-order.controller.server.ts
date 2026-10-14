@@ -193,7 +193,7 @@ export class PurchaseOrderController {
 
     const errors: string[] = [];
     const itemById = new Map(po.items.map((item) => [item.id, item]));
-    const receipts: Array<{ itemId?: string; colour?: string; size?: string; sku?: string | null; locationId?: string | null; quantity: number; unitCost?: number | null }> = [];
+    const receipts: Array<{ itemId?: string; colour?: string; size?: string; sku?: string | null; locationId?: string | null; quantity: number; unitCost?: number | null; remark?: string | null }> = [];
 
     for (const raw of rawReceipts) {
       if (!raw || typeof raw !== 'object') continue;
@@ -203,6 +203,7 @@ export class PurchaseOrderController {
       const size = typeof r.size === 'string' ? r.size.trim() : '';
       const locationId = typeof r.locationId === 'string' && r.locationId.trim() ? r.locationId.trim() : null;
       const quantity = Number(r.quantity);
+      const remark = typeof r.remark === 'string' ? upperTrim(r.remark) || null : undefined;
       let unitCost: number | null | undefined;
       if (r.unitCost !== undefined && r.unitCost !== null && r.unitCost !== '') {
         const parsed = Number(r.unitCost);
@@ -228,7 +229,7 @@ export class PurchaseOrderController {
           errors.push(`quantity: Cannot receive more than the ${remaining} unit(s) outstanding for this item`);
           continue;
         }
-        receipts.push({ itemId, colour: colour || undefined, size: size || undefined, sku: typeof r.sku === 'string' ? r.sku : null, locationId, quantity: Math.trunc(quantity), unitCost });
+        receipts.push({ itemId, colour: colour || undefined, size: size || undefined, sku: typeof r.sku === 'string' ? r.sku : null, locationId, quantity: Math.trunc(quantity), unitCost, remark });
       } else if (colour && size) {
         receipts.push({ colour, size, sku: typeof r.sku === 'string' ? r.sku : null, quantity: Math.trunc(quantity), unitCost });
       } else {

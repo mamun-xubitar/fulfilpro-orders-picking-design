@@ -19,6 +19,8 @@ const INCOMING_BADGE_COLORS = [
   'border-inventory-sec-stocktake/30 bg-inventory-sec-stocktake/10 text-inventory-sec-stocktake',
   'border-inventory-sec-details/30 bg-inventory-sec-details/10 text-inventory-sec-details',
 ];
+/** The text colour of each INCOMING_BADGE_COLORS entry, same order. */
+const INCOMING_TEXT_COLORS = ['text-inventory-warning-ink', 'text-inventory-primary', 'text-inventory-sec-stocktake', 'text-inventory-sec-details'];
 const INPUT_BASE =
   'h-[15px] rounded-[5px] border border-inventory-border-strong bg-inventory-surface px-[3px] text-[9.5px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring';
 
@@ -155,6 +157,21 @@ export function LocationStockCell({
         </div>
         <CellSave show={dirty} saving={saving} label={`Save ${label}`} onSave={onSave} />
       </div>
+    </td>
+  );
+}
+
+/** Available, then each open PO's unreceived quantity as " + (qty)" — coloured like that PO's
+ * badge in the Incoming column (same position, same palette) so the two columns read together. */
+export function AvailableCell({ available, lots }: { available: number; lots: IncomingLot[] }) {
+  return (
+    <td className={`${CELL_CLASS} text-right text-[10px] font-bold leading-none tabular-nums text-inventory-success-hover`}>
+      {formatNumber(available)}
+      {lots.map((lot, i) => (
+        <span key={i} title={`${formatPoNumber(lot.poNumber)} · ${formatIncomingLot(lot)}`} className={INCOMING_TEXT_COLORS[i % INCOMING_TEXT_COLORS.length]}>
+          {' + '}({formatNumber(lot.quantity)})
+        </span>
+      ))}
     </td>
   );
 }

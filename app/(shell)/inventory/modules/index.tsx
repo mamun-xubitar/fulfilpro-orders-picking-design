@@ -14,6 +14,7 @@ import InventoryModals from './InventoryModals';
 import LocationsTab from './LocationsTab';
 import PaymentsTab from './PaymentsTab';
 import PurchaseOrdersTab from './PurchaseOrdersTab';
+import PurchaseRecommendTab from './PurchaseRecommendTab';
 import ModuleTabs from './ModuleTabs';
 import ProductDetailsTab from './ProductDetailsTab';
 import ProductPageSkeleton from './ProductPageSkeleton';
@@ -86,7 +87,9 @@ function InventoryPageBody() {
       ) : p.moduleTab === 'suppliers' ? (
         <SuppliersTab suppliers={p.suppliers} onOpenPurchaseOrders={p.openPurchaseOrdersFor} onOpenPayments={p.openPaymentsFor} />
       ) : p.moduleTab === 'purchase-orders' ? (
-        <PurchaseOrdersTab tab={p.poTab} suppliers={p.supplierOptions} onReceive={p.po.openReceive} onPay={p.payment.open} onOpenSupplier={p.openSupplierDetails} onOpenProduct={p.openProductInVariants} />
+        <PurchaseOrdersTab tab={p.poTab} suppliers={p.supplierOptions} onReceive={p.po.openReceive} onPay={p.payment.open} onBulkPay={p.openBulkPay} onOpenSupplier={p.openSupplierDetails} onOpenProduct={p.openProductInVariants} />
+      ) : p.moduleTab === 'purchase-recommend' ? (
+        <PurchaseRecommendTab tab={p.recommendTab} suppliers={p.supplierOptions} onOpenProduct={p.openProductInVariants} onCreatePo={(product, variantIds) => p.po.openCreate(variantIds, product)} />
       ) : p.moduleTab === 'payments' ? (
         <PaymentsTab tab={p.paymentsTab} suppliers={p.supplierOptions} onEdit={p.payment.openById} onOpenSupplier={p.openSupplierDetails} />
       ) : p.moduleTab === 'locations' ? (
