@@ -1043,39 +1043,45 @@ export class OrderModel {
   async getPackingSlipLabel(orderId: string) {
     const order = await prisma.order.findUnique({
       where: { id: orderId },
-      include: {
-        store: {
-          select: {
-            name: true,
-            storeDomain: true,
-            url: true,
-            logoPath: true,
-          },
-        },
-      },
+      include: packingSlipInclude,
     });
 
     if (!order) {
       throw new Error('Order not found');
     }
 
-    return {
-      id: order.id,
-      number: order.number,
-      customer: order.cusName,
-      address: order.address,
-      address2: order.address2,
-      city: order.city,
-      state: order.state,
-      zip: order.zip,
-      country: order.country,
-      phone: order.phone,
-      note: order.note,
-      storeName: order.store.name ?? order.store.storeDomain,
-      storeDomain: order.store.storeDomain,
-      storeUrl: order.store.url,
-      storeLogoPath: order.store.logoPath,
+    return toPackingSlipLabel(order);
+  }
+
+  async getPackingSlipLabels(orderIds: string[], allowedStoreIds: string[] | null) {
+    const orders = await prisma.order.findMany({
+      where: {
+        id: { in: orderIds },
+        ...(allowedStoreIds !== null ? { storeId: { in: allowedStoreIds } } : {}),
+      },
+      include: packingSlipInclude,
+    });
+    const byId = new Map(orders.map((order) => [order.id, order]));
+
+    return orderIds.flatMap((id) => {
+      const order = byId.get(id);
+      return order ? [toPackingSlipLabel(order)] : [];
+    });
+  }
+
+  async markLabelsPrinted(orderIds: string[], allowedStoreIds: string[] | null) {
+    const where = {
+      id: { in: orderIds },
+      ...(allowedStoreIds !== null ? { storeId: { in: allowedStoreIds } } : {}),
     };
+    const matched = await prisma.order.findMany({ where, select: { id: true } });
+    const printedOrderIds = matched.map((order) => order.id);
+    await prisma.order.updateMany({
+      where: { id: { in: printedOrderIds } },
+      data: { labelPrintedAt: new Date() },
+    });
+
+    return { printedOrderIds };
   }
 
   async saveBarcodes(orderId: string, barcodes: string[]) {
@@ -1622,6 +1628,7 @@ function toOrderRow(row: {
   canceled: boolean;
   canceledAt: Date | null;
   orderedAt: Date | null;
+  labelPrintedAt: Date | null;
   lineItems: Prisma.JsonValue;
   shippingLines: Prisma.JsonValue | null;
   fulfillmentItems: Prisma.JsonValue | null;
@@ -1698,6 +1705,7 @@ function toOrderRow(row: {
     canceledAt: toSafeISOString(row.canceledAt),
     status: getDisplayStatus(row),
     orderedAt: toSafeISOString(row.orderedAt) ?? undefined,
+    labelPrintedAt: toSafeISOString(row.labelPrintedAt),
     storeId: row.store.id,
     storeName: row.store.name ?? row.store.storeDomain,
     storeDomain: row.store.storeDomain,
@@ -1726,6 +1734,37 @@ function toOrderRow(row: {
     packedQuantity,
     totalQuantity,
     trackings: trackings ?? [],
+  };
+}
+
+const packingSlipInclude = {
+  store: {
+    select: {
+      name: true,
+      storeDomain: true,
+      url: true,
+      logoPath: true,
+    },
+  },
+} satisfies Prisma.OrderInclude;
+
+function toPackingSlipLabel(order: Prisma.OrderGetPayload<{ include: typeof packingSlipInclude }>) {
+  return {
+    id: order.id,
+    number: order.number,
+    customer: order.cusName,
+    address: order.address,
+    address2: order.address2,
+    city: order.city,
+    state: order.state,
+    zip: order.zip,
+    country: order.country,
+    phone: order.phone,
+    note: order.note,
+    storeName: order.store.name ?? order.store.storeDomain,
+    storeDomain: order.store.storeDomain,
+    storeUrl: order.store.url,
+    storeLogoPath: order.store.logoPath,
   };
 }
 

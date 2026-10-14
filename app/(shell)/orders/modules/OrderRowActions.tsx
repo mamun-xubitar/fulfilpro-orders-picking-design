@@ -96,7 +96,9 @@ export default function OrderRowActions({
             disabled={printingOrderId === order.id || isFullyFulfilled}
             className={`p-2 rounded-lg transition-colors duration-150 ${printingOrderId === order.id || isFullyFulfilled
               ? 'text-gray-300 cursor-not-allowed'
-              : 'hover:bg-gray-100 text-gray-500 hover:text-gray-700 cursor-pointer'
+              : order.labelPrintedAt
+                ? 'hover:bg-gray-100 text-green-600 hover:text-green-700 cursor-pointer'
+                : 'hover:bg-gray-100 text-gray-500 hover:text-gray-700 cursor-pointer'
               }`}
           >
             {printingOrderId === order.id ? (
@@ -107,7 +109,7 @@ export default function OrderRowActions({
               </svg>
             )}
           </button>
-          <span className="tt">Print Label</span>
+          <span className="tt">{order.labelPrintedAt ? 'Label Printed — Print Again' : 'Print Label'}</span>
         </div>
         </>
         )}

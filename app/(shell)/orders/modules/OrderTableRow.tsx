@@ -38,10 +38,21 @@ export default function OrderTableRow({
       onClick={() => p.toggleExpanded(order.id)}
       className={`border-b border-gray-200 cursor-pointer ${p.userIsAdmin || isExpanded ? 'border-l-4 border-l-blue-500' : ''} ${hasBackInStockSignal ? 'bg-amber-50 hover:bg-amber-100' : status.row ?? getOrderDecorationRowTint(order) ?? 'hover:bg-gray-50'} transition-colors duration-100`}
     >
+      {!p.userIsDecorator && (
+        <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+          <input
+            type="checkbox"
+            checked={p.selectedLabelIds.has(order.id)}
+            onChange={() => p.toggleLabelSelected(order.id)}
+            aria-label={`Select order ${order.number}`}
+            className="rounded border-gray-300 text-blue-600 cursor-pointer"
+          />
+        </td>
+      )}
       <td className="hidden sm:table-cell px-4 py-3 text-gray-400 text-xs">
         {(p.pagination.page - 1) * p.pagination.pageSize + index + 1}
       </td>
-      <td className="px-4 py-3 font-mono text-sm font-medium text-gray-900">{order.number}</td>
+      <td className={`px-4 py-3 font-mono text-sm font-medium ${order.labelPrintedAt ? 'text-green-700' : 'text-gray-900'}`}>{order.number}</td>
       <td className="hidden md:table-cell px-4 py-3 text-sm text-gray-600">{order.storeName}</td>
       <td className="px-4 py-3 text-sm text-gray-700">{order.customer}</td>
       <td className="px-4 py-3 text-sm text-gray-600">

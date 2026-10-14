@@ -246,6 +246,26 @@ export class OrderController {
     };
   }
 
+  async getPackingSlipLabels(ids: string[], allowedStoreIds: string[] | null) {
+    const orderIds = parseLabelOrderIds(ids);
+    const labels = await model.getPackingSlipLabels(orderIds, allowedStoreIds);
+
+    return {
+      data: labels,
+      message: 'Packing slip labels retrieved',
+    };
+  }
+
+  async markLabelsPrinted(body: unknown, allowedStoreIds: string[] | null) {
+    const orderIds = parseLabelOrderIds((body as { orderIds?: unknown } | null)?.orderIds);
+    const result = await model.markLabelsPrinted(orderIds, allowedStoreIds);
+
+    return {
+      data: result,
+      message: 'Label prints recorded',
+    };
+  }
+
   async refreshOrder(orderId: string) {
     const result = await model.refreshFromShopify(orderId);
 
@@ -667,4 +687,16 @@ function normalizePositiveInt(value: string | null, fallback: number) {
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
+}
+
+const MAX_LABEL_ORDER_IDS = 200;
+
+function parseLabelOrderIds(value: unknown) {
+  if (!Array.isArray(value) || value.length === 0 || value.some((id) => typeof id !== 'string' || !id)) {
+    throw new Error('orderIds must be a non-empty list of order ids');
+  }
+  if (value.length > MAX_LABEL_ORDER_IDS) {
+    throw new Error(`At most ${MAX_LABEL_ORDER_IDS} orders can be printed at once`);
+  }
+  return [...new Set(value as string[])];
 }

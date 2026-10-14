@@ -175,6 +175,7 @@ export type OrderRow = {
   backInStockStatus: BackInStockStatus | null;
   stockAdjustment: OrderStockAdjustment | null;
   decorationAttachments: OrderDecorationAttachments;
+  labelPrintedAt: string | null;
   packingStatus: 'packed' | 'partially_packed' | 'not_packed';
   packedQuantity: number;
   totalQuantity: number;
