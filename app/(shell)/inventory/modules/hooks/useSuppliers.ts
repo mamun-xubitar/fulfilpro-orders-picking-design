@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import useRequest from '@/hooks/useRequest';
 import { buildPageNumbers, type PaginationState } from '@/hooks/usePagination';
+import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS } from '../constants';
 
 export type SupplierRow = {
   id: string;
@@ -20,8 +21,8 @@ export type SupplierRow = {
 export type SupplierForm = { name: string; poEmail: string; contactEmail: string; description: string };
 
 const EMPTY_FORM: SupplierForm = { name: '', poEmail: '', contactEmail: '', description: '' };
-const PAGE_SIZE = 20;
-const EMPTY_PAGINATION: PaginationState = { page: 1, pageSize: PAGE_SIZE, total: 0, totalPages: 1, hasPrev: false, hasNext: false };
+export const SUPPLIER_PAGE_SIZE_OPTIONS = PAGE_SIZE_OPTIONS;
+const EMPTY_PAGINATION: PaginationState = { page: 1, pageSize: 20, total: 0, totalPages: 1, hasPrev: false, hasNext: false };
 
 type UseSuppliersArgs = {
   /** Called after a create/edit/delete so the New Product / Import Products / Create PO
@@ -45,6 +46,7 @@ export function useSuppliers({ onChanged, refreshKey }: UseSuppliersArgs) {
 
   const [searchInput, setSearchInputState] = useState('');
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSizeState] = useState(DEFAULT_PAGE_SIZE);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const setSearchInput = (value: string) => {
@@ -53,13 +55,13 @@ export function useSuppliers({ onChanged, refreshKey }: UseSuppliersArgs) {
     debounceRef.current = setTimeout(() => setPage(1), 300);
   };
 
-  const queryKey = JSON.stringify({ search: searchInput, page, pageSize: PAGE_SIZE });
+  const queryKey = JSON.stringify({ search: searchInput, page, pageSize });
   const load = (overrides?: { page?: number }) => {
     requestList({
       url: '/api/inventory/suppliers',
       method: 'GET',
       showToast: false,
-      data: { search: searchInput, page: overrides?.page ?? page, pageSize: PAGE_SIZE },
+      data: { search: searchInput, page: overrides?.page ?? page, pageSize },
       onSuccess: ({ data }) => {
         setRows(data.suppliers);
         setPagination(data.pagination);
@@ -70,7 +72,7 @@ export function useSuppliers({ onChanged, refreshKey }: UseSuppliersArgs) {
   };
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(load, [searchInput, page, refreshKey]);
+  useEffect(load, [searchInput, page, pageSize, refreshKey]);
 
   const pageNumbers = buildPageNumbers(pagination.page, pagination.totalPages);
 
@@ -142,6 +144,11 @@ export function useSuppliers({ onChanged, refreshKey }: UseSuppliersArgs) {
     searchInput,
     setSearchInput,
     goToPage: setPage,
+    pageSize,
+    setPageSize: (size: number) => {
+      setPageSizeState(size);
+      setPage(1);
+    },
     modalOpen,
     editingId,
     form,

@@ -10,7 +10,7 @@ type HistoryTabProps = { tab: HistoryTabState; onOpenProduct: (productId: string
 /** The History tab — every change recorded across the product catalogue in one read-only table. */
 export default function HistoryTab({ tab, onOpenProduct, onViewAdjustment }: HistoryTabProps) {
   return (
-    <div className="overflow-hidden rounded-xl border border-inventory-border bg-inventory-surface shadow-sm xl:min-h-0 xl:flex-1 xl:overflow-y-auto thin-scroll">
+    <div className="overflow-hidden rounded-xl border border-inventory-border bg-inventory-surface shadow-sm xl:flex xl:min-h-0 xl:flex-1 xl:flex-col">
       <HistoryListToolbar tab={tab} />
       <HistoryTable tab={tab} onOpenProduct={onOpenProduct} onViewAdjustment={onViewAdjustment} />
       <Pagination

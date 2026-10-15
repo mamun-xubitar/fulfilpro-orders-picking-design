@@ -64,7 +64,7 @@ export function SkeletonRows({ cells, rows = 6, cellClassName = 'px-2 py-1.5' }:
   return (
     <>
       {Array.from({ length: rows }).map((_, r) => (
-        <tr key={r} aria-hidden="true" className="border-b border-inventory-divider last:border-0" style={{ '--i': r } as React.CSSProperties}>
+        <tr key={r} aria-hidden="true" className="border-b border-inventory-divider" style={{ '--i': r } as React.CSSProperties}>
           {cells.map((cell, c) => (
             <td key={c} className={cellClassName}>
               <Cell cell={cell} seed={r + c * 2} />

@@ -7,11 +7,12 @@ import { buildPageNumbers, type PaginationState } from '@/hooks/usePagination';
 import { printPurchaseOrders } from '../poPrint';
 import type { PurchaseOrderRecord, PurchaseOrderStatusValue } from '../types';
 import { receiveLocationOptions } from './usePurchaseOrder';
+import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS } from '../constants';
 
 export type PoSortKey = 'number' | 'createdAt' | 'deliveryDate' | 'supplierName' | 'productTitle' | 'status';
 export type PayFilter = '' | 'PAID' | 'UNPAID';
 
-export const PO_PAGE_SIZE_OPTIONS = [20, 50, 100];
+export const PO_PAGE_SIZE_OPTIONS = PAGE_SIZE_OPTIONS;
 const EMPTY_PAGINATION: PaginationState = { page: 1, pageSize: 20, total: 0, totalPages: 1, hasPrev: false, hasNext: false };
 
 type Filters = { supplierId: string; status: '' | PurchaseOrderStatusValue; payStatus: PayFilter; dateFrom: string; dateTo: string };
@@ -46,7 +47,7 @@ export function usePurchaseOrdersTab({ enabled, refreshKey, onChanged }: Args) {
   const [sort, setSort] = useState<PoSortKey>('createdAt');
   const [dir, setDir] = useState<'asc' | 'desc'>('desc');
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSizeState] = useState(PO_PAGE_SIZE_OPTIONS[0]);
+  const [pageSize, setPageSizeState] = useState(DEFAULT_PAGE_SIZE);
   const [selected, setSelected] = useState<string[]>([]);
   const [selectAllFilters, setSelectAllFilters] = useState(false);
   const [matchingRows, setMatchingRows] = useState<PurchaseOrderRecord[] | null>(null);

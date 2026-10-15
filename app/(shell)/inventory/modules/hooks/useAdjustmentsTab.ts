@@ -4,10 +4,11 @@ import { useEffect, useRef, useState } from 'react';
 import useRequest from '@/hooks/useRequest';
 import { buildPageNumbers, type PaginationState } from '@/hooks/usePagination';
 import type { AdjustmentBatchRecord, StockAdjustmentReasonValue } from '../types';
+import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS } from '../constants';
 
 export type AdjustmentsSortKey = 'number' | 'createdAt' | 'productName' | 'lineCount' | 'actorName';
 
-export const ADJUSTMENTS_PAGE_SIZE_OPTIONS = [20, 50, 100];
+export const ADJUSTMENTS_PAGE_SIZE_OPTIONS = PAGE_SIZE_OPTIONS;
 const EMPTY_PAGINATION: PaginationState = { page: 1, pageSize: 20, total: 0, totalPages: 1, hasPrev: false, hasNext: false };
 
 type Filters = { reason: '' | StockAdjustmentReasonValue; dateFrom: string; dateTo: string };
@@ -34,7 +35,7 @@ export function useAdjustmentsTab({ enabled }: Args) {
   const [sort, setSort] = useState<AdjustmentsSortKey>('createdAt');
   const [dir, setDir] = useState<'asc' | 'desc'>('desc');
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSizeState] = useState(ADJUSTMENTS_PAGE_SIZE_OPTIONS[0]);
+  const [pageSize, setPageSizeState] = useState(DEFAULT_PAGE_SIZE);
   const [localRefresh, setLocalRefresh] = useState(0);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 

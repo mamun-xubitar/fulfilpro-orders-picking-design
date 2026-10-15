@@ -7,10 +7,11 @@ import useRequest from '@/hooks/useRequest';
 import { buildPageNumbers, type PaginationState } from '@/hooks/usePagination';
 import { printStocktake } from '../stocktakePrint';
 import type { StocktakeRecord, StocktakeStatusValue } from '../types';
+import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS } from '../constants';
 
 export type StocktakeSortKey = 'number' | 'createdAt' | 'productName' | 'status' | 'countedAt' | 'completedAt';
 
-export const STOCKTAKE_PAGE_SIZE_OPTIONS = [20, 50, 100];
+export const STOCKTAKE_PAGE_SIZE_OPTIONS = PAGE_SIZE_OPTIONS;
 const EMPTY_PAGINATION: PaginationState = { page: 1, pageSize: 20, total: 0, totalPages: 1, hasPrev: false, hasNext: false };
 
 type Filters = { status: '' | StocktakeStatusValue; dateFrom: string; dateTo: string };
@@ -43,7 +44,7 @@ export function useStocktakesTab({ enabled, refreshKey }: Args) {
   const [sort, setSort] = useState<StocktakeSortKey>('createdAt');
   const [dir, setDir] = useState<'asc' | 'desc'>('desc');
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSizeState] = useState(STOCKTAKE_PAGE_SIZE_OPTIONS[0]);
+  const [pageSize, setPageSizeState] = useState(DEFAULT_PAGE_SIZE);
   const [localRefresh, setLocalRefresh] = useState(0);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 

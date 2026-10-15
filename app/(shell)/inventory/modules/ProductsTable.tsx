@@ -4,6 +4,7 @@ import { SkeletonRows, type SkeletonCell } from './Skeleton';
 import ProductsTableRow from './ProductsTableRow';
 import type { ProductsSortKey, useProductsTable } from './hooks/useProductsTable';
 import { formatCurrencyValue, formatNumber } from './utils';
+import { STICKY_TFOOT, STICKY_THEAD } from './constants';
 
 type ProductsTableProps = {
   table: ReturnType<typeof useProductsTable>;
@@ -32,9 +33,9 @@ export default function ProductsTable({ table, loading }: ProductsTableProps) {
   const colSpan = COLUMNS.length + 2; // + select + actions
 
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto thin-scroll xl:min-h-0 xl:flex-1 xl:overflow-y-auto">
       <table className="w-full min-w-[1020px] text-[11px] leading-none">
-        <thead>
+        <thead className={STICKY_THEAD}>
           <tr className="border-b border-inventory-border bg-inventory-surface-muted">
             <th className="w-10 px-2 py-1">
               <input
@@ -74,8 +75,8 @@ export default function ProductsTable({ table, loading }: ProductsTableProps) {
             ))}
         </tbody>
         {!loading && table.products.length > 0 && (
-          <tfoot>
-            <tr className="border-t-2 border-inventory-border bg-inventory-surface-muted font-bold text-inventory-text">
+          <tfoot className={STICKY_TFOOT}>
+            <tr className="font-bold text-inventory-text">
               <td className="px-2 py-1.5" />
               <td className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-[0.4px] text-inventory-text-subtle">
                 Total <span className="normal-case text-inventory-text-subtle">({formatNumber(table.pagination.total)} matching)</span>

@@ -23,7 +23,7 @@ export default function ProductsTableRow({ product, selected, onToggleSelect, on
   const badge = PRODUCT_STATUS_BADGES[product.status] ?? PRODUCT_STATUS_BADGES.DRAFT;
 
   return (
-    <tr className={`border-b border-inventory-divider last:border-0 transition-colors duration-150 hover:bg-inventory-surface-hover ${product.omitted ? 'opacity-50' : ''} ${selected ? 'bg-inventory-secondary/10/50' : ''}`}>
+    <tr className={`border-b border-inventory-divider transition-colors duration-150 hover:bg-inventory-surface-hover ${product.omitted ? 'opacity-50' : ''} ${selected ? 'bg-inventory-secondary/10/50' : ''}`}>
       <td className="px-2 py-1">
         <input
           type="checkbox"

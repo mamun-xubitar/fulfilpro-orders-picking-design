@@ -10,7 +10,7 @@ import type { StocktakeDetailState } from './hooks/useStocktakeDetail';
  * open the shared modals owned by the page (useStocktakeDetail), not state in here. */
 export default function StocktakesTab({ tab, detail }: { tab: StocktakesTabState; detail: StocktakeDetailState }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-inventory-border bg-inventory-surface shadow-sm xl:min-h-0 xl:flex-1 xl:overflow-y-auto thin-scroll">
+    <div className="overflow-hidden rounded-xl border border-inventory-border bg-inventory-surface shadow-sm xl:flex xl:min-h-0 xl:flex-1 xl:flex-col">
       <StocktakeListToolbar tab={tab} />
       <StocktakesTable tab={tab} detail={detail} />
       <Pagination

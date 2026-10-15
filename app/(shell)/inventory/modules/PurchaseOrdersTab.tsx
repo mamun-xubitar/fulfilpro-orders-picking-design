@@ -27,7 +27,7 @@ const outstanding = (po: PurchaseOrderRecord) => po.items.reduce((sum, i) => sum
 /** The Purchase Orders tab — every product's POs in one table. */
 export default function PurchaseOrdersTab({ tab, suppliers, onReceive, onPay, onBulkPay, onOpenSupplier, onOpenProduct }: PurchaseOrdersTabProps) {
   return (
-    <div className="overflow-hidden rounded-xl border border-inventory-border bg-inventory-surface shadow-sm xl:min-h-0 xl:flex-1 xl:overflow-y-auto thin-scroll">
+    <div className="overflow-hidden rounded-xl border border-inventory-border bg-inventory-surface shadow-sm xl:flex xl:min-h-0 xl:flex-1 xl:flex-col">
       <PoListToolbar tab={tab} suppliers={suppliers} />
 
       {tab.hasSelection && <PoSelectionBar tab={tab} onBulkPay={onBulkPay} />}

@@ -1,5 +1,15 @@
 import type { ModuleTabId, ProductStatusValue, QuickFilterId, TabDef, VariantStatus } from './types';
 
+// The list tabs scroll inside the table, so the header row sticks. Tables are border-collapse, where
+// a sticky row's border doesn't travel with it, so the divider is an inset shadow on each th.
+export const STICKY_THEAD = 'sticky top-0 z-10 [&_th]:shadow-[inset_0_-1px_0_var(--color-inventory-border)]';
+// Same for a totals row: it pins to the bottom of the scroll area so the pagination bar never covers it.
+export const STICKY_TFOOT = 'sticky bottom-0 z-10 [&_td]:bg-inventory-surface-muted [&_td]:shadow-[inset_0_2px_0_var(--color-inventory-border)]';
+
+// Rows-per-page choices for every inventory list's pagination bar.
+export const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50, 100];
+export const DEFAULT_PAGE_SIZE = 20;
+
 // Item 5: the child/sub-tab strip (formerly PRODUCT_TABS — Details/Variants/Purchase
 // info/Suppliers/Images/Notes/Documents/History) is gone. Only the primary tabs remain, with
 // History promoted here as its own primary tab.

@@ -6,6 +6,7 @@ import { SkeletonRows, type SkeletonCell } from './Skeleton';
 import type { AdjustmentsSortKey, AdjustmentsTabState } from './hooks/useAdjustmentsTab';
 import type { AdjustmentBatchRecord } from './types';
 import { formatDate } from './utils';
+import { STICKY_THEAD } from './constants';
 
 const COLUMN_COUNT = 8;
 const SKELETON: SkeletonCell[] = ['text', 'text', 'stack', 'num', 'num', 'badge', 'text', { kind: 'actions', count: 1 }];
@@ -18,9 +19,9 @@ export default function AdjustmentsTable({ tab, onOpenProduct, onView }: Adjustm
   );
 
   return (
-    <div className="overflow-x-auto thin-scroll">
+    <div className="overflow-x-auto thin-scroll xl:min-h-0 xl:flex-1 xl:overflow-y-auto">
       <table aria-busy={tab.loading || tab.initialLoading} className="w-full min-w-[900px] border-collapse text-[11px] leading-none">
-        <thead>
+        <thead className={STICKY_THEAD}>
           <tr className="border-b border-inventory-border bg-inventory-surface-muted">
             {th('Adjustment', 'number')}
             {th('Date', 'createdAt')}
@@ -52,7 +53,7 @@ export default function AdjustmentsTable({ tab, onOpenProduct, onView }: Adjustm
 
 function AdjustmentRow({ row, onOpenProduct, onView }: { row: AdjustmentBatchRecord; onOpenProduct: (productId: string) => void; onView: (id: string) => void }) {
   return (
-    <tr className="border-b border-inventory-divider transition-colors duration-150 last:border-0 hover:bg-inventory-surface-hover">
+    <tr className="border-b border-inventory-divider transition-colors duration-150 hover:bg-inventory-surface-hover">
       <td className="whitespace-nowrap px-2 py-1.5">
         <AdjustmentNumber adjustment={row} />
       </td>

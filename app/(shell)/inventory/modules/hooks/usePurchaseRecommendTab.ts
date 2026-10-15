@@ -4,10 +4,11 @@ import { useEffect, useRef, useState } from 'react';
 import useRequest from '@/hooks/useRequest';
 import { buildPageNumbers, type PaginationState } from '@/hooks/usePagination';
 import type { ProductRecord } from '../types';
+import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS } from '../constants';
 
 export type RecommendSortKey = 'name' | 'brand' | 'reorder' | 'stock';
 
-export const RECOMMEND_PAGE_SIZE_OPTIONS = [20, 50, 100];
+export const RECOMMEND_PAGE_SIZE_OPTIONS = PAGE_SIZE_OPTIONS;
 const EMPTY_PAGINATION: PaginationState = { page: 1, pageSize: 20, total: 0, totalPages: 1, hasPrev: false, hasNext: false };
 
 type Args = {
@@ -34,7 +35,7 @@ export function usePurchaseRecommendTab({ enabled, refreshKey }: Args) {
   const [sort, setSort] = useState<RecommendSortKey>('reorder');
   const [dir, setDir] = useState<'asc' | 'desc'>('desc');
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSizeState] = useState(RECOMMEND_PAGE_SIZE_OPTIONS[0]);
+  const [pageSize, setPageSizeState] = useState(DEFAULT_PAGE_SIZE);
   const [viewTarget, setViewTarget] = useState<ProductRecord | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 

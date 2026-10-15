@@ -1,6 +1,6 @@
 'use client';
 
-import { STATUS_STYLES } from './constants';
+import { STATUS_STYLES, STICKY_THEAD } from './constants';
 import { useInventoryAccess } from './InventoryAccess';
 import { Eye, Plus } from './icons';
 import SortableTh from './SortableTh';
@@ -30,9 +30,9 @@ export default function RecommendTable({ tab, onOpenProduct, onCreatePo }: Recom
   );
 
   return (
-    <div className="overflow-x-auto thin-scroll">
+    <div className="overflow-x-auto thin-scroll xl:min-h-0 xl:flex-1 xl:overflow-y-auto">
       <table aria-busy={tab.loading || tab.initialLoading} className="w-full min-w-[940px] border-collapse text-[11px] leading-none">
-        <thead>
+        <thead className={STICKY_THEAD}>
           <tr className="border-b border-inventory-border bg-inventory-surface-muted">
             {th('Product', 'name')}
             {th('Brand', 'brand')}
@@ -68,7 +68,7 @@ function RecommendRow({ product, tab, onOpenProduct, onCreatePo }: { product: Pr
   const incoming = product.variants.reduce((sum, v) => sum + v.incoming, 0);
 
   return (
-    <tr className="border-b border-inventory-divider transition-colors duration-150 last:border-0 hover:bg-inventory-surface-hover">
+    <tr className="border-b border-inventory-divider transition-colors duration-150 hover:bg-inventory-surface-hover">
       <td className="max-w-[260px] px-2 py-1.5">
         <button
           type="button"

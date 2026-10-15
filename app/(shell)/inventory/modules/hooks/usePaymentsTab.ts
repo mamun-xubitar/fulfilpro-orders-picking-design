@@ -4,10 +4,11 @@ import { useEffect, useRef, useState } from 'react';
 import useRequest from '@/hooks/useRequest';
 import { buildPageNumbers, type PaginationState } from '@/hooks/usePagination';
 import type { PoPaymentListRecord, PoPaymentStatusValue } from '../types';
+import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS } from '../constants';
 
 export type PaymentSortKey = 'updatedAt' | 'paidAt' | 'totalAud' | 'status' | 'poNumber' | 'supplierName' | 'productTitle';
 
-export const PAYMENT_PAGE_SIZE_OPTIONS = [20, 50, 100];
+export const PAYMENT_PAGE_SIZE_OPTIONS = PAGE_SIZE_OPTIONS;
 const EMPTY_PAGINATION: PaginationState = { page: 1, pageSize: 20, total: 0, totalPages: 1, hasPrev: false, hasNext: false };
 
 type Filters = { supplierId: string; status: '' | PoPaymentStatusValue; dateFrom: string; dateTo: string };
@@ -35,7 +36,7 @@ export function usePaymentsTab({ enabled, refreshKey }: Args) {
   const [sort, setSort] = useState<PaymentSortKey>('updatedAt');
   const [dir, setDir] = useState<'asc' | 'desc'>('desc');
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSizeState] = useState(PAYMENT_PAGE_SIZE_OPTIONS[0]);
+  const [pageSize, setPageSizeState] = useState(DEFAULT_PAGE_SIZE);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const setSearchInput = (value: string) => {

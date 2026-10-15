@@ -3,7 +3,7 @@
 import { VIEW_BTN } from './AdjustmentBits';
 import SortableTh from './SortableTh';
 import { SkeletonRows, type SkeletonCell } from './Skeleton';
-import { activityTypeLabel } from './constants';
+import { activityTypeLabel, STICKY_THEAD } from './constants';
 import type { HistorySortKey, HistoryTabState } from './hooks/useHistoryTab';
 import type { InventoryActivityRecord } from './types';
 import { formatDate } from './utils';
@@ -19,9 +19,9 @@ export default function HistoryTable({ tab, onOpenProduct, onViewAdjustment }: H
   );
 
   return (
-    <div className="overflow-x-auto thin-scroll">
+    <div className="overflow-x-auto thin-scroll xl:min-h-0 xl:flex-1 xl:overflow-y-auto">
       <table aria-busy={tab.loading || tab.initialLoading} className="w-full min-w-[800px] border-collapse text-[11px] leading-none">
-        <thead>
+        <thead className={STICKY_THEAD}>
           <tr className="border-b border-inventory-border bg-inventory-surface-muted">
             {th('Date', 'createdAt')}
             {th('Product', 'productName')}
@@ -51,7 +51,7 @@ export default function HistoryTable({ tab, onOpenProduct, onViewAdjustment }: H
 
 function HistoryRow({ row, onOpenProduct, onViewAdjustment }: { row: InventoryActivityRecord; onOpenProduct: (productId: string) => void; onViewAdjustment: (id: string) => void }) {
   return (
-    <tr className="border-b border-inventory-divider transition-colors duration-150 last:border-0 hover:bg-inventory-surface-hover">
+    <tr className="border-b border-inventory-divider transition-colors duration-150 hover:bg-inventory-surface-hover">
       <td className="whitespace-nowrap px-2 py-1.5 text-inventory-text-subtle">{formatDate(row.createdAt)}</td>
       <td className="max-w-[240px] px-2 py-1.5">
         <button

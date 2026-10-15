@@ -10,7 +10,7 @@ type AdjustmentsTabProps = { tab: AdjustmentsTabState; onOpenProduct: (productId
 /** The Adjustments tab — every product's stock adjustments in one read-only table, one row per adjustment; View opens its lines. */
 export default function AdjustmentsTab({ tab, onOpenProduct, onView }: AdjustmentsTabProps) {
   return (
-    <div className="overflow-hidden rounded-xl border border-inventory-border bg-inventory-surface shadow-sm xl:min-h-0 xl:flex-1 xl:overflow-y-auto thin-scroll">
+    <div className="overflow-hidden rounded-xl border border-inventory-border bg-inventory-surface shadow-sm xl:flex xl:min-h-0 xl:flex-1 xl:flex-col">
       <AdjustmentListToolbar tab={tab} />
       <AdjustmentsTable tab={tab} onOpenProduct={onOpenProduct} onView={onView} />
       <Pagination

@@ -104,7 +104,7 @@ export class SupplierProductController {
 
     if (mode === 'table') {
       const page = Math.max(1, Number(searchParams.get('page')) || 1);
-      const pageSize = [20, 50, 100].includes(Number(searchParams.get('pageSize'))) ? Number(searchParams.get('pageSize')) : 20;
+      const pageSize = [10, 20, 30, 40, 50, 100].includes(Number(searchParams.get('pageSize'))) ? Number(searchParams.get('pageSize')) : 20;
       const search = searchParams.get('search')?.trim() || undefined;
       const params: CatalogueListParams = { page, pageSize, search, verified, status, supplierId, inventoryCategoryId, quickFilter, sort, dir, includeOmitted };
       // Every supplier/category in the system, not just ones with linked products — one with

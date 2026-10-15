@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { toast } from 'react-toastify';
 import useRequest from '@/hooks/useRequest';
 import { buildPageNumbers, type PaginationState } from '@/hooks/usePagination';
+import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS } from '../constants';
 
 export type LocationRow = {
   id: string;
@@ -19,8 +20,8 @@ export type LocationOption = { id: string; name: string };
 export type LocationForm = { name: string; description: string };
 
 const EMPTY_FORM: LocationForm = { name: '', description: '' };
-const PAGE_SIZE = 20;
-const EMPTY_PAGINATION: PaginationState = { page: 1, pageSize: PAGE_SIZE, total: 0, totalPages: 1, hasPrev: false, hasNext: false };
+export const LOCATION_PAGE_SIZE_OPTIONS = PAGE_SIZE_OPTIONS;
+const EMPTY_PAGINATION: PaginationState = { page: 1, pageSize: 20, total: 0, totalPages: 1, hasPrev: false, hasNext: false };
 
 type UseLocationsArgs = {
   /** Bumped when a variant's locations change elsewhere, so the tab's per-location variant counts refresh. */
@@ -45,6 +46,7 @@ export function useLocations({ refreshKey, onChanged }: UseLocationsArgs) {
 
   const [searchInput, setSearchInputState] = useState('');
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSizeState] = useState(DEFAULT_PAGE_SIZE);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const setSearchInput = (value: string) => {
     setSearchInputState(value);
@@ -52,13 +54,13 @@ export function useLocations({ refreshKey, onChanged }: UseLocationsArgs) {
     debounceRef.current = setTimeout(() => setPage(1), 300);
   };
 
-  const queryKey = JSON.stringify({ search: searchInput, page, pageSize: PAGE_SIZE });
+  const queryKey = JSON.stringify({ search: searchInput, page, pageSize });
   const load = () => {
     requestList({
       url: '/api/inventory/locations',
       method: 'GET',
       showToast: false,
-      data: { search: searchInput, page, pageSize: PAGE_SIZE },
+      data: { search: searchInput, page, pageSize },
       onSuccess: ({ data }) => {
         setRows(data.locations);
         setPagination(data.pagination);
@@ -68,7 +70,7 @@ export function useLocations({ refreshKey, onChanged }: UseLocationsArgs) {
     });
   };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(load, [searchInput, page, refreshKey]);
+  useEffect(load, [searchInput, page, pageSize, refreshKey]);
 
   useEffect(() => {
     requestOptions({ url: '/api/inventory/locations', method: 'GET', showToast: false, data: { options: '1' }, onSuccess: ({ data }) => setOptions(data.locations) });
@@ -152,6 +154,11 @@ export function useLocations({ refreshKey, onChanged }: UseLocationsArgs) {
     searchInput,
     setSearchInput,
     goToPage: setPage,
+    pageSize,
+    setPageSize: (size: number) => {
+      setPageSizeState(size);
+      setPage(1);
+    },
     modalOpen,
     editingId,
     form,

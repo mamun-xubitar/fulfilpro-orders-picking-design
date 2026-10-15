@@ -17,7 +17,7 @@ type PurchaseRecommendTabProps = {
 /** The Purchase Recommend tab — every product with a variant to reorder, in one table. */
 export default function PurchaseRecommendTab({ tab, suppliers, onOpenProduct, onCreatePo }: PurchaseRecommendTabProps) {
   return (
-    <div className="overflow-hidden rounded-xl border border-inventory-border bg-inventory-surface shadow-sm xl:min-h-0 xl:flex-1 xl:overflow-y-auto thin-scroll">
+    <div className="overflow-hidden rounded-xl border border-inventory-border bg-inventory-surface shadow-sm xl:flex xl:min-h-0 xl:flex-1 xl:flex-col">
       <RecommendListToolbar tab={tab} suppliers={suppliers} />
 
       <RecommendTable tab={tab} onOpenProduct={onOpenProduct} onCreatePo={onCreatePo} />

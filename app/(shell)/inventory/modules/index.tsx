@@ -60,7 +60,7 @@ function InventoryPageBody() {
 
   return (
     <main
-      className="inventory-theme flex-1 space-y-2 bg-inventory-bg p-2 xl:flex xl:h-[calc(100vh-60px)] xl:min-h-0 xl:flex-col xl:space-y-0 xl:overflow-hidden xl:gap-2"
+      className="inventory-theme flex-1 space-y-2 bg-inventory-bg p-2 xl:flex xl:min-h-0 xl:flex-col xl:space-y-0 xl:overflow-hidden xl:gap-2"
       style={{ zoom: `${zoomPercent}%`, '--page-zoom': zoomPercent / 100 } as React.CSSProperties}
     >
       <ModuleTabs active={p.moduleTab} onChange={p.setModuleTab} right={<InventoryGlobals p={p} />} />
@@ -70,7 +70,7 @@ function InventoryPageBody() {
       <ProductsToolbar {...p} />
 
       {p.nav.allRecords ? (
-        <div className="overflow-hidden rounded-xl border border-inventory-border bg-inventory-surface shadow-inventory xl:min-h-0 xl:flex-1 xl:overflow-y-auto">
+        <div className="overflow-hidden rounded-xl border border-inventory-border bg-inventory-surface shadow-inventory xl:flex xl:min-h-0 xl:flex-1 xl:flex-col">
           <ProductsTableToolbar table={p.productsTable} onRefresh={p.productsTable.refresh} loading={p.productsTable.loading} />
           {hasSelection && <ProductsSelectionBar table={p.productsTable} />}
           <ProductsTable table={p.productsTable} loading={p.productsTable.loading} />
@@ -109,7 +109,7 @@ function InventoryPageBody() {
       ) : p.moduleTab === 'variants' ? (
         <VariantsTab p={p} />
       ) : (
-        <div className="space-y-2 xl:flex xl:min-h-0 xl:flex-1 xl:flex-col xl:space-y-0 xl:gap-2 xl:overflow-hidden">
+        <div className="space-y-2 xl:min-h-0 xl:flex-1 xl:overflow-y-auto xl:pr-[2px] thin-scroll">
           <ProductDetailsTab p={p} />
           {!p.matrixFullView && <VariantsMatrixSection p={p} />}
           <BottomPanels p={p} />
