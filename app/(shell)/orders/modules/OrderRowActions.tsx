@@ -10,9 +10,11 @@ type OrderRowActionsProps = {
   userIsAdmin: boolean;
   refreshingOrderIds: Record<string, boolean>;
   printingOrderId: string | null;
+  printingInvoiceOrderId?: string | null;
   toggleExpanded: (id: string) => void;
   refreshSingleOrder: (order: OrderRow) => void;
   printPackingSlipLabel: (order: OrderRow) => void;
+  printTaxInvoice?: (order: OrderRow) => void;
   openMessageModal: (order: OrderRow) => void;
   openTrackingModal: (order: OrderRow) => void;
 };
@@ -41,9 +43,11 @@ export default function OrderRowActions({
   userIsAdmin,
   refreshingOrderIds,
   printingOrderId,
+  printingInvoiceOrderId = null,
   toggleExpanded,
   refreshSingleOrder,
   printPackingSlipLabel,
+  printTaxInvoice,
   openMessageModal,
   openTrackingModal,
 }: OrderRowActionsProps) {
@@ -111,6 +115,30 @@ export default function OrderRowActions({
           </button>
           <span className="tt">{order.labelPrintedAt ? 'Label Printed — Print Again' : 'Print Label'}</span>
         </div>
+        {printTaxInvoice && (
+        <div className="tooltip">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              void printTaxInvoice(order);
+            }}
+            disabled={printingInvoiceOrderId === order.id}
+            className={`p-2 rounded-lg transition-colors duration-150 ${printingInvoiceOrderId === order.id
+              ? 'text-gray-300 cursor-not-allowed'
+              : 'hover:bg-gray-100 text-gray-500 hover:text-gray-700 cursor-pointer'
+              }`}
+          >
+            {printingInvoiceOrderId === order.id ? (
+              <span className="block h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-gray-700" aria-label="Loading tax invoice" />
+            ) : (
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
+              </svg>
+            )}
+          </button>
+          <span className="tt">Print Tax Invoice</span>
+        </div>
+        )}
         </>
         )}
         <div className="tooltip">

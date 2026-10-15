@@ -8,8 +8,10 @@ import type { StoreRow } from '@/models/store.model.server';
 import StoresTable from './StoresTable';
 import AddStoreModal from './AddStoreModal';
 import UpdateAppModal from './UpdateAppModal';
+import InvoiceSettingsModal from './InvoiceSettingsModal';
 import { useShopifyConnect } from './useShopifyConnect';
 import { useUpdateApp } from './useUpdateApp';
+import { useInvoiceSettings } from './useInvoiceSettings';
 
 type ApiResponse<T> = { success: boolean; message: string; data: T };
 
@@ -79,6 +81,12 @@ export default function StoresPage() {
   const handleUpdateApp = (id: string) => {
     const store = stores.find((item) => item.id === id);
     if (store) void updateApp.startUpdate({ id: store.id, name: store.name, storeDomain: store.storeDomain });
+  };
+
+  const invoice = useInvoiceSettings();
+  const handleEditInvoice = (id: string) => {
+    const store = stores.find((item) => item.id === id);
+    if (store) invoice.open({ id: store.id, name: store.name, storeDomain: store.storeDomain });
   };
 
   const handleDisconnect = async (id: string) => {
@@ -265,6 +273,7 @@ export default function StoresPage() {
           onLogoUpload={(id, file) => void handleLogoUpload(id, file)}
           onLogoRemove={(id) => void handleLogoRemove(id)}
           onUpdateApp={handleUpdateApp}
+          onEditInvoice={handleEditInvoice}
           reauthorizeUrls={updatedApps}
           disconnectingIds={disconnectingIds}
           deletingIds={deletingIds}
@@ -329,6 +338,23 @@ export default function StoresPage() {
         onCopyAuthorizationUrl={updateApp.copyAuthorizationUrl}
         onAuthorize={updateApp.authorize}
         onClose={updateApp.close}
+      />
+
+      <InvoiceSettingsModal
+        store={invoice.target}
+        form={invoice.form}
+        loading={invoice.loading}
+        saving={invoice.saving}
+        errors={invoice.errors}
+        logoPath={invoice.logoPath}
+        logoBusy={invoice.logoBusy}
+        logoError={invoice.logoError}
+        onChange={invoice.set}
+        onAccentChange={invoice.setAccent}
+        onUploadLogo={invoice.uploadLogo}
+        onRemoveLogo={invoice.removeLogo}
+        onSave={invoice.save}
+        onClose={invoice.close}
       />
     </main>
   );

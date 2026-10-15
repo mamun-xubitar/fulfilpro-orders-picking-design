@@ -69,9 +69,27 @@ model Store {
   processedFulfillments       ProcessedFulfillmentEvent[]
   processedRefunds            ProcessedRefundEvent[]
   locations                   StoreLocation[]
+  invoiceSetting              StoreInvoiceSetting?
 
   @@index([status])
   @@index([partnerStoreId])
+}
+
+model StoreInvoiceSetting {
+  id                  String   @id @default(uuid())
+  storeId             String   @unique
+  storeName           String?
+  businessName        String?
+  email               String?
+  websiteUrl          String?
+  abn                 String?
+  invoicePrefix       String?
+  paymentInstructions String?
+  accentColor         String?
+  logoPath            String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  store               Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
 }
 
 model Order {
@@ -101,6 +119,13 @@ model Order {
   storeId                String
   orderedAt              DateTime?
   labelPrintedAt         DateTime?
+  currentSubtotalPrice   Decimal?                   @db.Decimal(14, 2)
+  currentTotalDiscounts  Decimal?                   @db.Decimal(14, 2)
+  currentTotalTax        Decimal?                   @db.Decimal(14, 2)
+  currentTotalPrice      Decimal?                   @db.Decimal(14, 2)
+  taxesIncluded          Boolean?
+  amountPaid             Decimal?                   @db.Decimal(14, 2)
+  paymentMethods         Json?
   store                  Store                      @relation(fields: [storeId], references: [id])
   messages               OrderMessage[]
   notes                  OrderNote[]

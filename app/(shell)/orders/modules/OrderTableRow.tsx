@@ -98,9 +98,11 @@ export default function OrderTableRow({
         userIsAdmin={p.userIsAdmin}
         refreshingOrderIds={p.refreshingOrderIds}
         printingOrderId={p.printingOrderId}
+        printingInvoiceOrderId={p.printingInvoiceOrderId}
         toggleExpanded={p.toggleExpanded}
         refreshSingleOrder={p.refreshSingleOrder}
         printPackingSlipLabel={p.printPackingSlipLabel}
+        printTaxInvoice={p.printTaxInvoice}
         openMessageModal={p.openMessageModal}
         openTrackingModal={p.openTrackingModal}
       />

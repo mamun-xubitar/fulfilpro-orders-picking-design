@@ -23,6 +23,7 @@ import { useStockRequests } from "./useStockRequests";
 import { useStockAdjustment } from "./useStockAdjustment";
 import { useTracking } from "./useTracking";
 import { useLabelPrinting } from "./useLabelPrinting";
+import { useTaxInvoicePrinting } from "./useTaxInvoicePrinting";
 
 export function useOrdersPage() {
   const { data: session } = useSession();
@@ -129,6 +130,8 @@ export function useOrdersPage() {
     setOrders: data.setOrders,
     userIsTest,
   });
+
+  const taxInvoicePrinting = useTaxInvoicePrinting();
 
   const handleRefresh = () => {
     data.setRefreshRotation((prev) => prev + 360);
@@ -351,6 +354,8 @@ export function useOrdersPage() {
     // packing slip / printing
     printPackingSlipLabel: labelPrinting.printPackingSlipLabel,
     printingOrderId: labelPrinting.printingOrderId,
+    printTaxInvoice: taxInvoicePrinting.printTaxInvoice,
+    printingInvoiceOrderId: taxInvoicePrinting.printingInvoiceOrderId,
     bulkPrinting: labelPrinting.bulkPrinting,
     selectedLabelIds: labelPrinting.selectedLabelIds,
     printableLabelCount: labelPrinting.printableLabelCount,

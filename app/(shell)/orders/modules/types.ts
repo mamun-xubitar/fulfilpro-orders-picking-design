@@ -264,6 +264,7 @@ export type PackingSlipLabel = {
   storeUrl: string | null;
   storeLogoPath: string | null;
 };
+export type { TaxInvoice } from '@/lib/tax-invoice.server';
 export type Pagination = {
   page: number;
   pageSize: number;
