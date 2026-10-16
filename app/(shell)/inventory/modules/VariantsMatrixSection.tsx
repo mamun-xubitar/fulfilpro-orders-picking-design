@@ -26,9 +26,9 @@ export default function VariantsMatrixSection({ p, fullView, tall }: VariantsMat
   // markup identical to the previous fixed-width layout until the first measurement lands.
   const [colourPanelWidth, setColourPanelWidth] = useState(170);
   return (
-    <section className={fullView ? 'flex h-full min-h-0 flex-col' : `rounded-xl border ${panelBorderClass('variants')} bg-inventory-surface shadow-sm`}>
+    <section className={fullView ? 'flex h-full min-h-0 flex-col' : `rounded-xl border ${panelBorderClass('variants')} bg-inventory-surface shadow-sm${tall ? ' xl:flex-none' : ' xl:flex xl:min-h-[15rem] xl:flex-1 xl:flex-col'}`}>
       <VariantsMatrixToolbar p={p} fullView={fullView} />
-      <div className={`flex ${fullView ? 'min-h-0 flex-1' : tall ? 'min-h-[14rem]' : 'min-h-[10rem]'}`}>
+      <div className={`flex ${fullView ? 'min-h-0 flex-1' : tall ? 'min-h-[14rem]' : 'min-h-[10rem] xl:min-h-0 xl:flex-1'}`}>
         <div className="relative shrink-0 border-r border-inventory-border" style={{ width: colourPanelWidth }}>
           <div className="absolute inset-0">
             <VariantColourPanel colour={p.matrix.colourFilter} onWidthChange={setColourPanelWidth} />

@@ -44,6 +44,9 @@ function InventoryPageBody() {
   const { zoomPercent } = useZoom();
   const moduleTab = MODULE_TABS.find((t) => t.id === p.moduleTab)!;
   const isProductTab = p.moduleTab === 'products' || p.moduleTab === 'variants';
+  // Single-product Variant / Products tabs scroll as one page (tabs, toolbar and panels together)
+  // on wide screens; every other view keeps the page fixed and scrolls only inside its tables.
+  const pageScroll = isProductTab && !p.nav.allRecords;
   const { canEdit } = useInventoryAccess();
   // Every bulk action on the selection bar writes, so staff never see it.
   const hasSelection = canEdit && (p.productsTable.selectAllFilters || p.productsTable.selectedIds.length > 0);
@@ -60,7 +63,7 @@ function InventoryPageBody() {
 
   return (
     <main
-      className="inventory-theme flex-1 space-y-2 bg-inventory-bg p-2 xl:flex xl:min-h-0 xl:flex-col xl:space-y-0 xl:overflow-hidden xl:gap-2"
+      className={`inventory-theme flex-1 space-y-2 bg-inventory-bg p-2 xl:flex xl:min-h-0 xl:flex-col xl:space-y-0 xl:gap-2 ${pageScroll ? 'xl:overflow-y-auto thin-scroll' : 'xl:overflow-hidden'}`}
       style={{ zoom: `${zoomPercent}%`, '--page-zoom': zoomPercent / 100 } as React.CSSProperties}
     >
       <ModuleTabs active={p.moduleTab} onChange={p.setModuleTab} right={<InventoryGlobals p={p} />} />
@@ -109,7 +112,7 @@ function InventoryPageBody() {
       ) : p.moduleTab === 'variants' ? (
         <VariantsTab p={p} />
       ) : (
-        <div className="space-y-2 xl:min-h-0 xl:flex-1 xl:overflow-y-auto xl:pr-[2px] thin-scroll">
+        <div className="space-y-2 xl:space-y-0 xl:contents">
           <ProductDetailsTab p={p} />
           {!p.matrixFullView && <VariantsMatrixSection p={p} />}
           <BottomPanels p={p} />

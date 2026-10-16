@@ -62,7 +62,7 @@ export default function VariantsMatrixTable({ matrix, locations, fillHeight, sho
   const columnCount = 8 + numericHeaders.length + (showAllColumns ? 1 : 0);
 
   return (
-    <div className={`thin-scroll ${fillHeight ? 'h-full overflow-y-auto overflow-x-auto' : scrollable ? `${tall ? TALL_MAX_H : 'max-h-[12.5rem]'} overflow-y-auto overflow-x-auto` : 'overflow-x-auto'}`}>
+    <div className={`thin-scroll ${fillHeight ? 'h-full overflow-y-auto overflow-x-auto' : scrollable ? `${tall ? TALL_MAX_H : 'max-h-[12.5rem] xl:max-h-none xl:h-full'} overflow-y-auto overflow-x-auto` : 'overflow-x-auto xl:h-full xl:overflow-y-auto'}`}>
       <table className="w-full min-w-5xl border-collapse">
         <thead>
           <tr className="border-b border-inventory-border bg-inventory-surface-muted">
