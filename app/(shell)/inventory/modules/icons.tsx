@@ -18,6 +18,8 @@ const p = (d: string) => <path strokeLinecap="round" strokeLinejoin="round" stro
 export const ChevronLeft = (i: IconProps) => <Icon {...i}>{p('M15 19l-7-7 7-7')}</Icon>;
 export const ChevronRight = (i: IconProps) => <Icon {...i}>{p('M9 5l7 7-7 7')}</Icon>;
 export const ChevronDown = (i: IconProps) => <Icon {...i}>{p('M19 9l-7 7-7-7')}</Icon>;
+export const ChevronUpDown = (i: IconProps) => <Icon {...i}>{p('M8 9l4-4 4 4m0 6l-4 4-4-4')}</Icon>;
+export const ArrowLeft = (i: IconProps) => <Icon {...i}>{p('M10 19l-7-7m0 0l7-7m-7 7h18')}</Icon>;
 export const First = (i: IconProps) => <Icon {...i}>{p('M11 19l-7-7 7-7m8 14l-7-7 7-7')}</Icon>;
 export const Last = (i: IconProps) => <Icon {...i}>{p('M13 5l7 7-7 7M5 5l7 7-7 7')}</Icon>;
 export const Search = (i: IconProps) => <Icon {...i}>{p('M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z')}</Icon>;
