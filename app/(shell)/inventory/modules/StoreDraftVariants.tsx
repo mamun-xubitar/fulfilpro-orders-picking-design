@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef } from 'react';
-import StoreDraftVariantImage from './StoreDraftVariantImage';
+import StoreDiffVariantImagePicker from './StoreDiffVariantImagePicker';
 import type { ProductRecord } from './types';
 import type { StoreDraft } from './hooks/useStorePublish';
 import { sortVariantsForDisplay } from './utils';
@@ -151,7 +151,7 @@ export default function StoreDraftVariants({
                   )}
                   {showVariantImages && (
                     <td className="px-2 py-1">
-                      <StoreDraftVariantImage
+                      <StoreDiffVariantImagePicker
                         variantLabel={`${v.colour} / ${v.size}`}
                         storeName={storeName}
                         images={availableImages}

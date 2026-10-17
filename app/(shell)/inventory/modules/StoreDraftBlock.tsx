@@ -103,6 +103,16 @@ export default function StoreDraftBlock({
       variantImages: clearVariantImage(imageId),
     });
 
+  // Position is 1-based; the array order is the order Shopify receives the images in on Save.
+  const moveImage = (imageId: string, position: number) => {
+    const from = draft.images.findIndex((img) => img.id === imageId);
+    if (from === -1 || from === position - 1) return;
+    const next = [...draft.images];
+    const [moved] = next.splice(from, 1);
+    next.splice(position - 1, 0, moved);
+    onChange({ ...draft, images: next });
+  };
+
   // Shopify-style: an image is assigned per colour, not per variant — changing one row's image
   // changes it for every variant that shares its colour, mirroring how the hub's own
   // EditImagesModal (and updateImageColour) fans an assignment out.
@@ -136,7 +146,7 @@ export default function StoreDraftBlock({
         {showDetails && <StoreDraftDetails storeId={storeId} product={product} draft={draft} set={set} setField={setField} />}
 
         {showImages && (
-          <StoreDraftMedia productId={product.id} draft={draft} toggleImage={toggleImage} setAlt={setAlt} addImages={addImages} removeImage={removeImage} />
+          <StoreDraftMedia productId={product.id} draft={draft} toggleImage={toggleImage} setAlt={setAlt} addImages={addImages} removeImage={removeImage} moveImage={moveImage} />
         )}
 
         {(showPricing || showVariants) && (

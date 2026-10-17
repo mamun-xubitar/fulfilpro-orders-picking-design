@@ -5,6 +5,8 @@ import { ChevronDown } from './icons';
 
 type StoreDiffVariantImagePickerProps = {
   variantLabel: string;
+  /** Names the store in the trigger's aria-label — set where several stores' pickers are on screen at once. */
+  storeName?: string;
   images: { id: string; url: string; altText: string | null }[];
   selectedImageId: string | null;
   onChange: (imageId: string | null) => void;
@@ -12,7 +14,7 @@ type StoreDiffVariantImagePickerProps = {
 
 /** The Differences modal's per-variant image picker: the same thumbnail grid as the "Use a system
  * image" menu on a store tile, but over the store's own gallery, with a "No image" tile to unlink. */
-export default function StoreDiffVariantImagePicker({ variantLabel, images, selectedImageId, onChange }: StoreDiffVariantImagePickerProps) {
+export default function StoreDiffVariantImagePicker({ variantLabel, storeName, images, selectedImageId, onChange }: StoreDiffVariantImagePickerProps) {
   const selected = selectedImageId ? images.find((img) => img.id === selectedImageId) : undefined;
 
   return (
@@ -31,7 +33,7 @@ export default function StoreDiffVariantImagePicker({ variantLabel, images, sele
           disabled={images.length === 0}
           aria-haspopup="listbox"
           aria-expanded={open}
-          aria-label={`Image for ${variantLabel} at the store`}
+          aria-label={`Image for ${variantLabel} at ${storeName ?? 'the store'}`}
           className="flex h-[24px] w-full items-center gap-1.5 rounded-[7px] border border-inventory-border-strong px-[6px] text-left text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
         >
           {selected ? (

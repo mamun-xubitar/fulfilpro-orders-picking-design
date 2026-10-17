@@ -94,23 +94,30 @@ export default function StoreImageTile({ url, altText, position, busy, saving, s
   return (
     <div className="flex shrink-0 flex-col gap-[4px]">
       {tile}
-      <label className="flex items-center justify-between gap-[4px] text-[9px] font-semibold uppercase tracking-[0.3px] text-inventory-text-subtle">
-        Position
-        <select
-          value={position}
-          onChange={(e) => onMove(Number(e.target.value))}
-          disabled={disabled}
-          aria-label={`Position of image ${position}`}
-          className="h-[20px] rounded-[5px] border border-inventory-border-strong bg-inventory-surface px-[4px] text-[10.5px] font-bold normal-case tracking-normal text-inventory-text outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
-        >
-          {Array.from({ length: positionCount }, (_, i) => (
-            <option key={i + 1} value={i + 1}>
-              {i + 1}
-            </option>
-          ))}
-        </select>
-      </label>
+      <ImagePositionSelect position={position} count={positionCount} disabled={disabled} onChange={onMove} />
     </div>
+  );
+}
+
+/** The "Position  [n]" dropdown under a gallery image (1…count). */
+export function ImagePositionSelect({ position, count, disabled, onChange }: { position: number; count: number; disabled?: boolean; onChange: (position: number) => void }) {
+  return (
+    <label className="flex items-center justify-between gap-[4px] text-[9px] font-semibold uppercase tracking-[0.3px] text-inventory-text-subtle">
+      Position
+      <select
+        value={position}
+        onChange={(e) => onChange(Number(e.target.value))}
+        disabled={disabled}
+        aria-label={`Position of image ${position}`}
+        className="h-[20px] rounded-[5px] border border-inventory-border-strong bg-inventory-surface px-[4px] text-[10.5px] font-bold normal-case tracking-normal text-inventory-text outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+      >
+        {Array.from({ length: count }, (_, i) => (
+          <option key={i + 1} value={i + 1}>
+            {i + 1}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 
