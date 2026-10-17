@@ -177,7 +177,7 @@ function buildGroup(handle: string, records: Record<string, string>[]): ParsedPr
       colour,
       size,
       sku: get(record, 'variant sku'),
-      barcode: get(record, 'variant barcode'),
+      barcode: get(record, 'variant barcode') || get(record, 'variant barcodes'),
       stockOnHand: Number(get(record, 'variant inventory qty')) || 0,
       buyPrice: costPerItem !== '' && Number.isFinite(Number(costPerItem)) ? Number(costPerItem) : undefined,
       sellPrice: Number(get(record, 'variant price')) || 0,
@@ -201,6 +201,9 @@ function buildGroup(handle: string, records: Record<string, string>[]): ParsedPr
   // No row ever carried an option value — a single "Default Title" variant, taking its
   // sku/price/stock from the group's first row.
   if (!anyAxisValue && firstRowFields) rows.push(firstRowFields);
+
+  // Image Position is the gallery order; rows needn't list images in that order.
+  images.sort((a, b) => a.position - b.position);
 
   return { handle, product, colours, sizes, rows, images };
 }
@@ -307,6 +310,9 @@ export async function upsertParsedProductVariants(
 ): Promise<{ created: number; updated: number }> {
   let created = 0;
   let updated = 0;
+  // New variants follow the CSV row order, after any the product already has.
+  const maxPosition = await tx.supplierProductVariant.aggregate({ where: { supplierProductId }, _max: { position: true } });
+  let nextPosition = (maxPosition._max.position ?? -1) + 1;
   for (const row of rows) {
     const imageId = row.imageUrl ? urlToImageId.get(row.imageUrl) : undefined;
     const existing = await tx.supplierProductVariant.findUnique({
@@ -337,6 +343,7 @@ export async function upsertParsedProductVariants(
           stockOnHand: row.stockOnHand,
           sellPrice: row.sellPrice,
           buyPrice: row.buyPrice ?? 0,
+          position: nextPosition++,
           ...(imageId !== undefined && { imageId }),
         },
       });

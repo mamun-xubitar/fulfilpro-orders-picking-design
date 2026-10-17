@@ -256,7 +256,7 @@ export class InventoryProductImportController {
           // Keyed by the CSV's own URL, which is what a `Variant Image` cell carries.
           const urlToImageId = new Map(imageRows.map((image) => [image.sourceUrl ?? image.url, image.id]));
 
-          for (const variantRow of group.rows) {
+          for (const [position, variantRow] of group.rows.entries()) {
             const imageId = variantRow.imageUrl ? urlToImageId.get(variantRow.imageUrl) : undefined;
             await tx.supplierProductVariant.create({
               data: {
@@ -268,6 +268,7 @@ export class InventoryProductImportController {
                 stockOnHand: variantRow.stockOnHand,
                 sellPrice: variantRow.sellPrice,
                 buyPrice: variantRow.buyPrice ?? 0,
+                position,
                 ...(imageId !== undefined && { imageId }),
               },
             });

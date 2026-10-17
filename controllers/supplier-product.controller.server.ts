@@ -113,7 +113,7 @@ export class SupplierProductController {
         model.list(params),
         supplierModel.listOptions(),
         categoryModel.list(),
-        model.countAll(),
+        model.countAll(includeOmitted),
         model.countForStepper(verified),
       ]);
       const supplierOptions = supplierOptionRows.map((s) => ({ id: s.id, name: s.name }));

@@ -205,15 +205,17 @@ export class SupplierProductModel {
     return rows[0] ?? null;
   }
 
-  /** Whole-catalogue count, ignoring every filter — the "of Y" half of the record stepper. */
-  async countAll(): Promise<number> {
-    return prisma.supplierProduct.count();
+  /** Whole-catalogue count, ignoring every filter except omitted — the "of Y" half of the record
+   * stepper. Omitted products are left out unless `includeOmitted` (the table's "Show omitted"). */
+  async countAll(includeOmitted = false): Promise<number> {
+    return prisma.supplierProduct.count({ where: includeOmitted ? {} : { omitted: false } });
   }
 
   /** Count under the Verified filter only (ignoring every other table filter) — the "n / X"
-   * half of the record stepper, kept in sync with the table via useProductsTable's onCounts. */
+   * half of the record stepper, kept in sync with the table via useProductsTable's onCounts.
+   * Omitted products never count here. */
   async countForStepper(verified?: boolean): Promise<number> {
-    return prisma.supplierProduct.count({ where: verified === undefined ? {} : { verified } });
+    return prisma.supplierProduct.count({ where: { omitted: false, ...(verified === undefined ? {} : { verified }) } });
   }
 
   async findById(id: string): Promise<SupplierProductRow | null> {
