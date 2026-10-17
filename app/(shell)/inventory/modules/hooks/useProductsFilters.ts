@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react';
 import type { ProductStatusValue, QuickFilterId } from '../types';
 import type { ProductsSortKey } from './useProductsTable';
+import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS } from '../constants';
 
-export const PAGE_SIZE_OPTIONS = [20, 50, 100];
+export { PAGE_SIZE_OPTIONS };
 
 type UseProductsFiltersArgs = {
   /** Only watched to reset the page to 1 when either changes — the values themselves are read
@@ -18,7 +19,7 @@ type UseProductsFiltersArgs = {
  * page 1 inline, mirroring how useOrdersFilters resets its own pagination. */
 export function useProductsFilters({ verifiedOnly, quickFilter }: UseProductsFiltersArgs) {
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSizeState] = useState(PAGE_SIZE_OPTIONS[0]);
+  const [pageSize, setPageSizeState] = useState(DEFAULT_PAGE_SIZE);
 
   // The input reflects every keystroke immediately; `search` (what buildParams/the fetch effect
   // actually read) only catches up 300ms later, per the project's debounced-search pattern.

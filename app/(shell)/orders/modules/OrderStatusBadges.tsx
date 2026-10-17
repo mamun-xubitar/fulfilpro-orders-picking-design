@@ -27,6 +27,11 @@ export default function OrderStatusBadges({ order, status, hasBackInStockSignal 
           Partial Packed
         </span>
       )}
+      {order.labelPrintedAt && (
+        <span className="inline-flex items-center rounded-full border border-purple-200 bg-purple-100 px-2 py-0.5 text-[11px] font-semibold text-purple-700">
+          Label Printed
+        </span>
+      )}
       {hasBackInStockSignal && order.backInStockStatus && (
         <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${getStockStatusChip(order.backInStockStatus)}`}>
           {formatStockStatus(order.backInStockStatus)}

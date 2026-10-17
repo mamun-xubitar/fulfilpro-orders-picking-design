@@ -175,6 +175,7 @@ export type OrderRow = {
   backInStockStatus: BackInStockStatus | null;
   stockAdjustment: OrderStockAdjustment | null;
   decorationAttachments: OrderDecorationAttachments;
+  labelPrintedAt: string | null;
   packingStatus: 'packed' | 'partially_packed' | 'not_packed';
   packedQuantity: number;
   totalQuantity: number;
@@ -263,6 +264,7 @@ export type PackingSlipLabel = {
   storeUrl: string | null;
   storeLogoPath: string | null;
 };
+export type { TaxInvoice } from '@/lib/tax-invoice.server';
 export type Pagination = {
   page: number;
   pageSize: number;

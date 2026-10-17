@@ -1,26 +1,30 @@
 'use client';
 
 import { ModalShell } from '@/components/ModalShell';
-import { formatColourName } from '@/lib/inventory/colour';
 import ColumnFillInput from './ColumnFillInput';
 import { STATUS_BADGES } from './PurchaseOrdersPanel';
+import ReceivePoItemRow, { RECEIVE_GRID_COLS, RECEIVE_SELECT_CLASS } from './ReceivePoItemRow';
+import type { LocationOption } from './hooks/useLocations';
 import type { usePurchaseOrder } from './hooks/usePurchaseOrder';
 import { SPINNER, WIZARD_BODY_CLASS, WIZARD_BTN_FINISH, WIZARD_BTN_SECONDARY, WIZARD_CARD_CLASS } from './modalStyles';
 import { formatDate, formatMoney, formatPoNumber, poAveragePrice } from './utils';
 
-const GRID_COLS = 'grid-cols-[minmax(0,1fr)_6rem_4.5rem_4rem_4rem_4rem_4.5rem_5.5rem_7rem]';
-
-export default function ReceivePoModal({ po }: { po: ReturnType<typeof usePurchaseOrder> }) {
+export default function ReceivePoModal({ po, locations }: { po: ReturnType<typeof usePurchaseOrder>; locations: LocationOption[] }) {
   const target = po.receiveTarget!;
   const avgPrice = poAveragePrice(target.items);
   const hasQtyError = target.items.some((item) => po.getReceiveQtyError(po.receiveQty[item.id], Math.max(0, item.quantity - item.receivedQuantity)) !== null);
+  const receivable = target.items.filter((item) => item.quantity > item.receivedQuantity);
+  const selected = target.items.filter((item) => po.receiveSelected[item.id]);
+  const allSelected = receivable.length > 0 && receivable.every((item) => po.receiveSelected[item.id]);
+  // Every ticked line needs a location, and at least one of them a quantity, before Receive enables.
+  const canReceive = selected.some((item) => Number(po.receiveQty[item.id]) > 0) && selected.every((item) => po.receiveLocations[item.id]);
 
   return (
     <ModalShell disableBackdropClose
       title={`Receive — ${target.productTitle}`}
       compact
       onClose={po.closeReceive}
-      maxWidthClass="max-w-5xl"
+      maxWidthClass="max-w-6xl"
       bodyClassName={WIZARD_BODY_CLASS}
       footer={
         <div className="flex flex-wrap items-center gap-2">
@@ -34,7 +38,7 @@ export default function ReceivePoModal({ po }: { po: ReturnType<typeof usePurcha
           <button
             type="button"
             onClick={po.submitReceive}
-            disabled={po.receiving || hasQtyError}
+            disabled={po.receiving || hasQtyError || !canReceive}
             className={`flex-1 ${WIZARD_BTN_FINISH}`}
           >
             {po.receiving && SPINNER}
@@ -87,32 +91,47 @@ export default function ReceivePoModal({ po }: { po: ReturnType<typeof usePurcha
           </dl>
         </div>
 
-        <p className="text-[12px] text-inventory-text-muted">Enter the quantity received for each item. Leave 0 for items not yet shipped — receive again later for partial deliveries.</p>
-
-        <div className="flex items-center gap-2">
-          <label htmlFor="receive-location" className="text-[11px] font-semibold text-inventory-text-muted">
-            Location
-          </label>
-          {po.receiveLocationOptions.length > 0 ? (
-            <select
-              id="receive-location"
-              value={po.receiveLocationId}
-              onChange={(e) => po.setReceiveLocationId(e.target.value)}
-              className="h-[22px] w-44 cursor-pointer rounded-[6px] border border-inventory-border-strong px-[6px] text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring"
-            >
-              {po.receiveLocationOptions.map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.name}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <span className="text-[11px] text-inventory-text-subtle">Unassigned stock — these variants have no location</span>
+        {/* The bulk-location controls share the always-present hint row (fixed min-height) so
+            appearing/disappearing as rows get ticked never shifts the table below. */}
+        <div className="flex min-h-[22px] flex-wrap items-center justify-between gap-2">
+          <p className="text-[12px] text-inventory-text-muted"><span className="font-bold">Check the variants to receive</span>, choose a location for each, and enter the quantity received. Receive again later for partial deliveries.</p>
+          {selected.length > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-semibold text-inventory-text-muted">{selected.length} selected</span>
+              <label htmlFor="receive-bulk-location" className="text-[11px] font-semibold text-inventory-text-muted">
+                Location
+              </label>
+              <select
+                id="receive-bulk-location"
+                value=""
+                onChange={(e) => e.target.value && po.setSelectedReceiveLocation(e.target.value)}
+                className={`w-44 ${RECEIVE_SELECT_CLASS}`}
+              >
+                <option value="">Set for selected…</option>
+                {locations.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           )}
         </div>
 
-        <div className="rounded-lg border border-inventory-border">
-          <div className={`sticky top-[-1rem] z-10 grid ${GRID_COLS} items-center gap-2 border-b border-inventory-border bg-inventory-surface-muted px-2 py-1 text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-inventory-text-subtle`}>
+        <div className="thin-scroll max-h-[calc(60dvh/var(--page-zoom,1))] overflow-auto rounded-lg border border-inventory-border">
+          <div className="min-w-[64.5rem]">
+          <div className={`sticky top-0 z-10 grid ${RECEIVE_GRID_COLS} items-center gap-2 border-b border-inventory-border bg-inventory-surface-muted px-2 py-1 text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-inventory-text-subtle`}>
+            <input
+              type="checkbox"
+              checked={allSelected}
+              disabled={receivable.length === 0}
+              ref={(el) => {
+                if (el) el.indeterminate = selected.length > 0 && !allSelected;
+              }}
+              onChange={po.toggleAllReceive}
+              aria-label="Select all variants"
+              className="h-3 w-3 cursor-pointer accent-inventory-primary disabled:cursor-not-allowed"
+            />
             <span className="flex min-h-[16px] items-center">Variant</span>
             <span className="flex min-h-[16px] items-center">Supplier SKU</span>
             <span className="flex min-h-[16px] items-center">Colour</span>
@@ -120,10 +139,15 @@ export default function ReceivePoModal({ po }: { po: ReturnType<typeof usePurcha
             <span className="flex min-h-[16px] items-center justify-end text-right">Ordered</span>
             <span className="flex min-h-[16px] items-center justify-end text-right">Received</span>
             <span className="flex min-h-[16px] items-center justify-end text-right">Outstanding</span>
-            <span className="flex min-h-[16px] items-center justify-end text-right">Unit cost</span>
-            <span className="flex items-center justify-end gap-[4px] whitespace-nowrap">
-              <span>Receive qty</span>
-              <span className="w-[64px] min-w-0">
+            <span className="flex flex-col justify-center gap-[2px]">
+              <span className="flex min-h-[16px] items-center">Remark</span>
+              <ColumnFillInput label="Remark" type="text" rowCount={target.items.length} onApplyText={po.setAllReceiveRemark} />
+            </span>
+            <span className="flex min-h-[16px] items-center justify-end text-right">Unit cost (AUD)</span>
+            <span className="flex min-h-[16px] items-center">Location</span>
+            <span className="flex flex-col justify-center gap-[2px]">
+              <span className="flex min-h-[16px] items-center justify-end text-right">Receive qty</span>
+              <span className="min-w-0">
                 <ColumnFillInput
                   label="Receive qty"
                   rowCount={target.items.length}
@@ -143,50 +167,25 @@ export default function ReceivePoModal({ po }: { po: ReturnType<typeof usePurcha
             </span>
           </div>
           <div className="divide-y divide-inventory-border">
-            {target.items.map((item) => {
-              const remaining = Math.max(0, item.quantity - item.receivedQuantity);
-              const qtyError = po.getReceiveQtyError(po.receiveQty[item.id], remaining);
-              return (
-                <div key={item.id} className="px-2 py-1 transition-colors duration-150 hover:bg-inventory-surface-hover">
-                  <div className={`grid ${GRID_COLS} items-center gap-2 text-[11px] leading-none`}>
-                    <span title={item.variantTitle} className="min-w-0 truncate whitespace-nowrap text-inventory-text-muted">{item.variantTitle}</span>
-                    <span className="truncate text-inventory-text-subtle">{item.sku ?? '—'}</span>
-                    <span className="truncate text-inventory-text-subtle">{item.colour ? formatColourName(item.colour) : '—'}</span>
-                    <span className="truncate text-inventory-text-subtle">{item.size || '—'}</span>
-                    <span className="text-right tabular-nums text-inventory-text-subtle">{item.quantity}</span>
-                    <span className="text-right tabular-nums text-inventory-text-subtle">{item.receivedQuantity}</span>
-                    <span className="text-right tabular-nums font-medium text-inventory-text-muted">{remaining}</span>
-                    <div className="relative w-full min-w-0">
-                      <span className="pointer-events-none absolute inset-y-0 left-[6px] flex items-center text-[11px] text-inventory-text-subtle">$</span>
-                      <input
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        value={po.receiveCost[item.id] ?? ''}
-                        onChange={(e) => po.setReceiveItemCost(item.id, e.target.value)}
-                        aria-label={`Unit cost for ${item.variantTitle}`}
-                        className="h-[22px] w-full rounded-[7px] border border-inventory-border-strong pl-[14px] pr-[10px] text-right text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring"
-                      />
-                    </div>
-                    <div className="w-full min-w-0">
-                      <input
-                        type="number"
-                        min={0}
-                        max={remaining}
-                        step={1}
-                        value={po.receiveQty[item.id] ?? ''}
-                        onChange={(e) => po.setReceiveItemQty(item.id, e.target.value, remaining)}
-                        aria-label={`Receive quantity for ${item.variantTitle}`}
-                        aria-invalid={qtyError !== null}
-                        title={qtyError ?? `0 to ${remaining}`}
-                        className={`h-[22px] w-full rounded-[7px] border pl-[6px] pr-[10px] text-right text-[11px] leading-none outline-none focus:ring-2 ${qtyError ? 'border-inventory-danger/45 bg-inventory-danger/8 focus:border-inventory-danger focus:ring-inventory-danger/20' : 'border-inventory-border-strong focus:border-inventory-primary focus:ring-inventory-primary-ring'}`}
-                      />
-                    </div>
-                  </div>
-                  {qtyError && <p className="mt-1 text-right text-[10px] leading-tight text-inventory-danger">{qtyError}</p>}
-                </div>
-              );
-            })}
+            {target.items.map((item) => (
+              <ReceivePoItemRow
+                key={item.id}
+                item={item}
+                locations={locations}
+                selected={!!po.receiveSelected[item.id]}
+                locationId={po.receiveLocations[item.id] ?? ''}
+                qty={po.receiveQty[item.id] ?? ''}
+                cost={po.receiveCost[item.id] ?? ''}
+                remark={po.receiveRemark[item.id] ?? ''}
+                qtyError={po.getReceiveQtyError(po.receiveQty[item.id], Math.max(0, item.quantity - item.receivedQuantity))}
+                onToggle={() => po.toggleReceiveItem(item.id)}
+                onLocationChange={(locationId) => po.setReceiveItemLocation(item.id, locationId)}
+                onQtyChange={(value) => po.setReceiveItemQty(item.id, value)}
+                onCostChange={(value) => po.setReceiveItemCost(item.id, value)}
+                onRemarkChange={(value) => po.setReceiveItemRemark(item.id, value)}
+              />
+            ))}
+          </div>
           </div>
         </div>
       </div>

@@ -4,10 +4,11 @@ import { useEffect, useRef, useState } from 'react';
 import useRequest from '@/hooks/useRequest';
 import { buildPageNumbers, type PaginationState } from '@/hooks/usePagination';
 import type { InventoryActivityRecord } from '../types';
+import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS } from '../constants';
 
 export type HistorySortKey = 'createdAt' | 'productName' | 'type' | 'actorName';
 
-export const HISTORY_PAGE_SIZE_OPTIONS = [20, 50, 100];
+export const HISTORY_PAGE_SIZE_OPTIONS = PAGE_SIZE_OPTIONS;
 const EMPTY_PAGINATION: PaginationState = { page: 1, pageSize: 20, total: 0, totalPages: 1, hasPrev: false, hasNext: false };
 
 type Filters = { type: string; dateFrom: string; dateTo: string };
@@ -33,7 +34,7 @@ export function useHistoryTab({ enabled }: Args) {
   const [sort, setSort] = useState<HistorySortKey>('createdAt');
   const [dir, setDir] = useState<'asc' | 'desc'>('desc');
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSizeState] = useState(HISTORY_PAGE_SIZE_OPTIONS[0]);
+  const [pageSize, setPageSizeState] = useState(DEFAULT_PAGE_SIZE);
   const [localRefresh, setLocalRefresh] = useState(0);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 

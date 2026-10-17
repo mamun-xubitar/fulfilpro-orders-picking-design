@@ -8,6 +8,7 @@ import { SkeletonRows, type SkeletonCell } from './Skeleton';
 import type { PurchaseOrdersTabState, PoSortKey } from './hooks/usePurchaseOrdersTab';
 import type { PurchaseOrderRecord } from './types';
 import { formatCurrencyValue, formatDate, formatPoNumber } from './utils';
+import { STICKY_THEAD } from './constants';
 
 type PurchaseOrdersTableProps = {
   tab: PurchaseOrdersTabState;
@@ -33,9 +34,9 @@ export default function PurchaseOrdersTable({ tab, onReceive, onPay, onOpenSuppl
   );
 
   return (
-    <div className="overflow-x-auto thin-scroll">
+    <div className="overflow-x-auto thin-scroll xl:min-h-0 xl:flex-1 xl:overflow-y-auto">
       <table aria-busy={tab.loading || tab.initialLoading} className="w-full min-w-[1080px] border-collapse text-[11px] leading-none">
-        <thead>
+        <thead className={STICKY_THEAD}>
           <tr className="border-b border-inventory-border bg-inventory-surface-muted">
             <th className="w-7 px-2 py-1">
               <input type="checkbox" checked={tab.allSelected} onChange={tab.toggleAll} aria-label="Select all purchase orders on this page" className="h-3 w-3 cursor-pointer accent-inventory-primary" />
@@ -48,7 +49,7 @@ export default function PurchaseOrdersTable({ tab, onReceive, onPay, onOpenSuppl
             {th('Status', 'status', 'center')}
             {th('Qty', undefined, 'right')}
             {th('Received', undefined, 'right')}
-            {th('Value', undefined, 'right')}
+            {th('Value (AUD)', undefined, 'right')}
             {th('Payment', undefined, 'center')}
             {th('Remark')}
             {th('Actions', undefined, 'right')}
@@ -81,11 +82,14 @@ function PoRow({ po, tab, onReceive, onPay, onOpenSupplier, onOpenProduct }: { p
   const selected = tab.selectAllFilters || tab.selectedIds.includes(po.id);
 
   return (
-    <tr className={`border-b border-inventory-divider transition-colors duration-150 last:border-0 hover:bg-inventory-surface-hover ${selected ? 'bg-inventory-primary/[5%]' : ''}`}>
+    <tr className={`border-b border-inventory-divider transition-colors duration-150 hover:bg-inventory-surface-hover ${selected ? 'bg-inventory-primary/[5%]' : ''}`}>
       <td className="px-2 py-1.5">
         <input type="checkbox" checked={selected} onChange={() => tab.toggle(po.id)} aria-label={`Select ${formatPoNumber(po.number)}`} className="h-3 w-3 cursor-pointer accent-inventory-primary" />
       </td>
-      <td className="whitespace-nowrap px-2 py-1.5 text-inventory-text-subtle">{formatDate(po.createdAt)}</td>
+      <td className="whitespace-nowrap px-2 py-1.5 text-inventory-text-subtle">
+        {formatDate(po.createdAt)}
+        <span className="mt-[2px] block text-[9.5px]">{po.createdByName}</span>
+      </td>
       <td className="whitespace-nowrap px-2 py-1.5 font-medium text-inventory-text">{formatPoNumber(po.number)}</td>
       <td className="max-w-[200px] px-2 py-1.5">
         <button

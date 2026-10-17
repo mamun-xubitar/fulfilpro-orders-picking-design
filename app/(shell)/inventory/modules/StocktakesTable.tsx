@@ -8,6 +8,7 @@ import type { StocktakeDetailState } from './hooks/useStocktakeDetail';
 import type { StocktakeSortKey, StocktakesTabState } from './hooks/useStocktakesTab';
 import type { StocktakeRecord, StocktakeStatusValue } from './types';
 import { formatDate } from './utils';
+import { STICKY_THEAD } from './constants';
 
 export const STOCKTAKE_STATUS_LABELS: Record<StocktakeStatusValue, string> = {
   OPEN: 'Not counted',
@@ -36,9 +37,9 @@ export default function StocktakesTable({ tab, detail }: StocktakesTableProps) {
   );
 
   return (
-    <div className="overflow-x-auto thin-scroll">
+    <div className="overflow-x-auto thin-scroll xl:min-h-0 xl:flex-1 xl:overflow-y-auto">
       <table aria-busy={tab.loading || tab.initialLoading} className="w-full min-w-[900px] border-collapse text-[11px] leading-none">
-        <thead>
+        <thead className={STICKY_THEAD}>
           <tr className="border-b border-inventory-border bg-inventory-surface-muted">
             {th('Stocktake', 'number')}
             {th('Product', 'productName')}
@@ -74,7 +75,7 @@ function StocktakeRow({ row, tab, detail }: { row: StocktakeRecord } & Stocktake
   const number = formatStocktakeNumber(row.number);
 
   return (
-    <tr className="border-b border-inventory-divider transition-colors duration-150 last:border-0 hover:bg-inventory-surface-hover">
+    <tr className="border-b border-inventory-divider transition-colors duration-150 hover:bg-inventory-surface-hover">
       <td className="whitespace-nowrap px-2 py-1.5 font-medium text-inventory-text">{number}</td>
       <td className="max-w-[220px] px-2 py-1.5">
         <span className="block truncate text-inventory-text" title={row.productName}>

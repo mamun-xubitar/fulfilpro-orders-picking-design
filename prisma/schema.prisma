@@ -1,8 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -56,9 +54,6 @@ model Store {
   partnerStoreId              String?
   lastSyncedAt                DateTime?
   lastProductSyncedAt         DateTime?
-  /// Global fallback margin for this store's inventory pricing — used when a product has no
-  /// product-specific per-store margin of its own (SupplierProductStoreListing.marginPercent).
-  /// Null means unset, in which case pricing falls back further to the product's own sell price.
   defaultMarginPercent        Decimal?                      @db.Decimal(6, 2)
   partnerStore                Store?                        @relation("PartnerStores", fields: [partnerStoreId], references: [id], onDelete: SetNull)
   childStores                 Store[]                       @relation("PartnerStores")
@@ -74,9 +69,27 @@ model Store {
   processedFulfillments       ProcessedFulfillmentEvent[]
   processedRefunds            ProcessedRefundEvent[]
   locations                   StoreLocation[]
+  invoiceSetting              StoreInvoiceSetting?
 
   @@index([status])
   @@index([partnerStoreId])
+}
+
+model StoreInvoiceSetting {
+  id                  String   @id @default(uuid())
+  storeId             String   @unique
+  storeName           String?
+  businessName        String?
+  email               String?
+  websiteUrl          String?
+  abn                 String?
+  invoicePrefix       String?
+  paymentInstructions String?
+  accentColor         String?
+  logoPath            String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  store               Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
 }
 
 model Order {
@@ -105,6 +118,14 @@ model Order {
   country                String?
   storeId                String
   orderedAt              DateTime?
+  labelPrintedAt         DateTime?
+  currentSubtotalPrice   Decimal?                   @db.Decimal(14, 2)
+  currentTotalDiscounts  Decimal?                   @db.Decimal(14, 2)
+  currentTotalTax        Decimal?                   @db.Decimal(14, 2)
+  currentTotalPrice      Decimal?                   @db.Decimal(14, 2)
+  taxesIncluded          Boolean?
+  amountPaid             Decimal?                   @db.Decimal(14, 2)
+  paymentMethods         Json?
   store                  Store                      @relation(fields: [storeId], references: [id])
   messages               OrderMessage[]
   notes                  OrderNote[]
@@ -842,22 +863,12 @@ model CurrencyRate {
   updatedAt DateTime @updatedAt
 }
 
-/**
- * Global colour library for the inventory hub's Colour & size adjustment modal, shared across
- * every product — one flat, alphabetically-displayed name list (a swatch is derived from each
- * name at render time via resolveSwatch; nothing is stored). Replaces the old
- * ColourPresetGroup/SizePresetGroup preset-group system.
- */
 model GlobalColour {
   id        String   @id @default(uuid())
   name      String   @unique
   createdAt DateTime @default(now())
 }
 
-/**
- * Global size library, mirrors GlobalColour. `position` preserves insertion order (sizes read
- * naturally in the order they were added, unlike colours which sort A→Z).
- */
 model GlobalSize {
   id        String   @id @default(uuid())
   name      String   @unique
@@ -865,11 +876,6 @@ model GlobalSize {
   createdAt DateTime @default(now())
 }
 
-/**
- * Flat hub-only category library (distinct from the nested Shopify taxonomy that
- * `category`/`categoryId` on SupplierProduct already track) — a searchable, flat, add-as-you-go
- * list, same shape as GlobalColour. Never pushed to Shopify.
- */
 model InventoryCategory {
   id        String            @id @default(uuid())
   name      String            @unique
@@ -901,9 +907,6 @@ enum PurchaseOrderStatus {
 model PurchaseOrder {
   id                  String                 @id @default(uuid())
   number              Int                    @unique @default(autoincrement())
-  /**
-   * Supplier's or internal free-text reference. Optional; not unique.
-   */
   referenceNumber     String?
   supplierId          String
   supplierName        String
@@ -914,10 +917,6 @@ model PurchaseOrder {
   deliveryDate        DateTime?
   poRemark            String?
   shippingRemark      String?
-  /**
-   * The product's "Pricing & margin" figures frozen when the PO was created — what the Pay modal
-   * seeds from before any payment exists. Null only on POs created before the snapshot existed.
-   */
   pricingCurrencyCode String?
   pricingExchangeRate Decimal?               @db.Decimal(14, 6)
   pricingBuyingPrice  Decimal?               @db.Decimal(14, 2)
@@ -950,6 +949,7 @@ model PurchaseOrderItem {
   quantity         Int
   receivedQuantity Int                     @default(0)
   unitCost         Decimal?                @db.Decimal(14, 2)
+  remark           String?
   purchaseOrder    PurchaseOrder           @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
   variant          SupplierProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
 
@@ -957,12 +957,13 @@ model PurchaseOrderItem {
   @@index([purchaseOrderId])
 }
 
-/// One stock receipt against a PO — where it was put away. `locationName` is a snapshot (null = unassigned stock) so the PO's printout survives a location being renamed or deleted.
 model PurchaseOrderReceipt {
   id              String        @id @default(uuid())
   purchaseOrderId String
   locationName    String?
   quantity        Int
+  receivedById    String?
+  receivedByName  String?
   createdAt       DateTime      @default(now())
   purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
 
@@ -974,25 +975,15 @@ enum PoPaymentStatus {
   PAID
 }
 
-/**
- * What was (or is to be) paid for one purchase order — one row per PO, edited in place. The
- * cost breakdown mirrors the product's "Pricing & margin (AUD)" panel: the currency the goods were
- * bought in, its rate to AUD, the per-unit buying price in that currency, and freight / misc in AUD.
- * Every save also appends a snapshot to `PurchaseOrderPaymentHistory`.
- */
 model PurchaseOrderPayment {
   id              String                        @id @default(uuid())
   purchaseOrderId String                        @unique
   status          PoPaymentStatus               @default(UNPAID)
   currencyCode    String
   exchangeRate    Decimal                       @db.Decimal(14, 6)
-  /// Per-unit buying price, in `currencyCode`.
   buyingPrice     Decimal                       @db.Decimal(14, 2)
-  /// AUD.
   freight         Decimal                       @default(0) @db.Decimal(14, 2)
-  /// AUD.
   misc            Decimal                       @default(0) @db.Decimal(14, 2)
-  /// Whole-order landed cost in AUD: qty × buyingPrice × rate + freight + misc.
   totalAud        Decimal                       @db.Decimal(14, 2)
   paidAt          DateTime?
   reference       String?
@@ -1012,7 +1003,6 @@ model PurchaseOrderPayment {
 model PurchaseOrderPaymentHistory {
   id           String               @id @default(uuid())
   paymentId    String
-  /// created | updated | paid | unpaid
   action       String
   status       PoPaymentStatus
   currencyCode String
@@ -1033,10 +1023,6 @@ model PurchaseOrderPaymentHistory {
   @@index([createdAt])
 }
 
-/**
- * A physical place variants are kept (a shelf, bin, rack). A variant belongs to any number of
- * locations and holds its own quantity at each (SupplierProductVariantLocation.quantity).
- */
 model InventoryLocation {
   id               String                           @id @default(uuid())
   name             String                           @unique
@@ -1049,15 +1035,9 @@ model InventoryLocation {
   updatedAt      DateTime                         @updatedAt
 }
 
-/**
- * One Shopify location of a connected store, mapped (by an admin) to the hub InventoryLocation whose
- * stock that store's fulfilments and returns at this location move. Synced from Shopify; unmapped
- * (or unknown) locations fall back to the variant's fullest / first location.
- */
 model StoreLocation {
   id                  String             @id @default(uuid())
   storeId             String
-  /// Shopify's numeric location id as a string — the `location_id` webhooks carry (not the gid).
   shopifyLocationId   String
   name                String
   active              Boolean            @default(true)
@@ -1071,11 +1051,6 @@ model StoreLocation {
   @@index([inventoryLocationId])
 }
 
-/**
- * A variant's stock at one location. While a variant has any of these, its stockOnHand is kept equal
- * to the sum of their quantities (see lib/inventory-stock.server.ts); a variant with none holds its
- * stockOnHand unassigned.
- */
 model SupplierProductVariantLocation {
   variantId  String
   locationId String
@@ -1094,29 +1069,14 @@ enum SupplierProductStatus {
   UNLISTED
 }
 
-/**
- * The hub catalogue master record — a supplier's product, sold at its own price by any connected store.
- */
 model SupplierProduct {
   id                  String                        @id @default(uuid())
-  /**
-   * Globally unique — one product = one item no. across every supplier (see SupplierProductSupplier for the many-to-many supplier relation).
-   */
   itemNo              String                        @unique
-  /**
-   * Unique, URL-safe slug — Shopify's product Handle equivalent.
-   */
   handle              String                        @unique
   name                String
   brand               String?
-  /**
-   * Shopify's nested taxonomy category — drives the productType/categoryGid fallback on publish.
-   */
   category            String?
   categoryId          String?
-  /**
-   * Hub-only flat category (InventoryCategory) — never pushed to Shopify, filterable in the catalogue list.
-   */
   inventoryCategoryId String?
   inventoryCategory   InventoryCategory?            @relation(fields: [inventoryCategoryId], references: [id], onDelete: SetNull)
   sku                 String
@@ -1148,12 +1108,6 @@ model SupplierProduct {
   @@index([inventoryCategoryId])
 }
 
-/**
- * The product<->supplier many-to-many relation — a product's only link to its supplier(s), no
- * separate FK and no default/primary among them. Receiving a PO from a supplier upserts a link
- * here so the Suppliers tab's Products Count reflects every supplier that has actually fulfilled
- * this product.
- */
 model SupplierProductSupplier {
   id                String          @id @default(uuid())
   supplierProductId String
@@ -1174,21 +1128,15 @@ model SupplierProductVariant {
   colour             String
   size               String
   stockOnHand        Int                              @default(0)
-  /**
-   * Committed to unfulfilled orders. Manually editable; wins over the order-derived figure shown as a hint.
-   */
+
   allocated          Int                              @default(0)
   buyPrice           Decimal                          @default(0) @db.Decimal(14, 2)
   sellPrice          Decimal                          @default(0) @db.Decimal(14, 2)
   trigger            Int                              @default(10)
-  /**
-   * Unused by the UI — kept for backward compatibility with existing rows.
-   */
+
   forwardOrders      Int                              @default(0)
   position           Int                              @default(0)
-  /**
-   * One image from the product's pool, Shopify-style — several variants may point at the same image.
-   */
+
   imageId            String?
   image              SupplierProductImage?            @relation(fields: [imageId], references: [id], onDelete: SetNull)
   supplierProduct    SupplierProduct                  @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
@@ -1222,9 +1170,6 @@ model SupplierProductImage {
   @@index([supplierProductId])
 }
 
-/**
- * Mirrors the old ProductPricing table 1:1 so `computePricing` in the client stays unchanged.
- */
 model SupplierProductPricing {
   id                String          @id @default(uuid())
   supplierProductId String          @unique
@@ -1234,19 +1179,12 @@ model SupplierProductPricing {
   freight           Decimal         @default(0) @db.Decimal(14, 2)
   misc              Decimal         @default(0) @db.Decimal(14, 2)
   marginPercent     Decimal         @default(0) @db.Decimal(6, 2)
-  /**
-   * A percent (0-100), not a flat amount — e.g. 10 means 10% of the ex-tax sell price.
-   */
   tax               Decimal         @default(10) @db.Decimal(6, 2)
   supplierProduct   SupplierProduct @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
 }
 
-/**
- * OPEN: created, not every line counted yet. COUNTED: every line has a count, waiting for an admin
- * to sync. COMPLETED: synced into stock on hand.
- */
 enum StocktakeStatus {
   OPEN
   COUNTED
@@ -1256,9 +1194,6 @@ enum StocktakeStatus {
 
 model Stocktake {
   id                String          @id @default(uuid())
-  /**
-   * Human reference, shown as ST-0001.
-   */
   number            Int             @unique @default(autoincrement())
   supplierProductId String
   status            StocktakeStatus @default(OPEN)
@@ -1269,9 +1204,6 @@ model Stocktake {
   countedAt         DateTime?
   syncedById        String?
   syncedByName      String?
-  /**
-   * When the counts were synced into stock on hand.
-   */
   completedAt       DateTime?
   supplierProduct   SupplierProduct @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
   items             StocktakeItem[]
@@ -1282,19 +1214,11 @@ model Stocktake {
   @@index([status, createdAt])
 }
 
-/**
- * One counting line: a variant at one of its locations (or the lone line of a variant with no
- * location). expectedQty is the stock at that location when the stocktake was created (the
- * variant's unassigned stock on hand for a line with no location).
- */
 model StocktakeItem {
   id           String                 @id @default(uuid())
   stocktakeId  String
   variantId    String
   locationId   String?
-  /**
-   * Snapshot so the sheet still reads right after a location is renamed or deleted.
-   */
   locationName String?
   expectedQty  Int
   countedQty   Int?
@@ -1321,14 +1245,11 @@ enum StockAdjustmentSource {
   STOCKTAKE
 }
 
-/// One save of the adjustment modal (or one stocktake sync): the "main" adjustment, shown as ADJ-0001.
-/// Its `lines` are the per-variant changes.
 model StockAdjustmentBatch {
   id                String                @id @default(uuid())
   number            Int                   @unique @default(autoincrement())
   supplierProductId String
   source            StockAdjustmentSource @default(MANUAL)
-  /// Display reference of the stocktake that produced it, e.g. ST-0007.
   reference         String?
   actorId           String
   actorName         String
@@ -1347,13 +1268,8 @@ model StockAdjustment {
   supplierProductId String
   variantId         String
   delta             Int
-  /// Stock at `locationId` (or the variant's unassigned stock on hand when it has none) just before
-  /// this change. Older rows hold the variant's whole stock on hand; null before batches existed.
   stockBefore       Int?
-  /// Where the change landed; null for a variant with no location and for rows recorded before
-  /// stock was held per location.
   locationId        String?
-  /// Snapshot so the history still reads right after a location is renamed or deleted.
   locationName      String?
   reason            StockAdjustmentReason
   note              String?
@@ -1378,15 +1294,12 @@ model InventoryActivity {
   message           String
   actorId           String?
   actorName         String
-  /// Set on `stock_adjusted` / `stocktake_completed` entries so History can open the adjustment's lines.
   adjustmentBatchId String?
   supplierProduct   SupplierProduct @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
   createdAt         DateTime        @default(now())
 
   @@index([supplierProductId, createdAt])
 }
-
-// — Connected-store publishing —
 
 enum StoreListingStatus {
   NOT_LISTED
@@ -1395,30 +1308,15 @@ enum StoreListingStatus {
   FAILED
 }
 
-/**
- * A hub product's presence on one connected store. Created lazily — either the first time an
- * admin sets a per-store margin, or the first time the product is published — so its existence
- * alone doesn't imply the product is actually listed; `status` is the source of truth for that.
- */
 model SupplierProductStoreListing {
   id                String                        @id @default(uuid())
   supplierProductId String
   storeId           String
-  /**
-   * Filled once the first successful publish returns Shopify's product id.
-   */
   productGid        String?
   externalId        String?
   handle            String?
   status            StoreListingStatus            @default(NOT_LISTED)
-  /**
-   * ACTIVE / DRAFT / ARCHIVED as last reported by Shopify.
-   */
   shopifyStatus     String?
-  /**
-   * Per-store margin % — pre-fills this store's suggested price in the publish/bulk-update
-   * modals only. Never enters SupplierProductPricing's calculation.
-   */
   marginPercent     Decimal?                      @db.Decimal(6, 2)
   lastError         String?
   lastPublishedAt   DateTime?
@@ -1433,18 +1331,12 @@ model SupplierProductStoreListing {
   @@index([storeId])
 }
 
-/**
- * One hub variant's mapping onto a single store's Shopify variant + inventory item.
- */
 model SupplierProductStoreVariant {
   id               String                      @id @default(uuid())
   listingId        String
   variantId        String
   variantGid       String?
   inventoryItemGid String?
-  /**
-   * Last price pushed to (or read back from) this store for this variant.
-   */
   price            Decimal?                    @db.Decimal(14, 2)
   listing          SupplierProductStoreListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
   variant          SupplierProductVariant      @relation(fields: [variantId], references: [id], onDelete: Cascade)
@@ -1455,10 +1347,6 @@ model SupplierProductStoreVariant {
   @@index([variantId])
 }
 
-/**
- * Idempotency guard for inbound Shopify webhooks — `X-Shopify-Webhook-Id` is stable across
- * Shopify's own retries of the same delivery, unlike topic+body which can legitimately repeat.
- */
 model ShopifyWebhookEvent {
   id          String    @id @default(uuid())
   storeId     String
@@ -1480,12 +1368,6 @@ enum InventoryAllocationState {
   RELEASED
 }
 
-/**
- * One hub-side commitment for a single Shopify order line item — the ledger that makes order-
- * driven allocation idempotent and auditable. Joined to a hub variant by SKU string equality,
- * the same join SupplierProductModel already uses for its allocatedFromOrders hint — there is no
- * variant-level id on the order line items the app fetches from Shopify.
- */
 model InventoryAllocation {
   id                String                   @id @default(uuid())
   storeId           String
@@ -1512,16 +1394,6 @@ model InventoryAllocation {
   @@index([sku])
 }
 
-/**
- * Per-fulfilment-line idempotency for fulfillments/create + fulfillments/update.
- * Shopify re-delivers the same fulfilment (same `payload.id`) on every status
- * change (pending -> open -> success, tracking updates) with a fresh
- * X-Shopify-Webhook-Id, so the delivery-level ShopifyWebhookEvent guard alone
- * cannot dedupe. One row per (fulfilment, order line): the first delivery moves
- * stock, later deliveries for the same line are no-ops (or reverse once). The
- * key MUST stay per-line — a per-fulfilment key would make the second and later
- * lines of a multi-line fulfilment collide and silently skip their stock moves.
- */
 model ProcessedFulfillmentEvent {
   id             String   @id @default(uuid())
   storeId        String
@@ -1538,11 +1410,6 @@ model ProcessedFulfillmentEvent {
   @@index([storeId, shopifyOrderId])
 }
 
-/**
- * Per-refund-line idempotency for refunds/create. A refund (same `payload.id`
- * + `line_item_id`) must never restock twice, even across Shopify retries or
- * an orders/cancelled + refunds/create pair for the same units.
- */
 model ProcessedRefundEvent {
   id             String   @id @default(uuid())
   storeId        String

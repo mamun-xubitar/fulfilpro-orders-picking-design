@@ -47,6 +47,31 @@ type ShopifyGraphQLOrder = {
       currencyCode: string;
     };
   } | null;
+  currentSubtotalPriceSet: {
+    shopMoney: {
+      amount: string;
+      currencyCode: string;
+    };
+  } | null;
+  currentTotalDiscountsSet: {
+    shopMoney: {
+      amount: string;
+      currencyCode: string;
+    };
+  } | null;
+  currentTotalTaxSet: {
+    shopMoney: {
+      amount: string;
+      currencyCode: string;
+    };
+  } | null;
+  taxesIncluded: boolean | null;
+  netPaymentSet: {
+    shopMoney: {
+      amount: string;
+      currencyCode: string;
+    };
+  } | null;
   discountCodes: string[];
   customer: {
     firstName: string | null;
@@ -126,6 +151,12 @@ type ShopifyGraphQLOrder = {
           currencyCode: string;
         };
       } | null;
+      originalUnitPriceSet: {
+        shopMoney: {
+          amount: string;
+          currencyCode: string;
+        };
+      } | null;
       customAttributes: Array<{ key: string; value: string | null }>;
     }>;
   };
@@ -164,6 +195,31 @@ const ORDERS_QUERY = `
         cancelledAt
         displayFulfillmentStatus
         currentTotalPriceSet {
+          shopMoney {
+            amount
+            currencyCode
+          }
+        }
+        currentSubtotalPriceSet {
+          shopMoney {
+            amount
+            currencyCode
+          }
+        }
+        currentTotalDiscountsSet {
+          shopMoney {
+            amount
+            currencyCode
+          }
+        }
+        currentTotalTaxSet {
+          shopMoney {
+            amount
+            currencyCode
+          }
+        }
+        taxesIncluded
+        netPaymentSet {
           shopMoney {
             amount
             currencyCode
@@ -253,6 +309,12 @@ const ORDERS_QUERY = `
               id
             }
             discountedUnitPriceSet {
+              shopMoney {
+                amount
+                currencyCode
+              }
+            }
+            originalUnitPriceSet {
               shopMoney {
                 amount
                 currencyCode
@@ -482,6 +544,11 @@ function toShopifyOrderPayload(order: ShopifyGraphQLOrder): ShopifyOrderPayload 
     note: order.note,
     total_price: totalPrice?.amount ?? null,
     current_total_price: totalPrice?.amount ?? null,
+    current_subtotal_price: order.currentSubtotalPriceSet?.shopMoney.amount ?? null,
+    current_total_discounts: order.currentTotalDiscountsSet?.shopMoney.amount ?? null,
+    current_total_tax: order.currentTotalTaxSet?.shopMoney.amount ?? null,
+    taxes_included: order.taxesIncluded,
+    net_payment: order.netPaymentSet?.shopMoney.amount ?? null,
     fulfillment_status: normalizeGraphQLFulfillmentStatus(order.displayFulfillmentStatus),
     created_at: order.createdAt,
     closed_at: order.closedAt,
@@ -530,6 +597,7 @@ function toShopifyOrderPayload(order: ShopifyGraphQLOrder): ShopifyOrderPayload 
         fulfillable_quantity: lineItem.fulfillableQuantity,
         current_quantity: lineItem.currentQuantity,
         price: lineItem.discountedUnitPriceSet?.shopMoney.amount ?? null,
+        original_price: lineItem.originalUnitPriceSet?.shopMoney.amount ?? null,
         price_set: lineItem.discountedUnitPriceSet
           ? {
             shop_money: {

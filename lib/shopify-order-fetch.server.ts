@@ -24,6 +24,31 @@ type ShopifyOrderByIdResult = {
         currencyCode: string;
       };
     } | null;
+    currentSubtotalPriceSet: {
+      shopMoney: {
+        amount: string;
+        currencyCode: string;
+      };
+    } | null;
+    currentTotalDiscountsSet: {
+      shopMoney: {
+        amount: string;
+        currencyCode: string;
+      };
+    } | null;
+    currentTotalTaxSet: {
+      shopMoney: {
+        amount: string;
+        currencyCode: string;
+      };
+    } | null;
+    taxesIncluded: boolean | null;
+    netPaymentSet: {
+      shopMoney: {
+        amount: string;
+        currencyCode: string;
+      };
+    } | null;
     discountCodes: string[];
     customer: {
       firstName: string | null;
@@ -103,6 +128,12 @@ type ShopifyOrderByIdResult = {
             currencyCode: string;
           };
         } | null;
+        originalUnitPriceSet: {
+          shopMoney: {
+            amount: string;
+            currencyCode: string;
+          };
+        } | null;
         customAttributes: Array<{ key: string; value: string | null }>;
       }>;
     };
@@ -141,6 +172,31 @@ const ORDER_BY_ID_QUERY = `
       cancelledAt
       displayFulfillmentStatus
       currentTotalPriceSet {
+        shopMoney {
+          amount
+          currencyCode
+        }
+      }
+      currentSubtotalPriceSet {
+        shopMoney {
+          amount
+          currencyCode
+        }
+      }
+      currentTotalDiscountsSet {
+        shopMoney {
+          amount
+          currencyCode
+        }
+      }
+      currentTotalTaxSet {
+        shopMoney {
+          amount
+          currencyCode
+        }
+      }
+      taxesIncluded
+      netPaymentSet {
         shopMoney {
           amount
           currencyCode
@@ -235,6 +291,12 @@ const ORDER_BY_ID_QUERY = `
               currencyCode
             }
           }
+          originalUnitPriceSet {
+            shopMoney {
+              amount
+              currencyCode
+            }
+          }
           customAttributes {
             key
             value
@@ -284,6 +346,97 @@ export async function fetchShopifyOrderById(params: {
   return toShopifyOrderPayload(data.order);
 }
 
+type MoneySet = { shopMoney: { amount: string } } | null;
+
+export type RawPaymentTransaction = {
+  kind: string;
+  status: string;
+  gateway: string | null;
+  formattedGateway: string | null;
+  manualPaymentGateway: boolean | null;
+  paymentDetails: { company?: string | null; number?: string | null; wallet?: string | null } | null;
+};
+
+export type RawPaymentData = {
+  gatewayNames: string[];
+  transactions: RawPaymentTransaction[];
+};
+
+type ShopifyOrderFinancialsResult = {
+  order: {
+    currentSubtotalPriceSet: MoneySet;
+    currentTotalDiscountsSet: MoneySet;
+    currentTotalTaxSet: MoneySet;
+    currentTotalPriceSet: MoneySet;
+    currentShippingPriceSet: MoneySet;
+    netPaymentSet: MoneySet;
+    taxesIncluded: boolean | null;
+    paymentGatewayNames: string[];
+    transactions: RawPaymentTransaction[];
+  } | null;
+};
+
+const ORDER_FINANCIALS_QUERY = `
+  query OrderFinancials($id: ID!) {
+    order(id: $id) {
+      currentSubtotalPriceSet { shopMoney { amount } }
+      currentTotalDiscountsSet { shopMoney { amount } }
+      currentTotalTaxSet { shopMoney { amount } }
+      currentTotalPriceSet { shopMoney { amount } }
+      currentShippingPriceSet { shopMoney { amount } }
+      netPaymentSet { shopMoney { amount } }
+      taxesIncluded
+      paymentGatewayNames
+      transactions(first: 20) {
+        kind
+        status
+        gateway
+        formattedGateway
+        manualPaymentGateway
+        paymentDetails {
+          ... on CardPaymentDetails { company number wallet }
+        }
+      }
+    }
+  }
+`;
+
+/** The money figures and payment methods the tax invoice needs, so printing gets current data
+ * (payment status, tax, totals, how it was paid) without a full order refresh. */
+export async function fetchShopifyOrderFinancials(params: {
+  shop: string;
+  accessToken: string;
+  orderId: string | number;
+}) {
+  const { shop, accessToken, orderId } = params;
+  const data = await shopifyGraphQL<ShopifyOrderFinancialsResult>(shop, accessToken, {
+    query: ORDER_FINANCIALS_QUERY,
+    variables: { id: toOrderGid(orderId) },
+  });
+
+  if (!data.order) {
+    throw new Error(`Shopify order ${orderId} was not found`);
+  }
+
+  const amount = (set: MoneySet) => (set ? Number(set.shopMoney.amount) : null);
+  return {
+    financials: {
+      currentSubtotalPrice: amount(data.order.currentSubtotalPriceSet),
+      currentTotalDiscounts: amount(data.order.currentTotalDiscountsSet),
+      currentTotalTax: amount(data.order.currentTotalTaxSet),
+      currentTotalPrice: amount(data.order.currentTotalPriceSet),
+      amountPaid: amount(data.order.netPaymentSet),
+      taxesIncluded: data.order.taxesIncluded,
+    },
+    // Shipping after refunds and discounts; not stored, only used to keep the invoice rows summing to the total.
+    shipping: amount(data.order.currentShippingPriceSet),
+    payments: {
+      gatewayNames: data.order.paymentGatewayNames,
+      transactions: data.order.transactions,
+    } satisfies RawPaymentData,
+  };
+}
+
 async function shopifyGraphQL<T>(
   shop: string,
   accessToken: string,
@@ -328,6 +481,11 @@ function toShopifyOrderPayload(order: NonNullable<ShopifyOrderByIdResult['order'
     note: order.note,
     total_price: totalPrice?.amount ?? null,
     current_total_price: totalPrice?.amount ?? null,
+    current_subtotal_price: order.currentSubtotalPriceSet?.shopMoney.amount ?? null,
+    current_total_discounts: order.currentTotalDiscountsSet?.shopMoney.amount ?? null,
+    current_total_tax: order.currentTotalTaxSet?.shopMoney.amount ?? null,
+    taxes_included: order.taxesIncluded,
+    net_payment: order.netPaymentSet?.shopMoney.amount ?? null,
     fulfillment_status: order.displayFulfillmentStatus?.toLowerCase() ?? null,
     created_at: order.createdAt,
     closed_at: order.closedAt,
@@ -376,6 +534,7 @@ function toShopifyOrderPayload(order: NonNullable<ShopifyOrderByIdResult['order'
         fulfillable_quantity: lineItem.fulfillableQuantity,
         current_quantity: lineItem.currentQuantity,
         price: lineItem.discountedUnitPriceSet?.shopMoney.amount ?? null,
+        original_price: lineItem.originalUnitPriceSet?.shopMoney.amount ?? null,
         price_set: lineItem.discountedUnitPriceSet
           ? {
               shop_money: {

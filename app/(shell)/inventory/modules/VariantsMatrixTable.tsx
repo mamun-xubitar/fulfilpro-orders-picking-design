@@ -35,9 +35,10 @@ const NUMERIC_HEADERS = [
 // header + 8 body rows + totals footer = 10 rows visible at once (sticky header/footer).
 const SCROLL_THRESHOLD = 8;
 // The Variant tab caps the table at the viewport height (zoom-aware, like the modals) minus the
-// shell header (60px) and what sits above / below it: page padding, module tabs, product toolbar
-// and the table's own toolbar (~8rem). It always scrolls internally rather than by row count.
-const TALL_MAX_H = 'max-h-[calc((100vh_-_60px)/var(--page-zoom,1)_-_8rem)]';
+// shell header (60px) and what sits above / below it: page padding, module tabs, product toolbar,
+// the table's own toolbar (~8rem) and an ~64px peek so the product details below stay visible.
+// It always scrolls internally rather than by row count.
+const TALL_MAX_H = 'max-h-[calc((100vh_-_60px)/var(--page-zoom,1)_-_12rem)]';
 
 // `border-collapse` means a sticky cell's own border doesn't paint (the border lives on the
 // adjacent cell instead), so the header/footer's separating line is an inset box-shadow instead.
@@ -61,7 +62,7 @@ export default function VariantsMatrixTable({ matrix, locations, fillHeight, sho
   const columnCount = 8 + numericHeaders.length + (showAllColumns ? 1 : 0);
 
   return (
-    <div className={`thin-scroll ${fillHeight ? 'h-full overflow-y-auto overflow-x-auto' : scrollable ? `${tall ? TALL_MAX_H : 'max-h-[12.5rem]'} overflow-y-auto overflow-x-auto` : 'overflow-x-auto'}`}>
+    <div className={`thin-scroll ${fillHeight ? 'h-full overflow-y-auto overflow-x-auto' : scrollable ? `${tall ? TALL_MAX_H : 'max-h-[12.5rem] xl:max-h-none xl:h-full'} overflow-y-auto overflow-x-auto` : 'overflow-x-auto xl:h-full xl:overflow-y-auto'}`}>
       <table className="w-full min-w-5xl border-collapse">
         <thead>
           <tr className="border-b border-inventory-border bg-inventory-surface-muted">

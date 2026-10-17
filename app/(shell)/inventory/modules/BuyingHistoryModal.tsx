@@ -1,14 +1,14 @@
 'use client';
 
-import { useState } from 'react';
 import { ModalShell } from '@/components/ModalShell';
-import AnimatedStepBody from './newProduct/AnimatedStepBody';
+import { useState } from 'react';
 import { useInventoryAccess } from './InventoryAccess';
 import { WIZARD_BODY_CLASS, WIZARD_CARD_CLASS } from './modalStyles';
+import AnimatedStepBody from './newProduct/AnimatedStepBody';
 import { STATUS_BADGES } from './PurchaseOrdersPanel';
-import ViewPoModal from './ViewPoModal';
 import type { PurchaseOrderRecord } from './types';
 import { formatCurrencyValue, formatDate, formatMoney, formatPoNumber, poAveragePrice } from './utils';
+import ViewPoModal from './ViewPoModal';
 
 type BuyingHistoryModalProps = {
   purchaseOrders: PurchaseOrderRecord[];
@@ -40,7 +40,7 @@ export default function BuyingHistoryModal({ purchaseOrders, onClose, onReceive 
                   <Th align="center">Status</Th>
                   <Th align="right">Qty</Th>
                   <Th align="right">Avg cost (AUD)</Th>
-                  <Th align="right">Total value</Th>
+                  <Th align="right">Total value (AUD)</Th>
                   <Th align="right">Actions</Th>
                 </tr>
               </thead>

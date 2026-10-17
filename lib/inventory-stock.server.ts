@@ -26,6 +26,10 @@ export function describeHolding(holding: LocationStock[]): string {
 
 export type LocationStock = { locationId: string; name: string; quantity: number };
 
+/** Moves the stock of a removed location into a kept one: `remap[fromLocationId]` is the
+ * destination's location id, which must survive the write. */
+export type StockRemap = Record<string, string>;
+
 /** Where a write landed: the location (null for a variant with none) and its stock just before. */
 export type StockMove = { locationId: string | null; locationName: string | null; before: number };
 
@@ -111,17 +115,24 @@ export async function takeStock(tx: Tx, variantId: string, qty: number, preferLo
 }
 
 /**
- * Makes `entries` exactly the variant's locations and their stock. Refuses to drop a location that
- * still holds stock — it has to be set to 0 first, so stock never disappears with its location.
- * Dropping every location leaves the variant with no location and (necessarily) 0 unassigned stock.
+ * Makes `entries` exactly the variant's locations and their stock. Dropping a location that
+ * still holds stock is refused unless `remap` moves it into a location that survives (its
+ * quantity is added to the destination's). Dropping every location leaves the variant with no
+ * location and (necessarily) 0 unassigned stock — so clearing with stock is always refused.
  */
-export async function setLocationStock(tx: Tx, variantId: string, entries: { locationId: string; quantity: number }[]) {
+export async function setLocationStock(tx: Tx, variantId: string, entries: { locationId: string; quantity: number }[], remap: StockRemap = {}) {
   if (!(await lockVariant(tx, variantId))) return;
   const current = await variantLocationStock(tx, variantId);
   const nextIds = new Set(entries.map((e) => e.locationId));
   const holding = current.filter((l) => !nextIds.has(l.locationId) && l.quantity > 0);
-  if (holding.length > 0) {
-    throw new StockError(`${describeHolding(holding)} still ${holding.length === 1 ? 'holds' : 'hold'} stock — set to 0 before removing`, holding);
+  const byId = new Map(entries.map((e) => [e.locationId, e]));
+  for (const h of holding) {
+    const destId = remap[h.locationId];
+    const dest = destId ? byId.get(destId) : undefined;
+    if (!dest || destId === h.locationId) {
+      throw new StockError(`${describeHolding(holding)} still ${holding.length === 1 ? 'holds' : 'hold'} stock — set to 0 before removing`, holding);
+    }
+    dest.quantity += h.quantity;
   }
   await tx.supplierProductVariantLocation.deleteMany({ where: { variantId, locationId: { notIn: [...nextIds] } } });
   for (const { locationId, quantity } of entries) {
@@ -136,10 +147,11 @@ export async function setLocationStock(tx: Tx, variantId: string, entries: { loc
 
 /**
  * Bulk location assignment for one variant: `add` keeps its locations and adds `locationIds` at 0;
- * `replace` makes `locationIds` its set (refused while a dropped location holds stock). A variant
- * that had no location moves its unassigned stock into the first new location (A→Z).
+ * `replace` makes `locationIds` its set (a dropped location holding stock is refused unless
+ * `remap` moves it into a survivor). A variant that had no location moves its unassigned stock
+ * into the first new location (A→Z).
  */
-export async function assignLocations(tx: Tx, variantId: string, locationIds: string[], namesById: Map<string, string>, mode: 'add' | 'replace') {
+export async function assignLocations(tx: Tx, variantId: string, locationIds: string[], namesById: Map<string, string>, mode: 'add' | 'replace', remap: StockRemap = {}) {
   if (!(await lockVariant(tx, variantId))) return;
   const current = await variantLocationStock(tx, variantId);
   const kept = mode === 'add' ? current : current.filter((l) => locationIds.includes(l.locationId));
@@ -151,7 +163,7 @@ export async function assignLocations(tx: Tx, variantId: string, locationIds: st
     const v = await tx.supplierProductVariant.findUniqueOrThrow({ where: { id: variantId }, select: { stockOnHand: true } });
     entries[0].quantity = v.stockOnHand;
   }
-  await setLocationStock(tx, variantId, entries);
+  await setLocationStock(tx, variantId, entries, remap);
 }
 
 /** Brings the variant's total to `total` when only a total is known (CSV import): a rise goes to

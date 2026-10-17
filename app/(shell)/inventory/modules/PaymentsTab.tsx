@@ -9,6 +9,7 @@ import { Search } from './icons';
 import { useInventoryAccess } from './InventoryAccess';
 import type { SupplierOption } from './types';
 import { formatDate, formatMoney, formatPoNumber } from './utils';
+import { STICKY_THEAD } from './constants';
 
 const CONTROL =
   'h-[24px] rounded-[7px] border border-inventory-border-strong bg-inventory-surface px-[6px] text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring cursor-pointer';
@@ -34,7 +35,7 @@ export default function PaymentsTab({ tab, suppliers, onEdit, onOpenSupplier }: 
   );
 
   return (
-    <div className="overflow-hidden rounded-xl border border-inventory-border bg-inventory-surface shadow-sm xl:min-h-0 xl:flex-1 xl:overflow-y-auto thin-scroll">
+    <div className="overflow-hidden rounded-xl border border-inventory-border bg-inventory-surface shadow-sm xl:flex xl:min-h-0 xl:flex-1 xl:flex-col">
       <div className="flex flex-wrap items-center gap-[6px] border-b border-inventory-border px-2 py-1.5">
         <div className="relative min-w-44 flex-1 sm:w-64 sm:flex-none">
           <Search className="pointer-events-none absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-inventory-text-subtle" />
@@ -75,9 +76,9 @@ export default function PaymentsTab({ tab, suppliers, onEdit, onOpenSupplier }: 
         )}
       </div>
 
-      <div className="overflow-x-auto thin-scroll">
+      <div className="overflow-x-auto thin-scroll xl:min-h-0 xl:flex-1 xl:overflow-y-auto">
         <table aria-busy={tab.loading || tab.initialLoading} className="w-full min-w-[980px] border-collapse text-[11px] leading-none">
-          <thead>
+          <thead className={STICKY_THEAD}>
             <tr className="border-b border-inventory-border bg-inventory-surface-muted">
               {th('Updated', 'updatedAt')}
               {th('PO', 'poNumber')}
@@ -105,7 +106,7 @@ export default function PaymentsTab({ tab, suppliers, onEdit, onOpenSupplier }: 
               tab.rows.map((row) => {
                 const paid = row.status === 'PAID';
                 return (
-                  <tr key={row.id} className="border-b border-inventory-divider transition-colors duration-150 last:border-0 hover:bg-inventory-surface-hover">
+                  <tr key={row.id} className="border-b border-inventory-divider transition-colors duration-150 hover:bg-inventory-surface-hover">
                     <td className="whitespace-nowrap px-2 py-1.5 text-inventory-text-subtle">
                       {formatDate(row.updatedAt)}
                       <span className="mt-[2px] block text-[9.5px]">{row.updatedByName}</span>

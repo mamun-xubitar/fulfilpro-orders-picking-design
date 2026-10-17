@@ -2,11 +2,12 @@
 
 import { MODAL_FOOTER_BTN_DANGER, MODAL_FOOTER_BTN_SECONDARY, ModalShell } from '@/components/ModalShell';
 import Pagination from '@/components/Pagination';
-import type { useSuppliers } from './hooks/useSuppliers';
+import { SUPPLIER_PAGE_SIZE_OPTIONS, type useSuppliers } from './hooks/useSuppliers';
 import { Pencil, Plus, Search, Trash, Users } from './icons';
 import { useInventoryAccess } from './InventoryAccess';
 import { SkeletonRows, type SkeletonCell } from './Skeleton';
 import { formatDate } from './utils';
+import { STICKY_THEAD } from './constants';
 
 const SKELETON: SkeletonCell[] = ['text', 'text', 'text', 'num', 'num', 'num', 'text', { kind: 'actions', count: 2 }];
 
@@ -30,7 +31,7 @@ function CountLink({ count, label, onClick }: { count: number; label: string; on
 export default function SuppliersTab({ suppliers: s, onOpenPurchaseOrders, onOpenPayments }: SuppliersTabProps) {
   const { canEdit } = useInventoryAccess();
   return (
-    <div className="overflow-hidden rounded-xl border border-inventory-border bg-inventory-surface shadow-sm">
+    <div className="overflow-hidden rounded-xl border border-inventory-border bg-inventory-surface shadow-sm xl:flex xl:min-h-0 xl:flex-1 xl:flex-col">
       <div className="flex flex-wrap items-center gap-[6px] border-b border-inventory-border px-2 py-1.5">
         <div className="relative min-w-44 flex-1 sm:flex-none sm:w-56">
           <Search className="pointer-events-none absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-inventory-text-subtle" />
@@ -54,10 +55,10 @@ export default function SuppliersTab({ suppliers: s, onOpenPurchaseOrders, onOpe
         )}
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto thin-scroll xl:min-h-0 xl:flex-1 xl:overflow-y-auto">
         <table aria-busy={s.loading || s.initialLoading} className="w-full border-collapse text-[11px] leading-none">
-          <thead>
-            <tr className="border-b border-inventory-border text-left text-[10px] font-bold uppercase tracking-[0.4px] text-inventory-text-subtle">
+          <thead className={STICKY_THEAD}>
+            <tr className="bg-inventory-surface border-b border-inventory-border text-left text-[10px] font-bold uppercase tracking-[0.4px] text-inventory-text-subtle">
               <th className="px-2 py-1">Name</th>
               <th className="px-2 py-1">PO email</th>
               <th className="px-2 py-1">Contact email</th>
@@ -80,7 +81,7 @@ export default function SuppliersTab({ suppliers: s, onOpenPurchaseOrders, onOpe
               </tr>
             ) : (
               s.rows.map((row) => (
-                <tr key={row.id} className="border-b border-inventory-divider last:border-0 transition-colors duration-150 hover:bg-inventory-surface-hover">
+                <tr key={row.id} className="border-b border-inventory-divider transition-colors duration-150 hover:bg-inventory-surface-hover">
                   <td className="px-2 py-1 font-medium text-inventory-text">{row.name}</td>
                   <td className="px-2 py-1 text-inventory-text-muted">{row.poEmail}</td>
                   <td className="px-2 py-1 text-inventory-text-subtle">{row.contactEmail || '—'}</td>
@@ -121,7 +122,7 @@ export default function SuppliersTab({ suppliers: s, onOpenPurchaseOrders, onOpe
         </table>
       </div>
 
-      <Pagination pagination={s.pagination} loading={s.loading} pageNumbers={s.pageNumbers} onPageChange={s.goToPage} itemLabel="suppliers" />
+      <Pagination pagination={s.pagination} loading={s.loading} pageNumbers={s.pageNumbers} onPageChange={s.goToPage} itemLabel="suppliers" pageSizeOptions={SUPPLIER_PAGE_SIZE_OPTIONS} onPageSizeChange={s.setPageSize} />
 
       {s.deleteTarget && (
         <ModalShell disableBackdropClose

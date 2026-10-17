@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment } from 'react';
+import { Fragment, useEffect, useRef } from 'react';
 import type { OrdersPageBundle } from './ordersPageContext';
 import { STATUS_MAP } from './constants';
 import { getFulfillmentInfo, getOrderAddressLines, isOrderFullyFulfilled } from './utils';
@@ -14,11 +14,31 @@ type OrdersTableProps = {
 };
 
 export default function OrdersTable({ p }: OrdersTableProps) {
-  const { orders, loading, error, expandedIds, ordersColSpan, userIsAdmin, sort, dir, handleSortChange } = p;
+  const { orders, loading, error, expandedIds, ordersColSpan, userIsAdmin, userIsDecorator, sort, dir, handleSortChange } = p;
+  const selectAllRef = useRef<HTMLInputElement>(null);
+  const anyLabelSelected = p.selectedLabelIds.size > 0;
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = anyLabelSelected && !p.allLabelsOnPageSelected;
+    }
+  }, [anyLabelSelected, p.allLabelsOnPageSelected]);
   return (
     <table className="min-w-[900px] w-full text-sm">
       <thead>
         <tr className="bg-gray-50 border-b border-gray-200">
+          {!userIsDecorator && (
+            <th className="px-4 py-3 w-10">
+              <input
+                ref={selectAllRef}
+                type="checkbox"
+                checked={p.allLabelsOnPageSelected}
+                onChange={p.toggleSelectAllLabelsOnPage}
+                disabled={loading || orders.length === 0}
+                aria-label="Select all orders on this page"
+                className="rounded border-gray-300 text-blue-600 cursor-pointer"
+              />
+            </th>
+          )}
           <th className="hidden sm:table-cell px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-10">#</th>
           <SortableColumnHeader label="Order No." sortKey="number" sort={sort} dir={dir} onSortChange={handleSortChange} />
           <th className="hidden md:table-cell px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Store</th>

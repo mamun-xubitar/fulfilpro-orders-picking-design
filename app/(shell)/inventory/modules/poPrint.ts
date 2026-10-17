@@ -39,7 +39,7 @@ function poSection(po: PurchaseOrderRecord): string {
   const lines = po.items
     .map(
       (i) =>
-        `<tr><td>${escapeHtml(i.variantTitle)}</td><td>${escapeHtml(i.sku ?? '-')}</td><td class="n">${i.quantity}</td><td class="n">${i.receivedQuantity}</td><td class="n">${i.unitCost === null ? '-' : `$${formatMoney(i.unitCost)}`}</td></tr>`
+        `<tr><td>${escapeHtml(i.variantTitle)}</td><td>${escapeHtml(i.sku ?? '-')}</td><td class="n">${i.quantity}</td><td class="n">${i.receivedQuantity}</td><td>${escapeHtml(i.remark ?? '-')}</td><td class="n">${i.unitCost === null ? '-' : `$${formatMoney(i.unitCost)}`}</td></tr>`
     )
     .join('');
   const meta = [
@@ -58,7 +58,7 @@ function poSection(po: PurchaseOrderRecord): string {
       <p class="sub">${escapeHtml(po.itemNo)}</p>
       <table class="kv">${meta.map(([k, v]) => `<tr><th>${escapeHtml(k)}</th><td>${escapeHtml(v)}</td></tr>`).join('')}</table>
       <table class="lines">
-        <thead><tr><th>Variant</th><th>Supplier SKU</th><th class="n">Ordered</th><th class="n">Received</th><th class="n">Unit cost (AUD)</th></tr></thead>
+        <thead><tr><th>Variant</th><th>Supplier SKU</th><th class="n">Ordered</th><th class="n">Received</th><th>Remark</th><th class="n">Unit cost (AUD)</th></tr></thead>
         <tbody>${lines}</tbody>
       </table>
       ${costBlock(po)}

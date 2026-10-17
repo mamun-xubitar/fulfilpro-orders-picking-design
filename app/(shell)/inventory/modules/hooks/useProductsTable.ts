@@ -3,12 +3,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'react-toastify';
 import { buildPageNumbers } from '@/hooks/usePagination';
+import { DEFAULT_PAGE_SIZE } from '../constants';
 import { PAGE_SIZE_OPTIONS, useProductsFilters } from './useProductsFilters';
 import type { CataloguePagination, ProductRecord, ProductStatusValue, ProductsResponse, QuickFilterId } from '../types';
 
 export type ProductsSortKey = 'name' | 'brand' | 'category' | 'sku' | 'status' | 'variants' | 'stock' | 'stockValue' | 'createdAt';
 
-const EMPTY_PAGINATION: CataloguePagination = { page: 1, pageSize: PAGE_SIZE_OPTIONS[0], total: 0, totalPages: 1, hasPrev: false, hasNext: false };
+const EMPTY_PAGINATION: CataloguePagination = { page: 1, pageSize: DEFAULT_PAGE_SIZE, total: 0, totalPages: 1, hasPrev: false, hasNext: false };
 const EMPTY_TOTALS = { stockOnHand: 0, stockValue: 0 };
 
 type DeleteTarget = { kind: 'selection' } | { kind: 'single'; id: string; name: string };

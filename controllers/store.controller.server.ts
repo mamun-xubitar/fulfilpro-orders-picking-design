@@ -5,29 +5,9 @@ import {
   resolveShopDomain,
 } from '@/lib/shopify-auth.server';
 import { updateAppScopes } from '@/lib/shopify-partner.server';
-import { mkdir, unlink, writeFile } from 'fs/promises';
-import path from 'path';
-import { randomUUID } from 'crypto';
+import { removeLogoFile, validateLogoFile, writeLogoFile } from '@/lib/logo-upload.server';
 
 const model = new StoreModel();
-const LOGO_DIR = path.join(process.cwd(), 'public', 'uploaded', 'logos');
-const MAX_LOGO_SIZE = 2 * 1024 * 1024;
-const ALLOWED_LOGO_TYPES: Record<string, string> = {
-  'image/png': 'png',
-  'image/jpeg': 'jpg',
-  'image/webp': 'webp',
-  'image/gif': 'gif',
-};
-
-async function removeLogoFile(logoPath: string | null) {
-  if (!logoPath?.startsWith('uploaded/logos/')) return;
-  const filename = path.basename(logoPath);
-  try {
-    await unlink(path.join(LOGO_DIR, filename));
-  } catch {
-    // The database value is the source of truth; missing old files should not block updates.
-  }
-}
 
 export class StoreController {
   async list() {
@@ -113,26 +93,12 @@ export class StoreController {
       return { error: { message: 'Store not found', status: 404 } };
     }
 
-    const logo = formData.get('logo');
-    if (!(logo instanceof File)) {
-      return { error: { message: 'Logo file is required', status: 400 } };
+    const validated = validateLogoFile(formData.get('logo'));
+    if ('error' in validated) {
+      return { error: { message: validated.error, status: 400 } };
     }
 
-    const extension = ALLOWED_LOGO_TYPES[logo.type];
-    if (!extension) {
-      return { error: { message: 'Logo must be a PNG, JPG, WebP, or GIF image', status: 400 } };
-    }
-
-    if (logo.size > MAX_LOGO_SIZE) {
-      return { error: { message: 'Logo must be 2MB or smaller', status: 400 } };
-    }
-
-    await mkdir(LOGO_DIR, { recursive: true });
-    const filename = `${id}-${randomUUID()}.${extension}`;
-    const relativePath = `uploaded/logos/${filename}`;
-    const buffer = Buffer.from(await logo.arrayBuffer());
-
-    await writeFile(path.join(LOGO_DIR, filename), buffer);
+    const relativePath = await writeLogoFile(validated.file, validated.extension, id);
     let updated;
     try {
       updated = await model.update(id, { logoPath: relativePath });

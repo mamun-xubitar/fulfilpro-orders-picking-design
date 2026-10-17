@@ -19,6 +19,7 @@ interface StoresTableProps {
   onLogoUpload: (id: string, file: File) => void;
   onLogoRemove: (id: string) => void;
   onUpdateApp: (id: string) => void;
+  onEditInvoice: (id: string) => void;
   reauthorizeUrls: Record<string, string>;
   disconnectingIds: string[];
   deletingIds: string[];
@@ -54,6 +55,7 @@ export default function StoresTable({
   onLogoUpload,
   onLogoRemove,
   onUpdateApp,
+  onEditInvoice,
   reauthorizeUrls,
   disconnectingIds,
   deletingIds,
@@ -193,6 +195,13 @@ export default function StoresTable({
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => onEditInvoice(store.id)}
+                        disabled={isBusy}
+                        className="px-2.5 py-1 text-xs border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors duration-150 disabled:opacity-50 cursor-pointer"
+                      >
+                        Tax Invoice
+                      </button>
                       {store.status === 'connected' && (
                         <>
                           {store.hasApp && (

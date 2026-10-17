@@ -47,7 +47,7 @@ export type SupplierProductPricingRow = {
 
 export type SupplierProductActivityRow = { id: string; at: string; actor: string; message: string };
 
-export type ProductsSortKey = 'name' | 'brand' | 'category' | 'sku' | 'status' | 'variants' | 'stock' | 'stockValue' | 'createdAt';
+export type ProductsSortKey = 'name' | 'brand' | 'category' | 'sku' | 'status' | 'variants' | 'stock' | 'stockValue' | 'reorder' | 'createdAt';
 
 /** The four price-shortcut buttons — matched against a variant's effective (weighted-average
  * received cost, falling back to the stored buyPrice) buy price and its sell price. */
@@ -63,6 +63,8 @@ export type CatalogueListParams = {
   /** Filters by the hub-only flat InventoryCategory, distinct from the Shopify taxonomy `category`. */
   inventoryCategoryId?: string;
   quickFilter?: QuickFilterId | null;
+  /** Only products with at least one variant in the Reorder state (available stock below its trigger). */
+  reorderOnly?: boolean;
   sort?: ProductsSortKey;
   dir?: 'asc' | 'desc';
   /** Omitted products are excluded from every catalogue query by default (list, listIds,
@@ -567,14 +569,25 @@ export class SupplierProductModel {
         // their stock) back — only combos new to the product land at the chosen location.
         const previous = await tx.supplierProductVariant.findMany({
           where: { supplierProductId },
-          select: { colour: true, size: true, locations: { select: { locationId: true, quantity: true } } },
+          select: { id: true, colour: true, size: true, locations: { select: { locationId: true, quantity: true } } },
         });
         const previousLocations = new Map(previous.map((v) => [`${v.colour.toLowerCase()}::${v.size}`, v.locations]));
+        // PO lines point at variants with ON DELETE SET NULL — remember which combo each one was on so
+        // it can be re-linked to the recreated variant (otherwise its incoming drops off the matrix).
+        const poItemsByKey = new Map<string, string[]>();
+        const poItems = await tx.purchaseOrderItem.findMany({ where: { variantId: { in: previous.map((v) => v.id) } }, select: { id: true, variantId: true } });
+        const keyByOldId = new Map(previous.map((v) => [v.id, `${v.colour.toLowerCase()}::${v.size}`]));
+        for (const item of poItems) {
+          const key = keyByOldId.get(item.variantId!)!;
+          poItemsByKey.set(key, [...(poItemsByKey.get(key) ?? []), item.id]);
+        }
         await tx.supplierProductVariant.deleteMany({ where: { supplierProductId } });
         if (toCreate.length > 0) {
           const created = await tx.supplierProductVariant.createManyAndReturn({ data: toCreate, select: { id: true, colour: true, size: true, stockOnHand: true } });
           const links: Prisma.SupplierProductVariantLocationCreateManyInput[] = [];
           for (const v of created) {
+            const relink = poItemsByKey.get(`${v.colour.toLowerCase()}::${v.size}`);
+            if (relink) await tx.purchaseOrderItem.updateMany({ where: { id: { in: relink } }, data: { variantId: v.id } });
             const kept = previousLocations.get(`${v.colour.toLowerCase()}::${v.size}`) ?? [];
             if (kept.length > 0) {
               // The typed stock is for the chosen location; every other location keeps its quantity.
@@ -1016,6 +1029,8 @@ const CATALOGUE_CTE_SQL = Prisma.sql`
       v.id,
       v."supplierProductId" AS pid,
       v."stockOnHand" AS stock,
+      v."allocated" AS allocated,
+      v."trigger" AS reorder_point,
       v."sellPrice" AS sell,
       COALESCE(a.wac, v."buyPrice") AS buy
     FROM "SupplierProductVariant" v
@@ -1030,7 +1045,8 @@ const CATALOGUE_CTE_SQL = Prisma.sql`
       BOOL_OR(buy < 1) AS any_buy_lt_1,
       BOOL_OR((sell - buy) < 5) AS any_profit_lt_5,
       BOOL_OR(sell < 1) AS any_sell_lt_1,
-      BOOL_OR(sell < 5) AS any_sell_lt_5
+      BOOL_OR(sell < 5) AS any_sell_lt_5,
+      COUNT(*) FILTER (WHERE stock - allocated < reorder_point) AS reorder_count
     FROM variant_eff
     GROUP BY pid
   )
@@ -1067,6 +1083,7 @@ function buildCatalogueWhereSql(params: {
   supplierId?: string;
   inventoryCategoryId?: string;
   quickFilter?: QuickFilterId | null;
+  reorderOnly?: boolean;
   includeOmitted?: boolean;
 }): Prisma.Sql {
   const whereParts: Prisma.Sql[] = [Prisma.sql`1 = 1`];
@@ -1111,6 +1128,11 @@ function buildCatalogueWhereSql(params: {
     whereParts.push(quickFilterPredicateSql(params.quickFilter));
   }
 
+  if (params.reorderOnly) {
+    // Same "Reorder" rule as the variants matrix's getStatus(): stock on hand − allocated < trigger.
+    whereParts.push(Prisma.sql`COALESCE(pa.reorder_count, 0) > 0`);
+  }
+
   return Prisma.join(whereParts, ' AND ');
 }
 
@@ -1129,7 +1151,8 @@ function buildCatalogueFilteredSql(whereSql: Prisma.Sql): Prisma.Sql {
       sp."createdAt",
       COALESCE(pa.variant_count, 0) AS variant_count,
       COALESCE(pa.total_stock, 0) AS total_stock,
-      COALESCE(pa.stock_value, 0) AS stock_value
+      COALESCE(pa.stock_value, 0) AS stock_value,
+      COALESCE(pa.reorder_count, 0) AS reorder_count
     FROM "SupplierProduct" sp
     LEFT JOIN product_agg pa ON pa.pid = sp.id
     WHERE ${whereSql}
@@ -1155,6 +1178,8 @@ function buildCatalogueOrderSql(sort: ProductsSortKey, dir: 'asc' | 'desc'): Pri
       return Prisma.sql`total_stock ${dirSql}, id ASC`;
     case 'stockValue':
       return Prisma.sql`stock_value ${dirSql}, id ASC`;
+    case 'reorder':
+      return Prisma.sql`reorder_count ${dirSql}, LOWER(name) ASC, id ASC`;
     case 'createdAt':
     default:
       return Prisma.sql`"createdAt" ${dirSql}, id ASC`;

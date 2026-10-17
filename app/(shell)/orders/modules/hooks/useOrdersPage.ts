@@ -7,12 +7,6 @@ import {
   isStaffLikeRole,
   isTestUserRole,
 } from "@/lib/roles";
-import type { ApiResponse, OrderRow, PackingSlipLabel } from "../types";
-import {
-  buildPackingSlipDocument,
-  printDocumentInHiddenFrame,
-} from "../packingSlipPrint";
-import { getApiErrorMessage } from "../utils";
 import { useOrdersFilters } from "./useOrdersFilters";
 import { useOrdersData } from "./useOrdersData";
 import { useSync } from "./useSync";
@@ -28,6 +22,8 @@ import { useOrderNotes } from "./useOrderNotes";
 import { useStockRequests } from "./useStockRequests";
 import { useStockAdjustment } from "./useStockAdjustment";
 import { useTracking } from "./useTracking";
+import { useLabelPrinting } from "./useLabelPrinting";
+import { useTaxInvoicePrinting } from "./useTaxInvoicePrinting";
 
 export function useOrdersPage() {
   const { data: session } = useSession();
@@ -35,7 +31,7 @@ export function useOrdersPage() {
   const userIsAdmin = userRole === "admin";
   const userIsDecorator = isDecoratorRole(userRole);
   const decoratorCategory = getDecoratorCategory(userRole);
-  const ordersColSpan = userIsAdmin ? 11 : 10;
+  const ordersColSpan = (userIsAdmin ? 11 : 10) + (userIsDecorator ? 0 : 1);
   const userIsStaff = isStaffLikeRole(userRole);
   const userIsTest = isTestUserRole(userRole);
 
@@ -46,38 +42,6 @@ export function useOrdersPage() {
   };
 
   const [error, setError] = useState("");
-
-  const [printingOrderId, setPrintingOrderId] = useState<string | null>(null);
-  const printPackingSlipLabel = async (order: OrderRow) => {
-    setPrintingOrderId(order.id);
-
-    try {
-      const res = await fetch(
-        `/api/orders/${encodeURIComponent(order.id)}/packing-slip`,
-      );
-      const json = (await res.json()) as ApiResponse<PackingSlipLabel>;
-
-      if (!res.ok || !json.success) {
-        throw new Error(
-          getApiErrorMessage(json, "Failed to load packing slip label"),
-        );
-      }
-
-      const printHtml = buildPackingSlipDocument(
-        json.data,
-        window.location.origin,
-      );
-      await printDocumentInHiddenFrame(printHtml);
-    } catch (err) {
-      toast.error(
-        err instanceof Error
-          ? err.message
-          : "Failed to load packing slip label.",
-      );
-    } finally {
-      setPrintingOrderId(null);
-    }
-  };
 
   const filters = useOrdersFilters({ userIsDecorator: userIsDecorator });
 
@@ -160,6 +124,14 @@ export function useOrdersPage() {
   });
 
   const tracking = useTracking({ orders: data.orders, setOrders: data.setOrders });
+
+  const labelPrinting = useLabelPrinting({
+    orders: data.orders,
+    setOrders: data.setOrders,
+    userIsTest,
+  });
+
+  const taxInvoicePrinting = useTaxInvoicePrinting();
 
   const handleRefresh = () => {
     data.setRefreshRotation((prev) => prev + 360);
@@ -380,8 +352,18 @@ export function useOrdersPage() {
     handleAdminApproveRequest: fulfillmentRequests.handleAdminApproveRequest,
     handleAdminRejectRequest: fulfillmentRequests.handleAdminRejectRequest,
     // packing slip / printing
-    printPackingSlipLabel,
-    printingOrderId,
+    printPackingSlipLabel: labelPrinting.printPackingSlipLabel,
+    printingOrderId: labelPrinting.printingOrderId,
+    printTaxInvoice: taxInvoicePrinting.printTaxInvoice,
+    printingInvoiceOrderId: taxInvoicePrinting.printingInvoiceOrderId,
+    bulkPrinting: labelPrinting.bulkPrinting,
+    selectedLabelIds: labelPrinting.selectedLabelIds,
+    printableLabelCount: labelPrinting.printableLabelCount,
+    allLabelsOnPageSelected: labelPrinting.allLabelsOnPageSelected,
+    toggleLabelSelected: labelPrinting.toggleLabelSelected,
+    toggleSelectAllLabelsOnPage: labelPrinting.toggleSelectAllLabelsOnPage,
+    clearLabelSelection: labelPrinting.clearLabelSelection,
+    bulkPrintLabels: labelPrinting.bulkPrintLabels,
     // messages
     messageModal: messages.messageModal,
     setMessageModal: messages.setMessageModal,

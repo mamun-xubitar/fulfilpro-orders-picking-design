@@ -4,7 +4,7 @@ import { memo } from 'react';
 import VariantLocationCell from './VariantLocationCell';
 import { useInventoryAccess } from './InventoryAccess';
 import type { LocationOption } from './hooks/useLocations';
-import { IncomingCell, LocationStockCell, Num, NumCell, RowAction, SkuCell, VariantTitleCell } from './VariantsMatrixCells';
+import { AvailableCell, IncomingCell, LocationStockCell, Num, NumCell, RowAction, SkuCell, VariantTitleCell } from './VariantsMatrixCells';
 import { STATUS_STYLES } from './constants';
 import { Check, Close, Trash } from './icons';
 import { computeVariant, formatCurrencyValue, formatMoney, formatNumber } from './utils';
@@ -121,7 +121,7 @@ function VariantsMatrixRow({
         onChange={(allocated) => set({ allocated })}
       />
 
-      <Num value={formatNumber(available)} className="font-bold text-inventory-success-hover" />
+      <AvailableCell available={available} lots={variant.incomingLots} />
 
       <IncomingCell lots={variant.incomingLots} />
       {showAllColumns && <NumCell value={variant.trigger} label={`Reorder trigger for ${name}`} {...cell('trigger')} onChange={(trigger) => set({ trigger })} />}

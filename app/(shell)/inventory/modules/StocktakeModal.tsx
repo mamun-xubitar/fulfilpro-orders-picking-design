@@ -3,12 +3,10 @@
 import { ModalShell } from '@/components/ModalShell';
 import { useInventoryAccess } from './InventoryAccess';
 import { locationChipClass } from './LocationPickerMenu';
+import StocktakeFilterMultiSelect from './StocktakeFilterMultiSelect';
 import { variantTitle } from './utils';
 import { NO_LOCATION, type useStocktake } from './hooks/useStocktake';
 import { SPINNER, WIZARD_BODY_CLASS, WIZARD_BTN_FINISH, WIZARD_BTN_SECONDARY, WIZARD_CARD_CLASS } from './modalStyles';
-
-const CONTROL =
-  'h-[24px] rounded-[7px] border border-inventory-border-strong bg-inventory-surface px-[6px] text-[11px] leading-none outline-none focus:border-inventory-primary focus:ring-2 focus:ring-inventory-primary-ring cursor-pointer';
 
 type StocktakeState = ReturnType<typeof useStocktake>;
 
@@ -16,32 +14,15 @@ function StocktakeFilterBar({ stocktake }: { stocktake: StocktakeState }) {
   const { filters, options } = stocktake;
   return (
     <div className="mb-2 flex flex-wrap items-center gap-[6px]">
-      <select value={filters.locationId} onChange={(e) => stocktake.setFilter('locationId', e.target.value)} aria-label="Location" className={CONTROL}>
-        <option value="">All locations</option>
-        {options.locations.map((l) => (
-          <option key={l.id} value={l.id}>
-            {l.name}
-          </option>
-        ))}
-        {options.hasUnlocated && <option value={NO_LOCATION}>No location</option>}
-      </select>
-      <select value={filters.colour} onChange={(e) => stocktake.setFilter('colour', e.target.value)} aria-label="Colour" className={CONTROL}>
-        <option value="">All colours</option>
-        {options.colours.map((c) => (
-          <option key={c.value} value={c.value}>
-            {c.label}
-          </option>
-        ))}
-      </select>
-      <select value={filters.size} onChange={(e) => stocktake.setFilter('size', e.target.value)} aria-label="Size" className={CONTROL}>
-        <option value="">All sizes</option>
-        {options.sizes.map((s) => (
-          <option key={s} value={s}>
-            {s}
-          </option>
-        ))}
-      </select>
-      {(filters.locationId || filters.colour || filters.size) && (
+      <StocktakeFilterMultiSelect
+        noun="locations"
+        options={[...options.locations.map((l) => ({ value: l.id, label: l.name })), ...(options.hasUnlocated ? [{ value: NO_LOCATION, label: 'No location' }] : [])]}
+        selected={filters.locationIds}
+        onChange={(next) => stocktake.setFilter('locationIds', next)}
+      />
+      <StocktakeFilterMultiSelect noun="colours" options={options.colours} selected={filters.colours} onChange={(next) => stocktake.setFilter('colours', next)} />
+      <StocktakeFilterMultiSelect noun="sizes" options={options.sizes.map((s) => ({ value: s, label: s }))} selected={filters.sizes} onChange={(next) => stocktake.setFilter('sizes', next)} />
+      {(filters.locationIds.length > 0 || filters.colours.length > 0 || filters.sizes.length > 0) && (
         <button type="button" onClick={stocktake.clearFilters} className="h-[22px] rounded-[6px] px-[8px] text-[10px] font-bold text-inventory-secondary hover:bg-inventory-secondary/10 cursor-pointer">
           Clear filters
         </button>

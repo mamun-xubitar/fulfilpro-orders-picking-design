@@ -3,11 +3,12 @@
 import { MODAL_FOOTER_BTN_DANGER, MODAL_FOOTER_BTN_SECONDARY, ModalShell } from '@/components/ModalShell';
 import Pagination from '@/components/Pagination';
 import { locationChipClass } from './LocationPickerMenu';
-import type { LocationsState } from './hooks/useLocations';
+import { LOCATION_PAGE_SIZE_OPTIONS, type LocationsState } from './hooks/useLocations';
 import { Pencil, Plus, Search, Trash } from './icons';
 import { useInventoryAccess } from './InventoryAccess';
 import { SkeletonRows, type SkeletonCell } from './Skeleton';
 import { formatDate } from './utils';
+import { STICKY_THEAD } from './constants';
 
 const TH = 'px-2 py-1';
 const SKELETON: SkeletonCell[] = ['text', 'text', 'num', 'text', { kind: 'actions', count: 2 }];
@@ -17,7 +18,7 @@ const SKELETON: SkeletonCell[] = ['text', 'text', 'num', 'text', { kind: 'action
 export default function LocationsTab({ locations: l, onOpenStoreLocations }: { locations: LocationsState; onOpenStoreLocations: () => void }) {
   const { canEdit } = useInventoryAccess();
   return (
-    <div className="overflow-hidden rounded-xl border border-inventory-border bg-inventory-surface shadow-sm">
+    <div className="overflow-hidden rounded-xl border border-inventory-border bg-inventory-surface shadow-sm xl:flex xl:min-h-0 xl:flex-1 xl:flex-col">
       <div className="flex flex-wrap items-center gap-[6px] border-b border-inventory-border px-2 py-1.5">
         <div className="relative min-w-44 flex-1 sm:w-56 sm:flex-none">
           <Search className="pointer-events-none absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-inventory-text-subtle" />
@@ -51,10 +52,10 @@ export default function LocationsTab({ locations: l, onOpenStoreLocations }: { l
         )}
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto thin-scroll xl:min-h-0 xl:flex-1 xl:overflow-y-auto">
         <table aria-busy={l.loading || l.initialLoading} className="w-full border-collapse text-[11px] leading-none">
-          <thead>
-            <tr className="border-b border-inventory-border text-left text-[10px] font-bold uppercase tracking-[0.4px] text-inventory-text-subtle">
+          <thead className={STICKY_THEAD}>
+            <tr className="bg-inventory-surface border-b border-inventory-border text-left text-[10px] font-bold uppercase tracking-[0.4px] text-inventory-text-subtle">
               <th className={TH}>Name</th>
               <th className={TH}>Description</th>
               <th className={`${TH} text-right`}>Variants</th>
@@ -73,7 +74,7 @@ export default function LocationsTab({ locations: l, onOpenStoreLocations }: { l
               </tr>
             ) : (
               l.rows.map((row) => (
-                <tr key={row.id} className="border-b border-inventory-divider transition-colors duration-150 last:border-0 hover:bg-inventory-surface-hover">
+                <tr key={row.id} className="border-b border-inventory-divider transition-colors duration-150 hover:bg-inventory-surface-hover">
                   <td className="px-2 py-1">
                     <span className={`inline-flex items-center rounded-[4px] border px-[5px] py-[2px] text-[10px] font-semibold ${locationChipClass(row.id)}`}>{row.name}</span>
                   </td>
@@ -101,7 +102,7 @@ export default function LocationsTab({ locations: l, onOpenStoreLocations }: { l
         </table>
       </div>
 
-      <Pagination pagination={l.pagination} loading={l.loading} pageNumbers={l.pageNumbers} onPageChange={l.goToPage} itemLabel="locations" />
+      <Pagination pagination={l.pagination} loading={l.loading} pageNumbers={l.pageNumbers} onPageChange={l.goToPage} itemLabel="locations" pageSizeOptions={LOCATION_PAGE_SIZE_OPTIONS} onPageSizeChange={l.setPageSize} />
 
       {l.deleteTarget && (
         <ModalShell

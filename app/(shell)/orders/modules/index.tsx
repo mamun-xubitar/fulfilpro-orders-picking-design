@@ -106,6 +106,12 @@ export default function OrdersPage() {
         selectedNameCount={p.selectedNameCount}
         expandAll={p.expandAll}
         handleToggleExpandAll={p.handleToggleExpandAll}
+        showLabelPrint={!p.userIsDecorator}
+        selectedLabelCount={p.selectedLabelIds.size}
+        printableLabelCount={p.printableLabelCount}
+        bulkPrinting={p.bulkPrinting}
+        onBulkPrint={() => void p.bulkPrintLabels()}
+        onClearLabelSelection={p.clearLabelSelection}
       />
 
 

@@ -1,8 +1,11 @@
-import { OrderModel, type FulfillmentLineInput } from '@/models/order.model.server';
+import { OrderModel, type FulfillmentLineInput, type OrderFinancials } from '@/models/order.model.server';
 import { ProductModel } from '@/models/product.model.server';
 import { enqueueJob } from '@/lib/background-jobs.server';
 import prisma from '@/lib/prisma.server';
 import { getDecorationCrossVisibility } from '@/lib/decoration-visibility.server';
+import { fetchShopifyOrderFinancials } from '@/lib/shopify-order-fetch.server';
+import { buildTaxInvoice, summarizePayments, type PaymentSummary, type TaxInvoice } from '@/lib/tax-invoice.server';
+import { getSettingsTimezone } from '@/lib/task-due-date.server';
 
 const model = new OrderModel();
 const productModel = new ProductModel();
@@ -243,6 +246,79 @@ export class OrderController {
     return {
       data: label,
       message: 'Packing slip label retrieved',
+    };
+  }
+
+  async getPackingSlipLabels(ids: string[], allowedStoreIds: string[] | null) {
+    const orderIds = parseLabelOrderIds(ids);
+    const labels = await model.getPackingSlipLabels(orderIds, allowedStoreIds);
+
+    return {
+      data: labels,
+      message: 'Packing slip labels retrieved',
+    };
+  }
+
+  async getTaxInvoice(
+    orderId: string,
+  ): Promise<{ error: { message: string; status: number } } | { data: TaxInvoice; message: string }> {
+    let source = await model.getTaxInvoiceSource(orderId);
+    let notice: string | null = null;
+    let liveShipping: number | null = null;
+
+    // Always read the money figures fresh: payment status, tax and totals change in Shopify
+    // (EFT marked paid, edits, refunds) and nothing else keeps them current here.
+    const loaded = await this.loadOrderFinancials(source);
+    if ('financials' in loaded) {
+      source = { ...source, financials: loaded.financials, paymentMethods: loaded.paymentMethods };
+      liveShipping = loaded.shipping;
+    } else if (source.financials.currentTotalPrice !== null && source.financials.amountPaid !== null) {
+      notice = "Couldn't reach Shopify, so this invoice shows the last synced payment figures.";
+    } else {
+      return {
+        error: {
+          message: `Couldn't load this order's payment figures from Shopify: ${loaded.reason}.`,
+          status: 409,
+        },
+      };
+    }
+
+    const timezone = await getSettingsTimezone();
+    return { data: { ...buildTaxInvoice(source, timezone, liveShipping), notice }, message: 'Tax invoice retrieved' };
+  }
+
+  private async loadOrderFinancials(
+    source: Awaited<ReturnType<typeof model.getTaxInvoiceSource>>,
+  ): Promise<
+    { financials: OrderFinancials; paymentMethods: PaymentSummary; shipping: number | null } | { reason: string }
+  > {
+    if (!source.store.accessToken) return { reason: 'the store is disconnected' };
+    if (!source.shopifyOrderId) return { reason: 'the order has no Shopify id' };
+
+    try {
+      const { financials, shipping, payments } = await fetchShopifyOrderFinancials({
+        shop: source.store.storeDomain,
+        accessToken: source.store.accessToken,
+        orderId: source.shopifyOrderId,
+      });
+      if (financials.currentTotalPrice === null || financials.amountPaid === null) {
+        return { reason: 'Shopify returned no total or payment amount' };
+      }
+      const paymentMethods = summarizePayments(payments);
+      await model.saveOrderFinancials(source.id, financials, paymentMethods);
+      return { financials, paymentMethods, shipping };
+    } catch (error) {
+      return { reason: error instanceof Error ? error.message : 'request failed' };
+    }
+  }
+
+  async markLabelsPrinted(body: unknown, allowedStoreIds: string[] | null) {
+    const orderIds = parseLabelOrderIds((body as { orderIds?: unknown } | null)?.orderIds);
+    const result = await model.markLabelsPrinted(orderIds, allowedStoreIds);
+
+    return {
+      data: result,
+      message: 'Label prints recorded',
     };
   }
 
@@ -667,4 +743,16 @@ function normalizePositiveInt(value: string | null, fallback: number) {
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
+}
+
+const MAX_LABEL_ORDER_IDS = 200;
+
+function parseLabelOrderIds(value: unknown) {
+  if (!Array.isArray(value) || value.length === 0 || value.some((id) => typeof id !== 'string' || !id)) {
+    throw new Error('orderIds must be a non-empty list of order ids');
+  }
+  if (value.length > MAX_LABEL_ORDER_IDS) {
+    throw new Error(`At most ${MAX_LABEL_ORDER_IDS} orders can be printed at once`);
+  }
+  return [...new Set(value as string[])];
 }

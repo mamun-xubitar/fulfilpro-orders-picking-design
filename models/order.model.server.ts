@@ -28,6 +28,7 @@ import {
   type LineDecorationSummary,
 } from '@/models/decoration.model.server';
 import { TrackingModel, type TrackingSummary } from '@/models/tracking.model.server';
+import type { PaymentSummary } from '@/lib/tax-invoice.server';
 import { Prisma } from '@prisma/client';
 type OrderMessageTypeInput = 'orders' | 'picker';
 
@@ -51,6 +52,11 @@ export type ShopifyOrderPayload = {
       currency_code?: string | null;
     };
   };
+  current_subtotal_price?: string | number | null;
+  current_total_discounts?: string | number | null;
+  current_total_tax?: string | number | null;
+  taxes_included?: boolean | null;
+  net_payment?: string | number | null;
   discount_codes?: Array<{
     code?: string | null;
     amount?: string | number | null;
@@ -140,6 +146,7 @@ export type ShopifyOrderPayload = {
     custom_attributes?: Array<{ name?: string | null; value?: string | number | null }> | null;
     image?: { src?: string | null; url?: string | null } | null;
     price?: string | number | null;
+    original_price?: string | number | null;
     price_set?: {
       shop_money?: {
         amount?: string | number | null;
@@ -1043,13 +1050,44 @@ export class OrderModel {
   async getPackingSlipLabel(orderId: string) {
     const order = await prisma.order.findUnique({
       where: { id: orderId },
+      include: packingSlipInclude,
+    });
+
+    if (!order) {
+      throw new Error('Order not found');
+    }
+
+    return toPackingSlipLabel(order);
+  }
+
+  async getPackingSlipLabels(orderIds: string[], allowedStoreIds: string[] | null) {
+    const orders = await prisma.order.findMany({
+      where: {
+        id: { in: orderIds },
+        ...(allowedStoreIds !== null ? { storeId: { in: allowedStoreIds } } : {}),
+      },
+      include: packingSlipInclude,
+    });
+    const byId = new Map(orders.map((order) => [order.id, order]));
+
+    return orderIds.flatMap((id) => {
+      const order = byId.get(id);
+      return order ? [toPackingSlipLabel(order)] : [];
+    });
+  }
+
+  async getTaxInvoiceSource(orderId: string) {
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
       include: {
         store: {
           select: {
             name: true,
             storeDomain: true,
             url: true,
-            logoPath: true,
+            email: true,
+            accessToken: true,
+            invoiceSetting: true,
           },
         },
       },
@@ -1059,6 +1097,7 @@ export class OrderModel {
       throw new Error('Order not found');
     }
 
+    const { store } = order;
     return {
       id: order.id,
       number: order.number,
@@ -1069,13 +1108,52 @@ export class OrderModel {
       state: order.state,
       zip: order.zip,
       country: order.country,
-      phone: order.phone,
-      note: order.note,
-      storeName: order.store.name ?? order.store.storeDomain,
-      storeDomain: order.store.storeDomain,
-      storeUrl: order.store.url,
-      storeLogoPath: order.store.logoPath,
+      orderedAt: order.orderedAt ?? order.createdAt,
+      currencyCode: order.currencyCode,
+      lineItems: toLineItems(order.lineItems),
+      shippingLines: toShippingLines(order.shippingLines),
+      shopifyOrderId: toFulfillmentItems(order.fulfillmentItems).shopifyOrderId,
+      financials: toOrderFinancials(order),
+      paymentMethods: toPaymentSummary(order.paymentMethods),
+      store: {
+        name: store.name,
+        storeDomain: store.storeDomain,
+        url: store.url,
+        email: store.email,
+        accessToken: store.accessToken,
+        invoiceSetting: store.invoiceSetting,
+      },
     };
+  }
+
+  async saveOrderFinancials(orderId: string, figures: OrderFinancials, paymentMethods: PaymentSummary) {
+    await prisma.order.update({
+      where: { id: orderId },
+      data: {
+        currentSubtotalPrice: figures.currentSubtotalPrice,
+        currentTotalDiscounts: figures.currentTotalDiscounts,
+        currentTotalTax: figures.currentTotalTax,
+        currentTotalPrice: figures.currentTotalPrice,
+        amountPaid: figures.amountPaid,
+        taxesIncluded: figures.taxesIncluded,
+        paymentMethods: paymentMethods as Prisma.InputJsonValue,
+      },
+    });
+  }
+
+  async markLabelsPrinted(orderIds: string[], allowedStoreIds: string[] | null) {
+    const where = {
+      id: { in: orderIds },
+      ...(allowedStoreIds !== null ? { storeId: { in: allowedStoreIds } } : {}),
+    };
+    const matched = await prisma.order.findMany({ where, select: { id: true } });
+    const printedOrderIds = matched.map((order) => order.id);
+    await prisma.order.updateMany({
+      where: { id: { in: printedOrderIds } },
+      data: { labelPrintedAt: new Date() },
+    });
+
+    return { printedOrderIds };
   }
 
   async saveBarcodes(orderId: string, barcodes: string[]) {
@@ -1622,6 +1700,7 @@ function toOrderRow(row: {
   canceled: boolean;
   canceledAt: Date | null;
   orderedAt: Date | null;
+  labelPrintedAt: Date | null;
   lineItems: Prisma.JsonValue;
   shippingLines: Prisma.JsonValue | null;
   fulfillmentItems: Prisma.JsonValue | null;
@@ -1698,6 +1777,7 @@ function toOrderRow(row: {
     canceledAt: toSafeISOString(row.canceledAt),
     status: getDisplayStatus(row),
     orderedAt: toSafeISOString(row.orderedAt) ?? undefined,
+    labelPrintedAt: toSafeISOString(row.labelPrintedAt),
     storeId: row.store.id,
     storeName: row.store.name ?? row.store.storeDomain,
     storeDomain: row.store.storeDomain,
@@ -1726,6 +1806,73 @@ function toOrderRow(row: {
     packedQuantity,
     totalQuantity,
     trackings: trackings ?? [],
+  };
+}
+
+function toPaymentSummary(value: Prisma.JsonValue | null): PaymentSummary | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const obj = value as Record<string, unknown>;
+  const strings = (list: unknown) =>
+    Array.isArray(list) ? list.filter((item): item is string => typeof item === 'string') : [];
+  return { lines: strings(obj.lines), manual: obj.manual === true, manualNames: strings(obj.manualNames) };
+}
+
+export type OrderFinancials = {
+  currentSubtotalPrice: number | null;
+  currentTotalDiscounts: number | null;
+  currentTotalTax: number | null;
+  currentTotalPrice: number | null;
+  amountPaid: number | null;
+  taxesIncluded: boolean | null;
+};
+
+function toOrderFinancials(order: {
+  currentSubtotalPrice: Prisma.Decimal | null;
+  currentTotalDiscounts: Prisma.Decimal | null;
+  currentTotalTax: Prisma.Decimal | null;
+  currentTotalPrice: Prisma.Decimal | null;
+  amountPaid: Prisma.Decimal | null;
+  taxesIncluded: boolean | null;
+}): OrderFinancials {
+  const num = (value: Prisma.Decimal | null) => (value === null ? null : Number(value));
+  return {
+    currentSubtotalPrice: num(order.currentSubtotalPrice),
+    currentTotalDiscounts: num(order.currentTotalDiscounts),
+    currentTotalTax: num(order.currentTotalTax),
+    currentTotalPrice: num(order.currentTotalPrice),
+    amountPaid: num(order.amountPaid),
+    taxesIncluded: order.taxesIncluded,
+  };
+}
+
+const packingSlipInclude = {
+  store: {
+    select: {
+      name: true,
+      storeDomain: true,
+      url: true,
+      logoPath: true,
+    },
+  },
+} satisfies Prisma.OrderInclude;
+
+function toPackingSlipLabel(order: Prisma.OrderGetPayload<{ include: typeof packingSlipInclude }>) {
+  return {
+    id: order.id,
+    number: order.number,
+    customer: order.cusName,
+    address: order.address,
+    address2: order.address2,
+    city: order.city,
+    state: order.state,
+    zip: order.zip,
+    country: order.country,
+    phone: order.phone,
+    note: order.note,
+    storeName: order.store.name ?? order.store.storeDomain,
+    storeDomain: order.store.storeDomain,
+    storeUrl: order.store.url,
+    storeLogoPath: order.store.logoPath,
   };
 }
 
@@ -1892,6 +2039,7 @@ function buildOrderWriteData(
         vendor: item.vendor ?? '',
         qty: resolveLineItemQuantity(item, fulfilledQuantityByLineItem),
         price: Number(item.price_set?.shop_money?.amount ?? item.price ?? 0),
+        originalPrice: toOptionalMoney(item.original_price ?? item.price_set?.shop_money?.amount ?? item.price) ?? null,
         currencyCode: item.price_set?.shop_money?.currency_code ?? null,
         position,
       };
@@ -1945,9 +2093,29 @@ function buildOrderWriteData(
     fulfillmentItems,
     price: Number.isFinite(price) ? price : 0,
     currencyCode,
+    ...buildOrderFinancialData(payload),
     storeId,
     orderedAt: new Date(payload.created_at),
   };
+}
+
+/** Shopify's own subtotal/discount/tax/total, used by the tax invoice. Absent values are left
+ * `undefined` so a partial payload never clears figures a fuller sync already stored. */
+function buildOrderFinancialData(payload: ShopifyOrderPayload) {
+  return {
+    currentSubtotalPrice: toOptionalMoney(payload.current_subtotal_price),
+    currentTotalDiscounts: toOptionalMoney(payload.current_total_discounts),
+    currentTotalTax: toOptionalMoney(payload.current_total_tax),
+    currentTotalPrice: toOptionalMoney(payload.current_total_price ?? payload.total_price_set?.shop_money?.amount),
+    amountPaid: toOptionalMoney(payload.net_payment),
+    taxesIncluded: typeof payload.taxes_included === 'boolean' ? payload.taxes_included : undefined,
+  };
+}
+
+function toOptionalMoney(value: unknown): number | undefined {
+  if (value === null || value === undefined || value === '') return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
 }
 
 function resolveFulfillmentStatus(payloadStatus?: string | null) {
@@ -2842,13 +3010,14 @@ function toLineItems(value: Prisma.JsonValue): Array<{
   vendor: string;
   qty: number;
   price: number;
+  originalPrice: number | null;
   position: number;
 }> {
   if (!Array.isArray(value)) return [];
 
   return value.map((item, index) => {
     if (!item || typeof item !== 'object') {
-      return { id: '', productId: null, variantId: null, name: '', title: '', variantTitle: '', variantOptions: [], customAttributes: [], imageUrl: null, sku: '', vendor: '', qty: 0, price: 0, position: index };
+      return { id: '', productId: null, variantId: null, name: '', title: '', variantTitle: '', variantOptions: [], customAttributes: [], imageUrl: null, sku: '', vendor: '', qty: 0, price: 0, originalPrice: null, position: index };
     }
 
     const obj = item as Record<string, unknown>;
@@ -2866,6 +3035,7 @@ function toLineItems(value: Prisma.JsonValue): Array<{
       vendor: typeof obj.vendor === 'string' ? obj.vendor : '',
       qty: typeof obj.qty === 'number' ? obj.qty : Number(obj.qty ?? 0),
       price: typeof obj.price === 'number' ? obj.price : Number(obj.price ?? 0),
+      originalPrice: toOptionalMoney(obj.originalPrice) ?? null,
       position: typeof obj.position === 'number' ? obj.position : index,
     };
   });

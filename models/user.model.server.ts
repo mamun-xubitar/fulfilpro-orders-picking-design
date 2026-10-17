@@ -1,7 +1,26 @@
-import prisma from '@/lib/prisma.server';
+import { evaluateStaffAccess, getSessionExpiresAt, getUserAuthPolicy } from '@/lib/auth-policy.server';
 import { saltAndHashPassword } from '@/lib/password';
-import { evaluateStaffAccess, getUserAuthPolicy, getSessionExpiresAt } from '@/lib/auth-policy.server';
+import prisma from '@/lib/prisma.server';
 import { isRestrictedSessionRole } from '@/lib/roles';
+import { Prisma } from '@prisma/client';
+
+const DELETED_SUFFIX = ' (deleted)';
+
+/** History tables that snapshot a performer as [table, id column, name column]. Add any new `*ById`/`*ByName` history column here. */
+const HISTORY_ACTOR_COLUMNS = [
+  ['InventoryActivity', 'actorId', 'actorName'],
+  ['StockAdjustmentBatch', 'actorId', 'actorName'],
+  ['StockAdjustment', 'actorId', 'actorName'],
+  ['Stocktake', 'startedById', 'startedByName'],
+  ['Stocktake', 'countedById', 'countedByName'],
+  ['Stocktake', 'syncedById', 'syncedByName'],
+  ['PurchaseOrder', 'createdById', 'createdByName'],
+  ['PurchaseOrder', 'statusUpdatedById', 'statusUpdatedByName'],
+  ['PurchaseOrderPayment', 'createdById', 'createdByName'],
+  ['PurchaseOrderPayment', 'updatedById', 'updatedByName'],
+  ['PurchaseOrderPaymentHistory', 'actorId', 'actorName'],
+  ['PurchaseOrderReceipt', 'receivedById', 'receivedByName'],
+] as const;
 
 type SessionStatus = 'logged_in' | 'logout' | 'access_restricted' | 'session_timeout';
 
@@ -87,7 +106,13 @@ export class UserModel {
   }
 
   async delete(id: string): Promise<void> {
-    await prisma.user.delete({ where: { id } });
+    await prisma.$transaction([
+      ...HISTORY_ACTOR_COLUMNS.map(
+        ([table, idColumn, nameColumn]) =>
+          prisma.$executeRaw`UPDATE ${Prisma.raw(`"${table}"`)} SET ${Prisma.raw(`"${nameColumn}"`)} = ${Prisma.raw(`"${nameColumn}"`)} || ${DELETED_SUFFIX} WHERE ${Prisma.raw(`"${idColumn}"`)} = ${id}`
+      ),
+      prisma.user.delete({ where: { id } }),
+    ]);
   }
 }
 

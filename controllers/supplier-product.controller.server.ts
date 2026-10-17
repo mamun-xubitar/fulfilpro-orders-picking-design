@@ -43,6 +43,13 @@ function paginationOf(page: number, pageSize: number, total: number): CatalogueP
   return { page: clampedPage, pageSize, total, totalPages, hasPrev: clampedPage > 1, hasNext: clampedPage < totalPages };
 }
 
+/** `{ [fromLocationId]: toLocationId }` — where a removed location's stock moves. Whether each
+ * destination survives the write is checked by setLocationStock. */
+function parseRemap(raw: unknown): Record<string, string> {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  return Object.fromEntries(Object.entries(raw as Record<string, unknown>).filter((e): e is [string, string] => typeof e[1] === 'string'));
+}
+
 export class SupplierProductController {
   private async loadGlobals() {
     const [settings, currencies] = await Promise.all([
@@ -97,7 +104,7 @@ export class SupplierProductController {
 
     if (mode === 'table') {
       const page = Math.max(1, Number(searchParams.get('page')) || 1);
-      const pageSize = [20, 50, 100].includes(Number(searchParams.get('pageSize'))) ? Number(searchParams.get('pageSize')) : 20;
+      const pageSize = [10, 20, 30, 40, 50, 100].includes(Number(searchParams.get('pageSize'))) ? Number(searchParams.get('pageSize')) : 20;
       const search = searchParams.get('search')?.trim() || undefined;
       const params: CatalogueListParams = { page, pageSize, search, verified, status, supplierId, inventoryCategoryId, quickFilter, sort, dir, includeOmitted };
       // Every supplier/category in the system, not just ones with linked products — one with
@@ -390,6 +397,9 @@ export class SupplierProductController {
       }
       if (locationStock.length > 0 && (await locationModel.countExisting([...seen])) !== locationStock.length) errors.push('locationStock: Pick existing locations');
     }
+    // Stock from a removed location moves into a survivor: `remap[fromLocationId]` is the
+    // destination kept in `locationStock`.
+    const remap = parseRemap(value.remap);
     // A located variant's stock on hand is the sum of its locations — it's only set directly while
     // the variant has no location.
     if (numeric.stockOnHand !== undefined) {
@@ -404,8 +414,8 @@ export class SupplierProductController {
     let imageId: string | null | undefined;
 
     try {
-      // Locations first: dropping one that still holds stock is refused before anything is written.
-      if (locationStock !== undefined) await locationModel.setVariantLocationStock(variantId, locationStock);
+      // Locations first: a dropped location holding stock moves into its remap destination.
+      if (locationStock !== undefined) await locationModel.setVariantLocationStock(variantId, locationStock, remap);
       await model.updateVariant(variantId, {
         ...(typeof value.sku === 'string' ? { sku: value.sku.trim() || null } : {}),
         ...(typeof value.barcode === 'string' ? { barcode: value.barcode.trim() || null } : {}),
@@ -463,10 +473,12 @@ export class SupplierProductController {
     if (variantIds.length === 0) errors.push('variantIds: Select at least one variant');
     if (mode === 'add' && locationIds.length === 0) errors.push('locationIds: Pick at least one location');
     if (locationIds.length > 0 && (await locationModel.countExisting(locationIds)) !== locationIds.length) errors.push('locationIds: Pick existing locations');
+    // Stock from each removed location moves into one survivor: `remap[fromId]` is a kept location.
+    const remap = parseRemap(value.remap);
     if (errors.length) return { error: { message: 'Validation failed', errors, status: 400 } };
 
     try {
-      await locationModel.bulkSetVariantLocations(variantIds, locationIds, mode);
+      await locationModel.bulkSetVariantLocations(variantIds, locationIds, mode, remap);
     } catch (error) {
       if (error instanceof StockError) return { error: { message: error.message, errors: [`locationIds: ${error.message}`], status: 400 } };
       throw error;

@@ -9,7 +9,7 @@ import { paidLabel, printPurchaseOrders, receivedLabel } from './poPrint';
 import type { PurchaseOrderRecord } from './types';
 import { formatDate, formatMoney, formatPoNumber, poAveragePrice } from './utils';
 
-const GRID_COLS = 'grid-cols-[minmax(0,1fr)_7rem_5.5rem_4.5rem_4.5rem_4.5rem_5rem_8rem]';
+const GRID_COLS = 'grid-cols-[minmax(0,1fr)_7rem_5.5rem_4.5rem_4.5rem_4.5rem_5rem_9rem_8rem]';
 
 type ViewPoModalProps = { po: PurchaseOrderRecord; onClose: () => void };
 
@@ -71,11 +71,17 @@ export default function ViewPoModal({ po, onClose }: ViewPoModalProps) {
             </div>
             <div>
               <dt className="inline text-inventory-text-subtle">Created: </dt>
-              <dd className="inline">{formatDate(po.createdAt)}</dd>
+              <dd className="inline">{formatDate(po.createdAt)} by {po.createdByName}</dd>
             </div>
+            {po.statusUpdatedByName && (
+              <div>
+                <dt className="inline text-inventory-text-subtle">Last status change: </dt>
+                <dd className="inline">{po.statusUpdatedByName} · {formatDate(po.statusUpdatedAt)}</dd>
+              </div>
+            )}
             <div>
               <dt className="inline text-inventory-text-subtle">Received: </dt>
-              <dd className="inline">{receivedLabel(po)}</dd>
+              <dd className="inline">{receivedLabel(po)}{po.receivedBy.length > 0 && ` by ${po.receivedBy.join(', ')}`}</dd>
             </div>
             {po.receivedLocations.length > 0 && (
               <div>
@@ -111,6 +117,7 @@ export default function ViewPoModal({ po, onClose }: ViewPoModalProps) {
             <span className="flex min-h-[16px] items-center justify-end text-right">Ordered</span>
             <span className="flex min-h-[16px] items-center justify-end text-right">Received</span>
             <span className="flex min-h-[16px] items-center justify-end text-right">Outstanding</span>
+            <span className="flex min-h-[16px] items-center">Remark</span>
             <span className="flex min-h-[16px] items-center justify-end text-right">Unit cost (AUD)</span>
           </div>
           <div className="divide-y divide-inventory-border">
@@ -125,6 +132,7 @@ export default function ViewPoModal({ po, onClose }: ViewPoModalProps) {
                   <span className="text-right tabular-nums text-inventory-text-subtle">{item.quantity}</span>
                   <span className="text-right tabular-nums text-inventory-text-subtle">{item.receivedQuantity}</span>
                   <span className="text-right tabular-nums font-medium text-inventory-text-muted">{remaining}</span>
+                  <span title={item.remark ?? undefined} className="truncate text-inventory-text-subtle">{item.remark || '—'}</span>
                   <span className="text-right tabular-nums text-inventory-text-muted">{item.unitCost !== null ? `$${formatMoney(item.unitCost)}` : '—'}</span>
                 </div>
               );

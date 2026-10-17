@@ -14,6 +14,7 @@ import InventoryModals from './InventoryModals';
 import LocationsTab from './LocationsTab';
 import PaymentsTab from './PaymentsTab';
 import PurchaseOrdersTab from './PurchaseOrdersTab';
+import PurchaseRecommendTab from './PurchaseRecommendTab';
 import ModuleTabs from './ModuleTabs';
 import ProductDetailsTab from './ProductDetailsTab';
 import ProductPageSkeleton from './ProductPageSkeleton';
@@ -43,6 +44,9 @@ function InventoryPageBody() {
   const { zoomPercent } = useZoom();
   const moduleTab = MODULE_TABS.find((t) => t.id === p.moduleTab)!;
   const isProductTab = p.moduleTab === 'products' || p.moduleTab === 'variants';
+  // Single-product Variant / Products tabs scroll as one page (tabs, toolbar and panels together)
+  // on wide screens; every other view keeps the page fixed and scrolls only inside its tables.
+  const pageScroll = isProductTab && !p.nav.allRecords;
   const { canEdit } = useInventoryAccess();
   // Every bulk action on the selection bar writes, so staff never see it.
   const hasSelection = canEdit && (p.productsTable.selectAllFilters || p.productsTable.selectedIds.length > 0);
@@ -59,7 +63,7 @@ function InventoryPageBody() {
 
   return (
     <main
-      className="inventory-theme flex-1 space-y-2 bg-inventory-bg p-2 xl:flex xl:h-[calc(100vh-60px)] xl:min-h-0 xl:flex-col xl:space-y-0 xl:overflow-hidden xl:gap-2"
+      className={`inventory-theme flex-1 space-y-2 bg-inventory-bg p-2 xl:flex xl:min-h-0 xl:flex-col xl:space-y-0 xl:gap-2 ${pageScroll ? 'xl:overflow-y-auto thin-scroll' : 'xl:overflow-hidden'}`}
       style={{ zoom: `${zoomPercent}%`, '--page-zoom': zoomPercent / 100 } as React.CSSProperties}
     >
       <ModuleTabs active={p.moduleTab} onChange={p.setModuleTab} right={<InventoryGlobals p={p} />} />
@@ -69,7 +73,7 @@ function InventoryPageBody() {
       <ProductsToolbar {...p} />
 
       {p.nav.allRecords ? (
-        <div className="overflow-hidden rounded-xl border border-inventory-border bg-inventory-surface shadow-inventory xl:min-h-0 xl:flex-1 xl:overflow-y-auto">
+        <div className="overflow-hidden rounded-xl border border-inventory-border bg-inventory-surface shadow-inventory xl:flex xl:min-h-0 xl:flex-1 xl:flex-col">
           <ProductsTableToolbar table={p.productsTable} onRefresh={p.productsTable.refresh} loading={p.productsTable.loading} />
           {hasSelection && <ProductsSelectionBar table={p.productsTable} />}
           <ProductsTable table={p.productsTable} loading={p.productsTable.loading} />
@@ -86,7 +90,9 @@ function InventoryPageBody() {
       ) : p.moduleTab === 'suppliers' ? (
         <SuppliersTab suppliers={p.suppliers} onOpenPurchaseOrders={p.openPurchaseOrdersFor} onOpenPayments={p.openPaymentsFor} />
       ) : p.moduleTab === 'purchase-orders' ? (
-        <PurchaseOrdersTab tab={p.poTab} suppliers={p.supplierOptions} onReceive={p.po.openReceive} onPay={p.payment.open} onOpenSupplier={p.openSupplierDetails} onOpenProduct={p.openProductInVariants} />
+        <PurchaseOrdersTab tab={p.poTab} suppliers={p.supplierOptions} onReceive={p.po.openReceive} onPay={p.payment.open} onBulkPay={p.openBulkPay} onOpenSupplier={p.openSupplierDetails} onOpenProduct={p.openProductInVariants} />
+      ) : p.moduleTab === 'purchase-recommend' ? (
+        <PurchaseRecommendTab tab={p.recommendTab} suppliers={p.supplierOptions} onOpenProduct={p.openProductInVariants} onCreatePo={(product, variantIds) => p.po.openCreate(variantIds, product)} />
       ) : p.moduleTab === 'payments' ? (
         <PaymentsTab tab={p.paymentsTab} suppliers={p.supplierOptions} onEdit={p.payment.openById} onOpenSupplier={p.openSupplierDetails} />
       ) : p.moduleTab === 'locations' ? (
@@ -106,7 +112,7 @@ function InventoryPageBody() {
       ) : p.moduleTab === 'variants' ? (
         <VariantsTab p={p} />
       ) : (
-        <div className="space-y-2 xl:flex xl:min-h-0 xl:flex-1 xl:flex-col xl:space-y-0 xl:gap-2 xl:overflow-hidden">
+        <div className="space-y-2 xl:space-y-0 xl:contents">
           <ProductDetailsTab p={p} />
           {!p.matrixFullView && <VariantsMatrixSection p={p} />}
           <BottomPanels p={p} />

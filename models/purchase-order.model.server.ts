@@ -2,7 +2,7 @@ import prisma from '@/lib/prisma.server';
 import { formatPoNumber } from '@/lib/inventory/po-number';
 import { Prisma, PoPaymentStatus, PurchaseOrderStatus } from '@prisma/client';
 import { toPoPaymentRow, type PoPaymentRow } from '@/models/po-payment.model.server';
-import { addStock } from '@/lib/inventory-stock.server';
+import { addStock, assignLocations, variantLocationStock } from '@/lib/inventory-stock.server';
 
 export type PurchaseOrderItemRow = {
   id: string;
@@ -15,6 +15,7 @@ export type PurchaseOrderItemRow = {
   quantity: number;
   receivedQuantity: number;
   unitCost: number | null;
+  remark: string | null;
   /** The linked variant's locations, A→Z — where a receipt can be put away. */
   locations: { id: string; name: string }[];
 };
@@ -42,6 +43,8 @@ export type PurchaseOrderRow = {
   items: PurchaseOrderItemRow[];
   /** Where the PO's receipts were put away, A→Z, totalled per location; empty until something is received (and for POs received before receipts were recorded). */
   receivedLocations: { name: string; quantity: number }[];
+  /** Distinct names of whoever received stock against this PO, A→Z; empty for receipts recorded before this was tracked. */
+  receivedBy: string[];
   /** The hub product's item number. */
   itemNo: string;
   /** What has been paid / is to be paid for this PO; null until a payment is first saved. */
@@ -54,7 +57,7 @@ export type PoPricingSnapshot = { currencyCode: string; exchangeRate: number; bu
 
 const itemsInclude = {
   items: { include: { variant: { select: { colour: true, size: true, locations: { select: { location: { select: { id: true, name: true } } } } } } } },
-  receipts: { select: { locationName: true, quantity: true } },
+  receipts: { select: { locationName: true, quantity: true, receivedByName: true } },
   payment: true,
   supplierProduct: { select: { itemNo: true, pricing: { select: { currencyCode: true, exchangeRate: true, buyingPrice: true, freight: true, misc: true } } } },
 } as const;
@@ -223,11 +226,12 @@ export class PurchaseOrderModel {
   /**
    * Applies received quantities to the hub catalogue: adds stock at the receipt's location (the
    * variant's first location when none is given, its unassigned stock when it has none), and creates a new variant when the receipt references a colour/size the catalogue
-   * doesn't have yet (e.g. the supplier substituted or added an item).
+   * doesn't have yet (e.g. the supplier substituted or added an item). A receipt location the
+   * variant isn't kept at yet is added to it first (any unassigned stock moves into it).
    */
   async receive(
     id: string,
-    receipts: Array<{ itemId?: string; variantId?: string; colour?: string; size?: string; sku?: string | null; locationId?: string | null; quantity: number; unitCost?: number | null }>,
+    receipts: Array<{ itemId?: string; variantId?: string; colour?: string; size?: string; sku?: string | null; locationId?: string | null; quantity: number; unitCost?: number | null; remark?: string | null }>,
     actor: { id: string; name: string }
   ) {
     return prisma.$transaction(async (tx) => {
@@ -247,16 +251,20 @@ export class PurchaseOrderModel {
           unitCost = receipt.unitCost != null ? new Prisma.Decimal(receipt.unitCost) : item.unitCost;
 
           if (!variantId && receipt.colour && receipt.size) {
-            const created = await tx.supplierProductVariant.create({
-              data: { supplierProductId: po.supplierProductId, colour: receipt.colour, size: receipt.size, sku: receipt.sku ?? null },
+            // The combo may already exist (the line lost its link when variants were rebuilt) — reuse it.
+            const existing = await tx.supplierProductVariant.findUnique({
+              where: { supplierProductId_colour_size: { supplierProductId: po.supplierProductId, colour: receipt.colour, size: receipt.size } },
             });
+            const created = existing ?? (await tx.supplierProductVariant.create({
+              data: { supplierProductId: po.supplierProductId, colour: receipt.colour, size: receipt.size, sku: receipt.sku ?? null },
+            }));
             variantId = created.id;
             await tx.purchaseOrderItem.update({ where: { id: item.id }, data: { variantId } });
           }
 
           await tx.purchaseOrderItem.update({
             where: { id: item.id },
-            data: { receivedQuantity: { increment: receipt.quantity }, ...(receipt.unitCost != null && { unitCost: receipt.unitCost }) },
+            data: { receivedQuantity: { increment: receipt.quantity }, ...(receipt.unitCost != null && { unitCost: receipt.unitCost }), ...(receipt.remark !== undefined && { remark: receipt.remark }) },
           });
         } else if (receipt.colour && receipt.size) {
           const existing = await tx.supplierProductVariant.findUnique({
@@ -268,8 +276,13 @@ export class PurchaseOrderModel {
         }
 
         if (variantId) {
+          if (receipt.locationId && !(await variantLocationStock(tx, variantId)).some((l) => l.locationId === receipt.locationId)) {
+            await assignLocations(tx, variantId, [receipt.locationId], new Map(), 'add');
+          }
           const move = await addStock(tx, variantId, receipt.locationId ?? null, receipt.quantity);
-          await tx.purchaseOrderReceipt.create({ data: { purchaseOrderId: id, locationName: move?.locationName ?? null, quantity: receipt.quantity } });
+          await tx.purchaseOrderReceipt.create({
+            data: { purchaseOrderId: id, locationName: move?.locationName ?? null, quantity: receipt.quantity, receivedById: actor.id, receivedByName: actor.name },
+          });
           if (unitCost !== null) await tx.supplierProductVariant.update({ where: { id: variantId }, data: { buyPrice: unitCost } });
         }
       }
@@ -355,6 +368,7 @@ function toPurchaseOrderRow(row: PurchaseOrderWithItems): PurchaseOrderRow {
         }
       : null,
     receivedLocations: receivedLocations(row.receipts),
+    receivedBy: [...new Set(row.receipts.map((r) => r.receivedByName).filter((n): n is string => !!n))].sort((a, b) => a.localeCompare(b)),
     items: row.items.map((item) => ({
       id: item.id,
       variantId: item.variantId,
@@ -365,6 +379,7 @@ function toPurchaseOrderRow(row: PurchaseOrderWithItems): PurchaseOrderRow {
       quantity: item.quantity,
       receivedQuantity: item.receivedQuantity,
       unitCost: item.unitCost !== null ? Number(item.unitCost) : null,
+      remark: item.remark,
       locations: (item.variant?.locations ?? []).map((l) => l.location).sort((a, b) => a.name.localeCompare(b.name)),
     })),
   };
