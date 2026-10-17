@@ -3,10 +3,11 @@
 import { useMemo, useState } from 'react';
 import useRequest from '@/hooks/useRequest';
 import { upperTrim } from '@/lib/utils/common';
-import { adjustTarget, naturalCompare } from '../utils';
+import { naturalCompare, variantTitle } from '../utils';
 import type { LocationOption } from '../hooks/useLocations';
 import type { OptionLibraryState } from '../hooks/useOptionLibrary';
 import type { ProductRecord } from '../types';
+import { useLocationSelection } from './useLocationSelection';
 
 export type OptionKind = 'colour' | 'size';
 
@@ -15,6 +16,9 @@ export type OptionKind = 'colour' | 'size';
  * (shown with a NEW badge) — cleared back to an id once "Save" writes it to the library. */
 export type OptionItem = { name: string; id: string | null; checked: boolean; isNew: boolean };
 
+/** One picked location's stock on one preview row. */
+export type RowStock = { id: string; name: string; quantity: number; /** What `quantity` shows before anything is typed. */ base: number };
+
 /** One row of the live variant preview (checked colours x checked sizes). */
 export type VariantDraftRow = {
   key: string;
@@ -22,24 +26,23 @@ export type VariantDraftRow = {
   size: string;
   /** True when this combo isn't among the product's current variants yet. */
   isNew: boolean;
-  /** Stock on hand at the modal's chosen location (or the variant's total / unassigned stock when
-   * "No location" is chosen) — what Replace/Insert will write there. */
+  /** Stock stacked per picked location, A→Z — what Update/Insert will write at each. Empty only
+   * when no location is picked (none exist), where `stockOnHand` is the single unassigned figure. */
+  stock: RowStock[];
+  /** The total across `stock`, or the unassigned stock when `stock` is empty. */
   stockOnHand: number;
   /** What `stockOnHand` shows before anything is typed — compared against it to spot edits. */
   baseStockOnHand: number;
-  /** "No location" chosen on an existing variant that is kept at locations: its stock is the sum
-   * of them, so it is shown read-only until a location is picked. */
+  /** No location picked on an existing variant that is kept at locations: its stock is the sum of
+   * them, so it is shown read-only until a location is picked. */
   stockLocked: boolean;
   /** null on a brand-new combo nobody has typed a trigger for yet — shown blank, and left out of
    * the apply request so the server falls back to the store's low-stock threshold, same as
    * reconcileVariants. */
   trigger: number | null;
-  /** The modal's chosen location, or — under "No location" — an existing variant's own locations.
-   * null when it has none. Display only. */
-  locationLabel: string | null;
 };
 
-type ValueEntry = { stockOnHand?: number; trigger?: number | null };
+type ValueEntry = { stock?: Record<string, number>; stockOnHand?: number; trigger?: number | null };
 
 function keyOf(colour: string, size: string): string {
   return `${colour.toLowerCase()}::${size.toUpperCase()}`;
@@ -78,6 +81,43 @@ function buildItems(library: { id: string; name: string }[], productNames: strin
   return items;
 }
 
+/** Every colour x size pair of the checked axes — an empty axis is the '' sentinel, as in reconcileVariants. */
+function axisCombos(colours: string[], sizes: string[]): [string, string][] {
+  const colourAxis = colours.length > 0 ? colours : [''];
+  const sizeAxis = sizes.length > 0 ? sizes : [''];
+  return colourAxis.flatMap((colour) => sizeAxis.map((size): [string, string] => [colour, size]));
+}
+
+/** The preview rows for `combos`: the stock typed in the modal, else each variant's current stock at
+ * every picked location. A variant with no location yet shows its unassigned stock in the first
+ * picked one, which is where the server puts it. */
+function buildDraftRows(combos: [string, string][], product: ProductRecord, values: Record<string, ValueEntry>, picked: { id: string; name: string }[]): VariantDraftRow[] {
+  const existingByKey = new Map(product.variants.map((v) => [keyOf(v.colour, v.size), v]));
+  return combos.map(([colour, size]) => {
+    const key = keyOf(colour, size);
+    const existing = existingByKey.get(key);
+    const typed = values[key];
+    const stock: RowStock[] = picked.map((loc, i) => {
+      const held = existing?.locations.find((l) => l.id === loc.id);
+      const base = !existing ? 0 : existing.locations.length === 0 ? (i === 0 ? existing.stockOnHand : 0) : (held?.quantity ?? 0);
+      return { id: loc.id, name: loc.name, base, quantity: typed?.stock?.[loc.id] ?? base };
+    });
+    const stockLocked = picked.length === 0 && !!existing && existing.locations.length > 0;
+    const baseStockOnHand = stock.length > 0 ? stock.reduce((sum, s) => sum + s.base, 0) : (existing?.stockOnHand ?? 0);
+    return {
+      key,
+      colour,
+      size,
+      isNew: !existing,
+      stock,
+      stockOnHand: stock.length > 0 ? stock.reduce((sum, s) => sum + s.quantity, 0) : stockLocked ? baseStockOnHand : (typed?.stockOnHand ?? baseStockOnHand),
+      baseStockOnHand,
+      stockLocked,
+      trigger: typed?.trigger ?? existing?.trigger ?? null,
+    };
+  });
+}
+
 type UseColourSizeModalArgs = {
   product: ProductRecord;
   optionLibrary: OptionLibraryState;
@@ -109,17 +149,6 @@ export function useColourSizeModal({ product, optionLibrary, locationOptions, on
   // checking/unchecking colours or sizes so a typed value isn't lost by an unrelated toggle.
   const [values, setValues] = useState<Record<string, ValueEntry>>({});
   const [replaceConfirmOpen, setReplaceConfirmOpen] = useState(false);
-  // Whose stock the Stock on hand column shows and edits: defaults to where the product's existing
-  // variants already are, else the first location, so one is always selected ('' only when no
-  // locations exist at all).
-  const [pickedLocationId, setLocationId] = useState(() => product.variants.find((v) => v.locations.length > 0)?.locations[0].id ?? '');
-  const locationId = pickedLocationId || locationOptions[0]?.id || '';
-  const locationName = locationOptions.find((l) => l.id === locationId)?.name ?? null;
-  // Typed stock belongs to the location it was typed against, so it's dropped on a switch.
-  const changeLocation = (id: string) => {
-    setLocationId(id);
-    setValues((prev) => Object.fromEntries(Object.entries(prev).map(([k, v]) => [k, { trigger: v.trigger }])));
-  };
   const { request: requestApply, loading: applying } = useRequest<ProductRecord>();
 
   const itemsFor = (kind: OptionKind) => (kind === 'colour' ? colourItems : sizeItems);
@@ -127,11 +156,21 @@ export function useColourSizeModal({ product, optionLibrary, locationOptions, on
   const pendingDeletesFor = (kind: OptionKind) => (kind === 'colour' ? colourPendingDeletes : sizePendingDeletes);
   const setPendingDeletesFor = (kind: OptionKind) => (kind === 'colour' ? setColourPendingDeletes : setSizePendingDeletes);
 
+  /** Drops what was typed for every combo using these (now unchecked/removed) names, so checking
+   * one again shows the variant's real stock/trigger rather than a value typed before it left. */
+  const forgetTyped = (kind: OptionKind, names: string[]) => {
+    const keyed = names.map((n) => (kind === 'colour' ? `${n.toLowerCase()}::` : `::${n.toUpperCase()}`));
+    const used = (key: string) => keyed.some((k) => (kind === 'colour' ? key.startsWith(k) : key.endsWith(k)));
+    setValues((prev) => Object.fromEntries(Object.entries(prev).filter(([key]) => !used(key))));
+  };
+
   const toggle = (kind: OptionKind, name: string) => {
+    if (itemsFor(kind).some((i) => i.checked && i.name.toLowerCase() === name.toLowerCase())) forgetTyped(kind, [name]);
     setItemsFor(kind)((prev) => prev.map((i) => (i.name.toLowerCase() === name.toLowerCase() ? { ...i, checked: !i.checked } : i)));
   };
 
   const toggleAll = (kind: OptionKind, checked: boolean) => {
+    if (!checked) forgetTyped(kind, itemsFor(kind).filter((i) => i.checked).map((i) => i.name));
     setItemsFor(kind)((prev) => prev.map((i) => ({ ...i, checked })));
   };
 
@@ -168,6 +207,7 @@ export function useColourSizeModal({ product, optionLibrary, locationOptions, on
    * deletion on the next Save (see `saveToLibrary`) rather than deleted immediately. */
   const remove = (kind: OptionKind, name: string) => {
     const item = itemsFor(kind).find((i) => i.name.toLowerCase() === name.toLowerCase());
+    if (item?.checked) forgetTyped(kind, [item.name]);
     setItemsFor(kind)((prev) => prev.filter((i) => i.name.toLowerCase() !== name.toLowerCase()));
     if (item?.id) setPendingDeletesFor(kind)((prev) => [...prev, item.id as string]);
   };
@@ -202,59 +242,55 @@ export function useColourSizeModal({ product, optionLibrary, locationOptions, on
   const checkedColours = useMemo(() => colourItems.filter((i) => i.checked).map((i) => i.name), [colourItems]);
   const checkedSizes = useMemo(() => sizeItems.filter((i) => i.checked).map((i) => i.name), [sizeItems]);
 
+  // Existing variants that survive Update (their combo is still checked) — only these can lose
+  // stock by having a location unticked.
+  const keptVariantIds = useMemo(() => {
+    const keys = new Set(axisCombos(checkedColours, checkedSizes).map(([colour, size]) => keyOf(colour, size)));
+    return new Set(product.variants.filter((v) => keys.has(keyOf(v.colour, v.size))).map((v) => v.id));
+  }, [checkedColours, checkedSizes, product.variants]);
+  const location = useLocationSelection({ product, locationOptions, keptVariantIds });
+
+  const pickedLocations = useMemo(
+    () => locationOptions.filter((o) => location.ids.includes(o.id)).sort((a, b) => a.name.localeCompare(b.name)),
+    [locationOptions, location.ids]
+  );
+
   const variants: VariantDraftRow[] = useMemo(() => {
-    const colourAxis = checkedColours.length > 0 ? checkedColours : [''];
-    const sizeAxis = checkedSizes.length > 0 ? checkedSizes : [''];
-    const existingByKey = new Map(product.variants.map((v) => [keyOf(v.colour, v.size), v]));
-    const rows: VariantDraftRow[] = [];
-    for (const colour of colourAxis) {
-      for (const size of sizeAxis) {
-        const key = keyOf(colour, size);
-        const existing = existingByKey.get(key);
-        const typed = values[key];
-        const target = existing && locationId ? adjustTarget(existing, locationId) : null;
-        const stockLocked = !locationId && !!existing && existing.locations.length > 0;
-        const baseStockOnHand = !existing ? 0 : target?.kind === 'location' ? target.quantity : target?.kind === 'absent' ? 0 : existing.stockOnHand;
-        rows.push({
-          key,
-          colour,
-          size,
-          isNew: !existing,
-          stockOnHand: stockLocked ? baseStockOnHand : (typed?.stockOnHand ?? baseStockOnHand),
-          baseStockOnHand,
-          stockLocked,
-          trigger: typed?.trigger ?? existing?.trigger ?? null,
-          locationLabel: locationId ? locationName : existing ? existing.locations.map((l) => l.name).join(', ') || null : null,
-        });
-      }
-    }
+    const rows = buildDraftRows(axisCombos(checkedColours, checkedSizes), product, values, pickedLocations);
     // Display order only (item 2) — numbers before letters, then alphabetical. The axis arrays
     // driving generation (checkedColours/checkedSizes, sent to apply-options as-is below) keep
     // their own library/insertion order, so this never touches the size positions stored on the
     // product or the matrix's own size order.
     rows.sort((a, b) => naturalCompare(a.colour, b.colour) || naturalCompare(a.size, b.size));
     return rows;
-  }, [checkedColours, checkedSizes, product.variants, values, locationId, locationName]);
+  }, [checkedColours, checkedSizes, product, values, pickedLocations]);
 
-  const setVariantValue = (key: string, field: 'stockOnHand' | 'trigger', value: number) => {
-    setValues((prev) => ({ ...prev, [key]: { ...prev[key], [field]: value } }));
+  const setVariantValue = (key: string, field: 'stockOnHand' | 'trigger', value: number, locationId?: string) => {
+    setValues((prev) => {
+      const entry = prev[key] ?? {};
+      if (field === 'stockOnHand' && locationId) return { ...prev, [key]: { ...entry, stock: { ...entry.stock, [locationId]: value } } };
+      return { ...prev, [key]: { ...entry, [field]: value } };
+    });
   };
 
+  /** Stock fills every picked location of every row (like the Variants / stock table's "Stock on
+   * hand at each location"); Trigger fills each row's one value. */
   const fillAll = (field: 'stockOnHand' | 'trigger', value: number) => {
     setValues((prev) => {
       const next = { ...prev };
       for (const row of variants) {
-        if (field === 'stockOnHand' && row.stockLocked) continue;
-        next[row.key] = { ...next[row.key], [field]: value };
+        if (field === 'trigger') next[row.key] = { ...next[row.key], trigger: value };
+        else if (row.stock.length > 0) next[row.key] = { ...next[row.key], stock: Object.fromEntries(row.stock.map((s) => [s.id, value])) };
+        else if (!row.stockLocked) next[row.key] = { ...next[row.key], stockOnHand: value };
       }
       return next;
     });
   };
 
-  /** Replace/Insert only ever wrote variants — any not-yet-saved colour/size names (or pending
+  /** Update/Insert only ever wrote variants — any not-yet-saved colour/size names (or pending
    * library deletes) sat unsaved unless the user separately hit each column's own Save first. Run
    * the same save each Save button uses for whichever column has unsaved state before applying,
-   * so Replace/Insert always leaves the shared library consistent with what's checked. */
+   * so Update/Insert always leaves the shared library consistent with what's checked. */
   const apply = async (mode: 'replace' | 'insert') => {
     const colourHasNew = colourItems.some((i) => i.isNew) || colourPendingDeletes.length > 0;
     const sizeHasNew = sizeItems.some((i) => i.isNew) || sizePendingDeletes.length > 0;
@@ -266,47 +302,63 @@ export function useColourSizeModal({ product, optionLibrary, locationOptions, on
       method: 'POST',
       data: {
         mode,
-        ...(locationId ? { locationId } : {}),
+        locationIds: location.ids,
+        ...(mode === 'replace' && location.remapNeeds.length > 0 ? { remap: location.remap } : {}),
         colours: checkedColours,
         sizes: checkedSizes,
         values: variants.map((v) => ({
           colour: v.colour,
           size: v.size,
-          stockOnHand: v.stockOnHand,
+          ...(v.stock.length > 0 ? { stock: v.stock.map((s) => ({ locationId: s.id, quantity: s.quantity })) } : { stockOnHand: v.stockOnHand }),
           ...(v.trigger !== null ? { trigger: v.trigger } : {}),
         })),
       },
-      successMessage: mode === 'replace' ? 'Variants replaced' : 'Variants inserted',
+      successMessage: mode === 'replace' ? 'Variants updated' : 'Variants inserted',
       onSuccess: ({ data }) => {
         onApplied(data);
         setReplaceConfirmOpen(false);
         setValues({});
+        location.clearRemap();
       },
     });
   };
 
-  const existingVariantCount = product.variants.length;
   const newVariantCount = variants.filter((v) => v.isNew).length;
   const hasChecked = checkedColours.length > 0 || checkedSizes.length > 0;
 
   const previewByKey = new Map(variants.map((v) => [v.key, v]));
-  const removedVariantCount = product.variants.filter((v) => !previewByKey.has(keyOf(v.colour, v.size))).length;
-  // Only Replace writes typed stock/trigger onto combos that already exist — Insert skips them.
+  const removedVariants = product.variants.filter((v) => !previewByKey.has(keyOf(v.colour, v.size)));
+  const removedVariantCount = removedVariants.length;
+  // Replace can't delete a variant that still has stock on hand — the confirm modal names them.
+  const stockedRemovedNames = removedVariants.filter((v) => v.stockOnHand > 0).map(variantTitle);
+  // Only Update writes typed stock/trigger/locations onto combos that already exist — Insert skips them.
   const valuesChanged = product.variants.some((v) => {
     const row = previewByKey.get(keyOf(v.colour, v.size));
-    return !!row && (row.stockOnHand !== row.baseStockOnHand || (row.trigger !== null && row.trigger !== v.trigger));
+    if (!row) return false;
+    const heldIds = v.locations.map((l) => l.id).sort().join();
+    const locationsChanged = row.stock.length > 0 && heldIds !== [...location.ids].sort().join();
+    return (
+      locationsChanged ||
+      row.stock.some((s) => s.quantity !== s.base) ||
+      row.stockOnHand !== row.baseStockOnHand ||
+      (row.trigger !== null && row.trigger !== v.trigger)
+    );
   });
 
   const insertDisabledReason = !hasChecked
     ? 'Check at least one colour or size'
-    : newVariantCount === 0
-      ? 'All checked variants already exist'
-      : null;
+    : location.error
+      ? location.error
+      : newVariantCount === 0
+        ? 'All checked variants already exist'
+        : null;
   const replaceDisabledReason = !hasChecked
     ? 'Check at least one colour or size'
-    : newVariantCount === 0 && removedVariantCount === 0 && !valuesChanged
-      ? 'No changes to replace'
-      : null;
+    : location.error
+      ? location.error
+      : newVariantCount === 0 && removedVariantCount === 0 && !valuesChanged
+        ? 'No changes to update'
+        : null;
 
   // Display order only (item 2) — the underlying colourItems/sizeItems arrays (and their
   // indices used by toggle/remove, which match by name rather than position) are untouched.
@@ -340,14 +392,14 @@ export function useColourSizeModal({ product, optionLibrary, locationOptions, on
       save: () => saveToLibrary('size'),
       saving: sizeSaving || optionLibrary.saving,
     },
-    location: { id: locationId, set: changeLocation, options: locationOptions },
+    location,
     variants,
     setVariantValue,
     fillAll,
     applying,
-    existingVariantCount,
     newVariantCount,
     removedVariantCount,
+    stockedRemovedNames,
     valuesChanged,
     canInsert: !applying && !colourSaving && !sizeSaving && insertDisabledReason === null,
     canReplace: !applying && !colourSaving && !sizeSaving && replaceDisabledReason === null,
@@ -356,6 +408,7 @@ export function useColourSizeModal({ product, optionLibrary, locationOptions, on
     replaceConfirmOpen,
     openReplaceConfirm: () => setReplaceConfirmOpen(true),
     closeReplaceConfirm: () => setReplaceConfirmOpen(false),
+    canConfirmUpdate: location.remapComplete,
     confirmReplace: () => apply('replace'),
     insert: () => apply('insert'),
     cancel: onClose,

@@ -2,6 +2,7 @@
 
 import { MODAL_FOOTER_BTN_DANGER, MODAL_FOOTER_BTN_SECONDARY, ModalActions, ModalShell } from '@/components/ModalShell';
 import type { LocationOption } from '../hooks/useLocations';
+import LocationRemapFields from '../LocationRemapFields';
 import type { OptionLibraryState } from '../hooks/useOptionLibrary';
 import { WIZARD_BODY_CLASS } from '../modalStyles';
 import type { ProductRecord } from '../types';
@@ -17,11 +18,19 @@ type ColourSizeModalProps = {
   onClose: () => void;
 };
 
+const plural = (n: number) => `${n} ${n === 1 ? 'variant' : 'variants'}`;
+
+/** What Update will actually do, from the preview's counts — e.g. "add 3 new variants and remove 1 variant". */
+function replaceSummary(newCount: number, removedCount: number): string {
+  const parts = [newCount > 0 && `add ${plural(newCount)}`, removedCount > 0 && `remove ${plural(removedCount)}`].filter(Boolean);
+  return parts.length > 0 ? parts.join(' and ') : 'update the existing variants';
+}
+
 /**
  * "Colour & size adjustment" — the single modal every "+ Colour"/"+ Size" entry point opens
  * (Product details, the Variants / stock toolbar, and step 2 of the New Product wizard). Three
  * columns: the global colour library, the global size library, and a live preview of the variants
- * checked colours x checked sizes would produce. Replace/Insert are the only actions that write
+ * checked colours x checked sizes would produce. Update/Insert are the only actions that write
  * anything to the product — see useColourSizeModal for the state and SupplierProductModel.applyOptions
  * for what each does server-side.
  */
@@ -56,7 +65,7 @@ export default function ColourSizeModal({ product, optionLibrary, locationOption
                   title={m.replaceDisabledReason ?? undefined}
                   className={MODAL_FOOTER_BTN_DANGER}
                 >
-                  Replace
+                  Update
                 </button>
                 <button
                   type="button"
@@ -71,7 +80,7 @@ export default function ColourSizeModal({ product, optionLibrary, locationOption
             </div>
           </div>
           <p className="text-[10px] leading-tight text-inventory-text-subtle">
-            <span className="font-semibold">Replace</span> deletes every existing variant and creates the checked colours x sizes.{' '}
+            <span className="font-semibold">Update</span> makes the variants exactly the checked colours x sizes at the picked locations.{' '}
             <span className="font-semibold">Insert </span> only adds the checked variants the product doesn&apos;t already have.
           </p>
         </div>
@@ -116,25 +125,39 @@ export default function ColourSizeModal({ product, optionLibrary, locationOption
           disableBackdropClose
           elevated
           compact
-          title="Replace all variants?"
+          title="Update variants?"
           onClose={m.closeReplaceConfirm}
           footer={
             <ModalActions
               onCancel={m.closeReplaceConfirm}
               onConfirm={m.confirmReplace}
-              confirmLabel={m.applying ? 'Replacing…' : 'Replace'}
-              disabled={m.applying}
+              confirmLabel={m.applying ? 'Updating…' : 'Update'}
+              disabled={m.applying || m.stockedRemovedNames.length > 0 || !m.canConfirmUpdate}
               danger
               compact
             />
           }
         >
           <p className="text-[12px] text-inventory-text-muted">
-            This deletes all <span className="font-semibold text-inventory-text">{m.existingVariantCount}</span> existing variant
-            {m.existingVariantCount === 1 ? '' : 's'} — along with their stocktake, adjustment and store-listing history — and creates{' '}
-            <span className="font-semibold text-inventory-text">{m.variants.length}</span> new one{m.variants.length === 1 ? '' : 's'} from the checked colours
-            and sizes.
+            This will <span className="font-semibold text-inventory-text">{replaceSummary(m.newVariantCount, m.removedVariantCount)}</span> to match the checked
+            colours and sizes. Variants that stay checked keep their stock history, SKU, barcode and prices.
+            {m.removedVariantCount > 0 && ' Removed variants are deleted along with their stocktake, adjustment and store-listing history.'}
           </p>
+          {m.location.remapNeeds.length > 0 && (
+            <div className="mt-2">
+              <LocationRemapFields
+                needs={m.location.remapNeeds.map((n) => ({ id: n.id, name: n.name, detail: n.detail }))}
+                destinations={m.location.options.filter((o) => m.location.ids.includes(o.id))}
+                remap={m.location.remap}
+                onChange={m.location.setRemapTarget}
+              />
+            </div>
+          )}
+          {m.stockedRemovedNames.length > 0 && (
+            <p className="mt-2 text-[12px] font-semibold text-inventory-danger">
+              Cannot remove {m.stockedRemovedNames.join(', ')} — still has stock on hand. Set its stock to 0 first.
+            </p>
+          )}
         </ModalShell>
       )}
     </ModalShell>
