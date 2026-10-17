@@ -53,7 +53,7 @@ export default function ImportProductsModal({ importProducts: ip, suppliers }: I
               {ip.importing ? (
                 <>
                   {SPINNER}
-                  Importing…
+                  Importing & downloading images…
                 </>
               ) : (
                 `Import ${actionableCount} product${actionableCount === 1 ? '' : 's'}`

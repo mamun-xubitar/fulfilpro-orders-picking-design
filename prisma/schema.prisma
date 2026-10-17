@@ -1160,6 +1160,8 @@ model SupplierProductImage {
   id                String                   @id @default(uuid())
   supplierProductId String
   url               String
+  /// Original remote URL this image was downloaded from (CSV import); `url` is then our own copy.
+  sourceUrl         String?
   altText           String?
   colour            String?
   position          Int                      @default(0)
@@ -1168,6 +1170,8 @@ model SupplierProductImage {
   createdAt         DateTime                 @default(now())
 
   @@index([supplierProductId])
+  @@index([sourceUrl])
+  @@index([url])
 }
 
 model SupplierProductPricing {

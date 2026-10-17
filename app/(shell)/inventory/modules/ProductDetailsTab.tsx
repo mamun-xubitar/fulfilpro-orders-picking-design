@@ -45,6 +45,7 @@ export default function ProductDetailsTab({ p }: { p: InventoryPage }) {
         onOpenBulkUpdate={p.storePublish.openBulkUpdate}
         onConnect={p.storePublish.openPublish}
         product={p.product}
+        onMoveSystemImage={p.imageMutations.moveImage}
       />
     </div>
   );

@@ -134,7 +134,7 @@ const catalogueInclude = {
     orderBy: { position: 'asc' as const },
     include: { locations: { select: { quantity: true, location: { select: { id: true, name: true } } } } },
   },
-  images: { orderBy: { position: 'asc' as const } },
+  images: { orderBy: [{ position: 'asc' as const }, { createdAt: 'asc' as const }] },
   pricing: true,
   stocktakes: { where: { status: 'COMPLETED' as const }, orderBy: { completedAt: 'desc' as const }, take: 1 },
   activity: { orderBy: { createdAt: 'desc' as const }, take: 30 },
@@ -776,22 +776,71 @@ export class SupplierProductModel {
     return prisma.supplierProductImage.count({ where: { supplierProductId } });
   }
 
+  /** Next free serial for a product's gallery — max + 1 rather than a count, so a new image never
+   * lands on an existing serial after earlier deletes left gaps. */
+  private async nextImagePosition(supplierProductId: string): Promise<number> {
+    const { _max } = await prisma.supplierProductImage.aggregate({ where: { supplierProductId }, _max: { position: true } });
+    return (_max.position ?? -1) + 1;
+  }
+
   async addImage(supplierProductId: string, data: { url: string; altText: string | null; colour: string | null }): Promise<void> {
-    const position = await prisma.supplierProductImage.count({ where: { supplierProductId } });
+    const position = await this.nextImagePosition(supplierProductId);
     await prisma.supplierProductImage.create({ data: { supplierProductId, ...data, position } });
   }
 
   /** Returns the created rows (id + url) so a caller can link them to variants — e.g. the first
-   * one to a variant after an upload, or a whole CSV import's `Variant Image` URLs by lookup. */
+   * one to a variant after an upload, or a whole CSV import's `Variant Image` URLs by lookup.
+   * `sourceUrl` is the remote URL an imported image was downloaded from (`url` is then our copy). */
   async addImages(
     supplierProductId: string,
-    images: { url: string; altText: string | null; colour: string | null }[]
-  ): Promise<{ id: string; url: string }[]> {
-    let position = await prisma.supplierProductImage.count({ where: { supplierProductId } });
+    images: { url: string; altText: string | null; colour: string | null; sourceUrl?: string | null }[]
+  ): Promise<{ id: string; url: string; sourceUrl: string | null }[]> {
+    let position = await this.nextImagePosition(supplierProductId);
     return prisma.supplierProductImage.createManyAndReturn({
       data: images.map((image) => ({ supplierProductId, ...image, position: position++ })),
-      select: { id: true, url: true },
+      select: { id: true, url: true, sourceUrl: true },
     });
+  }
+
+  /** Moves one image to a 1-based serial in the product's gallery and renumbers the rest 0…N-1
+   * (which also heals any duplicate positions left by older inserts). False when the image isn't
+   * on this product. */
+  async moveImage(supplierProductId: string, imageId: string, position: number): Promise<boolean> {
+    return prisma.$transaction(async (tx) => {
+      const rows = await tx.supplierProductImage.findMany({
+        where: { supplierProductId },
+        orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
+        select: { id: true, position: true },
+      });
+      const from = rows.findIndex((r) => r.id === imageId);
+      if (from === -1) return false;
+      const [moved] = rows.splice(from, 1);
+      rows.splice(Math.min(Math.max(position - 1, 0), rows.length), 0, moved);
+      for (const [index, row] of rows.entries()) {
+        if (row.position !== index) await tx.supplierProductImage.update({ where: { id: row.id }, data: { position: index } });
+      }
+      return true;
+    });
+  }
+
+  /** Each image's stored url and the remote URL it was downloaded from (CSV import), for matching a
+   * re-imported file's `Image Src` to images it already brought in. */
+  async listImageSources(supplierProductId: string): Promise<{ id: string; url: string; sourceUrl: string | null }[]> {
+    return prisma.supplierProductImage.findMany({ where: { supplierProductId }, select: { id: true, url: true, sourceUrl: true } });
+  }
+
+  /** Distinct image URLs of the given products — collected before a delete so their files can be
+   * cleaned up once the rows (which cascade with the product) are gone. */
+  async findImageUrls(productIds: string[]): Promise<string[]> {
+    const rows = await prisma.supplierProductImage.findMany({ where: { supplierProductId: { in: productIds } }, select: { url: true }, distinct: ['url'] });
+    return rows.map((r) => r.url);
+  }
+
+  /** Of the given URLs, those some image row (on any product) still points at. */
+  async findReferencedImageUrls(urls: string[]): Promise<string[]> {
+    if (urls.length === 0) return [];
+    const rows = await prisma.supplierProductImage.findMany({ where: { url: { in: urls } }, select: { url: true }, distinct: ['url'] });
+    return rows.map((r) => r.url);
   }
 
   /** Links a variant to one image from the product's own pool, or unlinks when imageId is null.
@@ -805,9 +854,12 @@ export class SupplierProductModel {
     return result.count > 0;
   }
 
-  async removeImage(supplierProductId: string, imageId: string): Promise<boolean> {
-    const result = await prisma.supplierProductImage.deleteMany({ where: { id: imageId, supplierProductId } });
-    return result.count > 0;
+  /** Returns the removed image's url (so the caller can clean up its file), or null if not found. */
+  async removeImage(supplierProductId: string, imageId: string): Promise<string | null> {
+    const image = await prisma.supplierProductImage.findFirst({ where: { id: imageId, supplierProductId }, select: { url: true } });
+    if (!image) return null;
+    await prisma.supplierProductImage.deleteMany({ where: { id: imageId, supplierProductId } });
+    return image.url;
   }
 
   /**

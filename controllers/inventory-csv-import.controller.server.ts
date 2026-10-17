@@ -1,6 +1,7 @@
 import prisma from '@/lib/prisma.server';
 import { detectCsvType, findIncompleteAxisRows, normalizeParsedProductRows, parseShopifyProductCsv, upsertParsedProductVariants } from '@/lib/inventory/csv-import';
 import type { ParsedProductGroup } from '@/lib/inventory/csv-import';
+import { importProductImages, imageFailureNote } from '@/lib/inventory/csv-import-images.server';
 import { SupplierProductModel } from '@/models/supplier-product.model.server';
 import type { SupplierProductRow } from '@/models/supplier-product.model.server';
 import { SupplierProductStatus } from '@prisma/client';
@@ -119,9 +120,10 @@ export class InventoryCsvImportController {
       delete parsed.product.status;
     }
 
-    // Dedup against existing images by url alone — a flat pool, Shopify-style, so the same photo
-    // shared by several variants is stored once and linked from multiple variants (`imageId`).
-    const existingImageUrls = new Set(product.images.map((i) => i.url));
+    // Dedup against existing images by url (or the remote URL an earlier import downloaded it
+    // from) — a flat pool, Shopify-style, so the same photo shared by several variants is stored
+    // once and linked from multiple variants (`imageId`).
+    const existingImageUrls = new Set((await productModel.listImageSources(product.id)).flatMap((i) => (i.sourceUrl ? [i.url, i.sourceUrl] : [i.url])));
     const images = parsed.images.map((image) => ({ url: image.url, altText: image.altText })).filter((image) => !existingImageUrls.has(image.url));
 
     if (!commit) {
@@ -136,15 +138,9 @@ export class InventoryCsvImportController {
       ...(options.markVerified ? { verified: true } : {}),
     });
 
-    // Insert new images first, so their ids are available to link into `Variant Image` rows below.
-    const urlToImageId = new Map(product.images.map((i) => [i.url, i.id]));
-    if (images.length > 0) {
-      const createdImages = await productModel.addImages(
-        product.id,
-        images.map((image) => ({ url: image.url, altText: image.altText, colour: null }))
-      );
-      for (const created of createdImages) urlToImageId.set(created.url, created.id);
-    }
+    // Download and insert new images first (the transaction below never waits on the network), so
+    // their ids are available to link into `Variant Image` rows.
+    const { urlToImageId, failed: failedImageCount } = await importProductImages(product.id, images);
 
     const { created, updated } = await prisma.$transaction(
       async (tx) => {
@@ -164,6 +160,9 @@ export class InventoryCsvImportController {
     );
 
     const updatedProduct = await productModel.findById(product.id);
-    return { data: { product: updatedProduct, created, updated }, message: `Imported ${rows.length} row${rows.length === 1 ? '' : 's'}` };
+    return {
+      data: { product: updatedProduct, created, updated, failedImageCount },
+      message: `Imported ${rows.length} row${rows.length === 1 ? '' : 's'}${imageFailureNote(failedImageCount)}`,
+    };
   }
 }

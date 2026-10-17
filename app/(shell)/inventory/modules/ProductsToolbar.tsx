@@ -83,10 +83,16 @@ export default function ProductsToolbar(p: InventoryPage) {
       <button
         type="button"
         onClick={p.importProducts.openModal}
-        className="flex h-[22px] items-center gap-1 whitespace-nowrap rounded-[6px] border border-inventory-success/35 bg-inventory-success/10 px-[6px] text-[10px] font-bold leading-none text-inventory-success-hover shadow-sm transition-colors duration-150 hover:bg-inventory-success/15 cursor-pointer"
+        disabled={p.importProducts.importing}
+        title={p.importProducts.importing ? 'Importing products and downloading their images…' : undefined}
+        className="flex h-[22px] items-center gap-1 whitespace-nowrap rounded-[6px] border border-inventory-success/35 bg-inventory-success/10 px-[6px] text-[10px] font-bold leading-none text-inventory-success-hover shadow-sm transition-colors duration-150 hover:bg-inventory-success/15 disabled:cursor-not-allowed disabled:opacity-70 cursor-pointer"
       >
-        <Upload className="h-3 w-3" />
-        Import
+        {p.importProducts.importing ? (
+          <span className="h-3 w-3 animate-spin rounded-full border-2 border-inventory-success/30 border-t-inventory-success-hover" aria-hidden="true" />
+        ) : (
+          <Upload className="h-3 w-3" />
+        )}
+        {p.importProducts.importing ? 'Importing…' : 'Import'}
       </button>
       <button
         type="button"

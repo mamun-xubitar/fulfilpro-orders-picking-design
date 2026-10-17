@@ -63,6 +63,7 @@ export function useImportProducts({ supplierOptions, onImported }: UseImportProd
   const [markVerified, setMarkVerified] = useState(false);
 
   const openModal = () => {
+    if (importing) return;
     setSupplierId(supplierOptions[0]?.id ?? '');
     setPendingFile(null);
     setPreview(null);
@@ -101,13 +102,15 @@ export function useImportProducts({ supplierOptions, onImported }: UseImportProd
     if (!pendingFile || !preview) return;
     setImporting(true);
     try {
-      const json = await postImportFile<{ created: ProductRecord[]; updated: ProductRecord[]; createdCount: number; updatedCount: number; skipped: string[] }>(
+      const json = await postImportFile<{ created: ProductRecord[]; updated: ProductRecord[]; createdCount: number; updatedCount: number; skipped: string[]; failedImageCount: number }>(
         pendingFile,
         supplierId,
         true,
         { overwrite, markVerified }
       );
-      toast.success(json.message);
+      // The modal may have been closed while images downloaded — this toast is the only signal then.
+      if (json.data.failedImageCount > 0) toast.warning(json.message);
+      else toast.success(json.message);
       onImported();
       setModalOpen(false);
       setPendingFile(null);

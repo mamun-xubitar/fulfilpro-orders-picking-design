@@ -5,7 +5,7 @@ import { LocationModel } from '@/models/location.model.server';
 import { InventoryCategoryModel } from '@/models/inventory-category.model.server';
 import { CurrencyRateModel } from '@/models/currency-rate.model.server';
 import { StockError } from '@/lib/inventory-stock.server';
-import { saveUploadedFile } from '@/lib/uploads.server';
+import { deleteUploadedFiles, saveUploadedFile } from '@/lib/uploads.server';
 import { deriveColorFromName } from '@/lib/inventory/colour';
 import { isValidHandle, slugifyHandle } from '@/lib/inventory/handle';
 import { sanitizeHtml } from '@/lib/sanitize-html';
@@ -708,11 +708,29 @@ export class SupplierProductController {
 
   async removeImage(id: string, imageId: string, session: Session) {
     if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
-    const removed = await model.removeImage(id, imageId);
-    if (!removed) return { error: { message: 'Image not found', status: 404 } };
+    const removedUrl = await model.removeImage(id, imageId);
+    if (removedUrl === null) return { error: { message: 'Image not found', status: 404 } };
+    await this.deleteUnusedFiles([removedUrl]);
     await model.logActivity(id, 'Image removed', 'image_removed', actorFromSession(session));
     const product = await model.findById(id);
     return { data: product, message: 'Image removed' };
+  }
+
+  /** Moves an image to a 1-based serial in the gallery; the serial is the order images are shown
+   * in and published to stores. */
+  async moveImage(id: string, imageId: string, body: unknown, session: Session) {
+    if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
+    const count = await model.countImages(id);
+    const value = (body ?? {}) as Record<string, unknown>;
+    const position = Number(value.position);
+    if (!Number.isInteger(position) || position < 1 || position > count) {
+      return { error: { message: 'Validation failed', errors: [`position: Must be a whole number from 1 to ${count}`], status: 400 } };
+    }
+    const moved = await model.moveImage(id, imageId, position);
+    if (!moved) return { error: { message: 'Image not found', status: 404 } };
+    await model.logActivity(id, `Image moved to position ${position}`, 'image_moved', actorFromSession(session));
+    const product = await model.findById(id);
+    return { data: product, message: 'Image moved' };
   }
 
   async updateImageColour(id: string, imageId: string, body: unknown, session: Session) {
@@ -733,10 +751,19 @@ export class SupplierProductController {
     return { data: updatedProduct, message: colour ? `Image assigned to ${colour}` : 'Image unassigned' };
   }
 
+  /** Deletes the stored files for image URLs that no remaining image row points at — the same file
+   * can back several products (e.g. a duplicated product), so it only goes once the last one does. */
+  private async deleteUnusedFiles(urls: string[]) {
+    const stillUsed = new Set(await model.findReferencedImageUrls(urls));
+    await deleteUploadedFiles(urls.filter((url) => !stillUsed.has(url)));
+  }
+
   async remove(id: string, session: Session) {
     if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
+    const urls = await model.findImageUrls([id]);
     const removed = await model.delete(id);
     if (!removed) return { error: { message: 'Product not found', status: 404 } };
+    await this.deleteUnusedFiles(urls);
     return { data: null, message: 'Product deleted' };
   }
 
@@ -749,7 +776,9 @@ export class SupplierProductController {
     if (productIds.length === 0) return { error: { message: 'productIds: At least one product is required', status: 400 } };
 
     if (action === 'delete') {
+      const urls = await model.findImageUrls(productIds);
       const count = await model.deleteMany(productIds);
+      await this.deleteUnusedFiles(urls);
       return { data: { count }, message: `${count} product${count === 1 ? '' : 's'} deleted` };
     }
 

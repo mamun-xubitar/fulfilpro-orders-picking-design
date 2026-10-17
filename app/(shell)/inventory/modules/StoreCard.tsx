@@ -17,12 +17,13 @@ type StoreCardProps = {
   onToggle: () => void;
   product: ProductRecord;
   storeListings: StoreListingsState;
+  onMoveSystemImage: (imageId: string, position: number) => void;
 };
 
 /** One connected-and-listed store (item 3/4) — split out of OnlineStoresPanel to stay within the
  * component size budget. The Differences badge (item 4) is computed client-side from data this
  * panel already has, so opening it costs nothing extra; the count is 0 when nothing disagrees. */
-export default function StoreCard({ listing, selected, onToggle, product, storeListings }: StoreCardProps) {
+export default function StoreCard({ listing, selected, onToggle, product, storeListings, onMoveSystemImage }: StoreCardProps) {
   const [diffOpen, setDiffOpen] = useState(false);
   const { canEdit } = useInventoryAccess();
   const diffCount = useMemo(() => computeStoreDiff(product, listing).total, [product, listing]);
@@ -105,7 +106,7 @@ export default function StoreCard({ listing, selected, onToggle, product, storeL
         )}
       </div>
 
-      {diffOpen && <StoreDiffModal product={product} listing={listing} storeListings={storeListings} onClose={() => setDiffOpen(false)} />}
+      {diffOpen && <StoreDiffModal product={product} listing={listing} storeListings={storeListings} onMoveSystemImage={onMoveSystemImage} onClose={() => setDiffOpen(false)} />}
     </article>
   );
 }

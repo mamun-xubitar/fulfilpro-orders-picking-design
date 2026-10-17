@@ -28,6 +28,7 @@ export function useProductImageMutations({ product, onSaved }: UseProductImageMu
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [settingImageForVariantId, setSettingImageForVariantId] = useState<string | null>(null);
   const [settingColourForImageId, setSettingColourForImageId] = useState<string | null>(null);
+  const [movingImageId, setMovingImageId] = useState<string | null>(null);
 
   /** `variantId` links the first uploaded image straight into that variant's image slot. */
   const uploadImages = async (files: File[], variantId?: string) => {
@@ -117,5 +118,33 @@ export function useProductImageMutations({ product, onSaved }: UseProductImageMu
     }
   };
 
-  return { uploading, removingId, settingImageForVariantId, settingColourForImageId, uploadImages, removeImage, setVariantImage, setImageColour };
+  /** Moves an image to a 1-based serial. The gallery reorders at once (optimistically); the
+   * server's refreshed product replaces it, or the original is restored if the request fails. */
+  const moveImage = async (imageId: string, position: number) => {
+    if (!product) return;
+    const from = product.images.findIndex((i) => i.id === imageId);
+    if (from === -1 || from === position - 1) return;
+    const reordered = [...product.images];
+    const [moved] = reordered.splice(from, 1);
+    reordered.splice(position - 1, 0, moved);
+    onSaved({ ...product, images: reordered });
+    setMovingImageId(imageId);
+    try {
+      const res = await fetch(`/api/inventory/catalog/${product.id}/images/${imageId}/position`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ position }),
+      });
+      const json = await parseApiResponse<ProductRecord>(res);
+      if (!res.ok || !json.success) throw new Error(json.message || 'Failed to move image');
+      onSaved(json.data);
+    } catch (error) {
+      onSaved(product);
+      toast.error(error instanceof Error ? error.message : 'Failed to move image');
+    } finally {
+      setMovingImageId(null);
+    }
+  };
+
+  return { uploading, removingId, settingImageForVariantId, settingColourForImageId, movingImageId, uploadImages, removeImage, setVariantImage, setImageColour, moveImage };
 }

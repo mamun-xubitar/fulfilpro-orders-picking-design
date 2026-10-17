@@ -64,6 +64,98 @@ export async function findMissingUploads(publicUrls: string[]): Promise<string[]
   return missing;
 }
 
+const OWN_UPLOAD_PREFIX = '/api/uploads/files/';
+
+/** The `uploads/<uuid>` directory behind one of our own upload URLs (bare or prefixed with
+ * APP_URL), or null for any other URL. Each upload lives alone in its own `<uuid>` folder. */
+export function ownUploadDir(url: string): string | null {
+  const base = process.env.APP_URL?.replace(/\/$/, '') ?? '';
+  const pathPart = base && url.startsWith(base + OWN_UPLOAD_PREFIX) ? url.slice(base.length) : url;
+  if (!pathPart.startsWith(OWN_UPLOAD_PREFIX)) return null;
+  const [id] = pathPart.slice(OWN_UPLOAD_PREFIX.length).split('/');
+  if (!id) return null;
+  try {
+    return resolveUploadPath([decodeURIComponent(id)]);
+  } catch {
+    return null;
+  }
+}
+
+/** Removes the files behind our own upload URLs. Best-effort: a failure is logged, never thrown,
+ * so a stuck file can't fail the delete that triggered it. Other hosts' URLs are ignored. */
+export async function deleteUploadedFiles(urls: string[]): Promise<void> {
+  const dirs = new Set(urls.map(ownUploadDir).filter((d): d is string => d !== null));
+  await Promise.all(
+    [...dirs].map((dir) =>
+      fs.rm(dir, { recursive: true, force: true }).catch((error) => console.error(`[uploads] could not remove ${dir}`, error))
+    )
+  );
+}
+
+const IMAGE_EXT_BY_MIME: Record<string, string> = {
+  'image/png': '.png',
+  'image/jpeg': '.jpg',
+  'image/gif': '.gif',
+  'image/webp': '.webp',
+  'image/svg+xml': '.svg',
+  'image/avif': '.avif',
+};
+const REMOTE_IMAGE_TIMEOUT_MS = 20_000;
+const REMOTE_IMAGE_MAX_BYTES = 20 * 1024 * 1024;
+const REMOTE_IMAGE_CONCURRENCY = 5;
+
+/** Downloads one remote image into our uploads folder and returns its site-relative URL. Throws
+ * on a non-http(s) URL, a non-2xx reply, a non-image content-type, a timeout, or a file over 20 MB. */
+async function saveRemoteImage(url: string): Promise<string> {
+  const parsed = new URL(url);
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') throw new Error('not an http(s) URL');
+  const res = await fetch(parsed, { signal: AbortSignal.timeout(REMOTE_IMAGE_TIMEOUT_MS) });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const mime = (res.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase();
+  if (!mime.startsWith('image/')) throw new Error(`not an image (${mime || 'no content-type'})`);
+  const declared = Number(res.headers.get('content-length'));
+  if (declared > REMOTE_IMAGE_MAX_BYTES) throw new Error('image is larger than 20 MB');
+  const buffer = Buffer.from(await res.arrayBuffer());
+  if (buffer.length > REMOTE_IMAGE_MAX_BYTES) throw new Error('image is larger than 20 MB');
+
+  let name = sanitizeFileName(decodeURIComponent(parsed.pathname.split('/').pop() || 'image'));
+  if (!path.extname(name)) name += IMAGE_EXT_BY_MIME[mime] ?? '.jpg';
+  const id = crypto.randomUUID();
+  const dir = path.join(UPLOADS_DIR, id);
+  await fs.mkdir(dir, { recursive: true });
+  await fs.writeFile(path.join(dir, name), buffer);
+  return `${OWN_UPLOAD_PREFIX}${id}/${encodeURIComponent(name)}`;
+}
+
+export type LocalizedImage = { url: string; failed: boolean };
+
+/** Copies each distinct remote image URL into our own storage (5 at a time) and maps it to the
+ * local URL. Our own upload URLs map to their site-relative form without a download. A URL that
+ * can't be downloaded keeps its original value, flagged `failed`, so the product still has the
+ * image and the caller can report it. */
+export async function localizeImageUrls(urls: string[]): Promise<Map<string, LocalizedImage>> {
+  const result = new Map<string, LocalizedImage>();
+  const base = process.env.APP_URL?.replace(/\/$/, '') ?? '';
+  const queue: string[] = [];
+  for (const url of new Set(urls)) {
+    const relative = base && url.startsWith(base + OWN_UPLOAD_PREFIX) ? url.slice(base.length) : url;
+    if (relative.startsWith(OWN_UPLOAD_PREFIX)) result.set(url, { url: relative, failed: false });
+    else queue.push(url);
+  }
+  const worker = async () => {
+    for (let url = queue.shift(); url !== undefined; url = queue.shift()) {
+      try {
+        result.set(url, { url: await saveRemoteImage(url), failed: false });
+      } catch (error) {
+        console.error(`[uploads] could not download ${url}`, error instanceof Error ? error.message : error);
+        result.set(url, { url, failed: true });
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(REMOTE_IMAGE_CONCURRENCY, queue.length) }, worker));
+  return result;
+}
+
 /** Resolve a public file path, guarding against directory traversal. Returns null if outside UPLOADS_DIR. */
 export function resolveUploadPath(segments: string[]): string | null {
   const normalized = path.normalize(path.join(UPLOADS_DIR, ...segments));
