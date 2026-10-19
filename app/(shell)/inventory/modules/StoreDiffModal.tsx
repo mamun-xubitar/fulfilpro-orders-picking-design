@@ -20,6 +20,7 @@ type StoreDiffModalProps = {
   product: ProductRecord;
   listing: StoreListingResult;
   storeListings: StoreListingsState;
+  onMoveSystemImage: (imageId: string, position: number) => void;
   onClose: () => void;
 };
 
@@ -30,7 +31,7 @@ type StoreDiffModalProps = {
  * (OnlineStoresPanel). The modal stays open after a save so several fields can be fixed in one
  * visit — see useStoreDiff's doc comment.
  */
-export default function StoreDiffModal({ product, listing, storeListings, onClose }: StoreDiffModalProps) {
+export default function StoreDiffModal({ product, listing, storeListings, onMoveSystemImage, onClose }: StoreDiffModalProps) {
   const d = useStoreDiff({ product, listing, storeListings });
 
   // Nothing to show only when the product isn't on the store at all; an in-sync listing still opens
@@ -136,7 +137,7 @@ export default function StoreDiffModal({ product, listing, storeListings, onClos
         )}
 
         <section className="space-y-[6px]">
-          <StoreDiffImagesSection product={product} listing={d.liveListing} rows={d.diff.rows} actions={d.images} savingKey={d.savingKey} />
+          <StoreDiffImagesSection product={product} listing={d.liveListing} rows={d.diff.rows} actions={d.images} savingKey={d.savingKey} onMoveSystemImage={onMoveSystemImage} />
         </section>
 
         {d.diff.rows.length > 0 && (

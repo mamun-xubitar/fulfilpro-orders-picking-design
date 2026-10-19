@@ -131,8 +131,9 @@ export function useImportExport({ product, onSaved }: UseImportExportArgs) {
     if (!product || !pendingFile || !preview) return;
     setImporting(true);
     try {
-      const json = await postImportFile<{ product: ProductRecord }>(product.id, pendingFile, true, { overwrite, markVerified });
-      toast.success(json.message);
+      const json = await postImportFile<{ product: ProductRecord; failedImageCount: number }>(product.id, pendingFile, true, { overwrite, markVerified });
+      if (json.data.failedImageCount > 0) toast.warning(json.message);
+      else toast.success(json.message);
       setImportOpen(false);
       setPendingFile(null);
       setPreview(null);

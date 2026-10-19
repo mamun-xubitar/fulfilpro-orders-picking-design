@@ -2,6 +2,7 @@ import moment from 'moment-timezone';
 import prisma from '@/lib/prisma.server';
 import { deriveColorFromName } from '@/lib/inventory/colour';
 import { Prisma, SupplierProductStatus } from '@prisma/client';
+import { setLocationStock, type StockRemap } from '@/lib/inventory-stock.server';
 
 export type ColourOptionData = { name: string; color: string };
 
@@ -133,7 +134,7 @@ const catalogueInclude = {
     orderBy: { position: 'asc' as const },
     include: { locations: { select: { quantity: true, location: { select: { id: true, name: true } } } } },
   },
-  images: { orderBy: { position: 'asc' as const } },
+  images: { orderBy: [{ position: 'asc' as const }, { createdAt: 'asc' as const }] },
   pricing: true,
   stocktakes: { where: { status: 'COMPLETED' as const }, orderBy: { completedAt: 'desc' as const }, take: 1 },
   activity: { orderBy: { createdAt: 'desc' as const }, take: 30 },
@@ -204,15 +205,17 @@ export class SupplierProductModel {
     return rows[0] ?? null;
   }
 
-  /** Whole-catalogue count, ignoring every filter — the "of Y" half of the record stepper. */
-  async countAll(): Promise<number> {
-    return prisma.supplierProduct.count();
+  /** Whole-catalogue count, ignoring every filter except omitted — the "of Y" half of the record
+   * stepper. Omitted products are left out unless `includeOmitted` (the table's "Show omitted"). */
+  async countAll(includeOmitted = false): Promise<number> {
+    return prisma.supplierProduct.count({ where: includeOmitted ? {} : { omitted: false } });
   }
 
   /** Count under the Verified filter only (ignoring every other table filter) — the "n / X"
-   * half of the record stepper, kept in sync with the table via useProductsTable's onCounts. */
+   * half of the record stepper, kept in sync with the table via useProductsTable's onCounts.
+   * Omitted products never count here. */
   async countForStepper(verified?: boolean): Promise<number> {
-    return prisma.supplierProduct.count({ where: verified === undefined ? {} : { verified } });
+    return prisma.supplierProduct.count({ where: { omitted: false, ...(verified === undefined ? {} : { verified }) } });
   }
 
   async findById(id: string): Promise<SupplierProductRow | null> {
@@ -489,10 +492,11 @@ export class SupplierProductModel {
   /**
    * Applies the Colour & size adjustment modal's checked colours/sizes to the product, in one of
    * two modes:
-   * - `replace`: the product's colours/sizes become exactly the checked lists; every existing
-   *   variant is deleted (along with its stocktake items, adjustments and store-variant links —
-   *   cascades on SupplierProductVariant) and one row per checked colour x checked size is
-   *   created fresh, seeded from `values`.
+   * - `replace`: the product's colours/sizes become exactly the checked lists; existing variants
+   *   that are still checked are updated in place (keeping their id, so stocktake items,
+   *   adjustments, store-variant links, allocations, SKU, barcode and prices survive), existing
+   *   variants that aren't are deleted (cascading their stocktake items, adjustments and
+   *   store-variant links), and a row is created for each checked combo that's new, seeded from `values`.
    * - `insert`: the product's colours/sizes become the union of what it already had and the
    *   checked lists; only the checked colour x checked size combos that don't already exist are
    *   created (existing variants are left untouched) — mirrors reconcileVariants' sentinel
@@ -511,11 +515,14 @@ export class SupplierProductModel {
       sizes: string[];
       /** Per-combo stock on hand / trigger typed in the modal — keyed by colour+size, matched
        * case-insensitively on colour. A combo missing from here falls back to 0 / the store's
-       * low-stock threshold, same as reconcileVariants. With `locationId` set, stock on hand is the
-       * quantity at that location. */
-      values: { colour: string; size: string; stockOnHand?: number; trigger?: number }[];
-      /** The location whose stock `values` describe, and where newly created variants are kept; null = unassigned. */
-      locationId: string | null;
+       * low-stock threshold, same as reconcileVariants. With `locationIds` set, the stock is the
+       * `stock` quantity at each of them (and `stockOnHand` their sum). */
+      values: { colour: string; size: string; stockOnHand?: number; trigger?: number; stock?: { locationId: string; quantity: number }[] }[];
+      /** The picked locations: where `values` describe stock and where newly created variants are
+       * kept. On replace they become each kept variant's exact set. Empty = unassigned stock. */
+      locationIds: string[];
+      /** Replace only: where a dropped location's stock moves (`remap[fromId]` is a picked location). */
+      remap?: StockRemap;
     }
   ): Promise<void> {
     const current = await prisma.supplierProduct.findUnique({ where: { id: supplierProductId }, select: { sizes: true, colours: true } });
@@ -524,6 +531,12 @@ export class SupplierProductModel {
     const colourAxis = data.colours.length > 0 ? data.colours.map((c) => c.name) : [''];
     const sizeAxis = data.sizes.length > 0 ? data.sizes : [''];
     const valuesByKey = new Map(data.values.map((v) => [`${v.colour.toLowerCase()}::${v.size}`, v]));
+    // One link per picked location for a created variant, at the quantity typed there.
+    const linksFor = (variants: { id: string; colour: string; size: string }[]): Prisma.SupplierProductVariantLocationCreateManyInput[] =>
+      variants.flatMap((v) => {
+        const typed = valuesByKey.get(`${v.colour.toLowerCase()}::${v.size}`)?.stock ?? [];
+        return data.locationIds.map((locationId) => ({ variantId: v.id, locationId, quantity: typed.find((s) => s.locationId === locationId)?.quantity ?? 0 }));
+      });
     const lowStockThreshold =
       (await prisma.appSettings.findUnique({ where: { id: 'default' }, select: { lowStockThreshold: true } }))?.lowStockThreshold ?? 10;
     // Mirrors reconcileVariants: a colour that already has an image assigned hands it straight to
@@ -565,43 +578,61 @@ export class SupplierProductModel {
             await tx.supplierProductImage.update({ where: { id: img.id }, data: { colour: null } });
           }
         }
-        // Replace recreates every variant, so a combo that already existed gets its locations (and
-        // their stock) back — only combos new to the product land at the chosen location.
+        const keyOf = (colour: string, size: string) => `${colour.toLowerCase()}::${size}`;
         const previous = await tx.supplierProductVariant.findMany({
           where: { supplierProductId },
-          select: { id: true, colour: true, size: true, locations: { select: { locationId: true, quantity: true } } },
+          select: { id: true, colour: true, size: true, stockOnHand: true, locations: { select: { locationId: true, quantity: true } } },
         });
-        const previousLocations = new Map(previous.map((v) => [`${v.colour.toLowerCase()}::${v.size}`, v.locations]));
-        // PO lines point at variants with ON DELETE SET NULL — remember which combo each one was on so
-        // it can be re-linked to the recreated variant (otherwise its incoming drops off the matrix).
-        const poItemsByKey = new Map<string, string[]>();
-        const poItems = await tx.purchaseOrderItem.findMany({ where: { variantId: { in: previous.map((v) => v.id) } }, select: { id: true, variantId: true } });
-        const keyByOldId = new Map(previous.map((v) => [v.id, `${v.colour.toLowerCase()}::${v.size}`]));
-        for (const item of poItems) {
-          const key = keyByOldId.get(item.variantId!)!;
-          poItemsByKey.set(key, [...(poItemsByKey.get(key) ?? []), item.id]);
+        const nextKeys = new Set(toCreate.map((row) => keyOf(row.colour, row.size)));
+        const kept = new Map<string, (typeof previous)[number]>();
+        const dropIds: string[] = [];
+        for (const v of previous) {
+          const key = keyOf(v.colour, v.size);
+          if (nextKeys.has(key) && !kept.has(key)) kept.set(key, v);
+          else dropIds.push(v.id);
         }
-        await tx.supplierProductVariant.deleteMany({ where: { supplierProductId } });
-        if (toCreate.length > 0) {
-          const created = await tx.supplierProductVariant.createManyAndReturn({ data: toCreate, select: { id: true, colour: true, size: true, stockOnHand: true } });
-          const links: Prisma.SupplierProductVariantLocationCreateManyInput[] = [];
-          for (const v of created) {
-            const relink = poItemsByKey.get(`${v.colour.toLowerCase()}::${v.size}`);
-            if (relink) await tx.purchaseOrderItem.updateMany({ where: { id: { in: relink } }, data: { variantId: v.id } });
-            const kept = previousLocations.get(`${v.colour.toLowerCase()}::${v.size}`) ?? [];
-            if (kept.length > 0) {
-              // The typed stock is for the chosen location; every other location keeps its quantity.
-              const typed = data.locationId ? valuesByKey.get(`${v.colour.toLowerCase()}::${v.size}`)?.stockOnHand : undefined;
-              const quantities = new Map(kept.map((l) => [l.locationId, l.quantity]));
-              if (data.locationId && typed !== undefined && (quantities.has(data.locationId) || typed > 0)) quantities.set(data.locationId, typed);
-              for (const [locationId, quantity] of quantities) links.push({ variantId: v.id, locationId, quantity });
-              await tx.supplierProductVariant.update({ where: { id: v.id }, data: { stockOnHand: [...quantities.values()].reduce((sum, q) => sum + q, 0) } });
-            } else if (data.locationId) {
-              links.push({ variantId: v.id, locationId: data.locationId, quantity: v.stockOnHand });
-            }
+        if (dropIds.length > 0) await tx.supplierProductVariant.deleteMany({ where: { id: { in: dropIds } } });
+
+        const fresh: Prisma.SupplierProductVariantCreateManyInput[] = [];
+        const links: Prisma.SupplierProductVariantLocationCreateManyInput[] = [];
+        const pickedNames = await tx.inventoryLocation.findMany({ where: { id: { in: data.locationIds } }, select: { id: true, name: true }, orderBy: { name: 'asc' } });
+        const firstPicked = pickedNames[0]?.id;
+        for (const row of toCreate) {
+          const key = keyOf(row.colour, row.size);
+          const existing = kept.get(key);
+          if (!existing) {
+            fresh.push(row);
+            continue;
           }
-          if (links.length > 0) await tx.supplierProductVariantLocation.createMany({ data: links });
+          // A still-checked variant keeps its id and everything not typed in the modal. With picked
+          // locations they become its exact set (stock of a dropped one moves through `remap`).
+          const typed = valuesByKey.get(key);
+          if (data.locationIds.length > 0) {
+            const quantityAt = (locationId: string) => {
+              const entered = typed?.stock?.find((s) => s.locationId === locationId);
+              if (entered) return entered.quantity;
+              const here = existing.locations.find((l) => l.locationId === locationId);
+              // Unassigned stock lands in the first picked location (A→Z), as assignLocations does.
+              return here ? here.quantity : existing.locations.length === 0 && locationId === firstPicked ? existing.stockOnHand : 0;
+            };
+            await setLocationStock(tx, existing.id, data.locationIds.map((locationId) => ({ locationId, quantity: quantityAt(locationId) })), data.remap ?? {});
+          }
+          await tx.supplierProductVariant.update({
+            where: { id: existing.id },
+            data: {
+              colour: row.colour,
+              size: row.size,
+              position: row.position,
+              ...(data.locationIds.length === 0 && typed?.stockOnHand !== undefined ? { stockOnHand: typed.stockOnHand } : {}),
+              ...(typed?.trigger !== undefined ? { trigger: typed.trigger } : {}),
+            },
+          });
         }
+        if (fresh.length > 0) {
+          const created = await tx.supplierProductVariant.createManyAndReturn({ data: fresh, select: { id: true, colour: true, size: true } });
+          links.push(...linksFor(created));
+        }
+        if (links.length > 0) await tx.supplierProductVariantLocation.createMany({ data: links });
       });
       return;
     }
@@ -643,11 +674,8 @@ export class SupplierProductModel {
       }
     }
     if (toCreate.length === 0) return;
-    const created = await prisma.supplierProductVariant.createManyAndReturn({ data: toCreate, select: { id: true, stockOnHand: true } });
-    if (data.locationId) {
-      const locationId = data.locationId;
-      await prisma.supplierProductVariantLocation.createMany({ data: created.map((v) => ({ variantId: v.id, locationId, quantity: v.stockOnHand })) });
-    }
+    const created = await prisma.supplierProductVariant.createManyAndReturn({ data: toCreate, select: { id: true, colour: true, size: true } });
+    if (data.locationIds.length > 0) await prisma.supplierProductVariantLocation.createMany({ data: linksFor(created) });
   }
 
   async upsertPricing(id: string, data: SupplierProductPricingRow): Promise<void> {
@@ -750,22 +778,71 @@ export class SupplierProductModel {
     return prisma.supplierProductImage.count({ where: { supplierProductId } });
   }
 
+  /** Next free serial for a product's gallery — max + 1 rather than a count, so a new image never
+   * lands on an existing serial after earlier deletes left gaps. */
+  private async nextImagePosition(supplierProductId: string): Promise<number> {
+    const { _max } = await prisma.supplierProductImage.aggregate({ where: { supplierProductId }, _max: { position: true } });
+    return (_max.position ?? -1) + 1;
+  }
+
   async addImage(supplierProductId: string, data: { url: string; altText: string | null; colour: string | null }): Promise<void> {
-    const position = await prisma.supplierProductImage.count({ where: { supplierProductId } });
+    const position = await this.nextImagePosition(supplierProductId);
     await prisma.supplierProductImage.create({ data: { supplierProductId, ...data, position } });
   }
 
   /** Returns the created rows (id + url) so a caller can link them to variants — e.g. the first
-   * one to a variant after an upload, or a whole CSV import's `Variant Image` URLs by lookup. */
+   * one to a variant after an upload, or a whole CSV import's `Variant Image` URLs by lookup.
+   * `sourceUrl` is the remote URL an imported image was downloaded from (`url` is then our copy). */
   async addImages(
     supplierProductId: string,
-    images: { url: string; altText: string | null; colour: string | null }[]
-  ): Promise<{ id: string; url: string }[]> {
-    let position = await prisma.supplierProductImage.count({ where: { supplierProductId } });
+    images: { url: string; altText: string | null; colour: string | null; sourceUrl?: string | null }[]
+  ): Promise<{ id: string; url: string; sourceUrl: string | null }[]> {
+    let position = await this.nextImagePosition(supplierProductId);
     return prisma.supplierProductImage.createManyAndReturn({
       data: images.map((image) => ({ supplierProductId, ...image, position: position++ })),
-      select: { id: true, url: true },
+      select: { id: true, url: true, sourceUrl: true },
     });
+  }
+
+  /** Moves one image to a 1-based serial in the product's gallery and renumbers the rest 0…N-1
+   * (which also heals any duplicate positions left by older inserts). False when the image isn't
+   * on this product. */
+  async moveImage(supplierProductId: string, imageId: string, position: number): Promise<boolean> {
+    return prisma.$transaction(async (tx) => {
+      const rows = await tx.supplierProductImage.findMany({
+        where: { supplierProductId },
+        orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
+        select: { id: true, position: true },
+      });
+      const from = rows.findIndex((r) => r.id === imageId);
+      if (from === -1) return false;
+      const [moved] = rows.splice(from, 1);
+      rows.splice(Math.min(Math.max(position - 1, 0), rows.length), 0, moved);
+      for (const [index, row] of rows.entries()) {
+        if (row.position !== index) await tx.supplierProductImage.update({ where: { id: row.id }, data: { position: index } });
+      }
+      return true;
+    });
+  }
+
+  /** Each image's stored url and the remote URL it was downloaded from (CSV import), for matching a
+   * re-imported file's `Image Src` to images it already brought in. */
+  async listImageSources(supplierProductId: string): Promise<{ id: string; url: string; sourceUrl: string | null }[]> {
+    return prisma.supplierProductImage.findMany({ where: { supplierProductId }, select: { id: true, url: true, sourceUrl: true } });
+  }
+
+  /** Distinct image URLs of the given products — collected before a delete so their files can be
+   * cleaned up once the rows (which cascade with the product) are gone. */
+  async findImageUrls(productIds: string[]): Promise<string[]> {
+    const rows = await prisma.supplierProductImage.findMany({ where: { supplierProductId: { in: productIds } }, select: { url: true }, distinct: ['url'] });
+    return rows.map((r) => r.url);
+  }
+
+  /** Of the given URLs, those some image row (on any product) still points at. */
+  async findReferencedImageUrls(urls: string[]): Promise<string[]> {
+    if (urls.length === 0) return [];
+    const rows = await prisma.supplierProductImage.findMany({ where: { url: { in: urls } }, select: { url: true }, distinct: ['url'] });
+    return rows.map((r) => r.url);
   }
 
   /** Links a variant to one image from the product's own pool, or unlinks when imageId is null.
@@ -779,9 +856,12 @@ export class SupplierProductModel {
     return result.count > 0;
   }
 
-  async removeImage(supplierProductId: string, imageId: string): Promise<boolean> {
-    const result = await prisma.supplierProductImage.deleteMany({ where: { id: imageId, supplierProductId } });
-    return result.count > 0;
+  /** Returns the removed image's url (so the caller can clean up its file), or null if not found. */
+  async removeImage(supplierProductId: string, imageId: string): Promise<string | null> {
+    const image = await prisma.supplierProductImage.findFirst({ where: { id: imageId, supplierProductId }, select: { url: true } });
+    if (!image) return null;
+    await prisma.supplierProductImage.deleteMany({ where: { id: imageId, supplierProductId } });
+    return image.url;
   }
 
   /**

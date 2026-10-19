@@ -19,12 +19,13 @@ type StoreDraftMediaProps = {
   setAlt: (imageId: string, value: string) => void;
   addImages: (images: { id: string; url: string; altText: string | null }[]) => void;
   removeImage: (imageId: string) => void;
+  moveImage: (imageId: string, position: number) => void;
 };
 
 /** Media section of a store draft — this store's own image list, temporary until Save. Adding a
  * file here stages it to disk (so Shopify has a URL to fetch) without creating a hub gallery row;
  * removing one here never deletes the hub's image, exactly like every other field in this modal. */
-export default function StoreDraftMedia({ productId, draft, toggleImage, setAlt, addImages, removeImage }: StoreDraftMediaProps) {
+export default function StoreDraftMedia({ productId, draft, toggleImage, setAlt, addImages, removeImage, moveImage }: StoreDraftMediaProps) {
   return (
     <div className="mb-3 space-y-2">
       <div>
@@ -35,10 +36,13 @@ export default function StoreDraftMedia({ productId, draft, toggleImage, setAlt,
       </div>
       {draft.images.length === 0 && <p className="text-[11px] text-inventory-text-subtle">No images for this store yet.</p>}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-        {draft.images.map((img) => (
+        {draft.images.map((img, i) => (
           <StoreDraftImageCard
             key={img.id}
             image={img}
+            position={i + 1}
+            positionCount={draft.images.length}
+            onMove={(position) => moveImage(img.id, position)}
             excluded={draft.excludedImages.includes(img.id)}
             altValue={draft.imageAlts[img.id] ?? img.altText ?? ''}
             onToggleInclude={() => toggleImage(img.id)}

@@ -20,6 +20,8 @@ type OnlineStoresPanelProps = {
    * "+" button, just pre-seeded with one store id. */
   onConnect: (storeId: string) => void;
   product: ProductRecord | null;
+  /** Reorders the system gallery from the Differences modal's System column. */
+  onMoveSystemImage: (imageId: string, position: number) => void;
 };
 
 /** Item 3: every connected store now shows here, not only ones this product is already listed
@@ -35,6 +37,7 @@ export default function OnlineStoresPanel({
   onOpenBulkUpdate,
   onConnect,
   product,
+  onMoveSystemImage,
 }: OnlineStoresPanelProps) {
   const { listings, loading, syncing, sync } = storeListings;
   const { canEdit } = useInventoryAccess();
@@ -113,6 +116,7 @@ export default function OnlineStoresPanel({
                   onToggle={() => onToggleStore(listing.storeId)}
                   product={product}
                   storeListings={storeListings}
+                  onMoveSystemImage={onMoveSystemImage}
                 />
               ) : null
             )}

@@ -14,6 +14,7 @@ type StoreDiffImagesSectionProps = {
   rows: StoreVariantTableRow[];
   actions: StoreImageActions;
   savingKey: string | null;
+  onMoveSystemImage: (imageId: string, position: number) => void;
 };
 
 type Group<T extends { id: string }> = ImageColourGroup<T>;
@@ -25,7 +26,7 @@ type Group<T extends { id: string }> = ImageColourGroup<T>;
  * delete all, or replace the lot with the system gallery. A store image's colour comes from the variants that link it (a store has
  * no colour field on an image), so one no variant uses lands in "Unassigned".
  */
-export default function StoreDiffImagesSection({ product, listing, rows, actions, savingKey }: StoreDiffImagesSectionProps) {
+export default function StoreDiffImagesSection({ product, listing, rows, actions, savingKey, onMoveSystemImage }: StoreDiffImagesSectionProps) {
   const t = DIFF_TONE_CLASSES.details;
   const colourOrder = useMemo(() => product.colours.map((c) => c.name), [product.colours]);
   const swatches = useMemo(() => new Map(product.colours.map((c) => [c.name.trim().toLowerCase(), c.color])), [product.colours]);
@@ -81,7 +82,16 @@ export default function StoreDiffImagesSection({ product, listing, rows, actions
             savingKey={savingKey}
             actions={actions}
           />
-          <ImageColumn title={`System (${product.images.length})`} groups={systemGroups} swatches={swatches} side="system" savingKey={savingKey} actions={actions} />
+          <ImageColumn
+            title={`System (${product.images.length})`}
+            groups={systemGroups}
+            swatches={swatches}
+            side="system"
+            positionCount={product.images.length}
+            onMoveSystemImage={onMoveSystemImage}
+            savingKey={savingKey}
+            actions={actions}
+          />
           <div className="col-span-2 mt-[6px] border-t border-inventory-divider pt-[8px]">
             <StoreImageAddTile onClick={actions.openAdd} busy={busy} />
           </div>
@@ -100,6 +110,7 @@ type ImageColumnProps = {
   side: 'store' | 'system';
   systemImages?: ProductImage[];
   positionCount?: number;
+  onMoveSystemImage?: (imageId: string, position: number) => void;
   savingKey: string | null;
   actions: StoreImageActions;
 };
@@ -107,7 +118,7 @@ type ImageColumnProps = {
 /** One side of the Images section: the colours as compact cells in a wrapping grid (normally one
  * image each), then the images tied to no colour in their own "Unassigned" grid below. Store
  * tiles carry the edit buttons and a position dropdown; system tiles are just the picture. */
-function ImageColumn({ title, groups, swatches, side, systemImages, positionCount, savingKey, actions }: ImageColumnProps) {
+function ImageColumn({ title, groups, swatches, side, systemImages, positionCount, onMoveSystemImage, savingKey, actions }: ImageColumnProps) {
   const coloured = groups.filter((g) => g.key !== '');
   const unassigned = groups.find((g) => g.key === '');
   const noun = side === 'store' ? 'the store' : 'the system';
@@ -119,13 +130,13 @@ function ImageColumn({ title, groups, swatches, side, systemImages, positionCoun
       {coloured.length > 0 && (
         <div className="flex flex-wrap gap-[8px] border-t border-inventory-divider py-[8px]">
           {coloured.map((group) => (
-            <ImageGroupCell key={group.key} group={group} swatch={swatches.get(group.key)} side={side} systemImages={systemImages} positionCount={positionCount} savingKey={savingKey} actions={actions} />
+            <ImageGroupCell key={group.key} group={group} swatch={swatches.get(group.key)} side={side} systemImages={systemImages} positionCount={positionCount} onMoveSystemImage={onMoveSystemImage} savingKey={savingKey} actions={actions} />
           ))}
         </div>
       )}
       {unassigned && (
         <div className="border-t border-inventory-divider py-[8px]">
-          <ImageGroupCell group={unassigned} side={side} systemImages={systemImages} positionCount={positionCount} savingKey={savingKey} actions={actions} bare />
+          <ImageGroupCell group={unassigned} side={side} systemImages={systemImages} positionCount={positionCount} onMoveSystemImage={onMoveSystemImage} savingKey={savingKey} actions={actions} bare />
         </div>
       )}
     </section>
@@ -138,13 +149,14 @@ type ImageGroupCellProps = {
   side: 'store' | 'system';
   systemImages?: ProductImage[];
   positionCount?: number;
+  onMoveSystemImage?: (imageId: string, position: number) => void;
   savingKey: string | null;
   actions: StoreImageActions;
   /** Unassigned block: no cell border, tiles wrap across the full column width. */
   bare?: boolean;
 };
 
-function ImageGroupCell({ group, swatch, side, systemImages, positionCount, savingKey, actions, bare }: ImageGroupCellProps) {
+function ImageGroupCell({ group, swatch, side, systemImages, positionCount, onMoveSystemImage, savingKey, actions, bare }: ImageGroupCellProps) {
   const busy = savingKey !== null;
   const isStore = side === 'store';
   return (
@@ -181,7 +193,14 @@ function ImageGroupCell({ group, swatch, side, systemImages, positionCount, savi
               onDelete={() => actions.removeOne(img)}
             />
           ) : (
-            <StoreImageTile key={img.id} url={img.url} altText={img.altText} position={img.position} />
+            <StoreImageTile
+              key={img.id}
+              url={img.url}
+              altText={img.altText}
+              position={img.position}
+              positionCount={positionCount}
+              onMove={onMoveSystemImage && ((position) => position !== img.position && onMoveSystemImage(img.id, position))}
+            />
           )
         )}
       </div>

@@ -31,10 +31,11 @@ type ImageCardsGridProps = {
  */
 export default function ImageCardsGrid({ images, colours, imageMutations }: ImageCardsGridProps) {
   const swatchOf = makeSwatchResolver(colours);
+  // Both sections list images in serial order (`images` is position-ascending); the serial shown
+  // on a card is its place in the whole gallery, which is the order it is published to stores.
   const assigned = images.filter((i) => i.colour);
-  // Newest first (matches the Main image gallery) — `images` itself stays position-ascending
-  // since Assigned above, and the product-list thumbnail, still want oldest-first.
-  const unassigned = images.filter((i) => !i.colour).reverse();
+  const unassigned = images.filter((i) => !i.colour);
+  const serialOf = new Map(images.map((image, index) => [image.id, index + 1]));
   const takenByOtherImages = new Set(assigned.map((i) => i.colour!.toLowerCase()));
 
   const availableColoursFor = (image: ProductImage) =>
@@ -86,7 +87,7 @@ export default function ImageCardsGrid({ images, colours, imageMutations }: Imag
           </h4>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
             {assigned.map((image) => (
-              <ImageCard key={image.id} image={image} colours={availableColoursFor(image)} imageMutations={imageMutations} swatchOf={swatchOf} />
+              <ImageCard key={image.id} image={image} serial={serialOf.get(image.id) ?? 0} total={images.length} colours={availableColoursFor(image)} imageMutations={imageMutations} swatchOf={swatchOf} />
             ))}
           </div>
         </section>
@@ -98,7 +99,7 @@ export default function ImageCardsGrid({ images, colours, imageMutations }: Imag
         </h4>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           {unassigned.map((image) => (
-            <ImageCard key={image.id} image={image} colours={availableColoursFor(image)} imageMutations={imageMutations} swatchOf={swatchOf} />
+            <ImageCard key={image.id} image={image} serial={serialOf.get(image.id) ?? 0} total={images.length} colours={availableColoursFor(image)} imageMutations={imageMutations} swatchOf={swatchOf} />
           ))}
           <AddImageTile fileInputRef={fileInputRef} uploading={imageMutations.uploading} remaining={remaining} />
         </div>
@@ -118,21 +119,28 @@ export default function ImageCardsGrid({ images, colours, imageMutations }: Imag
 
 function ImageCard({
   image,
+  serial,
+  total,
   colours,
   imageMutations,
   swatchOf,
 }: {
   image: ProductImage;
+  /** 1-based place in the gallery — the order images are shown in and published to stores. */
+  serial: number;
+  total: number;
   /** Every colour still assignable from this card — already excludes colours taken by other images. */
   colours: ColourOption[];
   imageMutations: ImageMutations;
   swatchOf: (colour: string) => string;
 }) {
   const assigning = imageMutations.settingColourForImageId === image.id;
+  const moving = imageMutations.movingImageId === image.id;
   const [broken, setBroken] = useState(false);
 
   return (
     <figure className="overflow-hidden rounded-xl border border-inventory-border flex flex-col justify-between">
+      <div className="relative">
       {broken ? (
         <div className="flex aspect-square w-full flex-col items-center justify-center gap-1 bg-inventory-danger/10 text-inventory-danger">
           <ImageIcon className="h-5 w-5" />
@@ -142,6 +150,18 @@ function ImageCard({
         // eslint-disable-next-line @next/next/no-img-element
         <img src={image.url} alt={image.altText ?? ''} className="aspect-square w-full object-cover " onError={() => setBroken(true)} />
       )}
+      <span className="absolute left-1.5 top-1.5 rounded-md bg-black/60 px-1.5 py-0.5 text-[10px] font-bold leading-none tabular-nums text-white">{serial}</span>
+      <button
+        type="button"
+        onClick={() => imageMutations.removeImage(image.id)}
+        disabled={imageMutations.removingId === image.id}
+        aria-label="Remove image"
+        title="Remove image"
+        className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-md bg-inventory-surface/95 text-inventory-text-muted shadow-inventory transition-colors duration-150 hover:text-inventory-danger-hover disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+      >
+        <Trash className="h-3.5 w-3.5" />
+      </button>
+      </div>
       <figcaption className="space-y-1.5 bg-inventory-surface-muted px-2 py-1.5">
         {image.colour && (
           <div className="flex flex-wrap gap-1">
@@ -163,6 +183,20 @@ function ImageCard({
         )}
         <div className="flex items-center gap-1">
           <select
+            value={serial}
+            onChange={(e) => void imageMutations.moveImage(image.id, Number(e.target.value))}
+            disabled={moving}
+            aria-label={`Serial of image ${serial}`}
+            title="Serial — position in the gallery and on stores"
+            className="w-12 shrink-0 rounded border border-inventory-border bg-inventory-surface px-1 py-0.5 text-[11px] font-medium text-inventory-text-muted outline-none focus:ring-2 focus:ring-inventory-primary-ring disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+          >
+            {Array.from({ length: total }, (_, i) => (
+              <option key={i + 1} value={i + 1}>
+                {i + 1}
+              </option>
+            ))}
+          </select>
+          <select
             value={image.colour ?? ''}
             onChange={(e) => imageMutations.setImageColour(image.id, e.target.value || null)}
             disabled={assigning}
@@ -176,16 +210,6 @@ function ImageCard({
               </option>
             ))}
           </select>
-          <button
-            type="button"
-            onClick={() => imageMutations.removeImage(image.id)}
-            disabled={imageMutations.removingId === image.id}
-            aria-label="Remove image"
-            title="Remove image"
-            className="shrink-0 rounded p-1 text-inventory-text-subtle hover:bg-inventory-danger/10 hover:text-inventory-danger-hover disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
-          >
-            <Trash className="h-3.5 w-3.5" />
-          </button>
         </div>
       </figcaption>
     </figure>

@@ -2,7 +2,7 @@
 
 import { DIFF_TONE_CLASSES, type DiffTone } from './StoreDiffFieldRow';
 import StoreDiffVariantCell, { CellSaveButton } from './StoreDiffVariantCell';
-import StoreDraftVariantImage from './StoreDraftVariantImage';
+import StoreDiffVariantImagePicker from './StoreDiffVariantImagePicker';
 import type { StoreVariantTableRow } from './storeDiff';
 import type { StoreVariantActions } from './hooks/useStoreVariantActions';
 import { Check, Plus, Trash } from './icons';
@@ -94,9 +94,8 @@ export default function StoreDiffVariantsRow({ row, systemImages, storeImages, s
             <span className="flex h-[20px] w-[20px] shrink-0 items-center justify-center text-[9px] text-inventory-text-subtle" title="System: none">—</span>
           )}
           <div className="w-[136px]">
-            <StoreDraftVariantImage
+            <StoreDiffVariantImagePicker
               variantLabel={label}
-              storeName="the store gallery"
               images={storeImages}
               selectedImageId={actions.valueOf(row, 'image') || null}
               onChange={(imageId) => (row.hubVariantId ? actions.setColourImage(row.colour, imageId) : actions.setValue(row, 'image', imageId ?? ''))}

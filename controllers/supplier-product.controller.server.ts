@@ -5,7 +5,7 @@ import { LocationModel } from '@/models/location.model.server';
 import { InventoryCategoryModel } from '@/models/inventory-category.model.server';
 import { CurrencyRateModel } from '@/models/currency-rate.model.server';
 import { StockError } from '@/lib/inventory-stock.server';
-import { saveUploadedFile } from '@/lib/uploads.server';
+import { deleteUploadedFiles, saveUploadedFile } from '@/lib/uploads.server';
 import { deriveColorFromName } from '@/lib/inventory/colour';
 import { isValidHandle, slugifyHandle } from '@/lib/inventory/handle';
 import { sanitizeHtml } from '@/lib/sanitize-html';
@@ -113,7 +113,7 @@ export class SupplierProductController {
         model.list(params),
         supplierModel.listOptions(),
         categoryModel.list(),
-        model.countAll(),
+        model.countAll(includeOmitted),
         model.countForStepper(verified),
       ]);
       const supplierOptions = supplierOptionRows.map((s) => ({ id: s.id, name: s.name }));
@@ -556,36 +556,79 @@ export class SupplierProductController {
       return { error: { message: 'Validation failed', errors: ['colours: Check at least one colour or size'], status: 400 } };
     }
 
-    const rawValues = Array.isArray(value.values) ? (value.values as unknown[]) : [];
+    // Replace deletes every variant outside the checked colours x sizes, so none holding stock may be left out.
+    if (mode === 'replace') {
+      const product = await model.findById(id);
+      const kept = new Set<string>();
+      for (const colour of colours.length > 0 ? colours.map((c) => c.name) : ['']) {
+        for (const size of sizes.length > 0 ? sizes : ['']) kept.add(`${colour.toLowerCase()}::${size.toUpperCase()}`);
+      }
+      const stocked = (product?.variants ?? []).filter((v) => v.stockOnHand > 0 && !kept.has(`${v.colour.toLowerCase()}::${v.size.toUpperCase()}`));
+      if (stocked.length > 0) {
+        const names = stocked.map((v) => [v.colour, v.size].filter(Boolean).join(' / ') || 'Default Title').join(', ');
+        return { error: { message: `Cannot remove ${names} — still has stock on hand. Set its stock to 0 first.`, status: 409 } };
+      }
+    }
+
     const errors: string[] = [];
-    const values: { colour: string; size: string; stockOnHand?: number; trigger?: number }[] = [];
+
+    // Where stock is kept: the ticked locations. Required whenever any location exists.
+    const locationIds = [...new Set((Array.isArray(value.locationIds) ? (value.locationIds as unknown[]) : []).filter((v): v is string => typeof v === 'string' && v.trim() !== '').map((v) => v.trim()))];
+    if (locationIds.length > 0) {
+      if ((await locationModel.countExisting(locationIds)) !== locationIds.length) errors.push('locationIds: Pick existing locations');
+    } else if ((await locationModel.listOptions()).length > 0) {
+      errors.push('locationIds: Pick at least one location');
+    }
+    const remap = parseRemap(value.remap);
+    for (const [from, to] of Object.entries(remap)) {
+      if (!locationIds.includes(to) || from === to) errors.push('remap: Move stock into one of the picked locations');
+    }
+
+    const isCount = (n: unknown): n is number => typeof n === 'number' && Number.isInteger(n) && n >= 0;
+    const rawValues = Array.isArray(value.values) ? (value.values as unknown[]) : [];
+    const values: { colour: string; size: string; stockOnHand?: number; trigger?: number; stock?: { locationId: string; quantity: number }[] }[] = [];
     for (const raw of rawValues) {
       if (!raw || typeof raw !== 'object') continue;
       const v = raw as Record<string, unknown>;
       const colour = typeof v.colour === 'string' ? v.colour.trim() : '';
       const size = typeof v.size === 'string' ? v.size.trim() : '';
-      const entry: { colour: string; size: string; stockOnHand?: number; trigger?: number } = { colour, size };
-      if (v.stockOnHand !== undefined) {
-        const n = Number(v.stockOnHand);
-        if (!Number.isFinite(n) || n < 0) errors.push('stockOnHand: Enter a value of 0 or more');
-        else entry.stockOnHand = Math.trunc(n);
-      }
+      const label = [colour, size].filter(Boolean).join(' / ') || 'Default Title';
+      const entry: (typeof values)[number] = { colour, size };
       if (v.trigger !== undefined) {
-        const n = Number(v.trigger);
-        if (!Number.isFinite(n) || n < 0) errors.push('trigger: Enter a value of 0 or more');
-        else entry.trigger = Math.trunc(n);
+        if (isCount(v.trigger)) entry.trigger = v.trigger;
+        else errors.push(`trigger: ${label} needs a whole number of 0 or more`);
+      }
+      if (locationIds.length > 0) {
+        const seen = new Set<string>();
+        const stock: { locationId: string; quantity: number }[] = [];
+        for (const s of Array.isArray(v.stock) ? (v.stock as unknown[]) : []) {
+          const row = (s ?? {}) as Record<string, unknown>;
+          const locationId = typeof row.locationId === 'string' ? row.locationId : '';
+          if (!locationIds.includes(locationId) || seen.has(locationId)) {
+            errors.push(`stock: ${label} has stock for a location that isn't picked`);
+          } else if (!isCount(row.quantity)) {
+            errors.push(`stock: ${label} needs a whole number of 0 or more`);
+          } else {
+            seen.add(locationId);
+            stock.push({ locationId, quantity: row.quantity });
+          }
+        }
+        entry.stock = stock;
+        entry.stockOnHand = stock.reduce((sum, l) => sum + l.quantity, 0);
+      } else if (v.stockOnHand !== undefined) {
+        if (isCount(v.stockOnHand)) entry.stockOnHand = v.stockOnHand;
+        else errors.push(`stockOnHand: ${label} needs a whole number of 0 or more`);
       }
       values.push(entry);
     }
-    if (errors.length) return { error: { message: 'Validation failed', errors, status: 400 } };
+    if (errors.length) return { error: { message: 'Validation failed', errors: [...new Set(errors)], status: 400 } };
 
-    // Where the variants this creates are kept; omitted = unassigned stock.
-    const locationId = typeof value.locationId === 'string' && value.locationId.trim() ? value.locationId.trim() : null;
-    if (locationId && (await locationModel.countExisting([locationId])) !== 1) {
-      return { error: { message: 'Validation failed', errors: ['locationId: Pick an existing location'], status: 400 } };
+    try {
+      await model.applyOptions(id, { mode, colours, sizes, values, locationIds, remap });
+    } catch (error) {
+      if (error instanceof StockError) return { error: { message: error.message, errors: [`locationIds: ${error.message}`], status: 400 } };
+      throw error;
     }
-
-    await model.applyOptions(id, { mode, colours, sizes, values, locationId });
 
     const variantCount = colours.length > 0 ? colours.length * Math.max(sizes.length, 1) : sizes.length;
     await model.logActivity(
@@ -665,11 +708,29 @@ export class SupplierProductController {
 
   async removeImage(id: string, imageId: string, session: Session) {
     if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
-    const removed = await model.removeImage(id, imageId);
-    if (!removed) return { error: { message: 'Image not found', status: 404 } };
+    const removedUrl = await model.removeImage(id, imageId);
+    if (removedUrl === null) return { error: { message: 'Image not found', status: 404 } };
+    await this.deleteUnusedFiles([removedUrl]);
     await model.logActivity(id, 'Image removed', 'image_removed', actorFromSession(session));
     const product = await model.findById(id);
     return { data: product, message: 'Image removed' };
+  }
+
+  /** Moves an image to a 1-based serial in the gallery; the serial is the order images are shown
+   * in and published to stores. */
+  async moveImage(id: string, imageId: string, body: unknown, session: Session) {
+    if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
+    const count = await model.countImages(id);
+    const value = (body ?? {}) as Record<string, unknown>;
+    const position = Number(value.position);
+    if (!Number.isInteger(position) || position < 1 || position > count) {
+      return { error: { message: 'Validation failed', errors: [`position: Must be a whole number from 1 to ${count}`], status: 400 } };
+    }
+    const moved = await model.moveImage(id, imageId, position);
+    if (!moved) return { error: { message: 'Image not found', status: 404 } };
+    await model.logActivity(id, `Image moved to position ${position}`, 'image_moved', actorFromSession(session));
+    const product = await model.findById(id);
+    return { data: product, message: 'Image moved' };
   }
 
   async updateImageColour(id: string, imageId: string, body: unknown, session: Session) {
@@ -690,10 +751,19 @@ export class SupplierProductController {
     return { data: updatedProduct, message: colour ? `Image assigned to ${colour}` : 'Image unassigned' };
   }
 
+  /** Deletes the stored files for image URLs that no remaining image row points at — the same file
+   * can back several products (e.g. a duplicated product), so it only goes once the last one does. */
+  private async deleteUnusedFiles(urls: string[]) {
+    const stillUsed = new Set(await model.findReferencedImageUrls(urls));
+    await deleteUploadedFiles(urls.filter((url) => !stillUsed.has(url)));
+  }
+
   async remove(id: string, session: Session) {
     if (!isAdmin(session)) return { error: { message: 'Forbidden', status: 403 } };
+    const urls = await model.findImageUrls([id]);
     const removed = await model.delete(id);
     if (!removed) return { error: { message: 'Product not found', status: 404 } };
+    await this.deleteUnusedFiles(urls);
     return { data: null, message: 'Product deleted' };
   }
 
@@ -706,7 +776,9 @@ export class SupplierProductController {
     if (productIds.length === 0) return { error: { message: 'productIds: At least one product is required', status: 400 } };
 
     if (action === 'delete') {
+      const urls = await model.findImageUrls(productIds);
       const count = await model.deleteMany(productIds);
+      await this.deleteUnusedFiles(urls);
       return { data: { count }, message: `${count} product${count === 1 ? '' : 's'} deleted` };
     }
 

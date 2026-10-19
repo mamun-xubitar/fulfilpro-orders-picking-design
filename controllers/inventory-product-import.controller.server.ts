@@ -2,9 +2,11 @@ import prisma from '@/lib/prisma.server';
 import { deriveColorFromName } from '@/lib/inventory/colour';
 import { detectCsvType, findIncompleteAxisRows, normalizeParsedProductRows, parseShopifyProductCsv, upsertParsedProductVariants } from '@/lib/inventory/csv-import';
 import type { ParsedProductGroup } from '@/lib/inventory/csv-import';
+import { imageFailureNote, importProductImages, localizeCsvImages } from '@/lib/inventory/csv-import-images.server';
 import { uniqueHandle } from '@/lib/inventory/handle';
 import { SupplierProductModel } from '@/models/supplier-product.model.server';
 import type { ColourOptionData, SupplierProductRow } from '@/models/supplier-product.model.server';
+import { deleteUploadedFiles } from '@/lib/uploads.server';
 import { Prisma, SupplierProductStatus } from '@prisma/client';
 
 const productModel = new SupplierProductModel();
@@ -89,6 +91,8 @@ export class InventoryProductImportController {
     // product declares that axis) — kept separate from plain "already exists"/"empty" skips so
     // the toast can tell the admin exactly what to fix, rather than just a bare count.
     const invalidReasons: string[] = [];
+    // Images that couldn't be downloaded and kept their original remote link.
+    let failedImageCount = 0;
 
     for (const group of groups) {
       const existingId = existingByHandle.get(group.handle);
@@ -113,7 +117,7 @@ export class InventoryProductImportController {
           invalidReasons.push(`${group.handle}: ${axisErrors[0]}`);
           continue;
         }
-        await this.updateProductFromGroup(existingProduct, group, normalized, actor, options.markVerified);
+        failedImageCount += await this.updateProductFromGroup(existingProduct, group, normalized, actor, options.markVerified);
         const product = await productModel.findById(existingId);
         if (product) updated.push(product);
         continue;
@@ -137,7 +141,8 @@ export class InventoryProductImportController {
       const itemNo = uniqueHandle(group.handle, takenItemNos);
       takenItemNos.add(itemNo);
 
-      const productId = await this.createProductFromGroup(group, itemNo, supplierId, settings, actor, options.markVerified);
+      const { productId, failedImages } = await this.createProductFromGroup(group, itemNo, supplierId, settings, actor, options.markVerified);
+      failedImageCount += failedImages;
       const product = await productModel.findById(productId);
       if (product) created.push(product);
     }
@@ -151,12 +156,13 @@ export class InventoryProductImportController {
     }
 
     return {
-      data: { created, updated, createdCount: created.length, updatedCount: updated.length, skipped },
-      message: parts.join(', '),
+      data: { created, updated, createdCount: created.length, updatedCount: updated.length, skipped, failedImageCount },
+      message: parts.join(', ') + imageFailureNote(failedImageCount),
     };
   }
 
-  /** Updates an existing product from its matching CSV group — details, new images, and a
+  /** Updates an existing product from its matching CSV group — details, new images (downloaded into
+   * our storage; returns how many couldn't be), and a
    * per-row variant upsert — mirroring `InventoryCsvImportController.processProductCsv`'s commit
    * path for the single-product import, just without the handle-adoption case (the handle is
    * already the match key here). `normalized` is precomputed by the caller so its own
@@ -168,7 +174,7 @@ export class InventoryProductImportController {
     normalized: ReturnType<typeof normalizeParsedProductRows>,
     actor: { id: string | null; name: string },
     markVerified: boolean
-  ) {
+  ): Promise<number> {
     const { rows, unionSizes, unionColours } = normalized;
     const status = group.product.status && PRODUCT_STATUS_VALUES.has(group.product.status) ? (group.product.status as SupplierProductStatus) : undefined;
 
@@ -180,16 +186,7 @@ export class InventoryProductImportController {
       ...(markVerified ? { verified: true } : {}),
     });
 
-    const existingImageUrls = new Set(product.images.map((i) => i.url));
-    const newImages = group.images.filter((image) => !existingImageUrls.has(image.url));
-    const urlToImageId = new Map(product.images.map((i) => [i.url, i.id]));
-    if (newImages.length > 0) {
-      const createdImages = await productModel.addImages(
-        product.id,
-        newImages.map((image) => ({ url: image.url, altText: image.altText, colour: null }))
-      );
-      for (const createdImage of createdImages) urlToImageId.set(createdImage.url, createdImage.id);
-    }
+    const { urlToImageId, failed } = await importProductImages(product.id, group.images);
 
     await prisma.$transaction(
       async (tx) => {
@@ -206,10 +203,12 @@ export class InventoryProductImportController {
       },
       { timeout: 30_000 }
     );
+    return failed;
   }
 
   /** Creates one product, its image pool, and its variants (linked to their `Variant Image`
-   * where set) in a single transaction, so a group is all-or-nothing. */
+   * where set) in a single transaction, so a group is all-or-nothing. The images are downloaded
+   * first, outside the transaction; if the transaction fails their files are removed again. */
   private async createProductFromGroup(
     group: ParsedProductGroup,
     itemNo: string,
@@ -217,66 +216,76 @@ export class InventoryProductImportController {
     settings: { globalMarginPercent: Prisma.Decimal; globalExchangeRate: Prisma.Decimal },
     actor: { id: string | null; name: string },
     markVerified: boolean
-  ): Promise<string> {
+  ): Promise<{ productId: string; failedImages: number }> {
     const colours: ColourOptionData[] = group.colours.map((name) => ({ name, color: deriveColorFromName(name) }));
     const status = group.product.status && PRODUCT_STATUS_VALUES.has(group.product.status) ? (group.product.status as SupplierProductStatus) : 'DRAFT';
 
-    return prisma.$transaction(
-      async (tx) => {
-        const row = await tx.supplierProduct.create({
-          data: {
-            itemNo,
-            handle: group.handle,
-            name: group.product.name || group.handle,
-            brand: group.product.brand || null,
-            category: group.product.category || null,
-            description: group.product.description || null,
-            sku: itemNo,
-            status,
-            verified: markVerified,
-            sizes: group.sizes,
-            colours: colours as unknown as Prisma.InputJsonValue,
-            pricing: { create: { currencyCode: 'USD', exchangeRate: Number(settings.globalExchangeRate), marginPercent: Number(settings.globalMarginPercent) } },
-            // Bug fix: CSV-imported products previously got the supplierId column set but no
-            // SupplierProductSupplier link, making them invisible to Products Count and to the
-            // products-table supplier filter.
-            supplierLinks: { create: { supplierId } },
-          },
-        });
+    const { rows: imageData, failed: failedImages } = await localizeCsvImages(group.images);
 
-        const imageRows =
-          group.images.length > 0
-            ? await tx.supplierProductImage.createManyAndReturn({
-                data: group.images.map((image, index) => ({ supplierProductId: row.id, url: image.url, altText: image.altText, colour: null, position: index })),
-                select: { id: true, url: true },
-              })
-            : [];
-        const urlToImageId = new Map(imageRows.map((image) => [image.url, image.id]));
-
-        for (const variantRow of group.rows) {
-          const imageId = variantRow.imageUrl ? urlToImageId.get(variantRow.imageUrl) : undefined;
-          await tx.supplierProductVariant.create({
+    try {
+      const productId = await prisma.$transaction(
+        async (tx) => {
+          const row = await tx.supplierProduct.create({
             data: {
-              supplierProductId: row.id,
-              colour: variantRow.colour,
-              size: variantRow.size,
-              sku: variantRow.sku || null,
-              barcode: variantRow.barcode || null,
-              stockOnHand: variantRow.stockOnHand,
-              sellPrice: variantRow.sellPrice,
-              buyPrice: variantRow.buyPrice ?? 0,
-              ...(imageId !== undefined && { imageId }),
+              itemNo,
+              handle: group.handle,
+              name: group.product.name || group.handle,
+              brand: group.product.brand || null,
+              category: group.product.category || null,
+              description: group.product.description || null,
+              sku: itemNo,
+              status,
+              verified: markVerified,
+              sizes: group.sizes,
+              colours: colours as unknown as Prisma.InputJsonValue,
+              pricing: { create: { currencyCode: 'USD', exchangeRate: Number(settings.globalExchangeRate), marginPercent: Number(settings.globalMarginPercent) } },
+              // Bug fix: CSV-imported products previously got the supplierId column set but no
+              // SupplierProductSupplier link, making them invisible to Products Count and to the
+              // products-table supplier filter.
+              supplierLinks: { create: { supplierId } },
             },
           });
-        }
 
-        await tx.inventoryActivity.create({
-          data: { supplierProductId: row.id, type: 'imported', message: `Product "${row.name}" imported`, actorId: actor.id, actorName: actor.name },
-        });
+          const imageRows =
+            imageData.length > 0
+              ? await tx.supplierProductImage.createManyAndReturn({
+                  data: imageData.map((image, index) => ({ supplierProductId: row.id, ...image, colour: null, position: index })),
+                  select: { id: true, url: true, sourceUrl: true },
+                })
+              : [];
+          // Keyed by the CSV's own URL, which is what a `Variant Image` cell carries.
+          const urlToImageId = new Map(imageRows.map((image) => [image.sourceUrl ?? image.url, image.id]));
 
-        return row.id;
-      },
-      { timeout: 30_000 }
-    );
+          for (const [position, variantRow] of group.rows.entries()) {
+            const imageId = variantRow.imageUrl ? urlToImageId.get(variantRow.imageUrl) : undefined;
+            await tx.supplierProductVariant.create({
+              data: {
+                supplierProductId: row.id,
+                colour: variantRow.colour,
+                size: variantRow.size,
+                sku: variantRow.sku || null,
+                barcode: variantRow.barcode || null,
+                stockOnHand: variantRow.stockOnHand,
+                sellPrice: variantRow.sellPrice,
+                buyPrice: variantRow.buyPrice ?? 0,
+                position,
+                ...(imageId !== undefined && { imageId }),
+              },
+            });
+          }
+
+          await tx.inventoryActivity.create({
+            data: { supplierProductId: row.id, type: 'imported', message: `Product "${row.name}" imported`, actorId: actor.id, actorName: actor.name },
+          });
+
+          return row.id;
+        },
+        { timeout: 30_000 }
+      );
+      return { productId, failedImages };
+    } catch (error) {
+      await deleteUploadedFiles(imageData.map((image) => image.url));
+      throw error;
+    }
   }
 }
