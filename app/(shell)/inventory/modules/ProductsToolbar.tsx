@@ -20,7 +20,7 @@ export default function ProductsToolbar(p: InventoryPage) {
   // single-record position while the pager buttons are disabled.
   const countLabel = nav.allRecords
     ? `${formatNumber(p.productsTable.pagination.total)} of ${formatNumber(nav.totalCount)}`
-    : `${nav.position} / ${formatNumber(nav.filteredCount)} of ${formatNumber(nav.totalCount)}`;
+    : `${nav.filteredCount === 0 ? 0 : nav.position} / ${formatNumber(nav.filteredCount)} of ${formatNumber(nav.totalCount)}`;
 
   return (
     <div className={`flex flex-wrap items-center gap-[6px] rounded-[10px] border ${panelBorderClass('toolbar')} bg-inventory-surface px-[8px] py-[4px] shadow-inventory`}>
