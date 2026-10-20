@@ -2258,7 +2258,7 @@ function buildOrderMessageEmailText({
   return [
     `Order ${order.number}`,
     `Store: ${order.store.name ?? order.store.storeDomain}`,
-    `Customer: ${order.cusName}`,
+    includeCustomerContact ? `Customer: ${order.cusName}` : null,
     includeCustomerContact && order.cusEmail ? `Customer email: ${order.cusEmail}` : null,
     includeCustomerContact && order.phone ? `Phone: ${order.phone}` : null,
     includeCustomerContact && order.address ? `Address: ${[order.address, order.address2, order.city, order.state, order.zip, order.country].filter(Boolean).join(', ')}` : null,
@@ -2295,7 +2295,7 @@ function buildOrderMessageEmailHtml({
       <h2 style="margin:0 0 12px">Order ${escapeHtml(order.number)} message</h2>
       <table style="border-collapse:collapse;margin-bottom:16px">
         <tr><td style="padding:3px 12px 3px 0;color:#6b7280">Store</td><td style="padding:3px 0">${escapeHtml(order.store.name ?? order.store.storeDomain)}</td></tr>
-        <tr><td style="padding:3px 12px 3px 0;color:#6b7280">Customer</td><td style="padding:3px 0">${escapeHtml(order.cusName)}</td></tr>
+        ${includeCustomerContact ? `<tr><td style="padding:3px 12px 3px 0;color:#6b7280">Customer</td><td style="padding:3px 0">${escapeHtml(order.cusName)}</td></tr>` : ''}
         ${includeCustomerContact && order.cusEmail ? `<tr><td style="padding:3px 12px 3px 0;color:#6b7280">Customer email</td><td style="padding:3px 0">${escapeHtml(order.cusEmail)}</td></tr>` : ''}
         ${includeCustomerContact && order.phone ? `<tr><td style="padding:3px 12px 3px 0;color:#6b7280">Phone</td><td style="padding:3px 0">${escapeHtml(order.phone)}</td></tr>` : ''}
         ${includeCustomerContact && address ? `<tr><td style="padding:3px 12px 3px 0;color:#6b7280">Address</td><td style="padding:3px 0">${escapeHtml(address)}</td></tr>` : ''}
@@ -2530,7 +2530,7 @@ function buildStockAdjustmentEmailText(order: OrderEmailDetails & { id: string }
     `Order: #${order.number}`,
     `Order link: ${orderUrl}`,
     `Store: ${order.store.name ?? order.store.storeDomain}`,
-    `Customer: ${order.cusName}`,
+    includeCustomerContact ? `Customer: ${order.cusName}` : null,
     includeCustomerContact && order.cusEmail ? `Customer email: ${order.cusEmail}` : null,
     includeCustomerContact && order.phone ? `Phone: ${order.phone}` : null,
     includeCustomerContact && address ? `Address: ${address}` : null,
@@ -2551,7 +2551,7 @@ function buildStockAdjustmentEmailHtml(order: OrderEmailDetails & { id: string }
         <tr><td style="padding:3px 12px 3px 0;color:#6b7280">Event</td><td style="padding:3px 0">${escapeHtml(formatStockAdjustmentEvent(eventType))}</td></tr>
         <tr><td style="padding:3px 12px 3px 0;color:#6b7280">Order</td><td style="padding:3px 0">#${escapeHtml(order.number)}</td></tr>
         <tr><td style="padding:3px 12px 3px 0;color:#6b7280">Store</td><td style="padding:3px 0">${escapeHtml(order.store.name ?? order.store.storeDomain)}</td></tr>
-        <tr><td style="padding:3px 12px 3px 0;color:#6b7280">Customer</td><td style="padding:3px 0">${escapeHtml(order.cusName)}</td></tr>
+        ${includeCustomerContact ? `<tr><td style="padding:3px 12px 3px 0;color:#6b7280">Customer</td><td style="padding:3px 0">${escapeHtml(order.cusName)}</td></tr>` : ''}
         ${includeCustomerContact && order.cusEmail ? `<tr><td style="padding:3px 12px 3px 0;color:#6b7280">Customer email</td><td style="padding:3px 0">${escapeHtml(order.cusEmail)}</td></tr>` : ''}
         ${includeCustomerContact && order.phone ? `<tr><td style="padding:3px 12px 3px 0;color:#6b7280">Phone</td><td style="padding:3px 0">${escapeHtml(order.phone)}</td></tr>` : ''}
         ${includeCustomerContact && address ? `<tr><td style="padding:3px 12px 3px 0;color:#6b7280">Address</td><td style="padding:3px 0">${escapeHtml(address)}</td></tr>` : ''}
