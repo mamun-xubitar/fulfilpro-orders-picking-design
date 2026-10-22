@@ -79,19 +79,23 @@ type TextField = Exclude<keyof ProductDetailsForm, 'verified' | 'status' | 'cate
 type UseProductDetailsArgs = {
   product: ProductRecord | null;
   onSaved: (product: ProductRecord) => void;
+  /** Handle lock state a product starts in (and returns to after save/cancel). Existing products
+   * open unlocked; the New Product wizard passes true so the handle follows the name. */
+  defaultHandleLocked?: boolean;
 };
 
-export function useProductDetails({ product, onSaved }: UseProductDetailsArgs) {
+export function useProductDetails({ product, onSaved, defaultHandleLocked = false }: UseProductDetailsArgs) {
   // Draft is tagged with the product it belongs to, so changing product discards it without an
   // effect having to reset anything.
   const [draft, setDraft] = useState<{ productId: string; form: ProductDetailsForm } | null>(null);
-  // Mirrors the New Product modal: locked (the default) re-derives the handle from the product
-  // name on every keystroke; unlocking hands control to the admin. Tagged with the product it
+  // Mirrors the New Product modal: locked re-derives the handle from the product name on every
+  // keystroke (the default only inside the New Product wizard); unlocked hands control to the
+  // admin (the default for existing products). Tagged with the product it
   // belongs to (same pattern as `draft`) so an unlock made on one product doesn't carry over to
   // the next — there's no explicit "start edit" moment anymore (the panel is always editable) to
   // reset it at.
   const [storedHandleLocked, setStoredHandleLocked] = useState<{ productId: string; locked: boolean } | null>(null);
-  const handleLocked = storedHandleLocked && storedHandleLocked.productId === product?.id ? storedHandleLocked.locked : true;
+  const handleLocked = storedHandleLocked && storedHandleLocked.productId === product?.id ? storedHandleLocked.locked : defaultHandleLocked;
   const { request, loading: saving, errors, setErrors } = useRequest<ProductRecord>();
 
   const saved = product ? productToForm(product) : EMPTY_FORM;
@@ -171,7 +175,7 @@ export function useProductDetails({ product, onSaved }: UseProductDetailsArgs) {
       onSuccess: ({ data }) => {
         onSaved(data);
         setDraft(null);
-        setStoredHandleLocked({ productId: data.id, locked: true });
+        setStoredHandleLocked({ productId: data.id, locked: defaultHandleLocked });
         after?.();
       },
     });
@@ -214,7 +218,7 @@ export function useProductDetails({ product, onSaved }: UseProductDetailsArgs) {
      * step 2 without saving. */
     cancelEdit: () => {
       setDraft(null);
-      if (product) setStoredHandleLocked({ productId: product.id, locked: true });
+      if (product) setStoredHandleLocked({ productId: product.id, locked: defaultHandleLocked });
       setErrors({});
     },
     saveDetails,
