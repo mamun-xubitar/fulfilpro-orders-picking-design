@@ -90,7 +90,14 @@ export default function VariantListColumn({ variants, location, onChange, onFill
                   style={{ backgroundColor: resolveSwatch(deriveColorFromName(row.colour)) }}
                 />
               )}
-              <span className="truncate text-[11.5px] font-medium uppercase tracking-[0.2px] text-inventory-text">
+              <span
+                onMouseEnter={(e) => {
+                  const el = e.currentTarget;
+                  if (el.scrollWidth > el.clientWidth) el.title = el.textContent ?? '';
+                  else el.removeAttribute('title');
+                }}
+                className="truncate text-[11.5px] font-medium uppercase tracking-[0.2px] text-inventory-text"
+              >
                 {[row.colour, row.size].filter(Boolean).join(' / ') || 'Default Title'}
               </span>
               {row.isNew && (
