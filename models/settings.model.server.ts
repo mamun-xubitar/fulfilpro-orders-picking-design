@@ -56,6 +56,7 @@ export type AppSettingsRow = {
   decorationCrossVisibilityEnabled: boolean;
   globalMarginPercent: number;
   lowStockThreshold: number;
+  invoiceNumbering: { prefix: string; nextNumber: number };
   updatedAt: string;
 };
 
@@ -91,6 +92,8 @@ export type UpdateAppSettingsData = Partial<{
   decorationCrossVisibilityEnabled: boolean;
   globalMarginPercent: number;
   lowStockThreshold: number;
+  invoicePrefix: string;
+  invoiceNextNumber: number;
   emailProvider: string;
   mailersendApiToken: string | null;
   mailersendFromEmail: string | null;
@@ -136,6 +139,8 @@ const DEFAULT_SETTINGS = {
   decorationCrossVisibilityEnabled: false,
   globalMarginPercent: 0,
   lowStockThreshold: 10,
+  invoicePrefix: 'INV-',
+  invoiceNextNumber: 1000,
 };
 
 type GoogleTokenData = {
@@ -171,6 +176,12 @@ export class SettingsModel {
     });
 
     return toSettingsRow(settings);
+  }
+
+  /** Highest counter value handed out to an order; 0 when none has been issued yet. */
+  async highestIssuedInvoiceSequence(): Promise<number> {
+    const { _max } = await prisma.order.aggregate({ _max: { invoiceSequence: true } });
+    return _max.invoiceSequence ?? 0;
   }
 
   async updateGoogleTokens(data: GoogleTokenData): Promise<AppSettingsRow> {
@@ -253,6 +264,8 @@ async function toSettingsRow(settings: {
   decorationCrossVisibilityEnabled?: boolean;
   globalMarginPercent?: Prisma.Decimal | number;
   lowStockThreshold?: number;
+  invoicePrefix?: string;
+  invoiceNextNumber?: number;
   updatedAt: Date;
 }): Promise<AppSettingsRow> {
   const { activeUsers, activeAdminUsers } = await listEmailRuleUsers();
@@ -314,6 +327,10 @@ async function toSettingsRow(settings: {
     decorationCrossVisibilityEnabled: settings.decorationCrossVisibilityEnabled ?? false,
     globalMarginPercent: Number(settings.globalMarginPercent ?? 0),
     lowStockThreshold: settings.lowStockThreshold ?? DEFAULT_SETTINGS.lowStockThreshold,
+    invoiceNumbering: {
+      prefix: settings.invoicePrefix ?? DEFAULT_SETTINGS.invoicePrefix,
+      nextNumber: settings.invoiceNextNumber ?? DEFAULT_SETTINGS.invoiceNextNumber,
+    },
     updatedAt: settings.updatedAt.toISOString(),
   };
 }

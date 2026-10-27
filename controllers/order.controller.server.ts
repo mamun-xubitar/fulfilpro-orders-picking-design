@@ -283,8 +283,13 @@ export class OrderController {
       };
     }
 
+    // Issued only once the Shopify figures are in hand, so a failed load never burns a number.
+    const invoiceNumber = await model.issueInvoiceNumber(orderId, source.store.invoiceSetting?.invoicePrefix ?? null);
     const timezone = await getSettingsTimezone();
-    return { data: { ...buildTaxInvoice(source, timezone, liveShipping), notice }, message: 'Tax invoice retrieved' };
+    return {
+      data: { ...buildTaxInvoice(source, timezone, invoiceNumber, liveShipping), notice },
+      message: 'Tax invoice retrieved',
+    };
   }
 
   private async loadOrderFinancials(

@@ -126,6 +126,8 @@ model Order {
   taxesIncluded          Boolean?
   amountPaid             Decimal?                   @db.Decimal(14, 2)
   paymentMethods         Json?
+  invoiceNumber          String?
+  invoiceSequence        Int?
   store                  Store                      @relation(fields: [storeId], references: [id])
   messages               OrderMessage[]
   notes                  OrderNote[]
@@ -608,6 +610,8 @@ model AppSettings {
   globalMarginPercent                Decimal   @default(0) @db.Decimal(6, 2)
   globalExchangeRate                 Decimal   @default(1) @db.Decimal(14, 6)
   lowStockThreshold                  Int       @default(10)
+  invoicePrefix                      String    @default("INV-")
+  invoiceNextNumber                  Int       @default(1000)
   createdAt                          DateTime  @default(now())
   updatedAt                          DateTime  @updatedAt
 }

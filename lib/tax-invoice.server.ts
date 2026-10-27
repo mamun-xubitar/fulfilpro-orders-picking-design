@@ -139,6 +139,7 @@ function buildStoreBlock(source: TaxInvoiceSource): TaxInvoice['store'] {
 export function buildTaxInvoice(
   source: TaxInvoiceSource,
   timezone: string,
+  invoiceNumber: string,
   liveShipping: number | null = null,
 ): Omit<TaxInvoice, 'notice'> {
   const { financials } = source;
@@ -167,7 +168,7 @@ export function buildTaxInvoice(
 
   return {
     orderId: source.id,
-    invoiceNumber: `${clean(source.store.invoiceSetting?.invoicePrefix) ?? ''}${source.number}`,
+    invoiceNumber,
     date: moment(source.orderedAt).tz(timezone).format('DD/MM/YYYY'),
     currencyCode: source.currencyCode ?? 'AUD',
     billTo: source.customer,

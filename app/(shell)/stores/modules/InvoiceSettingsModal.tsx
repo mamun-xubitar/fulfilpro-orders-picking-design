@@ -122,7 +122,7 @@ export default function InvoiceSettingsModal(props: InvoiceSettingsModalProps) {
           <Field
             label="Invoice number prefix"
             error={errors.invoicePrefix}
-            hint={`Invoice numbers look like ${form.invoicePrefix.trim() || ''}1001 (prefix + order number).`}
+            hint="Overrides the global prefix from Settings. Leave blank to use the global prefix. Numbers already issued don't change."
           >
             {text('invoicePrefix', 'e.g. MH')}
           </Field>

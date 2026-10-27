@@ -1126,6 +1126,27 @@ export class OrderModel {
     };
   }
 
+  /** Returns the order's invoice number, issuing the next global one on first call. The number is
+   * saved on the order, so it never changes afterwards. Store prefix wins over the global prefix. */
+  async issueInvoiceNumber(orderId: string, storePrefix: string | null): Promise<string> {
+    return prisma.$transaction(async (tx) => {
+      const [row] = await tx.$queryRaw<Array<{ invoiceNumber: string | null }>>`
+        SELECT "invoiceNumber" FROM "Order" WHERE "id" = ${orderId} FOR UPDATE`;
+      if (!row) throw new Error('Order not found');
+      if (row.invoiceNumber) return row.invoiceNumber;
+
+      const settings = await tx.appSettings.upsert({
+        where: { id: 'default' },
+        update: { invoiceNextNumber: { increment: 1 } },
+        create: { id: 'default', invoiceNextNumber: 1001 },
+      });
+      const sequence = settings.invoiceNextNumber - 1;
+      const invoiceNumber = `${storePrefix?.trim() || settings.invoicePrefix.trim()}${sequence}`;
+      await tx.order.update({ where: { id: orderId }, data: { invoiceNumber, invoiceSequence: sequence } });
+      return invoiceNumber;
+    });
+  }
+
   async saveOrderFinancials(orderId: string, figures: OrderFinancials, paymentMethods: PaymentSummary) {
     await prisma.order.update({
       where: { id: orderId },
