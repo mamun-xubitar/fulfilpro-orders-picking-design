@@ -107,7 +107,7 @@ export function useInventoryPage() {
   const pricing = useProductPricing({ product, globals: data.globals, storeListings, onSaved: onProductSaved });
   const optionLibrary = useOptionLibrary();
   const inventoryCategories = useInventoryCategories();
-  const details = useProductDetails({ product, onSaved: onProductSaved });
+  const details = useProductDetails({ product, onSaved: onProductSaved, defaultHandleLocked: newProductOpen });
   // A variant delete/edit, or the Colour & size adjustment modal's Replace/Insert, can change a
   // colour/size the details draft doesn't know about yet — sync the draft's lists from the
   // server's copy so a since-removed value isn't offered back (and a since-added one is).

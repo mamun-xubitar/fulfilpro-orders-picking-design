@@ -4,7 +4,6 @@ import { sendAppMail } from '@/lib/email.server';
 import { OrderModel } from '@/models/order.model.server';
 import { resolvePickerRecipientOptions } from '@/lib/email-rules.server';
 import { createNotification } from '@/lib/notifications.server';
-import { ADMIN_ROLE } from '@/lib/roles';
 
 export type PickingLineInput = {
   lineItemId: string;
@@ -1041,20 +1040,12 @@ async function sendPackingEmail(params: {
   const actor = params.actor?.name || params.actor?.email || 'Order picker';
   const url = params.originUrl ? `${params.originUrl}/picking-list?search=${encodeURIComponent(params.order.number)}` : '';
   const note = params.message ? `\n\nMessage:\n${params.message}` : '';
-  const groups = [
-    { emails: params.recipients.filter((r) => r.role === ADMIN_ROLE).map((r) => r.email), includeCustomer: true },
-    { emails: params.recipients.filter((r) => r.role !== ADMIN_ROLE).map((r) => r.email), includeCustomer: false },
-  ];
-  for (const group of groups) {
-    if (group.emails.length === 0) continue;
-    const customer = group.includeCustomer ? ` (${params.order.cusName})` : '';
-    await sendAppMail({
-      to: group.emails,
-      subject: `Order ${params.order.number} packing ${params.type}`,
-      text: `${actor} ${verb} items for order ${params.order.number}${customer}.\n\n${lines}${note}${url ? `\n\n${url}` : ''}`,
-      html: `<p><strong>${escapeHtml(actor)}</strong> ${escapeHtml(verb)} items for order <strong>${escapeHtml(params.order.number)}</strong>${escapeHtml(customer)}.</p><pre>${escapeHtml(lines)}</pre>${params.message ? `<p><strong>Message:</strong><br>${escapeHtml(params.message).replace(/\n/g, '<br>')}</p>` : ''}${url ? `<p><a href="${escapeHtml(url)}">Open order</a></p>` : ''}`,
-    });
-  }
+  await sendAppMail({
+    to: params.recipients.map((recipient) => recipient.email),
+    subject: `Order ${params.order.number} packing ${params.type}`,
+    text: `${actor} ${verb} items for order ${params.order.number} (${params.order.cusName}).\n\n${lines}${note}${url ? `\n\n${url}` : ''}`,
+    html: `<p><strong>${escapeHtml(actor)}</strong> ${escapeHtml(verb)} items for order <strong>${escapeHtml(params.order.number)}</strong> (${escapeHtml(params.order.cusName)}).</p><pre>${escapeHtml(lines)}</pre>${params.message ? `<p><strong>Message:</strong><br>${escapeHtml(params.message).replace(/\n/g, '<br>')}</p>` : ''}${url ? `<p><a href="${escapeHtml(url)}">Open order</a></p>` : ''}`,
+  });
 
   await Promise.all(params.recipients.map((r) =>
     createNotification({

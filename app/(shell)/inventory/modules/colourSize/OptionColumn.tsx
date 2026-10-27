@@ -103,7 +103,16 @@ export default function OptionColumn({
                 style={{ backgroundColor: resolveSwatch(deriveColorFromName(item.name)) }}
               />
             )}
-            <span className="flex-1 truncate text-[11.5px] font-medium uppercase tracking-[0.2px] text-inventory-text">{item.name}</span>
+            <span
+              onMouseEnter={(e) => {
+                const el = e.currentTarget;
+                if (el.scrollWidth > el.clientWidth) el.title = item.name;
+                else el.removeAttribute('title');
+              }}
+              className="flex-1 truncate text-[11.5px] font-medium uppercase tracking-[0.2px] text-inventory-text"
+            >
+              {item.name}
+            </span>
             {item.isNew && (
               <span className="rounded-full bg-inventory-success/15 px-[6px] py-[1px] text-[9px] font-bold uppercase leading-none tracking-[0.3px] text-inventory-success-hover">
                 New
