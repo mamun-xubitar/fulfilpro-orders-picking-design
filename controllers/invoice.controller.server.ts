@@ -6,19 +6,35 @@ import {
   readListParams,
   type BillingSession,
 } from '@/lib/billing-access.server';
-import { computeInvoiceTotals, DEFAULT_AUS_TAX_RATE, DEFAULT_NZ_TAX_RATE, lineAmount, type TaxRegion } from '@/lib/invoice-totals';
-import prisma from '@/lib/prisma.server';
+import { buildTaxInvoiceDocument } from '@/app/(shell)/orders/modules/taxInvoicePrint';
+import { escapeHtml } from '@/app/(shell)/orders/modules/utils';
+import { sendAppMail } from '@/lib/email.server';
+import {
+  computeInvoiceTotals,
+  DEFAULT_AUS_TAX_RATE,
+  derivePaymentStatus,
+  DEFAULT_NZ_TAX_RATE,
+  lineAmount,
+  PAYMENT_TYPES,
+  round2,
+  type TaxRegion,
+} from '@/lib/invoice-totals';
 import { getSettingsTimezone } from '@/lib/task-due-date.server';
 import { buildManualTaxInvoice, type ManualInvoiceSource } from '@/lib/tax-invoice.server';
-import { InvoiceModel, INVOICE_SORT_KEYS, type InvoiceInput } from '@/models/invoice.model.server';
+import { CustomerModel } from '@/models/customer.model.server';
+import { InvoiceModel, INVOICE_SORT_KEYS, type InvoiceInput, type InvoicePaymentInput } from '@/models/invoice.model.server';
 import { ProductModel } from '@/models/product.model.server';
+import { ShopifyCustomerModel } from '@/models/shopify-customer.model.server';
 
 const model = new InvoiceModel();
 const productModel = new ProductModel();
+const customerModel = new CustomerModel();
+const shopifyCustomerModel = new ShopifyCustomerModel();
 
 const FORBIDDEN = { error: { message: 'Forbidden', status: 403 } };
 const NOT_FOUND = { error: { message: 'Invoice not found', status: 404 } };
-const PAYMENT_TYPES = ['Cash', 'Bank deposit', 'Card', 'Other'];
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MAX_RECIPIENTS = 10;
 const TAX_REGIONS: TaxRegion[] = ['AU', 'NZ', 'NONE'];
 const STATUSES = ['UNPAID', 'PARTIAL', 'PAID'];
 const NUMBER_PATTERN = /^[A-Za-z0-9#/_-]{1,30}$/;
@@ -67,7 +83,7 @@ function parseLines(raw: unknown, errors: string[]): InvoiceInput['lineItems'] {
   });
 }
 
-function parsePayments(raw: unknown, errors: string[]): InvoiceInput['payments'] {
+function parsePayments(raw: unknown, errors: string[]): InvoicePaymentInput[] {
   const rows = Array.isArray(raw) ? raw : [];
   return rows.map((row, index) => {
     const payment = asRaw(row);
@@ -75,7 +91,7 @@ function parsePayments(raw: unknown, errors: string[]): InvoiceInput['payments']
     const amount = num(payment.amount);
     const paidOn = parseDate(text(payment, 'paidOn'));
     const type = text(payment, 'type');
-    if (!PAYMENT_TYPES.includes(type)) errors.push(`payments: Payment ${n} needs a type`);
+    if (!(PAYMENT_TYPES as readonly string[]).includes(type)) errors.push(`payments: Payment ${n} needs a type`);
     if (!Number.isFinite(amount) || amount <= 0) errors.push(`payments: Payment ${n} amount must be more than 0`);
     if (!paidOn) errors.push(`payments: Payment ${n} needs a date`);
     return {
@@ -88,8 +104,9 @@ function parsePayments(raw: unknown, errors: string[]): InvoiceInput['payments']
   });
 }
 
-/** Validates the invoice form and works out its totals. Errors are `field: message` for `useRequest`. */
-function parseInvoice(body: unknown): { input: InvoiceInput } | { errors: string[] } {
+/** Validates the invoice form and works out its totals. Payments are managed on their own, so
+ * `amountPaid` is what is already recorded (0 for a new invoice). Errors are `field: message` for `useRequest`. */
+function parseInvoice(body: unknown, amountPaid: number): { input: InvoiceInput } | { errors: string[] } {
   const raw = asRaw(body);
   const errors: string[] = [];
 
@@ -113,9 +130,10 @@ function parseInvoice(body: unknown): { input: InvoiceInput } | { errors: string
   if (!/^[A-Z]{3}$/.test(currencyCode)) errors.push('currencyCode: Use a 3-letter currency code');
   if (text(raw, 'terms').length > 2000) errors.push('terms: Terms must be 2000 characters or fewer');
   if (text(raw, 'notes').length > 2000) errors.push('notes: Notes must be 2000 characters or fewer');
+  if (text(raw, 'orderRef').length > 60) errors.push('orderRef: Order / PO # must be 60 characters or fewer');
+  if (text(raw, 'customerId') && text(raw, 'shopifyCustomerId')) errors.push('customerId: Link one customer only');
 
   const lineItems = parseLines(raw.lineItems, errors);
-  const payments = parsePayments(raw.payments, errors);
   if (errors.length) return { errors };
 
   const taxRate = Math.round(taxRateRaw * 100) / 100;
@@ -123,7 +141,7 @@ function parseInvoice(body: unknown): { input: InvoiceInput } | { errors: string
     lines: lineItems,
     shipping,
     taxRate,
-    amountPaid: payments.reduce((sum, payment) => sum + payment.amount, 0),
+    amountPaid,
   });
   const lines = lineItems.map((line) => ({ ...line, amount: lineAmount(line) }));
 
@@ -137,6 +155,7 @@ function parseInvoice(body: unknown): { input: InvoiceInput } | { errors: string
       billToAddress: text(raw, 'billToAddress') || null,
       shipToName: text(raw, 'shipToName') || billToName,
       shipToAddress: text(raw, 'shipToAddress') || null,
+      orderRef: text(raw, 'orderRef') || null,
       issueDate: issueDate as Date,
       dueDate,
       currencyCode,
@@ -147,7 +166,6 @@ function parseInvoice(body: unknown): { input: InvoiceInput } | { errors: string
       terms: text(raw, 'terms') || null,
       totals: { sub: totals.sub, discount: totals.discount, tax: totals.tax, total: totals.total, amountPaid: totals.amountPaid, balance: totals.balance, status: totals.status },
       lineItems: lines,
-      payments,
     },
   };
 }
@@ -163,6 +181,8 @@ function toDetail(row: Detail) {
     billToAddress: row.billToAddress,
     shipToName: row.shipToName,
     shipToAddress: row.shipToAddress,
+    orderRef: row.orderRef,
+    lastEmailedAt: row.lastEmailedAt,
     issueDate: row.issueDate,
     dueDate: row.dueDate,
     currencyCode: row.currencyCode,
@@ -198,6 +218,14 @@ function toDetail(row: Detail) {
       description: payment.description,
     })),
     store: { id: row.store.id, name: row.store.name, storeDomain: row.store.storeDomain },
+    /** Where the invoice can be emailed: the linked customer's email and its contacts' emails. */
+    customerEmails: [
+      ...new Set(
+        [row.customer?.email, ...(row.customer?.contacts ?? []).map((contact) => contact.email), row.shopifyCustomer?.email].filter(
+          (email): email is string => Boolean(email),
+        ),
+      ),
+    ],
   };
 }
 
@@ -206,10 +234,64 @@ async function canAccessStore(session: BillingSession, storeId: string) {
   return scope === null || scope.includes(storeId);
 }
 
-async function customerLinksExist(input: InvoiceInput) {
-  if (input.customerId && !(await prisma.customer.findUnique({ where: { id: input.customerId }, select: { id: true } }))) return false;
-  if (input.shopifyCustomerId && !(await prisma.shopifyCustomer.findUnique({ where: { id: input.shopifyCustomerId }, select: { id: true } }))) return false;
+/** The linked customer must exist; a Shopify customer must also be live and belong to the invoice's store. */
+async function customerLinksValid(input: InvoiceInput) {
+  if (input.customerId && !(await customerModel.exists(input.customerId))) return false;
+  if (input.shopifyCustomerId && !(await shopifyCustomerModel.existsInStore(input.shopifyCustomerId, input.storeId))) return false;
   return true;
+}
+
+function toPrintSource(row: Detail): ManualInvoiceSource {
+  return {
+    id: row.id,
+    invoiceNumber: row.invoiceNumber,
+    issueDate: row.issueDate,
+    dueDate: row.dueDate,
+    orderRef: row.orderRef,
+    currencyCode: row.currencyCode,
+    billToName: row.billToName,
+    billToAddress: row.billToAddress,
+    shipToName: row.shipToName,
+    shipToAddress: row.shipToAddress,
+    taxRate: Number(row.taxRate),
+    shipping: Number(row.shipping),
+    subTotal: Number(row.subTotal),
+    discountTotal: Number(row.discountTotal),
+    taxTotal: Number(row.taxTotal),
+    total: Number(row.total),
+    amountPaid: Number(row.amountPaid),
+    balance: Number(row.balance),
+    terms: row.terms,
+    lineItems: row.lineItems.map((line) => ({
+      qty: line.qty,
+      title: line.title,
+      size: line.size,
+      unitPrice: Number(line.unitPrice),
+      discountPercent: Number(line.discountPercent),
+      amount: Number(line.amount),
+    })),
+    payments: row.payments.map((payment) => ({ type: payment.type, paidOn: payment.paidOn, amount: Number(payment.amount) })),
+    store: { ...row.store, accessToken: null },
+  };
+}
+
+function parseEmail(body: unknown): { to: string[]; message: string } | { errors: string[] } {
+  const raw = asRaw(body);
+  const to = [...new Set((Array.isArray(raw.to) ? raw.to : []).map((value) => String(value).trim().toLowerCase()).filter(Boolean))];
+  const message = text(raw, 'message');
+  const errors: string[] = [];
+  if (to.length === 0) errors.push('to: Add at least one recipient');
+  else if (to.length > MAX_RECIPIENTS) errors.push(`to: Send to at most ${MAX_RECIPIENTS} recipients`);
+  else if (to.some((email) => !EMAIL_RE.test(email))) errors.push('to: One of the email addresses is not valid');
+  if (message.length > 2000) errors.push('message: Message must be 2000 characters or fewer');
+  return errors.length ? { errors } : { to, message };
+}
+
+/** The printed invoice as an email: the optional message above the same invoice document. */
+function buildInvoiceEmailHtml(documentHtml: string, message: string) {
+  if (!message) return documentHtml;
+  const intro = `<div style="font-family: Arial, Helvetica, sans-serif; font-size: 14px; white-space: pre-wrap; margin: 0 0 24px;">${escapeHtml(message)}</div>`;
+  return documentHtml.replace('<div class="page">', `${intro}<div class="page">`);
 }
 
 export class InvoiceController {
@@ -233,6 +315,9 @@ export class InvoiceController {
           storeId: row.storeId,
           storeName: row.store.name ?? row.store.storeDomain,
           billToName: row.billToName,
+          orderRef: row.orderRef,
+          lastEmailedAt: row.lastEmailedAt,
+          qty: row.lineItems.reduce((sum, line) => sum + line.qty, 0),
           issueDate: row.issueDate,
           currencyCode: row.currencyCode,
           total: Number(row.total),
@@ -255,11 +340,11 @@ export class InvoiceController {
   async create(body: unknown, session: BillingSession) {
     if (!canWriteBilling(session)) return FORBIDDEN;
 
-    const parsed = parseInvoice(body);
+    const parsed = parseInvoice(body, 0);
     if ('errors' in parsed) return validationError(parsed.errors);
     const { input } = parsed;
     if (!(await canAccessStore(session, input.storeId))) return FORBIDDEN;
-    if (!(await customerLinksExist(input))) return validationError(['customerId: That customer no longer exists']);
+    if (!(await customerLinksValid(input))) return validationError(['customerId: That customer no longer exists or belongs to another store']);
 
     const prefix = (await model.findStoreSettings(input.storeId))?.invoicePrefix ?? null;
     const created = await model.create(input, prefix);
@@ -273,15 +358,36 @@ export class InvoiceController {
     const existingStoreId = await model.findStoreIdById(id);
     if (!existingStoreId || !(await canAccessStore(session, existingStoreId))) return NOT_FOUND;
 
-    const parsed = parseInvoice(body);
+    const parsed = parseInvoice(body, await model.sumPayments(id));
     if ('errors' in parsed) return validationError(parsed.errors);
     const { input } = parsed;
     if (!(await canAccessStore(session, input.storeId))) return FORBIDDEN;
-    if (!(await customerLinksExist(input))) return validationError(['customerId: That customer no longer exists']);
+    if (!(await customerLinksValid(input))) return validationError(['customerId: That customer no longer exists or belongs to another store']);
 
     const updated = await model.update(id, input);
     if (!updated) return { error: { message: 'Validation failed', errors: ['invoiceNumber: That invoice number is already used'], status: 409 } };
     return { data: toDetail(updated), message: `Invoice ${updated.invoiceNumber} saved` };
+  }
+
+  /** Replaces an invoice's payments and recomputes what is paid and owing against its stored total. */
+  async updatePayments(id: string, body: unknown, session: BillingSession) {
+    if (!canWriteBilling(session)) return FORBIDDEN;
+    const existing = await model.findTotalById(id);
+    if (!existing || !(await canAccessStore(session, existing.storeId))) return NOT_FOUND;
+
+    const errors: string[] = [];
+    const payments = parsePayments(asRaw(body).payments, errors);
+    if (errors.length) return validationError(errors);
+
+    const total = Number(existing.total);
+    const amountPaid = round2(payments.reduce((sum, payment) => sum + payment.amount, 0));
+    const updated = await model.replacePayments(id, payments, {
+      amountPaid,
+      balance: round2(total - amountPaid),
+      status: derivePaymentStatus(total, amountPaid),
+    });
+    if (!updated) return NOT_FOUND;
+    return { data: toDetail(updated), message: `Payments saved for ${updated.invoiceNumber}` };
   }
 
   async delete(id: string, session: BillingSession) {
@@ -320,36 +426,34 @@ export class InvoiceController {
     const row = await model.findById(id);
     if (!row || !(await canAccessStore(session, row.storeId))) return NOT_FOUND;
 
-    const source: ManualInvoiceSource = {
-      id: row.id,
-      invoiceNumber: row.invoiceNumber,
-      issueDate: row.issueDate,
-      currencyCode: row.currencyCode,
-      billToName: row.billToName,
-      billToAddress: row.billToAddress,
-      shipToName: row.shipToName,
-      shipToAddress: row.shipToAddress,
-      taxRate: Number(row.taxRate),
-      shipping: Number(row.shipping),
-      subTotal: Number(row.subTotal),
-      discountTotal: Number(row.discountTotal),
-      taxTotal: Number(row.taxTotal),
-      total: Number(row.total),
-      amountPaid: Number(row.amountPaid),
-      balance: Number(row.balance),
-      terms: row.terms,
-      lineItems: row.lineItems.map((line) => ({
-        qty: line.qty,
-        title: line.title,
-        size: line.size,
-        unitPrice: Number(line.unitPrice),
-        discountPercent: Number(line.discountPercent),
-        amount: Number(line.amount),
-      })),
-      payments: row.payments.map((payment) => ({ type: payment.type, paidOn: payment.paidOn })),
-      store: { ...row.store, accessToken: null },
-    };
     const timezone = await getSettingsTimezone();
-    return { data: { ...buildManualTaxInvoice(source, timezone), notice: null }, message: 'Tax invoice retrieved' };
+    return { data: { ...buildManualTaxInvoice(toPrintSource(row), timezone), notice: null }, message: 'Tax invoice retrieved' };
+  }
+
+  /** Emails the invoice, rendered with the same template as the printed one, through the app's mail provider. */
+  async email(id: string, body: unknown, origin: string, session: BillingSession) {
+    if (!canWriteBilling(session)) return FORBIDDEN;
+    const row = await model.findById(id);
+    if (!row || !(await canAccessStore(session, row.storeId))) return NOT_FOUND;
+
+    const parsed = parseEmail(body);
+    if ('errors' in parsed) return validationError(parsed.errors);
+
+    const invoice = { ...buildManualTaxInvoice(toPrintSource(row), await getSettingsTimezone()), notice: null };
+    const subject = `Invoice ${invoice.invoiceNumber} from ${invoice.store.name}`;
+    const text = [
+      parsed.message,
+      `${subject}. Total ${invoice.totals.total.toFixed(2)} ${invoice.currencyCode}, balance due ${invoice.totals.balance.toFixed(2)} ${invoice.currencyCode}.`,
+    ]
+      .filter(Boolean)
+      .join('\n\n');
+
+    try {
+      await sendAppMail({ to: parsed.to, subject, html: buildInvoiceEmailHtml(buildTaxInvoiceDocument(invoice, origin), parsed.message), text });
+    } catch (error) {
+      return { error: { message: error instanceof Error ? error.message : 'Could not send the email', status: 502 } };
+    }
+    await model.markEmailed(id);
+    return { data: { id, lastEmailedAt: new Date() }, message: `Invoice ${invoice.invoiceNumber} emailed` };
   }
 }

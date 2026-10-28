@@ -45,15 +45,13 @@ export class ShopifyCustomerModel {
   async findById(id: string) {
     return prisma.shopifyCustomer.findFirst({
       where: { id, deletedAt: null },
-      include: {
-        store: storeSelect,
-        invoices: {
-          orderBy: { issueDate: 'desc' },
-          take: 20,
-          select: { id: true, invoiceNumber: true, issueDate: true, total: true, amountPaid: true, balance: true, paymentStatus: true },
-        },
-      },
+      include: { store: storeSelect },
     });
+  }
+
+  /** A live (not soft-deleted) customer of the given store, for linking to an invoice. */
+  async existsInStore(id: string, storeId: string) {
+    return Boolean(await prisma.shopifyCustomer.findFirst({ where: { id, storeId, deletedAt: null }, select: { id: true } }));
   }
 
   async create(storeId: string, data: CustomerValues) {

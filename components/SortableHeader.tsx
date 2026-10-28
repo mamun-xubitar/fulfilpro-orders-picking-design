@@ -27,7 +27,7 @@ export default function SortableHeader<K extends string>({ label, sortKey, sort,
       className={className ?? 'px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide'}
       aria-sort={active ? (dir === 'asc' ? 'ascending' : 'descending') : 'none'}
     >
-      <button type="button" onClick={() => onSortChange(sortKey)} className="group flex items-center gap-2 uppercase hover:text-gray-800 cursor-pointer">
+      <button type="button" onClick={() => onSortChange(sortKey)} className="group inline-flex items-center gap-2 uppercase hover:text-gray-800 cursor-pointer">
         {label}
         <svg className="w-4 h-4 min-w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           {arrow('asc', 'M7 10l5-5 5 5')}

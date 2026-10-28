@@ -1,7 +1,15 @@
-import { computeInvoiceTotals, taxRateForRegion, taxRegionForCountry, type PaymentStatus, type TaxRegion } from '@/lib/invoice-totals';
+import {
+  computeInvoiceTotals,
+  DEFAULT_AUS_TAX_RATE,
+  DEFAULT_NZ_TAX_RATE,
+  taxRateForRegion,
+  taxRegionForCountry,
+  type PaymentStatus,
+  type TaxRegion,
+} from '@/lib/invoice-totals';
 import type { BillingStore } from '@/hooks/useStoreOptions';
 
-export const PAYMENT_TYPES = ['Cash', 'Bank deposit', 'Card', 'Other'] as const;
+export { PAYMENT_TYPES } from '@/lib/invoice-totals';
 
 export type InvoiceListRow = {
   id: string;
@@ -9,11 +17,14 @@ export type InvoiceListRow = {
   storeId: string;
   storeName: string;
   billToName: string;
+  orderRef: string | null;
+  lastEmailedAt: string | null;
   issueDate: string;
   currencyCode: string;
   total: number;
   amountPaid: number;
   balance: number;
+  qty: number;
   paymentStatus: PaymentStatus;
 };
 
@@ -27,6 +38,8 @@ export type InvoiceDetail = {
   billToAddress: string | null;
   shipToName: string;
   shipToAddress: string | null;
+  orderRef: string | null;
+  lastEmailedAt: string | null;
   issueDate: string;
   dueDate: string | null;
   currencyCode: string;
@@ -35,7 +48,11 @@ export type InvoiceDetail = {
   shipping: number;
   notes: string | null;
   terms: string | null;
+  total: number;
+  amountPaid: number;
+  balance: number;
   paymentStatus: PaymentStatus;
+  customerEmails: string[];
   lineItems: Array<{ variantId: string | null; title: string; size: string | null; sku: string | null; qty: number; unitPrice: number; discountPercent: number }>;
   payments: Array<{ type: string; paidOn: string; amount: number; person: string | null; description: string | null }>;
 };
@@ -70,6 +87,7 @@ export type InvoiceFormValues = {
   billToAddress: string;
   shipToName: string;
   shipToAddress: string;
+  orderRef: string;
   issueDate: string;
   dueDate: string;
   currencyCode: string;
@@ -79,7 +97,8 @@ export type InvoiceFormValues = {
   notes: string;
   terms: string;
   lines: LineForm[];
-  payments: PaymentForm[];
+  /** Recorded payments, which are edited in their own modal; 0 for a new invoice. */
+  amountPaid: number;
 };
 
 let keyCounter = 0;
@@ -98,11 +117,16 @@ export const blankLine = (): LineForm => ({ key: nextKey(), variantId: null, tit
 
 export const blankPayment = (): PaymentForm => ({ key: nextKey(), type: 'Cash', paidOn: todayIso(), amount: '', person: '', description: '' });
 
+/** The store's tax-inclusive rate for a region, as a form value. */
+export function rateFor(store: BillingStore | undefined, region: TaxRegion) {
+  const rates = { aus: store?.ausTaxRate ?? DEFAULT_AUS_TAX_RATE, nz: store?.nzTaxRate ?? DEFAULT_NZ_TAX_RATE };
+  return String(taxRateForRegion(region, rates));
+}
+
 /** Tax for a store and ship-to country: the store's rate for that region. */
 export function taxFor(store: BillingStore | undefined, country: string | null | undefined) {
   const region = taxRegionForCountry(country);
-  const rates = { aus: store?.ausTaxRate ?? 11, nz: store?.nzTaxRate ?? 15 };
-  return { region, rate: String(taxRateForRegion(region, rates)) };
+  return { region, rate: rateFor(store, region) };
 }
 
 export function blankForm(store?: BillingStore): InvoiceFormValues {
@@ -117,6 +141,7 @@ export function blankForm(store?: BillingStore): InvoiceFormValues {
     billToAddress: '',
     shipToName: '',
     shipToAddress: '',
+    orderRef: '',
     issueDate: todayIso(),
     dueDate: '',
     currencyCode: 'AUD',
@@ -126,11 +151,12 @@ export function blankForm(store?: BillingStore): InvoiceFormValues {
     notes: '',
     terms: store?.defaultTerms ?? '',
     lines: [blankLine()],
-    payments: [],
+    amountPaid: 0,
   };
 }
 
-/** Edit keeps the number, dates and payments; copy starts a new invoice from the same content. */
+/** Edit keeps the number, dates, PO # and paid amount; copy starts a new, unpaid invoice from the same content.
+ * `customerLabel` starts blank and is filled once the linked customer has loaded. */
 export function formFromDetail(detail: InvoiceDetail, mode: 'edit' | 'copy'): InvoiceFormValues {
   const copy = mode === 'copy';
   return {
@@ -143,6 +169,7 @@ export function formFromDetail(detail: InvoiceDetail, mode: 'edit' | 'copy'): In
     billToAddress: detail.billToAddress ?? '',
     shipToName: detail.shipToName,
     shipToAddress: detail.shipToAddress ?? '',
+    orderRef: copy ? '' : (detail.orderRef ?? ''),
     issueDate: copy ? todayIso() : dateOnly(detail.issueDate),
     dueDate: copy ? '' : dateOnly(detail.dueDate),
     currencyCode: detail.currencyCode,
@@ -161,16 +188,7 @@ export function formFromDetail(detail: InvoiceDetail, mode: 'edit' | 'copy'): In
       unitPrice: String(line.unitPrice),
       discountPercent: line.discountPercent ? String(line.discountPercent) : '',
     })),
-    payments: copy
-      ? []
-      : detail.payments.map((payment) => ({
-          key: nextKey(),
-          type: payment.type,
-          paidOn: dateOnly(payment.paidOn),
-          amount: String(payment.amount),
-          person: payment.person ?? '',
-          description: payment.description ?? '',
-        })),
+    amountPaid: copy ? 0 : detail.amountPaid,
   };
 }
 
@@ -185,24 +203,41 @@ export function totalsForForm(form: InvoiceFormValues) {
     lines: form.lines.map((line) => ({ qty: toNumber(line.qty), unitPrice: toNumber(line.unitPrice), discountPercent: toNumber(line.discountPercent) })),
     shipping: toNumber(form.shipping),
     taxRate: form.taxRegion === 'NONE' ? 0 : toNumber(form.taxRate),
-    amountPaid: form.payments.reduce((sum, payment) => sum + toNumber(payment.amount), 0),
+    amountPaid: form.amountPaid,
   });
 }
 
 export function buildInvoicePayload(form: InvoiceFormValues) {
-  const { lines, payments, customerLabel, ...rest } = form;
+  const { lines, customerLabel, amountPaid, ...rest } = form;
   void customerLabel;
+  void amountPaid;
   return {
     ...rest,
     lineItems: lines.map(({ key, ...line }) => {
       void key;
       return line;
     }),
-    payments: payments.map(({ key, ...payment }) => {
-      void key;
-      return payment;
-    }),
   };
+}
+
+/** Payment rows for the payments modal, from a loaded invoice. */
+export function paymentsFromDetail(detail: InvoiceDetail): PaymentForm[] {
+  return detail.payments.map((payment) => ({
+    key: nextKey(),
+    type: payment.type,
+    paidOn: dateOnly(payment.paidOn),
+    amount: String(payment.amount),
+    person: payment.person ?? '',
+    description: payment.description ?? '',
+  }));
+}
+
+export const paymentsTotal = (payments: PaymentForm[]) => payments.reduce((sum, payment) => sum + toNumber(payment.amount), 0);
+
+export function validatePayments(payments: PaymentForm[]) {
+  const errors: Record<string, string> = {};
+  if (payments.some((payment) => toNumber(payment.amount) <= 0 || !payment.paidOn)) errors.payments = 'Each payment needs a date and an amount above 0';
+  return errors;
 }
 
 /** Client-side checks that mirror the server rules, so errors show before the request. */
@@ -217,6 +252,5 @@ export function validateInvoiceForm(form: InvoiceFormValues) {
   else if (form.lines.some((line) => !line.title.trim())) errors.lineItems = 'Every item needs a description';
   else if (form.lines.some((line) => !Number.isInteger(Number(line.qty)) || Number(line.qty) < 1)) errors.lineItems = 'Quantities must be whole numbers of 1 or more';
   else if (form.lines.some((line) => line.unitPrice.trim() === '' || toNumber(line.unitPrice) < 0)) errors.lineItems = 'Every item needs a price';
-  if (form.payments.some((payment) => toNumber(payment.amount) <= 0 || !payment.paidOn)) errors.payments = 'Each payment needs a date and an amount above 0';
   return errors;
 }

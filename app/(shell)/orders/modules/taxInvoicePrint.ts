@@ -44,9 +44,24 @@ const buildHeader = (invoice: TaxInvoice, origin: string) => {
     <div class="title-bar"><span>TAX INVOICE</span><span class="number">${escapeHtml(invoice.invoiceNumber)}</span></div>`;
 };
 
-const buildParties = (invoice: TaxInvoice) => `
+const buildParties = (invoice: TaxInvoice) => {
+  const meta = [
+    ['DATE', invoice.date],
+    ['DUE DATE', invoice.dueDate],
+    ['ORDER / PO #', invoice.orderRef],
+  ]
+    .filter((entry): entry is [string, string] => Boolean(entry[1]))
+    .map(([key, value]) => `<span class="key">${key}</span><span class="name">${escapeHtml(value)}</span>`)
+    .join('');
+  return `
     <section class="parties">
-      <div class="party bill"><span class="key">BILL TO :</span><span class="name">${escapeHtml(invoice.billTo)}</span></div>
+      <div class="party bill">
+        <span class="key">BILL TO :</span>
+        <div>
+          <div class="name">${escapeHtml(invoice.billTo)}</div>
+          ${invoice.billToLines.map((line) => `<div class="line">${escapeHtml(line)}</div>`).join('')}
+        </div>
+      </div>
       <div class="party ship">
         <span class="key">SHIP TO :</span>
         <div>
@@ -54,8 +69,9 @@ const buildParties = (invoice: TaxInvoice) => `
           ${invoice.shipTo.lines.map((line) => `<div class="line">${escapeHtml(line)}</div>`).join('')}
         </div>
       </div>
-      <div class="party date"><span class="key">DATE</span><span class="name">${escapeHtml(invoice.date)}</span></div>
+      <div class="party date">${meta}</div>
     </section>`;
+};
 
 const buildItems = (invoice: TaxInvoice) => {
   const money = (value: number) => formatMoney(value, invoice.currencyCode);
@@ -144,6 +160,7 @@ export const buildTaxInvoiceDocument = (invoice: TaxInvoice, origin: string) => 
         .title-bar .number { font-size: 16px; font-weight: 600; opacity: .85; }
         .parties { display: flex; justify-content: space-between; gap: 16px; padding: 12px 4px 18px; }
         .party { display: flex; gap: 6px; align-items: baseline; }
+        .party.bill { align-items: flex-start; }
         .party.ship { flex: 1; margin-left: 24px; align-items: flex-start; }
         .party.date { flex-direction: column; align-items: flex-end; gap: 2px; }
         .key { font-size: 12px; color: #333; white-space: nowrap; }

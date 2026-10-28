@@ -28,6 +28,11 @@ export function useCustomersList() {
       showToast: false,
       data: { source, search, page, pageSize, sort, dir, ...(storeId ? { storeId } : {}) },
       onSuccess: ({ data }) => {
+        // Deleting the last row of the last page leaves that page empty: step back to the new last page.
+        if (data.customers.length === 0 && data.pagination.page > data.pagination.totalPages) {
+          setPagination((prev) => ({ ...prev, page: data.pagination.totalPages }));
+          return;
+        }
         setRows(data.customers);
         setPagination(data.pagination);
       },

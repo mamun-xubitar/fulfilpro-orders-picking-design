@@ -11,7 +11,7 @@ import { useCustomersPage } from "./hooks/useCustomersPage";
 import { PAGE_SIZE_OPTIONS } from "./types";
 
 export default function CustomersPage() {
-  const { stores, list, form, actions, canWrite, isAdmin } = useCustomersPage();
+  const { stores, list, form, actions, emails, canWrite, isAdmin } = useCustomersPage();
 
   return (
     <main className="flex-1 p-4 md:p-6">
@@ -50,6 +50,8 @@ export default function CustomersPage() {
             onView={actions.openDetails}
             onEdit={form.openEdit}
             onDelete={actions.setDeleteTarget}
+            pickedEmails={emails.pickedFor}
+            onToggleEmail={emails.togglePick}
           />
         </div>
         <Pagination
@@ -72,11 +74,21 @@ export default function CustomersPage() {
           saving={form.saving}
           stores={stores}
           onChange={form.set}
+          onContactsChange={form.setContacts}
+          onAddressesChange={form.setAddresses}
           onSave={form.save}
           onClose={form.close}
         />
       )}
-      {actions.details && <CustomerDetailsModal customer={actions.details} loading={actions.detailsLoading} onClose={actions.closeDetails} />}
+      {actions.details && (
+        <CustomerDetailsModal
+          customer={actions.details}
+          history={actions.history}
+          historyLoading={actions.historyLoading}
+          onHistoryPage={actions.historyPage}
+          onClose={actions.closeDetails}
+        />
+      )}
       {actions.deleteTarget && (
         <DeleteCustomerModal
           customer={actions.deleteTarget}

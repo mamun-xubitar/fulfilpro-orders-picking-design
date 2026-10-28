@@ -24,6 +24,8 @@ export default function InvoicesToolbar(props: InvoicesToolbarProps) {
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
         <input
           type="search"
+          name="invoice-search"
+          autoComplete="off"
           value={props.searchInput}
           onChange={(event) => props.onSearchChange(event.target.value)}
           placeholder="Search invoice number or customer…"

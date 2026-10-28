@@ -99,24 +99,66 @@ model StoreInvoiceSetting {
 
 /// A customer created in this system (not synced from Shopify). Invoices are made against these.
 model Customer {
-  id        String    @id @default(uuid())
-  name      String
-  company   String?
-  email     String?
-  phone     String?
-  address   String?
-  address2  String?
-  city      String?
-  state     String?
-  zip       String?
-  country   String?
-  notes     String?
-  invoices  Invoice[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id           String            @id @default(uuid())
+  /// Human-readable customer code, shown as `C{code}`.
+  code         Int               @unique @default(autoincrement())
+  type         String?
+  creditLimit  Decimal?          @db.Decimal(14, 2)
+  /// Defaults for invoices made against this customer.
+  currencyCode String            @default("AUD")
+  taxRegion    String            @default("AU")
+  contacts     CustomerContact[]
+  addresses    CustomerAddress[]
+  name         String
+  company      String?
+  email        String?
+  phone        String?
+  address      String?
+  address2     String?
+  city         String?
+  state        String?
+  zip          String?
+  country      String?
+  notes        String?
+  invoices     Invoice[]
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
 
   @@index([name])
   @@index([email])
+}
+
+model CustomerContact {
+  id         String   @id @default(uuid())
+  customerId String
+  position   Int
+  name       String
+  email      String?
+  phone      String?
+  jobTitle   String?
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+}
+
+/// A shipping address of a system customer. The billing address lives on `Customer` itself.
+model CustomerAddress {
+  id         String   @id @default(uuid())
+  customerId String
+  position   Int
+  label      String?
+  name       String
+  phone      String?
+  address    String?
+  address2   String?
+  city       String?
+  state      String?
+  zip        String?
+  country    String?
+  isDefault  Boolean  @default(false)
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
 }
 
 /// Local copy of a Shopify store customer. Edits and deletes stay local; a re-sync leaves
@@ -165,6 +207,9 @@ model Invoice {
   billToAddress     String?
   shipToName        String
   shipToAddress     String?
+  /// Customer's order / PO reference.
+  orderRef          String?
+  lastEmailedAt     DateTime?
   issueDate         DateTime
   dueDate           DateTime?
   currencyCode      String            @default("AUD")
@@ -1169,8 +1214,8 @@ model InventoryLocation {
   stocktakeItems   StocktakeItem[]
   stockAdjustments StockAdjustment[]
   storeLocations   StoreLocation[]
-  createdAt      DateTime                         @default(now())
-  updatedAt      DateTime                         @updatedAt
+  createdAt        DateTime                         @default(now())
+  updatedAt        DateTime                         @updatedAt
 }
 
 model StoreLocation {
@@ -1259,21 +1304,21 @@ model SupplierProductSupplier {
 }
 
 model SupplierProductVariant {
-  id                 String                           @id @default(uuid())
-  supplierProductId  String
-  sku                String?
-  barcode            String?
-  colour             String
-  size               String
-  stockOnHand        Int                              @default(0)
+  id                String  @id @default(uuid())
+  supplierProductId String
+  sku               String?
+  barcode           String?
+  colour            String
+  size              String
+  stockOnHand       Int     @default(0)
 
-  allocated          Int                              @default(0)
-  buyPrice           Decimal                          @default(0) @db.Decimal(14, 2)
-  sellPrice          Decimal                          @default(0) @db.Decimal(14, 2)
-  trigger            Int                              @default(10)
+  allocated Int     @default(0)
+  buyPrice  Decimal @default(0) @db.Decimal(14, 2)
+  sellPrice Decimal @default(0) @db.Decimal(14, 2)
+  trigger   Int     @default(10)
 
-  forwardOrders      Int                              @default(0)
-  position           Int                              @default(0)
+  forwardOrders Int @default(0)
+  position      Int @default(0)
 
   imageId            String?
   image              SupplierProductImage?            @relation(fields: [imageId], references: [id], onDelete: SetNull)

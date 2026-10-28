@@ -3,6 +3,8 @@
 export type TaxRegion = 'AU' | 'NZ' | 'NONE';
 export type PaymentStatus = 'UNPAID' | 'PARTIAL' | 'PAID';
 
+export const PAYMENT_TYPES = ['Cash', 'Bank deposit', 'Card', 'Other'] as const;
+
 export const DEFAULT_AUS_TAX_RATE = 11;
 export const DEFAULT_NZ_TAX_RATE = 15;
 

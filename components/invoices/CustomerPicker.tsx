@@ -5,11 +5,7 @@ import useRequest from '@/hooks/useRequest';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { INPUT } from './fieldStyles';
 
-type CustomerRow = {
-  id: string;
-  name: string;
-  company: string | null;
-  email: string | null;
+type AddressFields = {
   address: string | null;
   address2: string | null;
   city: string | null;
@@ -18,19 +14,62 @@ type CustomerRow = {
   country: string | null;
 };
 
-export type PickedCustomer = { id: string; source: 'system' | 'shopify'; name: string; company: string | null; address: string; country: string | null };
+/** A customer as returned by `/api/customers` (list or single), on either tab. */
+export type CustomerApiRow = AddressFields & {
+  id: string;
+  name: string;
+  company: string | null;
+  email: string | null;
+  currencyCode?: string;
+  taxRegion?: string;
+  creditLimit?: number | null;
+  balance: number;
+  contacts?: Array<{ name: string; email: string | null }>;
+  addresses?: Array<AddressFields & { label: string | null; name: string; isDefault: boolean }>;
+};
 
-type Result = PickedCustomer & { email: string | null };
+export type ShipToOption = { label: string; name: string; address: string };
 
-const toResult = (row: CustomerRow, source: 'system' | 'shopify'): Result => ({
-  id: row.id,
-  source,
-  name: row.name,
-  company: row.company,
-  email: row.email,
-  country: row.country,
-  address: [row.address, row.address2, [row.city, row.state, row.zip].filter(Boolean).join(' '), row.country].filter(Boolean).join('\n'),
-});
+export type PickedCustomer = {
+  id: string;
+  source: 'system' | 'shopify';
+  name: string;
+  company: string | null;
+  email: string | null;
+  /** Billing address as invoice text. */
+  address: string;
+  country: string | null;
+  currencyCode: string | null;
+  taxRegion: string | null;
+  creditLimit: number | null;
+  balance: number;
+  /** Customer email plus contact emails, for emailing invoices. */
+  emails: string[];
+  /** Shipping addresses, default first. */
+  shipTo: ShipToOption[];
+};
+
+const joinAddress = (row: AddressFields) =>
+  [row.address, row.address2, [row.city, row.state, row.zip].filter(Boolean).join(' '), row.country].filter(Boolean).join('\n');
+
+export function pickedFromRow(row: CustomerApiRow, source: 'system' | 'shopify'): PickedCustomer {
+  const addresses = [...(row.addresses ?? [])].sort((a, b) => Number(b.isDefault) - Number(a.isDefault));
+  return {
+    id: row.id,
+    source,
+    name: row.name,
+    company: row.company,
+    email: row.email,
+    address: joinAddress(row),
+    country: row.country,
+    currencyCode: row.currencyCode ?? null,
+    taxRegion: row.taxRegion ?? null,
+    creditLimit: row.creditLimit ?? null,
+    balance: row.balance ?? 0,
+    emails: [...new Set([row.email, ...(row.contacts ?? []).map((contact) => contact.email)].filter((email): email is string => Boolean(email)))],
+    shipTo: addresses.map((address) => ({ label: address.label || address.name, name: address.name, address: joinAddress(address) })),
+  };
+}
 
 type CustomerPickerProps = {
   storeId: string;
@@ -42,18 +81,18 @@ type CustomerPickerProps = {
 /** Finds a system or Shopify customer to fill the invoice's bill-to. Typing the fields by hand still works. */
 export default function CustomerPicker({ storeId, selectedLabel, disabled, onPick }: CustomerPickerProps) {
   const [open, setOpen] = useState(false);
-  const [results, setResults] = useState<Result[]>([]);
+  const [results, setResults] = useState<PickedCustomer[]>([]);
   const { searchInput, setSearchInput, search } = useDebouncedSearch('', 300);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const systemReq = useRequest<{ customers: CustomerRow[] }>();
-  const shopifyReq = useRequest<{ customers: CustomerRow[] }>();
+  const systemReq = useRequest<{ customers: CustomerApiRow[] }>();
+  const shopifyReq = useRequest<{ customers: CustomerApiRow[] }>();
   const { request: requestSystem } = systemReq;
   const { request: requestShopify } = shopifyReq;
 
   useEffect(() => {
     if (!open) return;
     let current = true;
-    const merged: { system: Result[]; shopify: Result[] } = { system: [], shopify: [] };
+    const merged: { system: PickedCustomer[]; shopify: PickedCustomer[] } = { system: [], shopify: [] };
     const publish = () => current && setResults([...merged.system, ...merged.shopify]);
     void requestSystem({
       url: '/api/customers',
@@ -61,7 +100,7 @@ export default function CustomerPicker({ storeId, selectedLabel, disabled, onPic
       showToast: false,
       data: { source: 'system', search, pageSize: 8, sort: 'name', dir: 'asc' },
       onSuccess: ({ data }) => {
-        merged.system = data.customers.map((row) => toResult(row, 'system'));
+        merged.system = data.customers.map((row) => pickedFromRow(row, 'system'));
         publish();
       },
     });
@@ -72,7 +111,7 @@ export default function CustomerPicker({ storeId, selectedLabel, disabled, onPic
         showToast: false,
         data: { source: 'shopify', search, storeId, pageSize: 8, sort: 'name', dir: 'asc' },
         onSuccess: ({ data }) => {
-          merged.shopify = data.customers.map((row) => toResult(row, 'shopify'));
+          merged.shopify = data.customers.map((row) => pickedFromRow(row, 'shopify'));
           publish();
         },
       });

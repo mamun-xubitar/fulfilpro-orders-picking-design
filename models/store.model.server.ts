@@ -161,4 +161,8 @@ export class StoreModel {
   async delete(id: string) {
     return prisma.store.delete({ where: { id } });
   }
+
+  async countInvoices(id: string) {
+    return prisma.invoice.count({ where: { storeId: id } });
+  }
 }

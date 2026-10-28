@@ -27,7 +27,12 @@ export type TaxInvoice = {
   date: string;
   currencyCode: string;
   billTo: string;
+  /** Bill-to address lines; empty for Shopify-order invoices. */
+  billToLines: string[];
   shipTo: { name: string; lines: string[] };
+  /** Customer's order / PO reference and due date — manual invoices only. */
+  orderRef: string | null;
+  dueDate: string | null;
   items: Array<{ qty: number; title: string; size: string; price: number; discountPercent: number; amount: number }>;
   totals: {
     sub: number;
@@ -177,6 +182,9 @@ export function buildTaxInvoice(
     date: moment(source.orderedAt).tz(timezone).format('DD/MM/YYYY'),
     currencyCode: source.currencyCode ?? 'AUD',
     billTo: source.customer,
+    billToLines: [],
+    orderRef: null,
+    dueDate: null,
     shipTo: { name: source.customer, lines: addressLines(source) },
     items,
     totals: {
@@ -211,6 +219,8 @@ export type ManualInvoiceSource = {
   id: string;
   invoiceNumber: string;
   issueDate: Date;
+  dueDate: Date | null;
+  orderRef: string | null;
   currencyCode: string;
   billToName: string;
   billToAddress: string | null;
@@ -226,24 +236,35 @@ export type ManualInvoiceSource = {
   balance: number;
   terms: string | null;
   lineItems: Array<{ qty: number; title: string; size: string | null; unitPrice: number; discountPercent: number; amount: number }>;
-  payments: Array<{ type: string; paidOn: Date }>;
+  payments: Array<{ type: string; paidOn: Date; amount: number }>;
   store: TaxInvoiceSource['store'];
 };
+
+function formatMoney(value: number, currencyCode: string) {
+  try {
+    return new Intl.NumberFormat('en-AU', { style: 'currency', currency: currencyCode }).format(value);
+  } catch {
+    return `${value.toFixed(2)} ${currencyCode}`;
+  }
+}
 
 const splitLines = (value: string | null) =>
   (value ?? '').split('\n').map((line) => line.trim()).filter(Boolean);
 
 export function buildManualTaxInvoice(source: ManualInvoiceSource, timezone: string): Omit<TaxInvoice, 'notice'> {
   const instructions = source.balance > 0 ? clean(source.store.invoiceSetting?.paymentInstructions) : null;
-  const paymentLines = source.payments.map(
-    (payment) => `${payment.type} — ${moment(payment.paidOn).tz(timezone).format('DD/MM/YYYY')}`,
-  );
+  const day = (date: Date) => moment(date).tz(timezone).format('DD/MM/YYYY');
+  const money = (value: number) => formatMoney(value, source.currencyCode);
+  const paymentLines = source.payments.map((payment) => `${payment.type} — ${day(payment.paidOn)} — ${money(payment.amount)}`);
   return {
     orderId: source.id,
     invoiceNumber: source.invoiceNumber,
-    date: moment(source.issueDate).tz(timezone).format('DD/MM/YYYY'),
+    date: day(source.issueDate),
     currencyCode: source.currencyCode,
     billTo: source.billToName,
+    billToLines: splitLines(source.billToAddress),
+    orderRef: clean(source.orderRef),
+    dueDate: source.dueDate ? day(source.dueDate) : null,
     shipTo: { name: source.shipToName, lines: splitLines(source.shipToAddress) },
     items: source.lineItems.map((item) => ({
       qty: item.qty,

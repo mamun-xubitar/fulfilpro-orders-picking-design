@@ -23,10 +23,15 @@ export async function enqueueCustomerSync(storeId?: string) {
   return true;
 }
 
-/** Called by the worker on every tick: queues the daily sync once the last one is over a day old. */
+/** Called by the worker on every tick: queues the daily sync once the last one that did not fail
+ * is over a day old, so a failed sync is retried on the next tick. */
 export async function enqueueCustomerSyncIfDue(now = new Date()) {
   const recent = await prisma.backgroundJob.findFirst({
-    where: { type: SYNC_CUSTOMERS_JOB, createdAt: { gt: new Date(now.getTime() - CUSTOMER_SYNC_INTERVAL_MS) } },
+    where: {
+      type: SYNC_CUSTOMERS_JOB,
+      status: { not: 'failed' },
+      createdAt: { gt: new Date(now.getTime() - CUSTOMER_SYNC_INTERVAL_MS) },
+    },
     select: { id: true },
   });
   if (!recent) await enqueueCustomerSync();

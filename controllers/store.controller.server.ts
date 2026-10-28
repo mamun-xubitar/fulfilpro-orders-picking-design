@@ -191,6 +191,10 @@ export class StoreController {
     if (!store) {
       return { error: { message: 'Store not found', status: 404 } };
     }
+    // Manual invoices keep their store; delete or move them first.
+    if ((await model.countInvoices(id)) > 0) {
+      return { error: { message: 'This store has manual invoices. Delete them before deleting the store.', status: 409 } };
+    }
 
     await model.delete(id);
     return { data: null, message: 'Store deleted successfully' };

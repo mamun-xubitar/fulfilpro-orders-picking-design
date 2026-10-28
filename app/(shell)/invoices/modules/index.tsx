@@ -2,7 +2,9 @@
 
 import Pagination from "@/components/Pagination";
 import { ModalActions, ModalShell } from "@/components/ModalShell";
+import EmailInvoiceModal from "@/components/invoices/EmailInvoiceModal";
 import InvoiceModal from "@/components/invoices/InvoiceModal";
+import InvoicePaymentsModal from "@/components/invoices/InvoicePaymentsModal";
 import InvoicesTable from "./InvoicesTable";
 import InvoicesToolbar from "./InvoicesToolbar";
 import { useInvoicesPage } from "./hooks/useInvoicesPage";
@@ -31,7 +33,7 @@ export default function InvoicesPage() {
         <div className="overflow-x-auto">
           <InvoicesTable
             rows={list.rows}
-            loading={list.loading || p.loadingDetail}
+            loading={list.loading || p.loadingDetail || p.email.emailLoading || p.payments.paymentsLoading}
             searching={Boolean(list.search || list.storeId || list.status)}
             sort={list.sort}
             dir={list.dir}
@@ -42,6 +44,8 @@ export default function InvoicesPage() {
             onEdit={(row) => p.openFromRow(row, "edit")}
             onCopy={(row) => p.openFromRow(row, "copy")}
             onPrint={(row) => void p.printer.print(row.id)}
+            onEmail={(row) => p.email.openEmail(row.id)}
+            onPayments={(row) => p.payments.openPayments(row.id)}
             onDelete={p.setDeleteTarget}
           />
         </div>
@@ -66,10 +70,22 @@ export default function InvoicesPage() {
           printing={p.printer.printingId === modal.invoiceId}
           onSaved={p.onSaved}
           onPrint={modal.invoiceId ? () => void p.printer.print(modal.invoiceId as string) : undefined}
+          onEmail={modal.invoiceId && p.canWrite ? () => p.email.openEmail(modal.invoiceId as string) : undefined}
           onEdit={p.canWrite ? p.switchToEdit : undefined}
           onClose={p.closeModal}
         />
       )}
+      {p.email.emailTarget && (
+        <EmailInvoiceModal
+          key={p.email.emailTarget.id}
+          target={p.email.emailTarget}
+          sending={p.email.emailSending}
+          errors={p.email.emailErrors}
+          onSend={p.email.sendEmail}
+          onClose={p.email.closeEmail}
+        />
+      )}
+      <InvoicePaymentsModal p={p.payments} />
       {deleteTarget && (
         <ModalShell
           title="Delete invoice"

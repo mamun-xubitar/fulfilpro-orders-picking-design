@@ -17,6 +17,7 @@ type InvoiceModalProps = {
   printing?: boolean;
   onSaved: (invoice: InvoiceDetail) => void;
   onPrint?: () => void;
+  onEmail?: () => void;
   onEdit?: () => void;
   onClose: () => void;
 };
@@ -25,7 +26,7 @@ const BTN = 'flex-1 rounded-lg px-3 py-2 text-sm font-semibold cursor-pointer di
 const TITLES: Record<InvoiceModalMode, string> = { create: 'New invoice', edit: 'Edit invoice', view: 'Invoice', copy: 'New invoice (copy)' };
 
 /** Create / edit / view / copy a manual invoice. Mount it fresh for each open — it seeds its form from `initial`. */
-export default function InvoiceModal({ mode, initial, invoiceId, stores, title, printing, onSaved, onPrint, onEdit, onClose }: InvoiceModalProps) {
+export default function InvoiceModal({ mode, initial, invoiceId, stores, title, printing, onSaved, onPrint, onEmail, onEdit, onClose }: InvoiceModalProps) {
   const f = useInvoiceForm({ initial, invoiceId, stores, onSaved });
   const readOnly = mode === 'view';
 
@@ -38,6 +39,9 @@ export default function InvoiceModal({ mode, initial, invoiceId, stores, title, 
         <button type="button" onClick={onPrint} disabled={printing} className={`${BTN} border border-gray-300 bg-white text-gray-700 hover:bg-gray-50`}>
           {printing ? 'Preparing…' : 'Print'}
         </button>
+      )}
+      {readOnly && onEmail && (
+        <button type="button" onClick={onEmail} className={`${BTN} border border-gray-300 bg-white text-gray-700 hover:bg-gray-50`}>Email</button>
       )}
       {readOnly && onEdit && (
         <button type="button" onClick={onEdit} className={`${BTN} bg-blue-600 text-white hover:bg-blue-700`}>Edit</button>
@@ -52,7 +56,7 @@ export default function InvoiceModal({ mode, initial, invoiceId, stores, title, 
 
   return (
     <ModalShell title={title ?? TITLES[mode]} onClose={onClose} extraWide disableBackdropClose={!readOnly} footer={footer}>
-      <InvoiceFormBody f={f} stores={stores} readOnly={readOnly} />
+      <InvoiceFormBody f={f} stores={stores} readOnly={readOnly} showNumber={invoiceId !== null} />
     </ModalShell>
   );
 }

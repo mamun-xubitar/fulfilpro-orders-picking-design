@@ -1,8 +1,11 @@
 'use client';
 
-import { Eye, Pencil, Trash2 } from '@/components/icons';
+import { Eye, Mail, Pencil, Trash2 } from '@/components/icons';
 import SortableHeader from '@/components/SortableHeader';
-import type { CustomerRow, CustomerSortKey, CustomerSource } from './types';
+import { formatMoney } from '@/components/invoices/fieldStyles';
+import EmailPicker from './EmailPicker';
+import { emailOptions, mailtoFor } from './hooks/useEmailPicks';
+import { customerCode, type CustomerRow, type CustomerSortKey, type CustomerSource } from './types';
 
 type CustomersTableProps = {
   source: CustomerSource;
@@ -19,13 +22,15 @@ type CustomersTableProps = {
   onView: (row: CustomerRow) => void;
   onEdit: (row: CustomerRow) => void;
   onDelete: (row: CustomerRow) => void;
+  pickedEmails: (row: CustomerRow) => string[];
+  onToggleEmail: (row: CustomerRow, email: string) => void;
 };
 
 const TD = 'px-4 py-3 text-sm text-gray-700';
 const ICON_BTN = 'rounded-lg p-1.5 text-gray-400 cursor-pointer';
 
-const money = (value: number | undefined) =>
-  new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' }).format(value ?? 0);
+const money = (value: number | undefined, currencyCode = 'AUD') => formatMoney(value ?? 0, currencyCode);
+const balanceClass = (balance: number) => (balance > 0 ? 'font-semibold text-red-600' : '');
 
 function SkeletonRows({ columns }: { columns: number }) {
   return Array.from({ length: 6 }).map((_, row) => (
@@ -37,11 +42,23 @@ function SkeletonRows({ columns }: { columns: number }) {
   ));
 }
 
+/** Icon button that opens the user's mail app addressed to the picked emails, with the customer as the subject. */
+function EmailLink({ row, emails }: { row: CustomerRow; emails: string[] }) {
+  if (emails.length === 0) {
+    return <span aria-disabled="true" title="Pick at least one email" className={`${ICON_BTN} cursor-not-allowed text-gray-300`}><Mail className="h-4 w-4" /></span>;
+  }
+  return (
+    <a href={mailtoFor(row, emails)} aria-label={`Email ${row.name}`} title={`Email ${emails.join(', ')}`} className={`${ICON_BTN} hover:bg-gray-100 hover:text-gray-600`}>
+      <Mail className="h-4 w-4" />
+    </a>
+  );
+}
+
 export default function CustomersTable(props: CustomersTableProps) {
   const { source, rows, canWrite, selected } = props;
   const shopify = source === 'shopify';
   const selectable = canWrite && !shopify;
-  const columns = 5 + (shopify ? 3 : 1) + (selectable ? 1 : 0) + 1;
+  const columns = 5 + (shopify ? 4 : 5) + (selectable ? 1 : 0) + 2;
   const pageAllSelected = rows.length > 0 && rows.every((row) => selected.has(row.id));
   const header = (label: string, key: CustomerSortKey) => (
     <SortableHeader label={label} sortKey={key} sort={props.sort} dir={props.dir} onSortChange={props.onSortChange} />
@@ -51,7 +68,7 @@ export default function CustomersTable(props: CustomersTableProps) {
   );
 
   return (
-    <table className="w-full min-w-[900px] text-left">
+    <table className="w-full min-w-[1300px] text-left">
       <thead className="border-b border-gray-200 bg-gray-50">
         <tr>
           {selectable && (
@@ -59,6 +76,7 @@ export default function CustomersTable(props: CustomersTableProps) {
               <input type="checkbox" aria-label="Select all on this page" checked={pageAllSelected} onChange={() => props.onTogglePage(rows)} className="cursor-pointer" />
             </th>
           )}
+          {!shopify && header('Code', 'code')}
           {header('Name', 'name')}
           {header('Company', 'company')}
           {header('Email', 'email')}
@@ -69,8 +87,17 @@ export default function CustomersTable(props: CustomersTableProps) {
               {plainHeader('Store')}
               {header('Orders', 'ordersCount')}
               {header('Total spent', 'totalSpent')}
+              {plainHeader('Balance')}
             </>
-          ) : plainHeader('Invoices')}
+          ) : (
+            <>
+              {header('Type', 'type')}
+              {plainHeader('Invoices')}
+              {plainHeader('Total sales')}
+              {plainHeader('Balance')}
+            </>
+          )}
+          {plainHeader('Select email')}
           <th className="px-4 py-3" />
         </tr>
       </thead>
@@ -91,6 +118,7 @@ export default function CustomersTable(props: CustomersTableProps) {
                   <input type="checkbox" aria-label={`Select ${row.name}`} checked={selected.has(row.id)} onChange={() => props.onToggleSelected(row)} className="cursor-pointer" />
                 </td>
               )}
+              {!shopify && <td className={`${TD} whitespace-nowrap font-mono text-xs`}>{customerCode(row.code)}</td>}
               <td className={`${TD} font-semibold text-gray-900`}>{row.name}</td>
               <td className={TD}>{row.company || '—'}</td>
               <td className={TD}>{row.email || '—'}</td>
@@ -101,12 +129,22 @@ export default function CustomersTable(props: CustomersTableProps) {
                   <td className={TD}>{row.store?.name ?? row.store?.storeDomain ?? '—'}</td>
                   <td className={`${TD} tabular-nums`}>{row.ordersCount ?? 0}</td>
                   <td className={`${TD} tabular-nums`}>{money(row.totalSpent)}</td>
+                  <td className={`${TD} tabular-nums ${balanceClass(row.balance)}`}>{money(row.balance)}</td>
                 </>
               ) : (
-                <td className={`${TD} tabular-nums`}>{row.invoiceCount ?? 0}</td>
+                <>
+                  <td className={TD}>{row.type || '—'}</td>
+                  <td className={`${TD} tabular-nums`}>{row.invoiceCount ?? 0}</td>
+                  <td className={`${TD} tabular-nums`}>{money(row.totalSales, row.currencyCode)}</td>
+                  <td className={`${TD} tabular-nums ${balanceClass(row.balance)}`}>{money(row.balance, row.currencyCode)}</td>
+                </>
               )}
               <td className="px-4 py-3">
+                <EmailPicker options={emailOptions(row)} picked={props.pickedEmails(row)} onToggle={(email) => props.onToggleEmail(row, email)} />
+              </td>
+              <td className="px-4 py-3">
                 <div className="flex items-center justify-end gap-1">
+                  <EmailLink row={row} emails={props.pickedEmails(row)} />
                   <button type="button" aria-label={`View ${row.name}`} onClick={() => props.onView(row)} className={`${ICON_BTN} hover:bg-gray-100 hover:text-gray-600`}><Eye className="h-4 w-4" /></button>
                   {canWrite && (
                     <>

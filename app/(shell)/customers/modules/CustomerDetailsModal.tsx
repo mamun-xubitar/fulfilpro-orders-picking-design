@@ -1,11 +1,23 @@
 'use client';
 
 import { ModalShell } from '@/components/ModalShell';
-import type { CustomerRow } from './types';
-import { InvoiceStatusBadge } from '@/components/invoices/InvoiceStatusBadge';
+import { formatMoney } from '@/components/invoices/fieldStyles';
+import CustomerInvoiceHistory from './CustomerInvoiceHistory';
+import type { InvoiceHistory } from './hooks/useCustomerActions';
+import { customerCode, type CustomerRow } from './types';
 
-const money = (value: number) => new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' }).format(value);
-const date = (value: string) => new Date(value).toLocaleDateString('en-AU');
+type CustomerDetailsModalProps = {
+  customer: CustomerRow;
+  history: InvoiceHistory | null;
+  historyLoading: boolean;
+  onHistoryPage: (page: number) => void;
+  onClose: () => void;
+};
+
+const TAX_REGION_LABEL: Record<string, string> = { AU: 'Australia', NZ: 'New Zealand', NONE: 'No tax' };
+
+const joinAddress = (row: { address: string | null; address2: string | null; city: string | null; state: string | null; zip: string | null; country: string | null }) =>
+  [row.address, row.address2, [row.city, row.state, row.zip].filter(Boolean).join(' '), row.country].filter(Boolean).join('\n');
 
 function Row({ label, value }: { label: string; value: string | null | undefined }) {
   return (
@@ -16,50 +28,87 @@ function Row({ label, value }: { label: string; value: string | null | undefined
   );
 }
 
-export default function CustomerDetailsModal({ customer, loading, onClose }: { customer: CustomerRow; loading: boolean; onClose: () => void }) {
-  const address = [customer.address, customer.address2, [customer.city, customer.state, customer.zip].filter(Boolean).join(' '), customer.country]
-    .filter(Boolean)
-    .join('\n');
+function Stat({ label, value, tone = 'text-gray-900' }: { label: string; value: string; tone?: string }) {
+  return (
+    <div className="rounded-lg border border-gray-200 px-3 py-2">
+      <div className="text-xs font-medium uppercase text-gray-500">{label}</div>
+      <div className={`mt-0.5 text-base font-semibold tabular-nums ${tone}`}>{value}</div>
+    </div>
+  );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <h4 className="mb-2 border-b border-gray-100 pb-1 text-sm font-semibold text-gray-900">{title}</h4>
+      {children}
+    </div>
+  );
+}
+
+export default function CustomerDetailsModal({ customer, history, historyLoading, onHistoryPage, onClose }: CustomerDetailsModalProps) {
+  const system = customer.source === 'system';
+  const money = (value: number) => formatMoney(value, customer.currencyCode ?? 'AUD');
+  const title = system ? `${customerCode(customer.code)} · ${customer.company || customer.name}` : customer.name;
 
   return (
-    <ModalShell title={customer.name} onClose={onClose} extraWide>
+    <ModalShell title={title} onClose={onClose} extraWide>
       <div className="space-y-5">
+        <div className="grid gap-3 sm:grid-cols-4">
+          <Stat label="Total sales" value={money(customer.totalSales)} />
+          <Stat label="Balance" value={money(customer.balance)} tone={customer.balance > 0 ? 'text-red-600' : 'text-gray-900'} />
+          {system ? (
+            <Stat label="Credit limit" value={customer.creditLimit == null ? 'No limit' : money(customer.creditLimit)} />
+          ) : (
+            <Stat label="Shopify spend" value={money(customer.totalSpent ?? 0)} />
+          )}
+          {system ? <Stat label="Invoices" value={String(customer.invoiceCount ?? 0)} /> : <Stat label="Shopify orders" value={String(customer.ordersCount ?? 0)} />}
+        </div>
+
         <dl className="grid gap-4 sm:grid-cols-3">
+          <Row label="Name" value={customer.name} />
           <Row label="Company" value={customer.company} />
           <Row label="Email" value={customer.email} />
           <Row label="Phone" value={customer.phone} />
-          <Row label="Address" value={address} />
-          {customer.source === 'shopify' && <Row label="Store" value={customer.store?.name ?? customer.store?.storeDomain} />}
-          {customer.source === 'shopify' && <Row label="Shopify orders" value={String(customer.ordersCount ?? 0)} />}
+          <Row label={system ? 'Billing address' : 'Address'} value={joinAddress(customer)} />
+          {system && <Row label="Type" value={customer.type} />}
+          {system && <Row label="Invoice defaults" value={`${customer.currencyCode} · ${TAX_REGION_LABEL[customer.taxRegion ?? 'AU'] ?? customer.taxRegion}`} />}
+          {!system && <Row label="Store" value={customer.store?.name ?? customer.store?.storeDomain} />}
           <Row label="Notes" value={customer.notes} />
         </dl>
 
-        <div>
-          <h4 className="mb-2 border-b border-gray-100 pb-1 text-sm font-semibold text-gray-900">Invoice history</h4>
-          {loading && !customer.invoices ? (
-            <div className="h-16 animate-pulse rounded-lg bg-gray-100" />
-          ) : !customer.invoices?.length ? (
-            <p className="text-sm text-gray-500">No invoices for this customer yet.</p>
-          ) : (
-            <table className="w-full text-left text-sm">
-              <thead className="text-xs uppercase text-gray-500">
-                <tr><th className="py-1">Invoice</th><th>Date</th><th className="text-right">Total</th><th className="text-right">Paid</th><th className="text-right">Balance</th><th className="pl-4">Status</th></tr>
-              </thead>
-              <tbody>
-                {customer.invoices.map((invoice) => (
-                  <tr key={invoice.id} className="border-t border-gray-100">
-                    <td className="py-2 font-semibold">{invoice.invoiceNumber}</td>
-                    <td>{date(invoice.issueDate)}</td>
-                    <td className="text-right tabular-nums">{money(invoice.total)}</td>
-                    <td className="text-right tabular-nums">{money(invoice.amountPaid)}</td>
-                    <td className="text-right tabular-nums">{money(invoice.balance)}</td>
-                    <td className="pl-4"><InvoiceStatusBadge status={invoice.paymentStatus} /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+        {system && Boolean(customer.contacts?.length) && (
+          <Section title="Contacts">
+            <div className="grid gap-3 sm:grid-cols-2">
+              {customer.contacts?.map((contact, index) => (
+                <div key={index} className="rounded-lg border border-gray-200 p-3 text-sm">
+                  <div className="font-semibold text-gray-900">{contact.name}{contact.jobTitle ? <span className="font-normal text-gray-500"> · {contact.jobTitle}</span> : null}</div>
+                  <div className="text-gray-600">{[contact.email, contact.phone].filter(Boolean).join(' · ') || '—'}</div>
+                </div>
+              ))}
+            </div>
+          </Section>
+        )}
+
+        {system && Boolean(customer.addresses?.length) && (
+          <Section title="Shipping addresses">
+            <div className="grid gap-3 sm:grid-cols-2">
+              {customer.addresses?.map((address, index) => (
+                <div key={index} className="rounded-lg border border-gray-200 p-3 text-sm">
+                  <div className="font-semibold text-gray-900">
+                    {address.label || address.name}
+                    {address.isDefault && <span className="ml-2 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700">Default</span>}
+                  </div>
+                  <div className="whitespace-pre-line text-gray-600">{[address.label ? address.name : null, joinAddress(address), address.phone].filter(Boolean).join('\n')}</div>
+                </div>
+              ))}
+            </div>
+          </Section>
+        )}
+
+        <Section title="Invoice history">
+          <CustomerInvoiceHistory history={history} loading={historyLoading} onPage={onHistoryPage} />
+        </Section>
       </div>
     </ModalShell>
   );
