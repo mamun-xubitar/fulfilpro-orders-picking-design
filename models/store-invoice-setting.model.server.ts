@@ -1,4 +1,5 @@
 import prisma from '@/lib/prisma.server';
+import type { StoreInvoiceSetting } from '@prisma/client';
 
 export type InvoiceSettingValues = {
   storeName: string | null;
@@ -9,7 +10,21 @@ export type InvoiceSettingValues = {
   invoicePrefix: string | null;
   paymentInstructions: string | null;
   accentColor: string | null;
+  ausTaxRate: number;
+  nzTaxRate: number;
+  defaultTerms: string | null;
 };
+
+export type InvoiceSettingRow = Omit<StoreInvoiceSetting, 'ausTaxRate' | 'nzTaxRate'> & {
+  ausTaxRate: number;
+  nzTaxRate: number;
+};
+
+const toRow = (row: StoreInvoiceSetting): InvoiceSettingRow => ({
+  ...row,
+  ausTaxRate: Number(row.ausTaxRate),
+  nzTaxRate: Number(row.nzTaxRate),
+});
 
 export class StoreInvoiceSettingModel {
   async findStore(storeId: string) {
@@ -20,24 +35,27 @@ export class StoreInvoiceSettingModel {
   }
 
   async findByStoreId(storeId: string) {
-    return prisma.storeInvoiceSetting.findUnique({ where: { storeId } });
+    const row = await prisma.storeInvoiceSetting.findUnique({ where: { storeId } });
+    return row ? toRow(row) : null;
   }
 
   async upsert(storeId: string, values: InvoiceSettingValues) {
-    return prisma.storeInvoiceSetting.upsert({
+    const row = await prisma.storeInvoiceSetting.upsert({
       where: { storeId },
       create: { storeId, ...values },
       update: values,
     });
+    return toRow(row);
   }
 
   /** Sets (or clears) the logo. On first use the row is created from `defaults`, so a logo
    * upload on an unconfigured store doesn't leave a row with no store name. */
   async setLogoPath(storeId: string, logoPath: string | null, defaults: InvoiceSettingValues) {
-    return prisma.storeInvoiceSetting.upsert({
+    const row = await prisma.storeInvoiceSetting.upsert({
       where: { storeId },
       create: { storeId, ...defaults, logoPath },
       update: { logoPath },
     });
+    return toRow(row);
   }
 }

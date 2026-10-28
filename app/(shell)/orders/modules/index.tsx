@@ -7,6 +7,7 @@ import OrdersToolbar from './OrdersToolbar';
 import OrderModals from './OrderModals';
 import OrdersSelectionBar from './OrdersSelectionBar';
 import OrdersTable from './OrdersTable';
+import InvoiceModal from '@/components/invoices/InvoiceModal';
 import AssignModal from './AssignModal';
 import WorkModal from './WorkModal';
 import WorkDetailsModal from './WorkDetailsModal';
@@ -112,6 +113,8 @@ export default function OrdersPage() {
         bulkPrinting={p.bulkPrinting}
         onBulkPrint={() => void p.bulkPrintLabels()}
         onClearLabelSelection={p.clearLabelSelection}
+        showNewInvoice={p.canCreateInvoice}
+        onNewInvoice={p.openNewInvoice}
       />
 
 
@@ -246,6 +249,17 @@ export default function OrdersPage() {
           setCustomTitle={p.setAddLineItemCustomTitle}
           onClose={p.closeAddLineItemModal}
           onConfirm={() => void p.submitAddLineItem()}
+        />
+      )}
+      {p.invoiceModal && (
+        <InvoiceModal
+          key={p.invoiceModal.token}
+          mode="create"
+          initial={p.invoiceModal.initial}
+          invoiceId={null}
+          stores={p.invoiceStores}
+          onSaved={p.closeInvoiceModal}
+          onClose={p.closeInvoiceModal}
         />
       )}
     </main>

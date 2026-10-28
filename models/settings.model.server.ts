@@ -178,10 +178,13 @@ export class SettingsModel {
     return toSettingsRow(settings);
   }
 
-  /** Highest counter value handed out to an order; 0 when none has been issued yet. */
+  /** Highest counter value handed out to an order or manual invoice; 0 when none has been issued yet. */
   async highestIssuedInvoiceSequence(): Promise<number> {
-    const { _max } = await prisma.order.aggregate({ _max: { invoiceSequence: true } });
-    return _max.invoiceSequence ?? 0;
+    const [orders, invoices] = await Promise.all([
+      prisma.order.aggregate({ _max: { invoiceSequence: true } }),
+      prisma.invoice.aggregate({ _max: { invoiceSequence: true } }),
+    ]);
+    return Math.max(orders._max.invoiceSequence ?? 0, invoices._max.invoiceSequence ?? 0);
   }
 
   async updateGoogleTokens(data: GoogleTokenData): Promise<AppSettingsRow> {

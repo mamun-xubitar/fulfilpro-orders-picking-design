@@ -5,6 +5,7 @@ import {
   resolvePickerRecipientOptions,
 } from '@/lib/email-rules.server';
 import { sendAppMail } from '@/lib/email.server';
+import { allocateInvoiceNumber } from '@/lib/invoice-number.server';
 import { createNotification } from '@/lib/notifications.server';
 import prisma from '@/lib/prisma.server';
 import { ADMIN_ROLE, getDecoratorCategories, isDecoratorRole } from '@/lib/roles';
@@ -1135,13 +1136,7 @@ export class OrderModel {
       if (!row) throw new Error('Order not found');
       if (row.invoiceNumber) return row.invoiceNumber;
 
-      const settings = await tx.appSettings.upsert({
-        where: { id: 'default' },
-        update: { invoiceNextNumber: { increment: 1 } },
-        create: { id: 'default', invoiceNextNumber: 1001 },
-      });
-      const sequence = settings.invoiceNextNumber - 1;
-      const invoiceNumber = `${storePrefix?.trim() || settings.invoicePrefix.trim()}${sequence}`;
+      const { sequence, invoiceNumber } = await allocateInvoiceNumber(tx, storePrefix);
       await tx.order.update({ where: { id: orderId }, data: { invoiceNumber, invoiceSequence: sequence } });
       return invoiceNumber;
     });

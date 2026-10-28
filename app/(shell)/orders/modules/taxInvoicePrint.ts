@@ -66,7 +66,7 @@ const buildItems = (invoice: TaxInvoice) => {
           <td>${escapeHtml(item.title)}</td>
           <td>${escapeHtml(item.size)}</td>
           <td class="num">${money(item.price)}</td>
-          <td class="num"></td>
+          <td class="num">${item.discountPercent > 0 ? `${item.discountPercent}%` : ''}</td>
           <td class="num">${money(item.amount)}</td>
         </tr>`)
     .join('');
@@ -101,13 +101,18 @@ const buildSummary = (invoice: TaxInvoice) => {
         ${row('SUB', money(totals.sub))}
         ${row('DISCOUNT', money(totals.discount))}
         ${row('SHIPPING', money(totals.shipping))}
-        ${row(totals.taxesIncluded ? 'TAX (INCL.)' : 'TAX', money(totals.tax))}
+        ${row(totals.taxRate > 0 ? `TAX (INCL. ${totals.taxRate}%)` : 'TAX', money(totals.tax))}
         ${row('TOTAL', money(totals.total))}
         ${row('APPLIED', money(totals.applied))}
         ${row('BALANCE', money(totals.balance), 'balance')}
       </div>
     </section>`;
 };
+
+const buildTerms = (invoice: TaxInvoice) =>
+  invoice.terms
+    ? `<section class="terms"><span class="terms-title">Terms:</span> <span class="terms-body">${escapeHtml(invoice.terms)}</span></section>`
+    : '';
 
 const buildFooter = (invoice: TaxInvoice) => {
   const { store } = invoice;
@@ -160,6 +165,9 @@ export const buildTaxInvoiceDocument = (invoice: TaxInvoice, origin: string) => 
         .totals { width: 70mm; padding: 10px 4px 10px 16px; }
         .total-row { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; font-size: 14px; font-weight: 800; }
         .total-row.balance span:last-child { color: #e03a1e; }
+        .terms { margin-top: 8px; break-inside: avoid; }
+        .terms-title { font-size: 12px; font-weight: 800; color: #555; letter-spacing: .02em; }
+        .terms-body { font-size: 12px; line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; }
         .band { margin-top: auto; background: ${accent}; color: ${onAccent}; padding: 14px 12px; text-align: center; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .02em; }
         @media print {
           @page { size: A4; margin: 12mm; }
@@ -175,6 +183,7 @@ export const buildTaxInvoiceDocument = (invoice: TaxInvoice, origin: string) => 
         ${buildSummary(invoice)}
         <div style="height: 24px"></div>
         ${buildFooter(invoice)}
+        ${buildTerms(invoice)}
       </div>
     </body>
   </html>

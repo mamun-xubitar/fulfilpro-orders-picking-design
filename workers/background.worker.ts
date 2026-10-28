@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import moment from 'moment-timezone';
 import prisma from '@/lib/prisma.server';
-import { acquireNextJob, runJob, markJobFailed } from '@/lib/background-jobs.server';
+import { acquireNextJob, runJob, markJobFailed, enqueueCustomerSyncIfDue } from '@/lib/background-jobs.server';
 import { runPendingShipmentCheck, runPickupReminderCheck } from '@/lib/tracking-checks.server';
 import { runTaskReminderCheck } from '@/lib/task-reminders.server';
 import { runRecurringTaskCheck } from '@/lib/task-recurrence.server';
@@ -66,6 +66,15 @@ async function runTimedChecks() {
       await runTaskReminderCheck(now);
     } catch (error) {
       console.error('Task reminder check failed', error);
+    }
+  }
+
+  if (lastFired.get('customer_sync') !== minuteKey) {
+    lastFired.set('customer_sync', minuteKey);
+    try {
+      await enqueueCustomerSyncIfDue(now);
+    } catch (error) {
+      console.error('Customer sync scheduling failed', error);
     }
   }
 

@@ -18,6 +18,9 @@ export type InvoiceFormValues = {
   invoicePrefix: string;
   paymentInstructions: string;
   accentColor: string;
+  ausTaxRate: string;
+  nzTaxRate: string;
+  defaultTerms: string;
 };
 
 type InvoiceSettingsData = InvoiceFormValues & { logoPath: string | null };
@@ -31,6 +34,9 @@ const EMPTY_FORM: InvoiceFormValues = {
   invoicePrefix: '',
   paymentInstructions: '',
   accentColor: DEFAULT_INVOICE_ACCENT,
+  ausTaxRate: '11',
+  nzTaxRate: '15',
+  defaultTerms: '',
 };
 
 function validateForm(form: InvoiceFormValues) {
@@ -42,6 +48,12 @@ function validateForm(form: InvoiceFormValues) {
     errors.invoicePrefix = 'Up to 10 letters, numbers, #, / or -';
   }
   if (!/^#[0-9a-fA-F]{6}$/.test(form.accentColor.trim())) errors.accentColor = 'Use a hex color like #A6D3CC';
+  (['ausTaxRate', 'nzTaxRate'] as const).forEach((field) => {
+    const value = Number(form[field]);
+    if (form[field].trim() === '' || !Number.isFinite(value) || value < 0 || value > 100) {
+      errors[field] = 'Enter a rate between 0 and 100';
+    }
+  });
   return errors;
 }
 

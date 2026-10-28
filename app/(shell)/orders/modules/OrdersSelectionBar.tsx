@@ -15,6 +15,8 @@ type OrdersSelectionBarProps = {
   bulkPrinting?: boolean;
   onBulkPrint?: () => void;
   onClearLabelSelection?: () => void;
+  showNewInvoice?: boolean;
+  onNewInvoice?: () => void;
 };
 
 export default function OrdersSelectionBar({
@@ -32,6 +34,8 @@ export default function OrdersSelectionBar({
   bulkPrinting = false,
   onBulkPrint,
   onClearLabelSelection,
+  showNewInvoice = false,
+  onNewInvoice,
 }: OrdersSelectionBarProps) {
   return (
     <div className="flex items-center gap-3 mb-3 px-4 py-2.5 bg-white rounded-xl shadow-sm border border-gray-200">
@@ -89,10 +93,19 @@ export default function OrdersSelectionBar({
           </button>
         </div>
       )}
+      {showNewInvoice && (
+        <button
+          type="button"
+          onClick={onNewInvoice}
+          className={`${showLabelPrint && selectedLabelCount > 0 ? '' : 'ml-auto '}inline-flex items-center gap-1.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg px-3 py-1.5 cursor-pointer transition-colors duration-150`}
+        >
+          + New invoice
+        </button>
+      )}
       <button
         type="button"
         onClick={handleToggleExpandAll}
-        className={`${showLabelPrint && selectedLabelCount > 0 ? '' : 'ml-auto '}items-center gap-1.5 text-sm font-medium text-gray-700 hover:text-blue-600 border border-gray-300 hover:border-blue-300 rounded-lg px-3 py-1.5 cursor-pointer transition-colors duration-150`}
+        className={`${showLabelPrint && selectedLabelCount > 0 || showNewInvoice ? '' : 'ml-auto '}items-center gap-1.5 text-sm font-medium text-gray-700 hover:text-blue-600 border border-gray-300 hover:border-blue-300 rounded-lg px-3 py-1.5 cursor-pointer transition-colors duration-150`}
       >
         {expandAll ? '▲ Collapse all' : '▼ Expand all'}
       </button>

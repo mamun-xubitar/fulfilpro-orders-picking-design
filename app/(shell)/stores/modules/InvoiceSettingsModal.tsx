@@ -118,6 +118,16 @@ export default function InvoiceSettingsModal(props: InvoiceSettingsModalProps) {
             <Field label="Website" error={errors.websiteUrl}>{text('websiteUrl', 'www.example.com')}</Field>
           </div>
 
+          <SectionTitle>Tax</SectionTitle>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Australia tax %" error={errors.ausTaxRate} hint="Included in prices for Australian (and domestic) invoices; the total never changes.">
+              <input type="number" min={0} max={100} step="0.01" className={INPUT} value={form.ausTaxRate} onChange={onChange('ausTaxRate')} />
+            </Field>
+            <Field label="New Zealand tax %" error={errors.nzTaxRate} hint="Included in prices for New Zealand invoices.">
+              <input type="number" min={0} max={100} step="0.01" className={INPUT} value={form.nzTaxRate} onChange={onChange('nzTaxRate')} />
+            </Field>
+          </div>
+
           <SectionTitle>Invoice</SectionTitle>
           <Field
             label="Invoice number prefix"
@@ -132,6 +142,14 @@ export default function InvoiceSettingsModal(props: InvoiceSettingsModalProps) {
               value={form.paymentInstructions}
               onChange={onChange('paymentInstructions')}
               placeholder={'EFT NF FAMILY PTY LTD\nBSB CODE 000-000 ACCOUNT NUMBER 000 000 000\nPLEASE EMAIL YOUR RECEIPT ONCE PAID'}
+            />
+          </Field>
+          <Field label="Invoice terms" error={errors.defaultTerms} hint="Default terms printed at the bottom of every invoice for this store. Manual invoices start with this text and can change it.">
+            <textarea
+              className={`${INPUT} min-h-24`}
+              value={form.defaultTerms}
+              onChange={onChange('defaultTerms')}
+              placeholder="e.g. Payment due within 14 days. Goods remain our property until paid in full."
             />
           </Field>
         </div>
