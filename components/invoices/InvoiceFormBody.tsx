@@ -55,6 +55,11 @@ export default function InvoiceFormBody({ f, stores, readOnly, showNumber }: Inv
 
       <SectionTitle>Customer</SectionTitle>
       <CustomerPicker storeId={form.storeId} selectedLabel={form.customerLabel} disabled={readOnly} onPick={f.applyCustomer} />
+      {f.customer && (
+        <Field label="Email">
+          <input className={INPUT} value={f.customer.email ?? ''} placeholder="No email on file" disabled readOnly />
+        </Field>
+      )}
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Bill to" error={errors.billToName}>{text('billToName')}</Field>
         <Field label="Ship to" hint="Leave blank to use bill to.">{text('shipToName')}</Field>
