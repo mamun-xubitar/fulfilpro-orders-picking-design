@@ -201,6 +201,7 @@ export class CustomerModel {
           amountPaid: true,
           balance: true,
           paymentStatus: true,
+          createdByName: true,
           lineItems: { select: { qty: true } },
         },
       }),

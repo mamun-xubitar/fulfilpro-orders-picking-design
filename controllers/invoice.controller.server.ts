@@ -209,6 +209,7 @@ function toDetail(row: Detail) {
     amountPaid: Number(row.amountPaid),
     balance: Number(row.balance),
     paymentStatus: row.paymentStatus,
+    createdByName: row.createdByName,
     lineItems: row.lineItems.map((line) => ({
       id: line.id,
       variantId: line.variantId,
@@ -361,6 +362,7 @@ export class InvoiceController {
           amountPaid: Number(row.amountPaid),
           balance: Number(row.balance),
           paymentStatus: row.paymentStatus,
+          createdByName: row.createdByName,
         })),
         pagination: buildPagination(params.page, params.pageSize, total),
       },
@@ -384,7 +386,8 @@ export class InvoiceController {
     if (!(await customerLinksValid(input))) return validationError(['customerId: That customer no longer exists or belongs to another store']);
 
     const prefix = (await model.findStoreSettings(input.storeId))?.invoicePrefix ?? null;
-    const created = await model.create(input, prefix);
+    const actor = { id: session?.user?.id ?? '', name: session?.user?.name ?? session?.user?.email ?? 'Unknown' };
+    const created = await model.create(input, prefix, actor);
     if (!created) return { error: { message: 'Validation failed', errors: ['invoiceNumber: That invoice number is already used'], status: 409 } };
     return { data: toDetail(created), message: `Invoice ${created.invoiceNumber} created` };
   }

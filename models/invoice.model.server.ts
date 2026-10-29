@@ -138,7 +138,7 @@ export class InvoiceModel {
   }
 
   /** Creates the invoice, without payments, with the next global number or with `input.invoiceNumber` when one was typed. */
-  async create(input: InvoiceInput, storePrefix: string | null) {
+  async create(input: InvoiceInput, storePrefix: string | null, actor: { id: string; name: string }) {
     const id = await prisma.$transaction(async (tx) => {
       let invoiceNumber = input.invoiceNumber;
       let invoiceSequence: number | null = null;
@@ -152,6 +152,8 @@ export class InvoiceModel {
           ...columns(input),
           invoiceNumber,
           invoiceSequence,
+          createdById: actor.id,
+          createdByName: actor.name,
           lineItems: { create: lineRows(input) },
         },
         select: { id: true },

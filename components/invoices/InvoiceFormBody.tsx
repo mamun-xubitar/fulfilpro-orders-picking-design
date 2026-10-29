@@ -45,6 +45,11 @@ export default function InvoiceFormBody({ f, stores, readOnly, showNumber }: Inv
             <input className={INPUT} value={form.invoiceNumber} disabled readOnly />
           </Field>
         )}
+        {showNumber && (
+          <Field label="Created by">
+            <input className={INPUT} value={form.createdByName || '—'} disabled readOnly />
+          </Field>
+        )}
         <Field label="Currency" error={errors.currencyCode}>{text('currencyCode')}</Field>
         <Field label="Invoice date" error={errors.issueDate}>
           <input type="date" className={INPUT} value={form.issueDate} onChange={f.set('issueDate')} />

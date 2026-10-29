@@ -225,6 +225,8 @@ model Invoice {
   amountPaid        Decimal           @default(0) @db.Decimal(14, 2)
   balance           Decimal           @default(0) @db.Decimal(14, 2)
   paymentStatus     String            @default("UNPAID")
+  createdById       String?
+  createdByName     String?
   store             Store             @relation(fields: [storeId], references: [id])
   customer          Customer?         @relation(fields: [customerId], references: [id], onDelete: SetNull)
   shopifyCustomer   ShopifyCustomer?  @relation(fields: [shopifyCustomerId], references: [id], onDelete: SetNull)

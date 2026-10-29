@@ -1,7 +1,9 @@
 import { canReadInventory, isTestUserRole } from '@/lib/roles';
 import { getUserAllowedStoreIds } from '@/lib/store-access.server';
 
-export type BillingSession = { user?: { id?: string | null; role?: string | null } | null } | null;
+export type BillingSession = {
+  user?: { id?: string | null; role?: string | null; name?: string | null; email?: string | null } | null;
+} | null;
 
 /** Customers and invoices are for admin and staff; the test user can look but not change. */
 export const canReadBilling = (session: BillingSession) => canReadInventory(session?.user?.role);

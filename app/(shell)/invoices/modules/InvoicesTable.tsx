@@ -30,7 +30,7 @@ type InvoicesTableProps = {
 
 const TD = 'px-4 py-3 text-sm text-gray-700';
 const ICON_BTN = 'rounded-lg p-1.5 text-gray-400 cursor-pointer';
-const COLUMNS = 12;
+const COLUMNS = 13;
 const CHECKBOX = 'cursor-pointer';
 
 export default function InvoicesTable(props: InvoicesTableProps) {
@@ -48,7 +48,7 @@ export default function InvoicesTable(props: InvoicesTableProps) {
   );
 
   return (
-    <table className="w-full min-w-[1180px] text-left">
+    <table className="w-full min-w-[1320px] text-left">
       <thead className="border-b border-gray-200 bg-gray-50">
         <tr>
           <th className="w-10 px-4 py-3">
@@ -66,6 +66,7 @@ export default function InvoicesTable(props: InvoicesTableProps) {
           {plain('Paid', 'text-right')}
           {header('Balance', 'balance', 'px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500')}
           {header('Status', 'paymentStatus')}
+          {plain('Created by')}
           <th className="px-4 py-3" />
         </tr>
       </thead>
@@ -109,6 +110,7 @@ export default function InvoicesTable(props: InvoicesTableProps) {
               <td className={`${TD} text-right tabular-nums`}>{formatMoney(row.amountPaid, row.currencyCode)}</td>
               <td className={`${TD} text-right tabular-nums`}>{formatMoney(row.balance, row.currencyCode)}</td>
               <td className="px-4 py-3"><InvoiceStatusBadge status={row.paymentStatus} /></td>
+              <td className={TD}>{row.createdByName || '—'}</td>
               <td className="px-4 py-3">
                 <div className="flex items-center justify-end gap-1">
                   {iconButton(`View ${row.invoiceNumber}`, () => props.onView(row), <Eye className="h-4 w-4" />)}

@@ -34,6 +34,7 @@ export default function CustomerInvoiceHistory({ history, loading, onPage }: Cus
               <th className={`${TH} text-right`}>Balance</th>
               <th className={`${TH} text-right`}>Qty</th>
               <th className={TH}>Status</th>
+              <th className={TH}>Created by</th>
             </tr>
           </thead>
           <tbody>
@@ -49,6 +50,7 @@ export default function CustomerInvoiceHistory({ history, loading, onPage }: Cus
                 <td className="px-2 text-right tabular-nums">{formatMoney(invoice.balance, invoice.currencyCode)}</td>
                 <td className="px-2 text-right tabular-nums">{invoice.qty}</td>
                 <td className="px-2"><InvoiceStatusBadge status={invoice.paymentStatus} /></td>
+                <td className="px-2">{invoice.createdByName || '—'}</td>
               </tr>
             ))}
           </tbody>

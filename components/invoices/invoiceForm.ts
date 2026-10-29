@@ -26,6 +26,7 @@ export type InvoiceListRow = {
   balance: number;
   qty: number;
   paymentStatus: PaymentStatus;
+  createdByName: string | null;
 };
 
 export type InvoiceDetail = {
@@ -52,6 +53,7 @@ export type InvoiceDetail = {
   amountPaid: number;
   balance: number;
   paymentStatus: PaymentStatus;
+  createdByName: string | null;
   customerEmails: string[];
   lineItems: Array<{ variantId: string | null; title: string; size: string | null; sku: string | null; qty: number; unitPrice: number; discountPercent: number }>;
   payments: Array<{ type: string; paidOn: string; amount: number; person: string | null; description: string | null }>;
@@ -79,6 +81,8 @@ export type PaymentForm = {
 
 export type InvoiceFormValues = {
   invoiceNumber: string;
+  /** Read-only: set by the server when the invoice is created. */
+  createdByName: string;
   storeId: string;
   customerId: string;
   shopifyCustomerId: string;
@@ -133,6 +137,7 @@ export function blankForm(store?: BillingStore): InvoiceFormValues {
   const tax = taxFor(store, '');
   return {
     invoiceNumber: '',
+    createdByName: '',
     storeId: store?.id ?? '',
     customerId: '',
     shopifyCustomerId: '',
@@ -161,6 +166,7 @@ export function formFromDetail(detail: InvoiceDetail, mode: 'edit' | 'copy'): In
   const copy = mode === 'copy';
   return {
     invoiceNumber: copy ? '' : detail.invoiceNumber,
+    createdByName: copy ? '' : (detail.createdByName ?? ''),
     storeId: detail.storeId,
     customerId: detail.customerId ?? '',
     shopifyCustomerId: detail.shopifyCustomerId ?? '',
@@ -210,9 +216,10 @@ export function totalsForForm(form: InvoiceFormValues) {
 const upper = (value: string) => value.toUpperCase();
 
 export function buildInvoicePayload(form: InvoiceFormValues) {
-  const { lines, customerLabel, amountPaid, ...rest } = form;
+  const { lines, customerLabel, amountPaid, createdByName, ...rest } = form;
   void customerLabel;
   void amountPaid;
+  void createdByName;
   return {
     ...rest,
     currencyCode: upper(rest.currencyCode),

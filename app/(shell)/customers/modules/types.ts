@@ -13,6 +13,7 @@ export type CustomerInvoiceSummary = {
   balance: number;
   qty: number;
   paymentStatus: 'UNPAID' | 'PARTIAL' | 'PAID';
+  createdByName: string | null;
 };
 
 export type CustomerContact = { name: string; email: string | null; phone: string | null; jobTitle: string | null };
