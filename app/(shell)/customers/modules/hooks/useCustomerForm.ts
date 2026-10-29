@@ -88,11 +88,11 @@ function validate(form: CustomerFormValues, source: CustomerSource, creating: bo
 }
 
 /** Create / edit form for one customer, on either tab. System customers also edit contacts and addresses. */
-export function useCustomerForm(source: CustomerSource, onSaved: () => void) {
+export function useCustomerForm(source: CustomerSource, onSaved: (saved: CustomerRow) => void) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<CustomerRow | null>(null);
   const [form, setForm] = useState<CustomerFormValues>(EMPTY_CUSTOMER_FORM);
-  const { request, loading, errors, setErrors } = useRequest();
+  const { request, loading, errors, setErrors } = useRequest<CustomerRow>();
   const detailReq = useRequest<CustomerRow>();
 
   const show = (row: CustomerRow | null, values: CustomerFormValues) => {
@@ -129,9 +129,9 @@ export function useCustomerForm(source: CustomerSource, onSaved: () => void) {
       method: editing ? 'PATCH' : 'POST',
       data: { ...form, contacts: stripKeys(form.contacts), addresses: stripKeys(form.addresses) },
       validation: async () => validate(form, source, !editing),
-      onSuccess: () => {
+      onSuccess: ({ data }) => {
         close();
-        onSaved();
+        onSaved(data);
       },
     });
   };

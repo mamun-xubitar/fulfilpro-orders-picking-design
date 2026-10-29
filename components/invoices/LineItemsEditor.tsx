@@ -61,10 +61,10 @@ export default function LineItemsEditor({ storeId, currencyCode, lines, error, d
             {lines.map((line) => (
               <tr key={line.key} className="align-top">
                 <td className="py-1 pr-2">
-                  <input className={CELL_INPUT} value={line.title} disabled={disabled} onChange={(e) => onUpdate(line.key, { title: e.target.value })} placeholder="Description" />
+                  <input className={`${CELL_INPUT} uppercase`} value={line.title} disabled={disabled} onChange={(e) => onUpdate(line.key, { title: e.target.value })} placeholder="Description" />
                 </td>
-                <td className="px-1 py-1"><input className={CELL_INPUT} value={line.size} disabled={disabled} onChange={(e) => onUpdate(line.key, { size: e.target.value })} /></td>
-                <td className="px-1 py-1"><input className={CELL_INPUT} value={line.sku} disabled={disabled} onChange={(e) => onUpdate(line.key, { sku: e.target.value })} /></td>
+                <td className="px-1 py-1"><input className={`${CELL_INPUT} uppercase`} value={line.size} disabled={disabled} onChange={(e) => onUpdate(line.key, { size: e.target.value })} /></td>
+                <td className="px-1 py-1"><input className={`${CELL_INPUT} uppercase`} value={line.sku} disabled={disabled} onChange={(e) => onUpdate(line.key, { sku: e.target.value })} /></td>
                 <td className="px-1 py-1"><input type="number" min={1} step={1} className={CELL_INPUT} value={line.qty} disabled={disabled} onChange={(e) => onUpdate(line.key, { qty: e.target.value })} /></td>
                 <td className="px-1 py-1"><input type="number" min={0} step="0.01" className={CELL_INPUT} value={line.unitPrice} disabled={disabled} onChange={(e) => onUpdate(line.key, { unitPrice: e.target.value })} /></td>
                 <td className="px-1 py-1"><input type="number" min={0} max={100} step="0.01" className={CELL_INPUT} value={line.discountPercent} disabled={disabled} onChange={(e) => onUpdate(line.key, { discountPercent: e.target.value })} /></td>

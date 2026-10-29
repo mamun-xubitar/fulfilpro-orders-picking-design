@@ -6,8 +6,7 @@ import {
   readListParams,
   type BillingSession,
 } from '@/lib/billing-access.server';
-import { buildTaxInvoiceDocument } from '@/app/(shell)/orders/modules/taxInvoicePrint';
-import { escapeHtml } from '@/app/(shell)/orders/modules/utils';
+import { buildTaxInvoiceEmailHtml } from '@/lib/tax-invoice-email.server';
 import { sendAppMail } from '@/lib/email.server';
 import {
   computeInvoiceTotals,
@@ -287,13 +286,6 @@ function parseEmail(body: unknown): { to: string[]; message: string } | { errors
   return errors.length ? { errors } : { to, message };
 }
 
-/** The printed invoice as an email: the optional message above the same invoice document. */
-function buildInvoiceEmailHtml(documentHtml: string, message: string) {
-  if (!message) return documentHtml;
-  const intro = `<div style="font-family: Arial, Helvetica, sans-serif; font-size: 14px; white-space: pre-wrap; margin: 0 0 24px;">${escapeHtml(message)}</div>`;
-  return documentHtml.replace('<div class="page">', `${intro}<div class="page">`);
-}
-
 export class InvoiceController {
   async list(searchParams: URLSearchParams, session: BillingSession) {
     if (!canReadBilling(session)) return FORBIDDEN;
@@ -448,8 +440,11 @@ export class InvoiceController {
       .filter(Boolean)
       .join('\n\n');
 
+    // Logos must load for recipients, so prefer the public app URL over the (possibly internal) request origin.
+    const logoBase = process.env.APP_URL?.replace(/\/$/, '') || origin;
+
     try {
-      await sendAppMail({ to: parsed.to, subject, html: buildInvoiceEmailHtml(buildTaxInvoiceDocument(invoice, origin), parsed.message), text });
+      await sendAppMail({ to: parsed.to, subject, html: buildTaxInvoiceEmailHtml(invoice, logoBase, parsed.message), text });
     } catch (error) {
       return { error: { message: error instanceof Error ? error.message : 'Could not send the email', status: 502 } };
     }

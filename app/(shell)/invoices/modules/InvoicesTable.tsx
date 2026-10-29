@@ -79,7 +79,7 @@ export default function InvoicesTable(props: InvoicesTableProps) {
                   {row.invoiceNumber}
                   {row.lastEmailedAt && (
                     <span title={`Emailed ${new Date(row.lastEmailedAt).toLocaleString('en-AU')}`} aria-label="Emailed">
-                      <Mail className="h-3.5 w-3.5 text-blue-500" />
+                      <Mail className="h-3.5 w-3.5 text-green-600" />
                     </span>
                   )}
                 </span>
@@ -98,7 +98,7 @@ export default function InvoicesTable(props: InvoicesTableProps) {
                   {iconButton(`View ${row.invoiceNumber}`, () => props.onView(row), <Eye className="h-4 w-4" />)}
                   {iconButton(`Print ${row.invoiceNumber}`, () => props.onPrint(row), <Printer className="h-4 w-4" />, undefined, props.printingId === row.id)}
                   {canWrite && iconButton(`Payments for ${row.invoiceNumber}`, () => props.onPayments(row), <Wallet className="h-4 w-4" />)}
-                  {canWrite && iconButton(`Email ${row.invoiceNumber}`, () => props.onEmail(row), <Mail className="h-4 w-4" />)}
+                  {canWrite && iconButton(`Email ${row.invoiceNumber}`, () => props.onEmail(row), <Mail className={`h-4 w-4 ${row.lastEmailedAt ? 'text-green-600' : ''}`} />, row.lastEmailedAt ? 'hover:bg-green-50' : undefined)}
                   {canWrite && iconButton(`Edit ${row.invoiceNumber}`, () => props.onEdit(row), <Pencil className="h-4 w-4" />)}
                   {canWrite && iconButton(`Copy ${row.invoiceNumber}`, () => props.onCopy(row), <Copy className="h-4 w-4" />)}
                   {canWrite && iconButton(`Delete ${row.invoiceNumber}`, () => props.onDelete(row), <Trash2 className="h-4 w-4" />, 'hover:bg-red-50 hover:text-red-600')}

@@ -74,6 +74,7 @@ export default function CustomerModal(props: CustomerModalProps) {
       title={editing ? 'Edit customer' : 'New customer'}
       onClose={props.onClose}
       wide
+      elevated
       disableBackdropClose
       footer={<ModalActions onCancel={props.onClose} onConfirm={props.onSave} confirmLabel={saving ? 'Saving...' : 'Save'} disabled={saving} />}
     >

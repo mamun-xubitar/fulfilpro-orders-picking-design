@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import useRequest from '@/hooks/useRequest';
 import type { BillingStore } from '@/hooks/useStoreOptions';
+import { useCustomerForm } from '@/app/(shell)/customers/modules/hooks/useCustomerForm';
 import { round2, taxRegionForCountry, type TaxRegion } from '@/lib/invoice-totals';
 import { pickedFromRow, type CustomerApiRow, type PickedCustomer } from './CustomerPicker';
 import {
@@ -96,6 +97,9 @@ export function useInvoiceForm(args: {
     });
   };
 
+  // "New customer" from the picker: a system customer, selected on this invoice as soon as it is saved.
+  const newCustomer = useCustomerForm('system', (saved) => applyCustomer(pickedFromRow(saved, 'system')));
+
   const chooseShipTo = (index: number) => {
     const option = customer?.shipTo[index];
     if (option) patch({ shipToName: option.name, shipToAddress: option.address });
@@ -132,6 +136,7 @@ export function useInvoiceForm(args: {
     changeTaxRegion,
     applyCustomer,
     customer,
+    newCustomer,
     chooseShipTo,
     creditWarning,
     updateLine,

@@ -76,10 +76,11 @@ type CustomerPickerProps = {
   selectedLabel: string;
   disabled?: boolean;
   onPick: (customer: PickedCustomer) => void;
+  onCreate: () => void;
 };
 
 /** Finds a system or Shopify customer to fill the invoice's bill-to. Typing the fields by hand still works. */
-export default function CustomerPicker({ storeId, selectedLabel, disabled, onPick }: CustomerPickerProps) {
+export default function CustomerPicker({ storeId, selectedLabel, disabled, onPick, onCreate }: CustomerPickerProps) {
   const [open, setOpen] = useState(false);
   const [results, setResults] = useState<PickedCustomer[]>([]);
   const { searchInput, setSearchInput, search } = useDebouncedSearch('', 300);
@@ -133,7 +134,8 @@ export default function CustomerPicker({ storeId, selectedLabel, disabled, onPic
   const loading = systemReq.loading || shopifyReq.loading;
 
   return (
-    <div ref={containerRef} className="relative">
+    <div className="flex items-start gap-2">
+    <div ref={containerRef} className="relative min-w-0 flex-1">
       <input
         type="text"
         className={INPUT}
@@ -149,7 +151,22 @@ export default function CustomerPicker({ storeId, selectedLabel, disabled, onPic
       {open && (
         <ul className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
           {loading && results.length === 0 && <li className="px-3 py-2 text-sm text-gray-400">Searching…</li>}
-          {!loading && results.length === 0 && <li className="px-3 py-2 text-sm text-gray-400">No customers found — type the details below instead.</li>}
+          {!loading && results.length === 0 && (
+            <li className="px-3 py-2 text-sm text-gray-400">
+              No customers found —{' '}
+              <button
+                type="button"
+                className="font-medium text-blue-600 hover:underline cursor-pointer"
+                onClick={() => {
+                  setOpen(false);
+                  setSearchInput('');
+                  onCreate();
+                }}
+              >
+                create new customer
+              </button>
+            </li>
+          )}
           {results.map((result) => (
             <li key={`${result.source}-${result.id}`}>
               <button
@@ -173,6 +190,15 @@ export default function CustomerPicker({ storeId, selectedLabel, disabled, onPic
           ))}
         </ul>
       )}
+    </div>
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onCreate}
+      className="shrink-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
+    >
+      + New customer
+    </button>
     </div>
   );
 }

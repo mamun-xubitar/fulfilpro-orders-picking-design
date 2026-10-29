@@ -207,15 +207,25 @@ export function totalsForForm(form: InvoiceFormValues) {
   });
 }
 
+const upper = (value: string) => value.toUpperCase();
+
 export function buildInvoicePayload(form: InvoiceFormValues) {
   const { lines, customerLabel, amountPaid, ...rest } = form;
   void customerLabel;
   void amountPaid;
   return {
     ...rest,
+    currencyCode: upper(rest.currencyCode),
+    orderRef: upper(rest.orderRef),
+    billToName: upper(rest.billToName),
+    shipToName: upper(rest.shipToName),
+    billToAddress: upper(rest.billToAddress),
+    shipToAddress: upper(rest.shipToAddress),
+    notes: upper(rest.notes),
+    terms: upper(rest.terms),
     lineItems: lines.map(({ key, ...line }) => {
       void key;
-      return line;
+      return { ...line, title: upper(line.title), size: upper(line.size), sku: upper(line.sku) };
     }),
   };
 }

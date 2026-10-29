@@ -3,10 +3,10 @@ import type { TaxInvoice } from './types';
 import { escapeHtml } from './utils';
 import { getPackingSlipLogoSrc } from './packingSlipPrint';
 
-const HEX_COLOR = /^#[0-9a-f]{6}$/i;
+export const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 
 /** Near-black or white, whichever reads better on the accent color (WCAG relative luminance). */
-const readableTextColor = (hex: string) => {
+export const readableTextColor = (hex: string) => {
   const channel = (offset: number) => {
     const value = parseInt(hex.slice(offset, offset + 2), 16) / 255;
     return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
@@ -15,7 +15,7 @@ const readableTextColor = (hex: string) => {
   return luminance > 0.4 ? '#1f2937' : '#ffffff';
 };
 
-const formatMoney = (value: number, currencyCode: string) => {
+export const formatMoney = (value: number, currencyCode: string) => {
   try {
     return new Intl.NumberFormat('en-AU', { style: 'currency', currency: currencyCode }).format(value);
   } catch {
@@ -23,7 +23,7 @@ const formatMoney = (value: number, currencyCode: string) => {
   }
 };
 
-const stripProtocol = (url: string) => url.replace(/^https?:\/\//i, '').replace(/\/$/, '');
+export const stripProtocol = (url: string) => url.replace(/^https?:\/\//i, '').replace(/\/$/, '');
 
 const buildHeader = (invoice: TaxInvoice, origin: string) => {
   const { store } = invoice;

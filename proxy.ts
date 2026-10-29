@@ -19,6 +19,7 @@ const PUBLIC_ROUTES = [
   '/api/webhooks/.*',
   '/api/fulfillment-requests/.*',
   '/api/uploads/files/.*',
+  '/api/uploads/logos/.*',
 ];
 
 const AUTH_ONLY_ROUTES = ['/'];

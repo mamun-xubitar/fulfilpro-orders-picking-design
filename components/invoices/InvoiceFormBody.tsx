@@ -1,5 +1,6 @@
 'use client';
 
+import CustomerModal from '@/app/(shell)/customers/modules/CustomerModal';
 import type { BillingStore } from '@/hooks/useStoreOptions';
 import type { TaxRegion } from '@/lib/invoice-totals';
 import CustomerPicker from './CustomerPicker';
@@ -20,14 +21,15 @@ export default function InvoiceFormBody({ f, stores, readOnly, showNumber }: Inv
   const { form, errors, totals } = f;
   const shipTo = f.customer?.shipTo ?? [];
   const text = (field: 'billToName' | 'shipToName' | 'currencyCode' | 'orderRef') => (
-    <input className={INPUT} value={form[field]} onChange={f.set(field)} />
+    <input className={`${INPUT} uppercase`} value={form[field]} onChange={f.set(field)} />
   );
   const area = (field: 'billToAddress' | 'shipToAddress' | 'notes' | 'terms', rows = 3) => (
-    <textarea className={INPUT} rows={rows} value={form[field]} onChange={f.set(field)} />
+    <textarea className={`${INPUT} uppercase`} rows={rows} value={form[field]} onChange={f.set(field)} />
   );
   const taxLabel = form.taxRegion === 'NONE' ? 'Tax' : `Tax included (${form.taxRate || 0}%)`;
 
   return (
+    <>
     <fieldset disabled={readOnly} className="min-w-0 space-y-5">
       {errors.general && <p className="text-sm text-red-600">{errors.general}</p>}
 
@@ -54,7 +56,7 @@ export default function InvoiceFormBody({ f, stores, readOnly, showNumber }: Inv
       </div>
 
       <SectionTitle>Customer</SectionTitle>
-      <CustomerPicker storeId={form.storeId} selectedLabel={form.customerLabel} disabled={readOnly} onPick={f.applyCustomer} />
+      <CustomerPicker storeId={form.storeId} selectedLabel={form.customerLabel} disabled={readOnly} onPick={f.applyCustomer} onCreate={() => f.newCustomer.openCreate()} />
       {f.customer && (
         <Field label="Email">
           <input className={INPUT} value={f.customer.email ?? ''} placeholder="No email on file" disabled readOnly />
@@ -114,5 +116,21 @@ export default function InvoiceFormBody({ f, stores, readOnly, showNumber }: Inv
       <Field label="Notes" error={errors.notes}>{area('notes', 2)}</Field>
       <Field label="Invoice terms" error={errors.terms} hint="Printed at the bottom of the invoice.">{area('terms', 4)}</Field>
     </fieldset>
+    {f.newCustomer.open && !readOnly && (
+      <CustomerModal
+        source="system"
+        editing={false}
+        form={f.newCustomer.form}
+        errors={f.newCustomer.errors}
+        saving={f.newCustomer.saving}
+        stores={stores}
+        onChange={f.newCustomer.set}
+        onContactsChange={f.newCustomer.setContacts}
+        onAddressesChange={f.newCustomer.setAddresses}
+        onSave={f.newCustomer.save}
+        onClose={f.newCustomer.close}
+      />
+    )}
+    </>
   );
 }
