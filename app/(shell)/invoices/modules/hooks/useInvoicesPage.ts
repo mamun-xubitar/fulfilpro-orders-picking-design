@@ -9,6 +9,7 @@ import type { InvoiceModalMode } from '@/components/invoices/InvoiceModal';
 import { useInvoiceEmail } from '@/components/invoices/useInvoiceEmail';
 import { useInvoicePayments } from '@/components/invoices/useInvoicePayments';
 import { useInvoicePrint } from '@/components/invoices/useInvoicePrint';
+import { useInvoiceSelection } from './useInvoiceSelection';
 import { useInvoicesList } from './useInvoicesList';
 
 type ModalState = { mode: InvoiceModalMode; initial: InvoiceFormValues; invoiceId: string | null; token: number };
@@ -19,7 +20,12 @@ export function useInvoicesPage() {
   const stores = useStoreOptions();
   const list = useInvoicesList();
   const printer = useInvoicePrint();
-  const email = useInvoiceEmail(list.refresh);
+  const selection = useInvoiceSelection();
+  const { clear: clearSelection } = selection;
+  const email = useInvoiceEmail((bulk) => {
+    list.refresh();
+    if (bulk) clearSelection();
+  });
   const payments = useInvoicePayments(list.refresh);
   const [modal, setModal] = useState<ModalState | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<InvoiceListRow | null>(null);
@@ -71,6 +77,7 @@ export function useInvoicesPage() {
     list,
     printer,
     email,
+    selection,
     payments,
     modal,
     closeModal: () => setModal(null),

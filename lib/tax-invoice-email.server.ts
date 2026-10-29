@@ -153,6 +153,19 @@ const buildTerms = (invoice: TaxInvoice) =>
     ? `<tr><td style="padding-top:8px;text-transform:uppercase;"><span style="font-size:12px;font-weight:800;color:#555;letter-spacing:.02em;">Terms:</span> <span style="font-size:12px;line-height:1.4;white-space:pre-wrap;">${escapeHtml(invoice.terms)}</span></td></tr>`
     : '';
 
+/** An email carrying only the typed message, for sends that leave the invoice out. */
+export function buildMessageOnlyEmailHtml(message: string) {
+  return `<!doctype html>
+<html>
+  <head><meta charset="utf-8" /></head>
+  <body style="margin:0;padding:0;background:#fff;color:#111;font-family:Arial,Helvetica,sans-serif;font-size:13px;">
+    <table role="presentation" width="720" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:720px;">
+      ${buildMessage(message)}
+    </table>
+  </body>
+</html>`;
+}
+
 export function buildTaxInvoiceEmailHtml(invoice: TaxInvoice, logoBase: string, message: string) {
   const accent = HEX_COLOR.test(invoice.store.accentColor) ? invoice.store.accentColor : DEFAULT_INVOICE_ACCENT;
   const palette = { accent, onAccent: readableTextColor(accent) };

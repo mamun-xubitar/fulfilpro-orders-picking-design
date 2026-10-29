@@ -6,7 +6,7 @@ import {
   readListParams,
   type BillingSession,
 } from '@/lib/billing-access.server';
-import { buildTaxInvoiceEmailHtml } from '@/lib/tax-invoice-email.server';
+import { buildMessageOnlyEmailHtml, buildTaxInvoiceEmailHtml } from '@/lib/tax-invoice-email.server';
 import { sendAppMail } from '@/lib/email.server';
 import {
   computeInvoiceTotals,
@@ -34,6 +34,7 @@ const FORBIDDEN = { error: { message: 'Forbidden', status: 403 } };
 const NOT_FOUND = { error: { message: 'Invoice not found', status: 404 } };
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_RECIPIENTS = 10;
+const MAX_BULK_INVOICES = 50;
 const TAX_REGIONS: TaxRegion[] = ['AU', 'NZ', 'NONE'];
 const STATUSES = ['UNPAID', 'PARTIAL', 'PAID'];
 const NUMBER_PATTERN = /^[A-Za-z0-9#/_-]{1,30}$/;
@@ -169,6 +170,17 @@ function parseInvoice(body: unknown, amountPaid: number): { input: InvoiceInput 
   };
 }
 
+/** Where the invoice can be emailed: the linked customer's email and its contacts' emails. */
+function customerEmailsOf(row: Detail) {
+  return [
+    ...new Set(
+      [row.customer?.email, ...(row.customer?.contacts ?? []).map((contact) => contact.email), row.shopifyCustomer?.email].filter(
+        (email): email is string => Boolean(email),
+      ),
+    ),
+  ];
+}
+
 function toDetail(row: Detail) {
   return {
     id: row.id,
@@ -217,14 +229,7 @@ function toDetail(row: Detail) {
       description: payment.description,
     })),
     store: { id: row.store.id, name: row.store.name, storeDomain: row.store.storeDomain },
-    /** Where the invoice can be emailed: the linked customer's email and its contacts' emails. */
-    customerEmails: [
-      ...new Set(
-        [row.customer?.email, ...(row.customer?.contacts ?? []).map((contact) => contact.email), row.shopifyCustomer?.email].filter(
-          (email): email is string => Boolean(email),
-        ),
-      ),
-    ],
+    customerEmails: customerEmailsOf(row),
   };
 }
 
@@ -274,16 +279,56 @@ function toPrintSource(row: Detail): ManualInvoiceSource {
   };
 }
 
-function parseEmail(body: unknown): { to: string[]; message: string } | { errors: string[] } {
+/** The message and invoice toggle shared by the single and bulk email requests. */
+function parseEmailContent(raw: Raw, errors: string[]) {
+  const message = text(raw, 'message');
+  const includeInvoice = raw.includeInvoice !== false;
+  if (message.length > 2000) errors.push('message: Message must be 2000 characters or fewer');
+  if (!includeInvoice && !message) errors.push('message: Add a message when the invoice is not included');
+  return { message, includeInvoice };
+}
+
+function parseEmail(body: unknown): { to: string[]; message: string; includeInvoice: boolean } | { errors: string[] } {
   const raw = asRaw(body);
   const to = [...new Set((Array.isArray(raw.to) ? raw.to : []).map((value) => String(value).trim().toLowerCase()).filter(Boolean))];
-  const message = text(raw, 'message');
   const errors: string[] = [];
   if (to.length === 0) errors.push('to: Add at least one recipient');
   else if (to.length > MAX_RECIPIENTS) errors.push(`to: Send to at most ${MAX_RECIPIENTS} recipients`);
   else if (to.some((email) => !EMAIL_RE.test(email))) errors.push('to: One of the email addresses is not valid');
-  if (message.length > 2000) errors.push('message: Message must be 2000 characters or fewer');
-  return errors.length ? { errors } : { to, message };
+  const { message, includeInvoice } = parseEmailContent(raw, errors);
+  return errors.length ? { errors } : { to, message, includeInvoice };
+}
+
+function parseBulkEmail(body: unknown): { ids: string[]; message: string; includeInvoice: boolean } | { errors: string[] } {
+  const raw = asRaw(body);
+  const ids = [...new Set((Array.isArray(raw.ids) ? raw.ids : []).map((value) => String(value).trim()).filter(Boolean))];
+  const errors: string[] = [];
+  if (ids.length === 0) errors.push('ids: Select at least one invoice');
+  else if (ids.length > MAX_BULK_INVOICES) errors.push(`ids: Email at most ${MAX_BULK_INVOICES} invoices at once`);
+  const { message, includeInvoice } = parseEmailContent(raw, errors);
+  return errors.length ? { errors } : { ids, message, includeInvoice };
+}
+
+/** Renders and sends one invoice email (the full invoice, or only the message), then marks it emailed. */
+async function deliverInvoiceEmail(row: Detail, to: string[], message: string, includeInvoice: boolean, origin: string) {
+  const invoice = { ...buildManualTaxInvoice(toPrintSource(row), await getSettingsTimezone()), notice: null };
+  const subject = `Invoice ${invoice.invoiceNumber} from ${invoice.store.name}`;
+  const text = [
+    message,
+    ...(includeInvoice
+      ? [`${subject}. Total ${invoice.totals.total.toFixed(2)} ${invoice.currencyCode}, balance due ${invoice.totals.balance.toFixed(2)} ${invoice.currencyCode}.`]
+      : []),
+  ]
+    .filter(Boolean)
+    .join('\n\n');
+
+  // Logos must load for recipients, so prefer the public app URL over the (possibly internal) request origin.
+  const logoBase = process.env.APP_URL?.replace(/\/$/, '') || origin;
+  const html = includeInvoice ? buildTaxInvoiceEmailHtml(invoice, logoBase, message) : buildMessageOnlyEmailHtml(message);
+
+  await sendAppMail({ to, subject, html, text });
+  await model.markEmailed(row.id);
+  return invoice.invoiceNumber;
 }
 
 export class InvoiceController {
@@ -431,24 +476,50 @@ export class InvoiceController {
     const parsed = parseEmail(body);
     if ('errors' in parsed) return validationError(parsed.errors);
 
-    const invoice = { ...buildManualTaxInvoice(toPrintSource(row), await getSettingsTimezone()), notice: null };
-    const subject = `Invoice ${invoice.invoiceNumber} from ${invoice.store.name}`;
-    const text = [
-      parsed.message,
-      `${subject}. Total ${invoice.totals.total.toFixed(2)} ${invoice.currencyCode}, balance due ${invoice.totals.balance.toFixed(2)} ${invoice.currencyCode}.`,
-    ]
-      .filter(Boolean)
-      .join('\n\n');
-
-    // Logos must load for recipients, so prefer the public app URL over the (possibly internal) request origin.
-    const logoBase = process.env.APP_URL?.replace(/\/$/, '') || origin;
-
+    let invoiceNumber: string;
     try {
-      await sendAppMail({ to: parsed.to, subject, html: buildTaxInvoiceEmailHtml(invoice, logoBase, parsed.message), text });
+      invoiceNumber = await deliverInvoiceEmail(row, parsed.to, parsed.message, parsed.includeInvoice, origin);
     } catch (error) {
       return { error: { message: error instanceof Error ? error.message : 'Could not send the email', status: 502 } };
     }
-    await model.markEmailed(id);
-    return { data: { id, lastEmailedAt: new Date() }, message: `Invoice ${invoice.invoiceNumber} emailed` };
+    return { data: { id, lastEmailedAt: new Date() }, message: `Invoice ${invoiceNumber} emailed` };
+  }
+
+  /** Emails each selected invoice to its own customer's addresses; invoices with none are skipped. */
+  async bulkEmail(body: unknown, origin: string, session: BillingSession) {
+    if (!canWriteBilling(session)) return FORBIDDEN;
+    const parsed = parseBulkEmail(body);
+    if ('errors' in parsed) return validationError(parsed.errors);
+
+    let sent = 0;
+    const skipped: string[] = [];
+    const failed: string[] = [];
+    let lastError = 'Could not send the emails';
+    for (const id of parsed.ids) {
+      const row = await model.findById(id);
+      if (!row || !(await canAccessStore(session, row.storeId))) continue;
+      const to = customerEmailsOf(row).slice(0, MAX_RECIPIENTS);
+      if (to.length === 0) {
+        skipped.push(row.invoiceNumber);
+        continue;
+      }
+      try {
+        await deliverInvoiceEmail(row, to, parsed.message, parsed.includeInvoice, origin);
+        sent += 1;
+      } catch (error) {
+        failed.push(row.invoiceNumber);
+        lastError = error instanceof Error ? error.message : lastError;
+      }
+    }
+
+    if (sent === 0 && failed.length > 0) return { error: { message: lastError, status: 502 } };
+    const notes = [
+      skipped.length ? `${skipped.length} skipped: no email address (${skipped.join(', ')})` : '',
+      failed.length ? `${failed.length} failed (${failed.join(', ')})` : '',
+    ].filter(Boolean);
+    return {
+      data: { sent, skipped, failed },
+      message: `Emailed ${sent} invoice${sent === 1 ? '' : 's'}${notes.length ? `. ${notes.join('; ')}` : ''}`,
+    };
   }
 }

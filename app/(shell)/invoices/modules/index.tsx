@@ -27,6 +27,9 @@ export default function InvoicesPage() {
         onStatusChange={list.setStatus}
         canWrite={p.canWrite}
         onNew={p.openCreate}
+        selectedCount={p.selection.selectedIds.length}
+        onBulkEmail={() => p.email.openBulkEmail(p.selection.selectedIds)}
+        onClearSelection={p.selection.clear}
       />
 
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -39,6 +42,9 @@ export default function InvoicesPage() {
             dir={list.dir}
             canWrite={p.canWrite}
             printingId={p.printer.printingId}
+            selectedIds={p.selection.selectedIds}
+            onToggleRow={p.selection.toggle}
+            onTogglePage={p.selection.togglePage}
             onSortChange={list.changeSort}
             onView={(row) => p.openFromRow(row, "view")}
             onEdit={(row) => p.openFromRow(row, "edit")}
@@ -75,13 +81,16 @@ export default function InvoicesPage() {
           onClose={p.closeModal}
         />
       )}
-      {p.email.emailTarget && (
+      {(p.email.emailTarget || p.email.bulkCount > 0) && (
         <EmailInvoiceModal
-          key={p.email.emailTarget.id}
-          target={p.email.emailTarget}
+          key={p.email.emailTarget?.id ?? "bulk"}
+          target={p.email.emailTarget ?? undefined}
+          bulkCount={p.email.bulkCount}
           sending={p.email.emailSending}
           errors={p.email.emailErrors}
-          onSend={p.email.sendEmail}
+          onSend={(to, message, includeInvoice) =>
+            p.email.emailTarget ? p.email.sendEmail(to, message, includeInvoice) : p.email.sendBulkEmail(message, includeInvoice)
+          }
           onClose={p.email.closeEmail}
         />
       )}

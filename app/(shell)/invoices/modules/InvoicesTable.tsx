@@ -15,6 +15,9 @@ type InvoicesTableProps = {
   dir: 'asc' | 'desc';
   canWrite: boolean;
   printingId: string | null;
+  selectedIds: string[];
+  onToggleRow: (id: string) => void;
+  onTogglePage: (ids: string[]) => void;
   onSortChange: (key: InvoiceSortKey) => void;
   onView: (row: InvoiceListRow) => void;
   onEdit: (row: InvoiceListRow) => void;
@@ -27,7 +30,8 @@ type InvoicesTableProps = {
 
 const TD = 'px-4 py-3 text-sm text-gray-700';
 const ICON_BTN = 'rounded-lg p-1.5 text-gray-400 cursor-pointer';
-const COLUMNS = 11;
+const COLUMNS = 12;
+const CHECKBOX = 'cursor-pointer';
 
 export default function InvoicesTable(props: InvoicesTableProps) {
   const { rows, canWrite } = props;
@@ -37,6 +41,8 @@ export default function InvoicesTable(props: InvoicesTableProps) {
   const plain = (label: string, className = '') => (
     <th className={`px-4 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 ${className}`}>{label}</th>
   );
+  const pageIds = rows.map((row) => row.id);
+  const pageAllSelected = pageIds.length > 0 && pageIds.every((id) => props.selectedIds.includes(id));
   const iconButton = (label: string, onClick: () => void, icon: React.ReactNode, hover = 'hover:bg-gray-100 hover:text-gray-600', disabled = false) => (
     <button type="button" aria-label={label} title={label} onClick={onClick} disabled={disabled} className={`${ICON_BTN} ${hover} disabled:opacity-50`}>{icon}</button>
   );
@@ -45,6 +51,11 @@ export default function InvoicesTable(props: InvoicesTableProps) {
     <table className="w-full min-w-[1180px] text-left">
       <thead className="border-b border-gray-200 bg-gray-50">
         <tr>
+          <th className="w-10 px-4 py-3">
+            {canWrite && (
+              <input type="checkbox" aria-label="Select all invoices on this page" checked={pageAllSelected} disabled={rows.length === 0} onChange={() => props.onTogglePage(pageIds)} className={CHECKBOX} />
+            )}
+          </th>
           {header('Invoice', 'invoiceNumber')}
           {plain('Store')}
           {header('Customer', 'billToName')}
@@ -74,6 +85,11 @@ export default function InvoicesTable(props: InvoicesTableProps) {
         ) : (
           rows.map((row) => (
             <tr key={row.id} className="border-b border-gray-100 hover:bg-gray-50">
+              <td className="px-4 py-3">
+                {canWrite && (
+                  <input type="checkbox" aria-label={`Select ${row.invoiceNumber}`} checked={props.selectedIds.includes(row.id)} onChange={() => props.onToggleRow(row.id)} className={CHECKBOX} />
+                )}
+              </td>
               <td className={`${TD} font-semibold text-gray-900`}>
                 <span className="inline-flex items-center gap-1.5">
                   {row.invoiceNumber}
