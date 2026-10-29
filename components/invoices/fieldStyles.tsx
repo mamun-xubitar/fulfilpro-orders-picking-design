@@ -13,10 +13,6 @@ export function Field({ label, error, hint, children }: { label: string; error?:
   );
 }
 
-export function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <h4 className="border-b border-gray-100 pb-1 text-sm font-semibold text-gray-900">{children}</h4>;
-}
-
 export const formatMoney = (value: number, currencyCode: string) => {
   try {
     return new Intl.NumberFormat('en-AU', { style: 'currency', currency: currencyCode || 'AUD' }).format(value);
