@@ -192,3 +192,6 @@ input[type='search']::-webkit-search-cancel-button { cursor: pointer; }
    Used by the gallery thumb rail, which renders its own functional custom scrollbar instead. */
 .no-scrollbar { scrollbar-width: none !important; -ms-overflow-style: none !important; }
 .no-scrollbar::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }
+
+/* Keeps an <input list> type-ahead but hides the browser's dropdown arrow shown on hover. */
+.hide-list-arrow::-webkit-calendar-picker-indicator { display: none !important; }

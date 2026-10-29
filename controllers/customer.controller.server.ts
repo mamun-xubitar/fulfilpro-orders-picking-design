@@ -15,6 +15,7 @@ import {
   type SystemCustomerExtras,
   type SystemCustomerInput,
 } from '@/models/customer.model.server';
+import { taxRegionForCountry } from '@/lib/invoice-totals';
 import { SHOPIFY_CUSTOMER_SORT_KEYS, ShopifyCustomerModel } from '@/models/shopify-customer.model.server';
 
 const systemModel = new CustomerModel();
@@ -24,11 +25,11 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const FORBIDDEN = { error: { message: 'Forbidden', status: 403 } };
 const NOT_FOUND = { error: { message: 'Customer not found', status: 404 } };
 const OPTIONAL_TEXT = ['company', 'email', 'phone', 'address', 'address2', 'city', 'state', 'zip', 'country', 'notes'] as const;
-const ADDRESS_TEXT = ['label', 'phone', 'address', 'address2', 'city', 'state', 'zip', 'country'] as const;
+const CONTACT_TEXT = ['phone', 'jobTitle', 'address', 'city', 'state', 'zip', 'country'] as const;
+const ADDRESS_TEXT = ['label', 'email', 'phone', 'address', 'address2', 'city', 'state', 'zip', 'country'] as const;
 const MAX_LENGTH = { name: 150, notes: 2000, type: 60 } as const;
 const MAX_CHILDREN = 20;
 const CURRENCIES = ['AUD', 'NZD'];
-const TAX_REGIONS = ['AU', 'NZ', 'NONE'];
 const HISTORY_PAGE_SIZE = 10;
 
 export type CustomerSource = 'system' | 'shopify';
@@ -101,7 +102,9 @@ function parseContacts(value: unknown, errors: string[]): CustomerContactValues[
     const email = textOf(raw, 'email');
     if (!textOf(raw, 'name')) errors.push(`contacts: Contact ${index + 1} needs a name`);
     if (email && !EMAIL_RE.test(email)) errors.push(`contacts: Contact ${index + 1} has an invalid email`);
-    return { name: textOf(raw, 'name'), email: email || null, phone: textOf(raw, 'phone') || null, jobTitle: textOf(raw, 'jobTitle') || null };
+    const contact = { name: textOf(raw, 'name'), email: email || null } as CustomerContactValues;
+    for (const key of CONTACT_TEXT) contact[key] = textOf(raw, key) || null;
+    return contact;
   });
 }
 
@@ -111,10 +114,19 @@ function parseAddresses(value: unknown, errors: string[]): CustomerAddressValues
   const defaultIndex = Math.max(0, list.findIndex((raw) => raw.isDefault === true));
   return list.map((raw, index) => {
     if (!textOf(raw, 'name')) errors.push(`addresses: Address ${index + 1} needs a name`);
+    if (textOf(raw, 'email') && !EMAIL_RE.test(textOf(raw, 'email'))) errors.push(`addresses: Address ${index + 1} has an invalid email`);
     const address = { name: textOf(raw, 'name'), isDefault: index === defaultIndex } as CustomerAddressValues;
     for (const key of ADDRESS_TEXT) address[key] = textOf(raw, key) || null;
     return address;
   });
+}
+
+/** The customer's own email, phone and billing address are its first contact's, kept in the flat columns
+ * so lists, search, invoices and emailing keep working. Nothing is mirrored when there is no contact. */
+function primaryContactFields(contact: CustomerContactValues | undefined) {
+  if (!contact) return {};
+  const { email, phone, address, city, state, zip } = contact;
+  return { email, phone, address, address2: null, city, state, zip };
 }
 
 /** System customers also carry type, credit limit, invoice defaults, contacts and shipping addresses. */
@@ -130,14 +142,18 @@ function parseSystemCustomer(body: unknown): { values: SystemCustomerInput } | {
   if (creditLimit !== null && (!Number.isFinite(creditLimit) || creditLimit < 0)) errors.push('creditLimit: Credit limit must be 0 or more');
   const currencyCode = textOf(raw, 'currencyCode') || 'AUD';
   if (!CURRENCIES.includes(currencyCode)) errors.push('currencyCode: Choose AUD or NZD');
-  const taxRegion = textOf(raw, 'taxRegion') || 'AU';
-  if (!TAX_REGIONS.includes(taxRegion)) errors.push('taxRegion: Choose a tax region');
   const contacts = parseContacts(raw.contacts, errors);
   const addresses = parseAddresses(raw.addresses, errors);
 
   if (errors.length || 'errors' in parsed) return { errors };
-  const extras: SystemCustomerExtras = { type: type || null, creditLimit, currencyCode, taxRegion };
-  return { values: { ...parsed.values, ...extras, contacts, addresses } };
+  const extras: SystemCustomerExtras = {
+    type: type || null,
+    creditLimit,
+    currencyCode,
+    taxRegion: taxRegionForCountry(parsed.values.country),
+  };
+  const mirrored = contacts.length ? primaryContactFields(contacts[0]) : { email: null, phone: null, address: null, address2: null, city: null, state: null, zip: null };
+  return { values: { ...parsed.values, ...mirrored, ...extras, contacts, addresses } };
 }
 
 const validationError = (errors: string[]) => ({ error: { message: 'Validation failed', errors, status: 400 } });
@@ -148,12 +164,16 @@ async function canAccessStore(session: BillingSession, storeId: string) {
 }
 
 type MergeCandidate = NonNullable<Awaited<ReturnType<CustomerModel['findManyWithChildren']>>>[number];
-const MERGE_FIELDS = ['company', 'email', 'phone', 'address', 'address2', 'city', 'state', 'zip', 'country', 'type'] as const;
-const addressKey = (row: { address: string | null; zip: string | null }) =>
-  `${(row.address ?? '').trim().toLowerCase()}|${(row.zip ?? '').trim().toLowerCase()}`;
+const MERGE_FIELDS = ['company', 'country', 'type'] as const;
+const norm = (...parts: Array<string | null | undefined>) => parts.map((part) => (part ?? '').trim().toLowerCase().replace(/\s+/g, ' ')).join('|');
+/** Contacts are the same person when they share an email; without one, when every detail matches. */
+const contactKey = (row: CustomerContactValues) => (row.email?.trim() ? norm(row.email) : norm(row.name, row.phone, row.address, row.zip));
+const addressKey = (row: CustomerAddressValues) => norm(row.name, row.email, row.address, row.city, row.state, row.zip, row.country);
 
 /** What merging `sources` into `primary` changes: blank fields filled, notes combined, and the
- * contacts and addresses that are not already on the primary moved across. */
+ * contacts and shipping addresses that are not already on the primary moved across (the primary's
+ * own come first, then each source's in order). The primary's email, phone and billing address
+ * follow its first contact, as they do when a customer is saved. */
 function planMerge(primary: MergeCandidate, sources: MergeCandidate[]) {
   const patch: Partial<CustomerValues & SystemCustomerExtras> = {};
   for (const field of MERGE_FIELDS) {
@@ -161,6 +181,7 @@ function planMerge(primary: MergeCandidate, sources: MergeCandidate[]) {
     const donor = sources.find((source) => source[field]?.trim());
     if (donor) patch[field] = donor[field];
   }
+  if (patch.country) patch.taxRegion = taxRegionForCountry(patch.country);
   if (primary.creditLimit == null) {
     const donor = sources.find((source) => source.creditLimit != null);
     if (donor) patch.creditLimit = Number(donor.creditLimit);
@@ -168,15 +189,16 @@ function planMerge(primary: MergeCandidate, sources: MergeCandidate[]) {
   const notes = [primary, ...sources].map((row) => row.notes?.trim()).filter((note): note is string => Boolean(note));
   patch.notes = notes.length ? [...new Set(notes)].join('\n').slice(0, MAX_LENGTH.notes) : null;
 
-  const emails = new Set(primary.contacts.map((contact) => contact.email?.toLowerCase()).filter(Boolean));
+  const contacts = new Set(primary.contacts.map(contactKey));
   const addresses = new Set(primary.addresses.map(addressKey));
   const moveContacts: Array<{ id: string; position: number }> = [];
   const moveAddresses: Array<{ id: string; position: number }> = [];
+  let firstContact: CustomerContactValues | undefined = primary.contacts[0];
   for (const source of sources) {
     for (const contact of source.contacts) {
-      const email = contact.email?.toLowerCase();
-      if (email && emails.has(email)) continue;
-      if (email) emails.add(email);
+      if (contacts.has(contactKey(contact))) continue;
+      contacts.add(contactKey(contact));
+      firstContact ??= contact;
       moveContacts.push({ id: contact.id, position: primary.contacts.length + moveContacts.length });
     }
     for (const address of source.addresses) {
@@ -185,6 +207,7 @@ function planMerge(primary: MergeCandidate, sources: MergeCandidate[]) {
       moveAddresses.push({ id: address.id, position: primary.addresses.length + moveAddresses.length });
     }
   }
+  Object.assign(patch, primaryContactFields(firstContact));
   return { patch, moveContacts, moveAddresses };
 }
 

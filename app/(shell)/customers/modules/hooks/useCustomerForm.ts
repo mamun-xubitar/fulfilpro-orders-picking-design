@@ -16,12 +16,24 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 let keyCounter = 0;
 const nextKey = () => `c${(keyCounter += 1)}`;
 
-export const blankContact = (): ContactForm => ({ key: nextKey(), name: '', email: '', phone: '', jobTitle: '' });
+export const blankContact = (): ContactForm => ({
+  key: nextKey(),
+  name: '',
+  email: '',
+  phone: '',
+  jobTitle: '',
+  address: '',
+  city: '',
+  state: '',
+  zip: '',
+  country: '',
+});
 
 export const blankAddress = (): AddressForm => ({
   key: nextKey(),
   label: '',
   name: '',
+  email: '',
   phone: '',
   address: '',
   address2: '',
@@ -33,6 +45,9 @@ export const blankAddress = (): AddressForm => ({
 });
 
 const text = (value: string | null | undefined) => value ?? '';
+
+/** The blank cards a customer form always shows, so the inputs are there before anything is added. */
+const blankChildren = () => ({ contacts: [blankContact()], addresses: [{ ...blankAddress(), isDefault: true }] });
 
 const toForm = (row: CustomerRow): CustomerFormValues => ({
   name: row.name,
@@ -50,18 +65,23 @@ const toForm = (row: CustomerRow): CustomerFormValues => ({
   type: text(row.type),
   creditLimit: row.creditLimit == null ? '' : String(row.creditLimit),
   currencyCode: row.currencyCode ?? 'AUD',
-  taxRegion: row.taxRegion ?? 'AU',
   contacts: (row.contacts ?? []).map((contact) => ({
     key: nextKey(),
     name: contact.name,
     email: text(contact.email),
     phone: text(contact.phone),
     jobTitle: text(contact.jobTitle),
+    address: text(contact.address),
+    city: text(contact.city),
+    state: text(contact.state),
+    zip: text(contact.zip),
+    country: text(contact.country),
   })),
   addresses: (row.addresses ?? []).map((address) => ({
     ...blankAddress(),
     label: text(address.label),
     name: address.name,
+    email: text(address.email),
     phone: text(address.phone),
     address: text(address.address),
     address2: text(address.address2),
@@ -73,17 +93,35 @@ const toForm = (row: CustomerRow): CustomerFormValues => ({
   })),
 });
 
-const stripKeys = <T extends { key: string }>(rows: T[]) => rows.map(({ key, ...row }) => (void key, row));
+/** A form for `row`; a customer with no contacts or no addresses gets a blank card to fill in. */
+const toFormWithCards = (row: CustomerRow): CustomerFormValues => {
+  const form = toForm(row);
+  const blank = blankChildren();
+  return {
+    ...form,
+    contacts: form.contacts.length ? form.contacts : blank.contacts,
+    addresses: form.addresses.length ? form.addresses : blank.addresses,
+  };
+};
+
+/** Drops the key and any card the user left untouched, so a blank placeholder is never saved or validated. */
+const prune = <T extends { key: string; isDefault?: boolean }>(rows: T[]) =>
+  rows
+    .filter(({ key, isDefault, ...fields }) => (void key, void isDefault, Object.values(fields).some((value) => String(value).trim())))
+    .map(({ key, ...row }) => (void key, row));
 
 function validate(form: CustomerFormValues, source: CustomerSource, creating: boolean) {
+  const contacts = prune(form.contacts);
+  const addresses = prune(form.addresses);
   const next: Record<string, string> = {};
   if (!form.name.trim()) next.name = 'Name is required';
-  if (form.email.trim() && !EMAIL_RE.test(form.email.trim())) next.email = 'Enter a valid email address';
+  if (source === 'shopify' && form.email.trim() && !EMAIL_RE.test(form.email.trim())) next.email = 'Enter a valid email address';
   if (source === 'shopify' && creating && !form.storeId) next.storeId = 'Choose a store';
   if (form.creditLimit.trim() && !(Number(form.creditLimit) >= 0)) next.creditLimit = 'Credit limit must be 0 or more';
-  if (form.contacts.some((contact) => !contact.name.trim())) next.contacts = 'Every contact needs a name';
-  else if (form.contacts.some((contact) => contact.email.trim() && !EMAIL_RE.test(contact.email.trim()))) next.contacts = 'A contact has an invalid email';
-  if (form.addresses.some((address) => !address.name.trim())) next.addresses = 'Every address needs a name';
+  if (contacts.some((contact) => !contact.name.trim())) next.contacts = 'Every contact needs a name';
+  else if (contacts.some((contact) => contact.email.trim() && !EMAIL_RE.test(contact.email.trim()))) next.contacts = 'A contact has an invalid email';
+  if (addresses.some((address) => !address.name.trim())) next.addresses = 'Every address needs a name';
+  else if (addresses.some((address) => address.email.trim() && !EMAIL_RE.test(address.email.trim()))) next.addresses = 'An address has an invalid email';
   return next;
 }
 
@@ -102,16 +140,16 @@ export function useCustomerForm(source: CustomerSource, onSaved: (saved: Custome
     setOpen(true);
   };
 
-  const openCreate = (defaultStoreId = '') => show(null, { ...EMPTY_CUSTOMER_FORM, storeId: defaultStoreId });
+  const openCreate = (defaultStoreId = '') => show(null, { ...EMPTY_CUSTOMER_FORM, ...blankChildren(), storeId: defaultStoreId });
 
   /** List rows already carry contacts and addresses; the fetch makes sure the form edits the latest copy. */
   const openEdit = (row: CustomerRow) => {
-    show(row, toForm(row));
+    show(row, toFormWithCards(row));
     void detailReq.request({
       url: `/api/customers/${row.id}?source=${source}`,
       method: 'GET',
       showToast: false,
-      onSuccess: ({ data }) => show(data, toForm(data)),
+      onSuccess: ({ data }) => show(data, toFormWithCards(data)),
     });
   };
 
@@ -127,7 +165,7 @@ export function useCustomerForm(source: CustomerSource, onSaved: (saved: Custome
     void request({
       url: editing ? `/api/customers/${editing.id}?source=${source}` : `/api/customers?source=${source}`,
       method: editing ? 'PATCH' : 'POST',
-      data: { ...form, contacts: stripKeys(form.contacts), addresses: stripKeys(form.addresses) },
+      data: { ...form, contacts: prune(form.contacts), addresses: prune(form.addresses) },
       validation: async () => validate(form, source, !editing),
       onSuccess: ({ data }) => {
         close();

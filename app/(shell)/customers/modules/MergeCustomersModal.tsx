@@ -24,7 +24,7 @@ export default function MergeCustomersModal({ customers, merging, onMerge, onClo
     >
       <div className="space-y-4">
         <p className="text-sm text-gray-600">
-          Choose the customer to keep. The others are removed: their invoices, contacts and shipping addresses move to the kept customer, and any blank details on it are filled in from them.
+          Choose the customer to keep. The others are removed: their invoices move to the kept customer, and their contacts and shipping addresses are added to its own (a contact with the same email, or an address that matches exactly, is only kept once). Blank company, type and country details on the kept customer are filled in from them.
         </p>
         <ul className="space-y-2">
           {customers.map((customer) => (

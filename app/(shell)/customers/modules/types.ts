@@ -16,11 +16,22 @@ export type CustomerInvoiceSummary = {
   createdByName: string | null;
 };
 
-export type CustomerContact = { name: string; email: string | null; phone: string | null; jobTitle: string | null };
+export type CustomerContact = {
+  name: string;
+  email: string | null;
+  phone: string | null;
+  jobTitle: string | null;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
+  country: string | null;
+};
 
 export type CustomerAddress = {
   label: string | null;
   name: string;
+  email: string | null;
   phone: string | null;
   address: string | null;
   address2: string | null;
@@ -88,7 +99,6 @@ export type CustomerFormValues = {
   type: string;
   creditLimit: string;
   currencyCode: string;
-  taxRegion: string;
   contacts: ContactForm[];
   addresses: AddressForm[];
 };
@@ -109,7 +119,6 @@ export const EMPTY_CUSTOMER_FORM: CustomerFormValues = {
   type: '',
   creditLimit: '',
   currencyCode: 'AUD',
-  taxRegion: 'AU',
   contacts: [],
   addresses: [],
 };

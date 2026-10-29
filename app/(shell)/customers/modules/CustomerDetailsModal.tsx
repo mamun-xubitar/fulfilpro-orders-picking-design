@@ -3,6 +3,7 @@
 import { ModalShell } from '@/components/ModalShell';
 import { formatMoney } from '@/components/invoices/fieldStyles';
 import CustomerInvoiceHistory from './CustomerInvoiceHistory';
+import { AddressesZone, ContactsZone } from './CustomerZones';
 import type { InvoiceHistory } from './hooks/useCustomerActions';
 import { customerCode, type CustomerRow } from './types';
 
@@ -14,9 +15,7 @@ type CustomerDetailsModalProps = {
   onClose: () => void;
 };
 
-const TAX_REGION_LABEL: Record<string, string> = { AU: 'Australia', NZ: 'New Zealand', NONE: 'No tax' };
-
-const joinAddress = (row: { address: string | null; address2: string | null; city: string | null; state: string | null; zip: string | null; country: string | null }) =>
+const joinAddress = (row: { address: string | null; address2?: string | null; city: string | null; state: string | null; zip: string | null; country: string | null }) =>
   [row.address, row.address2, [row.city, row.state, row.zip].filter(Boolean).join(' '), row.country].filter(Boolean).join('\n');
 
 function Row({ label, value }: { label: string; value: string | null | undefined }) {
@@ -65,45 +64,31 @@ export default function CustomerDetailsModal({ customer, history, historyLoading
           {system ? <Stat label="Invoices" value={String(customer.invoiceCount ?? 0)} /> : <Stat label="Shopify orders" value={String(customer.ordersCount ?? 0)} />}
         </div>
 
-        <dl className="grid gap-4 sm:grid-cols-3">
+        <dl className={`grid gap-4 sm:grid-cols-3 ${system ? 'rounded-xl border border-gray-200 bg-gray-50 p-4' : ''}`}>
           <Row label="Name" value={customer.name} />
           <Row label="Company" value={customer.company} />
-          <Row label="Email" value={customer.email} />
-          <Row label="Phone" value={customer.phone} />
-          <Row label={system ? 'Billing address' : 'Address'} value={joinAddress(customer)} />
-          {system && <Row label="Type" value={customer.type} />}
-          {system && <Row label="Invoice defaults" value={`${customer.currencyCode} · ${TAX_REGION_LABEL[customer.taxRegion ?? 'AU'] ?? customer.taxRegion}`} />}
+          {system ? (
+            <>
+              <Row label="Type" value={customer.type} />
+              <Row label="Currency" value={customer.currencyCode} />
+              <Row label="Country" value={customer.country} />
+            </>
+          ) : (
+            <>
+              <Row label="Email" value={customer.email} />
+              <Row label="Phone" value={customer.phone} />
+              <Row label="Address" value={joinAddress(customer)} />
+            </>
+          )}
           {!system && <Row label="Store" value={customer.store?.name ?? customer.store?.storeDomain} />}
           <Row label="Notes" value={customer.notes} />
         </dl>
 
-        {system && Boolean(customer.contacts?.length) && (
-          <Section title="Contacts">
-            <div className="grid gap-3 sm:grid-cols-2">
-              {customer.contacts?.map((contact, index) => (
-                <div key={index} className="rounded-lg border border-gray-200 p-3 text-sm">
-                  <div className="font-semibold text-gray-900">{contact.name}{contact.jobTitle ? <span className="font-normal text-gray-500"> · {contact.jobTitle}</span> : null}</div>
-                  <div className="text-gray-600">{[contact.email, contact.phone].filter(Boolean).join(' · ') || '—'}</div>
-                </div>
-              ))}
-            </div>
-          </Section>
-        )}
-
-        {system && Boolean(customer.addresses?.length) && (
-          <Section title="Shipping addresses">
-            <div className="grid gap-3 sm:grid-cols-2">
-              {customer.addresses?.map((address, index) => (
-                <div key={index} className="rounded-lg border border-gray-200 p-3 text-sm">
-                  <div className="font-semibold text-gray-900">
-                    {address.label || address.name}
-                    {address.isDefault && <span className="ml-2 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700">Default</span>}
-                  </div>
-                  <div className="whitespace-pre-line text-gray-600">{[address.label ? address.name : null, joinAddress(address), address.phone].filter(Boolean).join('\n')}</div>
-                </div>
-              ))}
-            </div>
-          </Section>
+        {system && (
+          <div className="grid items-start gap-4 lg:grid-cols-2">
+            <ContactsZone contacts={customer.contacts ?? []} />
+            <AddressesZone addresses={customer.addresses ?? []} />
+          </div>
         )}
 
         <Section title="Invoice history">

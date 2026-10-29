@@ -136,6 +136,11 @@ model CustomerContact {
   email      String?
   phone      String?
   jobTitle   String?
+  address    String?
+  city       String?
+  state      String?
+  zip        String?
+  country    String?
   customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
   @@index([customerId])
@@ -148,6 +153,7 @@ model CustomerAddress {
   position   Int
   label      String?
   name       String
+  email      String?
   phone      String?
   address    String?
   address2   String?

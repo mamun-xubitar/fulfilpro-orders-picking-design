@@ -26,11 +26,22 @@ export type SystemCustomerExtras = {
   taxRegion: string;
 };
 
-export type CustomerContactValues = { name: string; email: string | null; phone: string | null; jobTitle: string | null };
+export type CustomerContactValues = {
+  name: string;
+  email: string | null;
+  phone: string | null;
+  jobTitle: string | null;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
+  country: string | null;
+};
 
 export type CustomerAddressValues = {
   label: string | null;
   name: string;
+  email: string | null;
   phone: string | null;
   address: string | null;
   address2: string | null;
