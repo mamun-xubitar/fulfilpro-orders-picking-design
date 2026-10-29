@@ -182,7 +182,7 @@ export const buildTaxInvoiceDocument = (invoice: TaxInvoice, origin: string) => 
         .totals { width: 70mm; padding: 10px 4px 10px 16px; }
         .total-row { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; font-size: 14px; font-weight: 800; }
         .total-row.balance span:last-child { color: #e03a1e; }
-        .terms { margin-top: 8px; break-inside: avoid; }
+        .terms { margin-top: 8px; break-inside: avoid; text-transform: uppercase; }
         .terms-title { font-size: 12px; font-weight: 800; color: #555; letter-spacing: .02em; }
         .terms-body { font-size: 12px; line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; }
         .band { margin-top: auto; background: ${accent}; color: ${onAccent}; padding: 14px 12px; text-align: center; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .02em; }
