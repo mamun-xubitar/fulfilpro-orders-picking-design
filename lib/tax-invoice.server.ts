@@ -1,6 +1,13 @@
 import moment from 'moment-timezone';
 import { DEFAULT_INVOICE_ACCENT } from '@/lib/invoice-defaults';
 import type { RawPaymentData } from '@/lib/shopify-order-fetch.server';
+import {
+  DEFAULT_AUS_TAX_RATE,
+  DEFAULT_NZ_TAX_RATE,
+  includedTax,
+  taxRateForRegion,
+  taxRegionForCountry,
+} from '@/lib/invoice-totals';
 import type { OrderModel } from '@/models/order.model.server';
 
 export type TaxInvoiceSource = Awaited<ReturnType<OrderModel['getTaxInvoiceSource']>>;
@@ -20,20 +27,28 @@ export type TaxInvoice = {
   date: string;
   currencyCode: string;
   billTo: string;
+  /** Bill-to address lines; empty for Shopify-order invoices. */
+  billToLines: string[];
   shipTo: { name: string; lines: string[] };
-  items: Array<{ qty: number; title: string; size: string; price: number; amount: number }>;
+  /** Customer's order / PO reference and due date — manual invoices only. */
+  orderRef: string | null;
+  dueDate: string | null;
+  items: Array<{ qty: number; title: string; size: string; price: number; discountPercent: number; amount: number }>;
   totals: {
     sub: number;
     discount: number;
     shipping: number;
+    /** Tax already contained in the prices — the total is not changed by it. */
     tax: number;
-    taxesIncluded: boolean;
+    taxRate: number;
     total: number;
     applied: number;
     balance: number;
   };
   /** PAYMENT METHOD block: what Shopify recorded, plus the store's instructions for manual methods. */
   payment: { lines: string[]; instructions: string | null };
+  /** Printed at the bottom of the invoice. */
+  terms: string | null;
   /** Shown to the user when printing, not on the invoice itself. */
   notice: string | null;
   store: {
@@ -50,12 +65,6 @@ export type TaxInvoice = {
 const round2 = (value: number) => Math.round(value * 100) / 100;
 
 const clean = (value: string | null | undefined) => value?.trim() || null;
-
-function isAustralia(country: string | null) {
-  const normalized = (country ?? '').trim().toLowerCase();
-  // No country means no shipping address (e.g. local pickup) — treated as a domestic sale.
-  return normalized === '' || normalized === 'australia' || normalized === 'au';
-}
 
 function addressLines(source: TaxInvoiceSource) {
   return [
@@ -121,8 +130,7 @@ function buildPaymentBlock(source: TaxInvoiceSource, balance: number): TaxInvoic
   return { lines, instructions };
 }
 
-function buildStoreBlock(source: TaxInvoiceSource): TaxInvoice['store'] {
-  const { store } = source;
+function buildStoreBlock(store: TaxInvoiceSource['store']): TaxInvoice['store'] {
   const setting = store.invoiceSetting;
   return {
     name: clean(setting?.storeName) ?? store.name ?? store.storeDomain,
@@ -139,6 +147,7 @@ function buildStoreBlock(source: TaxInvoiceSource): TaxInvoice['store'] {
 export function buildTaxInvoice(
   source: TaxInvoiceSource,
   timezone: string,
+  invoiceNumber: string,
   liveShipping: number | null = null,
 ): Omit<TaxInvoice, 'notice'> {
   const { financials } = source;
@@ -152,6 +161,7 @@ export function buildTaxInvoice(
         title: item.title,
         size: size.toLowerCase() === 'default title' ? '' : size,
         price: round2(price),
+        discountPercent: 0,
         amount: round2(item.qty * price),
       };
     });
@@ -164,13 +174,17 @@ export function buildTaxInvoice(
   // APPLIED is what Shopify has actually received net of refunds; BALANCE is what is still owed.
   const applied = round2(financials.amountPaid ?? 0);
   const balance = round2(total - applied);
+  const taxRate = taxRateForRegion(taxRegionForCountry(source.country), storeTaxRates(source.store));
 
   return {
     orderId: source.id,
-    invoiceNumber: `${clean(source.store.invoiceSetting?.invoicePrefix) ?? ''}${source.number}`,
+    invoiceNumber,
     date: moment(source.orderedAt).tz(timezone).format('DD/MM/YYYY'),
     currencyCode: source.currencyCode ?? 'AUD',
     billTo: source.customer,
+    billToLines: [],
+    orderRef: null,
+    dueDate: null,
     shipTo: { name: source.customer, lines: addressLines(source) },
     items,
     totals: {
@@ -178,13 +192,100 @@ export function buildTaxInvoice(
       discount,
       // Shopify's live figure reflects refunds and edits; the stored lines are the offline fallback.
       shipping: round2(liveShipping ?? shippingTotal(source.shippingLines)),
-      tax: isAustralia(source.country) ? round2(financials.currentTotalTax ?? 0) : 0,
-      taxesIncluded: financials.taxesIncluded ?? true,
+      // Shopify's own tax figure is ignored: prices are tax-inclusive, so the tax is the part of the
+      // total at the store's rate for the ship-to country.
+      tax: includedTax(total, taxRate),
+      taxRate,
       total,
       applied,
       balance,
     },
     payment: buildPaymentBlock(source, balance),
-    store: buildStoreBlock(source),
+    terms: clean(source.store.invoiceSetting?.defaultTerms),
+    store: buildStoreBlock(source.store),
+  };
+}
+
+function storeTaxRates(store: TaxInvoiceSource['store']) {
+  const setting = store.invoiceSetting;
+  return {
+    aus: setting ? Number(setting.ausTaxRate) : DEFAULT_AUS_TAX_RATE,
+    nz: setting ? Number(setting.nzTaxRate) : DEFAULT_NZ_TAX_RATE,
+  };
+}
+
+/** A manually created invoice, as loaded for printing. */
+export type ManualInvoiceSource = {
+  id: string;
+  invoiceNumber: string;
+  issueDate: Date;
+  dueDate: Date | null;
+  orderRef: string | null;
+  currencyCode: string;
+  billToName: string;
+  billToAddress: string | null;
+  shipToName: string;
+  shipToAddress: string | null;
+  taxRate: number;
+  shipping: number;
+  subTotal: number;
+  discountTotal: number;
+  taxTotal: number;
+  total: number;
+  amountPaid: number;
+  balance: number;
+  terms: string | null;
+  lineItems: Array<{ qty: number; title: string; size: string | null; unitPrice: number; discountPercent: number; amount: number }>;
+  payments: Array<{ type: string; paidOn: Date; amount: number }>;
+  store: TaxInvoiceSource['store'];
+};
+
+function formatMoney(value: number, currencyCode: string) {
+  try {
+    return new Intl.NumberFormat('en-AU', { style: 'currency', currency: currencyCode }).format(value);
+  } catch {
+    return `${value.toFixed(2)} ${currencyCode}`;
+  }
+}
+
+const splitLines = (value: string | null) =>
+  (value ?? '').split('\n').map((line) => line.trim()).filter(Boolean);
+
+export function buildManualTaxInvoice(source: ManualInvoiceSource, timezone: string): Omit<TaxInvoice, 'notice'> {
+  const instructions = source.balance > 0 ? clean(source.store.invoiceSetting?.paymentInstructions) : null;
+  const day = (date: Date) => moment(date).tz(timezone).format('DD/MM/YYYY');
+  const money = (value: number) => formatMoney(value, source.currencyCode);
+  const paymentLines = source.payments.map((payment) => `${payment.type} — ${day(payment.paidOn)} — ${money(payment.amount)}`);
+  return {
+    orderId: source.id,
+    invoiceNumber: source.invoiceNumber,
+    date: day(source.issueDate),
+    currencyCode: source.currencyCode,
+    billTo: source.billToName,
+    billToLines: splitLines(source.billToAddress),
+    orderRef: clean(source.orderRef),
+    dueDate: source.dueDate ? day(source.dueDate) : null,
+    shipTo: { name: source.shipToName, lines: splitLines(source.shipToAddress) },
+    items: source.lineItems.map((item) => ({
+      qty: item.qty,
+      title: item.title,
+      size: item.size ?? '',
+      price: item.unitPrice,
+      discountPercent: item.discountPercent,
+      amount: item.amount,
+    })),
+    totals: {
+      sub: source.subTotal,
+      discount: source.discountTotal,
+      shipping: source.shipping,
+      tax: source.taxTotal,
+      taxRate: source.taxRate,
+      total: source.total,
+      applied: source.amountPaid,
+      balance: source.balance,
+    },
+    payment: { lines: paymentLines, instructions },
+    terms: clean(source.terms),
+    store: buildStoreBlock(source.store),
   };
 }

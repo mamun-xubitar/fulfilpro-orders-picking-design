@@ -20,6 +20,7 @@ const HISTORY_ACTOR_COLUMNS = [
   ['PurchaseOrderPayment', 'updatedById', 'updatedByName'],
   ['PurchaseOrderPaymentHistory', 'actorId', 'actorName'],
   ['PurchaseOrderReceipt', 'receivedById', 'receivedByName'],
+  ['Invoice', 'createdById', 'createdByName'],
 ] as const;
 
 type SessionStatus = 'logged_in' | 'logout' | 'access_restricted' | 'session_timeout';

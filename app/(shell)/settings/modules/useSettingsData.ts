@@ -18,6 +18,7 @@ export type DecorationRescanJob = {
 
 const SECTION_LABELS: Record<string, string> = {
   timezone: 'Timezone',
+  invoiceNumbering: 'Invoice numbering',
   emailProvider: 'Email Sending',
   emailRules: 'Email Sending Rules',
   decorationDigest: 'Decoration Work Digest',
@@ -61,13 +62,18 @@ const DEFAULT_DECORATION_KEYWORDS: AppSettingsRow['decorationKeywords'] = {
   print: ['print'],
 };
 
+const DEFAULT_INVOICE_NUMBERING: AppSettingsRow['invoiceNumbering'] = {
+  prefix: 'INV-',
+  nextNumber: 1000,
+};
+
 const DEFAULT_MAILERSEND: AppSettingsRow['mailersend'] = {
   apiToken: null,
   fromEmail: null,
 };
 
 type ApiResponse<T> = { success: boolean; message: string; data: T };
-export type SettingsSection = 'timezone' | 'emailProvider' | 'emailRules' | 'decorationDigest' | 'tracking' | 'decorationKeywords' | 'taskVisibility' | 'decorationVisibility' | 'messageVisibility';
+export type SettingsSection = 'timezone' | 'invoiceNumbering' | 'emailProvider' | 'emailRules' | 'decorationDigest' | 'tracking' | 'decorationKeywords' | 'taskVisibility' | 'decorationVisibility' | 'messageVisibility';
 
 async function getJson<T>(url: string, init?: RequestInit) {
   const res = await fetch(url, init);
@@ -102,6 +108,7 @@ export function useSettingsData() {
   const [googleConnecting, setGoogleConnecting] = useState(false);
   const [googleDisconnecting, setGoogleDisconnecting] = useState(false);
   const [googleStatus, setGoogleStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [invoiceNumbering, setInvoiceNumbering] = useState<AppSettingsRow['invoiceNumbering']>(DEFAULT_INVOICE_NUMBERING);
   const [emailProvider, setEmailProvider] = useState<AppSettingsRow['emailProvider']>('google');
   const [mailersend, setMailersend] = useState<AppSettingsRow['mailersend']>(DEFAULT_MAILERSEND);
   const [testingEmail, setTestingEmail] = useState(false);
@@ -109,6 +116,7 @@ export function useSettingsData() {
 
   const applySettings = (settings: AppSettingsRow) => {
     setTz(settings.timezone);
+    setInvoiceNumbering(settings.invoiceNumbering);
     setGoogleEmail(settings.googleEmail);
     setGoogleConnected(settings.googleConnected);
     setEmailProvider(settings.emailProvider);
@@ -128,6 +136,8 @@ export function useSettingsData() {
     let payload: Record<string, unknown>;
     if (section === 'timezone') {
       payload = { timezone: tz };
+    } else if (section === 'invoiceNumbering') {
+      payload = { invoicePrefix: invoiceNumbering.prefix, invoiceNextNumber: invoiceNumbering.nextNumber };
     } else if (section === 'emailProvider') {
       payload = {
         emailProvider,
@@ -366,6 +376,7 @@ export function useSettingsData() {
 
   return {
     tz, setTz,
+    invoiceNumbering, setInvoiceNumbering,
     emailRules, setEmailRules,
     decorationDigest, setDecorationDigest,
     tracking, setTracking,

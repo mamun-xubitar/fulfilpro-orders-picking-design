@@ -70,6 +70,8 @@ model Store {
   processedRefunds            ProcessedRefundEvent[]
   locations                   StoreLocation[]
   invoiceSetting              StoreInvoiceSetting?
+  shopifyCustomers            ShopifyCustomer[]
+  invoices                    Invoice[]
 
   @@index([status])
   @@index([partnerStoreId])
@@ -87,9 +89,194 @@ model StoreInvoiceSetting {
   paymentInstructions String?
   accentColor         String?
   logoPath            String?
+  ausTaxRate          Decimal  @default(11) @db.Decimal(5, 2)
+  nzTaxRate           Decimal  @default(15) @db.Decimal(5, 2)
+  defaultTerms        String?
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
   store               Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+}
+
+/// A customer created in this system (not synced from Shopify). Invoices are made against these.
+model Customer {
+  id           String            @id @default(uuid())
+  /// Human-readable customer code, shown as `C{code}`.
+  code         Int               @unique @default(autoincrement())
+  type         String?
+  creditLimit  Decimal?          @db.Decimal(14, 2)
+  /// Defaults for invoices made against this customer.
+  currencyCode String            @default("AUD")
+  taxRegion    String            @default("AU")
+  contacts     CustomerContact[]
+  addresses    CustomerAddress[]
+  name         String
+  company      String?
+  email        String?
+  phone        String?
+  address      String?
+  address2     String?
+  city         String?
+  state        String?
+  zip          String?
+  country      String?
+  notes        String?
+  invoices     Invoice[]
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@index([name])
+  @@index([email])
+}
+
+model CustomerContact {
+  id         String   @id @default(uuid())
+  customerId String
+  position   Int
+  name       String
+  email      String?
+  phone      String?
+  jobTitle   String?
+  address    String?
+  city       String?
+  state      String?
+  zip        String?
+  country    String?
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+}
+
+/// A shipping address of a system customer. The billing address lives on `Customer` itself.
+model CustomerAddress {
+  id         String   @id @default(uuid())
+  customerId String
+  position   Int
+  label      String?
+  name       String
+  email      String?
+  phone      String?
+  address    String?
+  address2   String?
+  city       String?
+  state      String?
+  zip        String?
+  country    String?
+  isDefault  Boolean  @default(false)
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+}
+
+/// Local copy of a Shopify store customer. Edits and deletes stay local; a re-sync leaves
+/// `locallyEdited` rows alone and never resurrects soft-deleted ones. A null `shopifyCustomerId`
+/// is a customer added by hand on the Shopify tab.
+model ShopifyCustomer {
+  id                String    @id @default(uuid())
+  storeId           String
+  shopifyCustomerId String?
+  name              String
+  company           String?
+  email             String?
+  phone             String?
+  address           String?
+  address2          String?
+  city              String?
+  state             String?
+  zip               String?
+  country           String?
+  notes             String?
+  ordersCount       Int       @default(0)
+  totalSpent        Decimal   @default(0) @db.Decimal(14, 2)
+  locallyEdited     Boolean   @default(false)
+  deletedAt         DateTime?
+  store             Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  invoices          Invoice[]
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([storeId, shopifyCustomerId])
+  @@index([storeId])
+  @@index([name])
+  @@index([email])
+}
+
+/// A manually created invoice. Bill-to / ship-to are snapshots, so deleting or merging the
+/// linked customer never changes an issued invoice.
+model Invoice {
+  id                String            @id @default(uuid())
+  invoiceNumber     String            @unique
+  invoiceSequence   Int?
+  storeId           String
+  customerId        String?
+  shopifyCustomerId String?
+  billToName        String
+  billToAddress     String?
+  shipToName        String
+  shipToAddress     String?
+  /// Customer's order / PO reference.
+  orderRef          String?
+  lastEmailedAt     DateTime?
+  issueDate         DateTime
+  dueDate           DateTime?
+  currencyCode      String            @default("AUD")
+  taxRegion         String            @default("AU")
+  taxRate           Decimal           @default(0) @db.Decimal(5, 2)
+  shipping          Decimal           @default(0) @db.Decimal(14, 2)
+  notes             String?
+  terms             String?
+  subTotal          Decimal           @default(0) @db.Decimal(14, 2)
+  discountTotal     Decimal           @default(0) @db.Decimal(14, 2)
+  taxTotal          Decimal           @default(0) @db.Decimal(14, 2)
+  total             Decimal           @default(0) @db.Decimal(14, 2)
+  amountPaid        Decimal           @default(0) @db.Decimal(14, 2)
+  balance           Decimal           @default(0) @db.Decimal(14, 2)
+  paymentStatus     String            @default("UNPAID")
+  createdById       String?
+  createdByName     String?
+  store             Store             @relation(fields: [storeId], references: [id])
+  customer          Customer?         @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  shopifyCustomer   ShopifyCustomer?  @relation(fields: [shopifyCustomerId], references: [id], onDelete: SetNull)
+  lineItems         InvoiceLineItem[]
+  payments          InvoicePayment[]
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@index([storeId])
+  @@index([customerId])
+  @@index([shopifyCustomerId])
+  @@index([paymentStatus])
+  @@index([issueDate])
+}
+
+model InvoiceLineItem {
+  id              String  @id @default(uuid())
+  invoiceId       String
+  position        Int
+  variantId       String?
+  title           String
+  size            String?
+  sku             String?
+  qty             Int
+  unitPrice       Decimal @db.Decimal(14, 2)
+  discountPercent Decimal @default(0) @db.Decimal(5, 2)
+  amount          Decimal @db.Decimal(14, 2)
+  invoice         Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+}
+
+model InvoicePayment {
+  id          String   @id @default(uuid())
+  invoiceId   String
+  type        String
+  paidOn      DateTime
+  amount      Decimal  @db.Decimal(14, 2)
+  person      String?
+  description String?
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@index([invoiceId])
 }
 
 model Order {
@@ -126,6 +313,8 @@ model Order {
   taxesIncluded          Boolean?
   amountPaid             Decimal?                   @db.Decimal(14, 2)
   paymentMethods         Json?
+  invoiceNumber          String?
+  invoiceSequence        Int?
   store                  Store                      @relation(fields: [storeId], references: [id])
   messages               OrderMessage[]
   notes                  OrderNote[]
@@ -608,6 +797,8 @@ model AppSettings {
   globalMarginPercent                Decimal   @default(0) @db.Decimal(6, 2)
   globalExchangeRate                 Decimal   @default(1) @db.Decimal(14, 6)
   lowStockThreshold                  Int       @default(10)
+  invoicePrefix                      String    @default("INV-")
+  invoiceNextNumber                  Int       @default(1000)
   createdAt                          DateTime  @default(now())
   updatedAt                          DateTime  @updatedAt
 }
@@ -1031,8 +1222,8 @@ model InventoryLocation {
   stocktakeItems   StocktakeItem[]
   stockAdjustments StockAdjustment[]
   storeLocations   StoreLocation[]
-  createdAt      DateTime                         @default(now())
-  updatedAt      DateTime                         @updatedAt
+  createdAt        DateTime                         @default(now())
+  updatedAt        DateTime                         @updatedAt
 }
 
 model StoreLocation {
@@ -1121,21 +1312,21 @@ model SupplierProductSupplier {
 }
 
 model SupplierProductVariant {
-  id                 String                           @id @default(uuid())
-  supplierProductId  String
-  sku                String?
-  barcode            String?
-  colour             String
-  size               String
-  stockOnHand        Int                              @default(0)
+  id                String  @id @default(uuid())
+  supplierProductId String
+  sku               String?
+  barcode           String?
+  colour            String
+  size              String
+  stockOnHand       Int     @default(0)
 
-  allocated          Int                              @default(0)
-  buyPrice           Decimal                          @default(0) @db.Decimal(14, 2)
-  sellPrice          Decimal                          @default(0) @db.Decimal(14, 2)
-  trigger            Int                              @default(10)
+  allocated Int     @default(0)
+  buyPrice  Decimal @default(0) @db.Decimal(14, 2)
+  sellPrice Decimal @default(0) @db.Decimal(14, 2)
+  trigger   Int     @default(10)
 
-  forwardOrders      Int                              @default(0)
-  position           Int                              @default(0)
+  forwardOrders Int @default(0)
+  position      Int @default(0)
 
   imageId            String?
   image              SupplierProductImage?            @relation(fields: [imageId], references: [id], onDelete: SetNull)

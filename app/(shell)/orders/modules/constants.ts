@@ -20,6 +20,8 @@ export const PACKING_STATUSES = [
   { label: 'Not Packed', value: 'not_packed' },
   { label: 'Partial Packed', value: 'partially_packed' },
   { label: 'Packed', value: 'packed' },
+  { label: 'Late Unpacked', value: 'late_unpacked' },
+  { label: 'Shipped Delayed', value: 'shipped_delayed' },
 ] as const;
 
 export const SEARCH_FIELDS = [

@@ -5,6 +5,7 @@ import {
   resolvePickerRecipientOptions,
 } from '@/lib/email-rules.server';
 import { sendAppMail } from '@/lib/email.server';
+import { allocateInvoiceNumber } from '@/lib/invoice-number.server';
 import { createNotification } from '@/lib/notifications.server';
 import prisma from '@/lib/prisma.server';
 import { ADMIN_ROLE, getDecoratorCategories, isDecoratorRole } from '@/lib/roles';
@@ -29,6 +30,7 @@ import {
 } from '@/models/decoration.model.server';
 import { TrackingModel, type TrackingSummary } from '@/models/tracking.model.server';
 import type { PaymentSummary } from '@/lib/tax-invoice.server';
+import { matchesPackingFilter } from '@/lib/late-label-filter.server';
 import { Prisma } from '@prisma/client';
 type OrderMessageTypeInput = 'orders' | 'picker';
 
@@ -507,6 +509,27 @@ export class OrderModel {
       packingConfirmations: { select: { id: true, lines: true, confirmedAt: true, canceledAt: true }, orderBy: { confirmedAt: 'desc' as const } },
     } satisfies Prisma.OrderInclude;
 
+    const loadOrderRows = async (ids: string[]) => {
+      const rows = ids.length > 0
+        ? await prisma.order.findMany({
+            where: { id: { in: ids } },
+            include: listInclude,
+          })
+        : [];
+
+      const idOrder = new Map(ids.map((id, index) => [id, index]));
+      rows.sort((a, b) => (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0));
+
+      const messageCounts = await getOrderMessageCounts(rows.map((row) => row.id), 'orders');
+      const decorationsByOrder = await getDecorationsByOrder(rows.map((row) => row.id));
+      const assignmentsByOrder = await getAssignmentsByOrder(rows.map((row) => row.id));
+      const summariesByOrder = await getDecorationSummariesByOrder(rows.map((row) => row.id), viewer);
+      const trackingsByOrder = await new TrackingModel().getSummariesByOrderIds(rows.map((row) => row.id));
+      let orders = rows.map((row) => toOrderRow(row, messageCounts.get(row.id) ?? 0, decorationsByOrder.get(row.id), assignmentsByOrder.get(row.id), summariesByOrder.get(row.id), trackingsByOrder.get(row.id), viewerIsDecorator));
+      if (viewerIsDecorator) orders = sortDecoratorOrders(orders);
+      return orders;
+    };
+
     if (tokens.length > 0) {
       const searchPage = await getRankedOrderSearchPage({
         tokens,
@@ -525,54 +548,18 @@ export class OrderModel {
         dir,
       });
 
-      const rows = searchPage.ids.length > 0
-        ? await prisma.order.findMany({
-            where: { id: { in: searchPage.ids } },
-            include: listInclude,
-          })
-        : [];
-
-      const idOrder = new Map(searchPage.ids.map((id, index) => [id, index]));
-      rows.sort((a, b) => (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0));
-
-      const messageCounts = await getOrderMessageCounts(rows.map((row) => row.id), 'orders');
-      const decorationsByOrder = await getDecorationsByOrder(rows.map((row) => row.id));
-      const assignmentsByOrder = await getAssignmentsByOrder(rows.map((row) => row.id));
-      const summariesByOrder = await getDecorationSummariesByOrder(rows.map((row) => row.id), viewer);
-      const trackingsByOrder = await new TrackingModel().getSummariesByOrderIds(rows.map((row) => row.id));
-      let allOrders = rows.map((row) => toOrderRow(row, messageCounts.get(row.id) ?? 0, decorationsByOrder.get(row.id), assignmentsByOrder.get(row.id), summariesByOrder.get(row.id), trackingsByOrder.get(row.id), viewerIsDecorator));
-      if (viewerIsDecorator) allOrders = sortDecoratorOrders(allOrders);
-
       if (filterByPacking) {
-        const packingSet = new Set(packingStatuses);
-        const filtered = allOrders.filter((o) => packingSet.has(o.packingStatus));
-        const total = filtered.length;
-        const sliced = filtered.slice((page - 1) * pageSize, page * pageSize);
-        return { total, orders: sliced };
+        const matched = new Set(await getPackingFilteredOrderIds({ id: { in: searchPage.ids } }, undefined, packingStatuses));
+        const ids = searchPage.ids.filter((id) => matched.has(id));
+        return { total: ids.length, orders: await loadOrderRows(ids.slice((page - 1) * pageSize, page * pageSize)) };
       }
 
-      return { total: searchPage.total, orders: allOrders };
+      return { total: searchPage.total, orders: await loadOrderRows(searchPage.ids) };
     }
 
     if (filterByPacking) {
-      const allRows = await prisma.order.findMany({
-        where,
-        include: listInclude,
-        orderBy: buildOrdersOrderBy(sort, dir),
-      });
-      const packingSet = new Set(packingStatuses);
-      const messageCounts = await getOrderMessageCounts(allRows.map((row) => row.id), 'orders');
-      const decorationsByOrder = await getDecorationsByOrder(allRows.map((row) => row.id));
-      const assignmentsByOrder = await getAssignmentsByOrder(allRows.map((row) => row.id));
-      const summariesByOrder = await getDecorationSummariesByOrder(allRows.map((row) => row.id), viewer);
-      const trackingsByOrder = await new TrackingModel().getSummariesByOrderIds(allRows.map((row) => row.id));
-      let filtered = allRows
-        .map((row) => toOrderRow(row, messageCounts.get(row.id) ?? 0, decorationsByOrder.get(row.id), assignmentsByOrder.get(row.id), summariesByOrder.get(row.id), trackingsByOrder.get(row.id), viewerIsDecorator))
-        .filter((o) => packingSet.has(o.packingStatus));
-      if (viewerIsDecorator) filtered = sortDecoratorOrders(filtered);
-      const total = filtered.length;
-      const sliced = filtered.slice((page - 1) * pageSize, page * pageSize);
-      return { total, orders: sliced };
+      const ids = await getPackingFilteredOrderIds(where, buildOrdersOrderBy(sort, dir), packingStatuses);
+      return { total: ids.length, orders: await loadOrderRows(ids.slice((page - 1) * pageSize, page * pageSize)) };
     }
 
     const [total, rows] = await Promise.all([
@@ -1124,6 +1111,21 @@ export class OrderModel {
         invoiceSetting: store.invoiceSetting,
       },
     };
+  }
+
+  /** Returns the order's invoice number, issuing the next global one on first call. The number is
+   * saved on the order, so it never changes afterwards. Store prefix wins over the global prefix. */
+  async issueInvoiceNumber(orderId: string, storePrefix: string | null): Promise<string> {
+    return prisma.$transaction(async (tx) => {
+      const [row] = await tx.$queryRaw<Array<{ invoiceNumber: string | null }>>`
+        SELECT "invoiceNumber" FROM "Order" WHERE "id" = ${orderId} FOR UPDATE`;
+      if (!row) throw new Error('Order not found');
+      if (row.invoiceNumber) return row.invoiceNumber;
+
+      const { sequence, invoiceNumber } = await allocateInvoiceNumber(tx, storePrefix);
+      await tx.order.update({ where: { id: orderId }, data: { invoiceNumber, invoiceSequence: sequence } });
+      return invoiceNumber;
+    });
   }
 
   async saveOrderFinancials(orderId: string, figures: OrderFinancials, paymentMethods: PaymentSummary) {
@@ -1753,12 +1755,7 @@ function toOrderRow(row: {
     : new Map<string, number>();
   const totalQuantity = lineItems.reduce((sum, item) => sum + Math.max(0, item.qty), 0);
   const packedQuantity = [...packedByLine.values()].reduce((sum, qty) => sum + qty, 0);
-  const packingStatus: 'packed' | 'partially_packed' | 'not_packed' =
-    packedQuantity >= totalQuantity && totalQuantity > 0
-      ? 'packed'
-      : packedQuantity > 0
-        ? 'partially_packed'
-        : 'not_packed';
+  const packingStatus = getPackingStatus(packedQuantity, totalQuantity);
 
   return {
     id: row.id,
@@ -1936,6 +1933,53 @@ async function getOrderMessageCounts(orderIds: string[], type: OrderMessageTypeI
   });
 
   return new Map(rows.map((row) => [row.orderId, row._count._all]));
+}
+
+function getPackingStatus(packedQuantity: number, totalQuantity: number): 'packed' | 'partially_packed' | 'not_packed' {
+  return packedQuantity >= totalQuantity && totalQuantity > 0
+    ? 'packed'
+    : packedQuantity > 0
+      ? 'partially_packed'
+      : 'not_packed';
+}
+
+// Packing status is derived in JS, so the packing filter scans every candidate order. Select scalar
+// columns only: including relations here would bind one parameter per order in the follow-up
+// queries and exceed Postgres' 32,767 bind-parameter limit on large stores.
+async function getPackingFilteredOrderIds(where: Prisma.OrderWhereInput, orderBy: Prisma.OrderOrderByWithRelationInput | undefined, packingStatuses: string[]) {
+  const [candidates, confirmations] = await Promise.all([
+    prisma.order.findMany({
+      where,
+      orderBy,
+      select: { id: true, lineItems: true, labelPrintedAt: true, canceled: true, closed: true, fulfillmentStatus: true },
+    }),
+    prisma.orderPackingConfirmation.findMany({
+      where: { canceledAt: null, order: { is: where } },
+      select: { orderId: true, lines: true },
+    }),
+  ]);
+
+  const confirmationsByOrder = new Map<string, Array<{ lines: Prisma.JsonValue }>>();
+  for (const confirmation of confirmations) {
+    const list = confirmationsByOrder.get(confirmation.orderId) ?? [];
+    list.push(confirmation);
+    confirmationsByOrder.set(confirmation.orderId, list);
+  }
+
+  const packingSet = new Set(packingStatuses);
+  return candidates
+    .filter((row) => {
+      const totalQuantity = toLineItems(row.lineItems).reduce((sum, item) => sum + Math.max(0, item.qty), 0);
+      const packedQuantity = [...computePackedByLine(confirmationsByOrder.get(row.id) ?? []).values()].reduce((sum, qty) => sum + qty, 0);
+      return matchesPackingFilter(packingSet, {
+        labelPrintedAt: row.labelPrintedAt,
+        canceled: row.canceled,
+        closed: row.closed,
+        fulfillmentStatus: getDisplayStatus(row),
+        packingStatus: getPackingStatus(packedQuantity, totalQuantity),
+      });
+    })
+    .map((row) => row.id);
 }
 
 function computePackedByLine(confirmations: Array<{ lines: Prisma.JsonValue }>) {

@@ -3,10 +3,10 @@ import type { TaxInvoice } from './types';
 import { escapeHtml } from './utils';
 import { getPackingSlipLogoSrc } from './packingSlipPrint';
 
-const HEX_COLOR = /^#[0-9a-f]{6}$/i;
+export const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 
 /** Near-black or white, whichever reads better on the accent color (WCAG relative luminance). */
-const readableTextColor = (hex: string) => {
+export const readableTextColor = (hex: string) => {
   const channel = (offset: number) => {
     const value = parseInt(hex.slice(offset, offset + 2), 16) / 255;
     return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
@@ -15,7 +15,7 @@ const readableTextColor = (hex: string) => {
   return luminance > 0.4 ? '#1f2937' : '#ffffff';
 };
 
-const formatMoney = (value: number, currencyCode: string) => {
+export const formatMoney = (value: number, currencyCode: string) => {
   try {
     return new Intl.NumberFormat('en-AU', { style: 'currency', currency: currencyCode }).format(value);
   } catch {
@@ -23,7 +23,7 @@ const formatMoney = (value: number, currencyCode: string) => {
   }
 };
 
-const stripProtocol = (url: string) => url.replace(/^https?:\/\//i, '').replace(/\/$/, '');
+export const stripProtocol = (url: string) => url.replace(/^https?:\/\//i, '').replace(/\/$/, '');
 
 const buildHeader = (invoice: TaxInvoice, origin: string) => {
   const { store } = invoice;
@@ -44,9 +44,24 @@ const buildHeader = (invoice: TaxInvoice, origin: string) => {
     <div class="title-bar"><span>TAX INVOICE</span><span class="number">${escapeHtml(invoice.invoiceNumber)}</span></div>`;
 };
 
-const buildParties = (invoice: TaxInvoice) => `
+const buildParties = (invoice: TaxInvoice) => {
+  const meta = [
+    ['DATE', invoice.date],
+    ['DUE DATE', invoice.dueDate],
+    ['ORDER / PO #', invoice.orderRef],
+  ]
+    .filter((entry): entry is [string, string] => Boolean(entry[1]))
+    .map(([key, value]) => `<span class="key">${key}</span><span class="name">${escapeHtml(value)}</span>`)
+    .join('');
+  return `
     <section class="parties">
-      <div class="party bill"><span class="key">BILL TO :</span><span class="name">${escapeHtml(invoice.billTo)}</span></div>
+      <div class="party bill">
+        <span class="key">BILL TO :</span>
+        <div>
+          <div class="name">${escapeHtml(invoice.billTo)}</div>
+          ${invoice.billToLines.map((line) => `<div class="line">${escapeHtml(line)}</div>`).join('')}
+        </div>
+      </div>
       <div class="party ship">
         <span class="key">SHIP TO :</span>
         <div>
@@ -54,8 +69,9 @@ const buildParties = (invoice: TaxInvoice) => `
           ${invoice.shipTo.lines.map((line) => `<div class="line">${escapeHtml(line)}</div>`).join('')}
         </div>
       </div>
-      <div class="party date"><span class="key">DATE</span><span class="name">${escapeHtml(invoice.date)}</span></div>
+      <div class="party date">${meta}</div>
     </section>`;
+};
 
 const buildItems = (invoice: TaxInvoice) => {
   const money = (value: number) => formatMoney(value, invoice.currencyCode);
@@ -66,7 +82,7 @@ const buildItems = (invoice: TaxInvoice) => {
           <td>${escapeHtml(item.title)}</td>
           <td>${escapeHtml(item.size)}</td>
           <td class="num">${money(item.price)}</td>
-          <td class="num"></td>
+          <td class="num">${item.discountPercent > 0 ? `${item.discountPercent}%` : ''}</td>
           <td class="num">${money(item.amount)}</td>
         </tr>`)
     .join('');
@@ -101,13 +117,18 @@ const buildSummary = (invoice: TaxInvoice) => {
         ${row('SUB', money(totals.sub))}
         ${row('DISCOUNT', money(totals.discount))}
         ${row('SHIPPING', money(totals.shipping))}
-        ${row(totals.taxesIncluded ? 'TAX (INCL.)' : 'TAX', money(totals.tax))}
+        ${row(totals.taxRate > 0 ? `TAX (INCL. ${totals.taxRate}%)` : 'TAX', money(totals.tax))}
         ${row('TOTAL', money(totals.total))}
         ${row('APPLIED', money(totals.applied))}
         ${row('BALANCE', money(totals.balance), 'balance')}
       </div>
     </section>`;
 };
+
+const buildTerms = (invoice: TaxInvoice) =>
+  invoice.terms
+    ? `<section class="terms"><span class="terms-title">Terms:</span> <span class="terms-body">${escapeHtml(invoice.terms)}</span></section>`
+    : '';
 
 const buildFooter = (invoice: TaxInvoice) => {
   const { store } = invoice;
@@ -139,6 +160,7 @@ export const buildTaxInvoiceDocument = (invoice: TaxInvoice, origin: string) => 
         .title-bar .number { font-size: 16px; font-weight: 600; opacity: .85; }
         .parties { display: flex; justify-content: space-between; gap: 16px; padding: 12px 4px 18px; }
         .party { display: flex; gap: 6px; align-items: baseline; }
+        .party.bill { align-items: flex-start; }
         .party.ship { flex: 1; margin-left: 24px; align-items: flex-start; }
         .party.date { flex-direction: column; align-items: flex-end; gap: 2px; }
         .key { font-size: 12px; color: #333; white-space: nowrap; }
@@ -160,6 +182,9 @@ export const buildTaxInvoiceDocument = (invoice: TaxInvoice, origin: string) => 
         .totals { width: 70mm; padding: 10px 4px 10px 16px; }
         .total-row { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; font-size: 14px; font-weight: 800; }
         .total-row.balance span:last-child { color: #e03a1e; }
+        .terms { margin-top: 8px; break-inside: avoid; text-transform: uppercase; }
+        .terms-title { font-size: 12px; font-weight: 800; color: #555; letter-spacing: .02em; }
+        .terms-body { font-size: 12px; line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; }
         .band { margin-top: auto; background: ${accent}; color: ${onAccent}; padding: 14px 12px; text-align: center; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .02em; }
         @media print {
           @page { size: A4; margin: 12mm; }
@@ -175,6 +200,7 @@ export const buildTaxInvoiceDocument = (invoice: TaxInvoice, origin: string) => 
         ${buildSummary(invoice)}
         <div style="height: 24px"></div>
         ${buildFooter(invoice)}
+        ${buildTerms(invoice)}
       </div>
     </body>
   </html>

@@ -23,6 +23,7 @@ import { useStockRequests } from "./useStockRequests";
 import { useStockAdjustment } from "./useStockAdjustment";
 import { useTracking } from "./useTracking";
 import { useLabelPrinting } from "./useLabelPrinting";
+import { useManualInvoice } from "./useManualInvoice";
 import { useTaxInvoicePrinting } from "./useTaxInvoicePrinting";
 
 export function useOrdersPage() {
@@ -132,6 +133,8 @@ export function useOrdersPage() {
   });
 
   const taxInvoicePrinting = useTaxInvoicePrinting();
+
+  const manualInvoice = useManualInvoice({ enabled: userIsAdmin || userIsStaff });
 
   const handleRefresh = () => {
     data.setRefreshRotation((prev) => prev + 360);
@@ -356,6 +359,11 @@ export function useOrdersPage() {
     printingOrderId: labelPrinting.printingOrderId,
     printTaxInvoice: taxInvoicePrinting.printTaxInvoice,
     printingInvoiceOrderId: taxInvoicePrinting.printingInvoiceOrderId,
+    canCreateInvoice: (userIsAdmin || userIsStaff) && !userIsTest,
+    invoiceStores: manualInvoice.stores,
+    invoiceModal: manualInvoice.invoiceModal,
+    openNewInvoice: manualInvoice.openNewInvoice,
+    closeInvoiceModal: manualInvoice.closeInvoiceModal,
     bulkPrinting: labelPrinting.bulkPrinting,
     selectedLabelIds: labelPrinting.selectedLabelIds,
     printableLabelCount: labelPrinting.printableLabelCount,

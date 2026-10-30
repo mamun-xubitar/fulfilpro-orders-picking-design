@@ -19,6 +19,7 @@ const PUBLIC_ROUTES = [
   '/api/webhooks/.*',
   '/api/fulfillment-requests/.*',
   '/api/uploads/files/.*',
+  '/api/uploads/logos/.*',
 ];
 
 const AUTH_ONLY_ROUTES = ['/'];
@@ -29,7 +30,7 @@ const LOGIN_ROUTE = '/';
 const RESTRICTED_ROUTE = '/restricted';
 const SESSION_EXPIRED_ROUTE = '/session-expired';
 
-const STAFF_ALLOWED_PAGE_ROUTES = ['/orders', '/back-in-stock', '/profile', '/tasks', '/tracking', '/messages', '/inventory'];
+const STAFF_ALLOWED_PAGE_ROUTES = ['/orders', '/back-in-stock', '/profile', '/tasks', '/tracking', '/messages', '/inventory', '/customers', '/invoices'];
 const STAFF_ALLOWED_API_ROUTES = [
   '/api/orders',
   '/api/orders/.*',
@@ -51,6 +52,10 @@ const STAFF_ALLOWED_API_ROUTES = [
   '/api/conversations/.*',
   '/api/inventory',
   '/api/inventory/.*',
+  '/api/customers',
+  '/api/customers/.*',
+  '/api/invoices',
+  '/api/invoices/.*',
 ];
 // Inventory is read-only for staff apart from creating a stocktake and saving its counts.
 const STAFF_INVENTORY_API_ROUTES = ['/api/inventory/.*'];
@@ -60,7 +65,7 @@ const STAFF_INVENTORY_WRITE_ROUTES = [
 ];
 const STAFF_RESTRICTED_API_ROUTES = ['/api/auth/.*'];
 const STAFF_EXPIRED_API_ROUTES = ['/api/auth/.*'];
-const TEST_USER_MUTATION_BLOCKED_API_ROUTES = ['/api/orders', '/api/orders/.*', '/api/back-in-stock', '/api/back-in-stock/.*', '/api/fulfillment-requests', '/api/fulfillment-requests/.*', '/api/tasks', '/api/tasks/.*', '/api/inventory/.*'];
+const TEST_USER_MUTATION_BLOCKED_API_ROUTES = ['/api/orders', '/api/orders/.*', '/api/back-in-stock', '/api/back-in-stock/.*', '/api/fulfillment-requests', '/api/fulfillment-requests/.*', '/api/tasks', '/api/tasks/.*', '/api/inventory/.*', '/api/customers', '/api/customers/.*', '/api/invoices', '/api/invoices/.*'];
 
 const PICKER_ALLOWED_PAGE_ROUTES = ['/picking-list', '/profile', '/tasks', '/messages'];
 const PICKER_ALLOWED_API_ROUTES = [

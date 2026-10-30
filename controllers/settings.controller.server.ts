@@ -27,6 +27,7 @@ const DAYS = new Set(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
 const SESSION_TIMEOUTS = new Set([15, 30, 60, 120, 240, 480, 720, 1440, 2880, 10080]);
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const INVOICE_PREFIX_PATTERN = /^[A-Za-z0-9#/-]{1,10}$/;
 
 type UserScope = 'active_user' | 'active_admin';
 
@@ -490,6 +491,27 @@ export class SettingsController {
             updateData.messageVisibilityByUser = map;
           }
         }
+      }
+    }
+
+    if ('invoicePrefix' in data) {
+      const prefix = typeof data.invoicePrefix === 'string' ? data.invoicePrefix.trim() : null;
+      if (prefix === null || (prefix && !INVOICE_PREFIX_PATTERN.test(prefix))) {
+        errors.push('invoicePrefix: Up to 10 letters, numbers, #, / or -');
+      } else {
+        updateData.invoicePrefix = prefix;
+      }
+    }
+
+    if ('invoiceNextNumber' in data) {
+      const next = Number(data.invoiceNextNumber);
+      const highestIssued = await model.highestIssuedInvoiceSequence();
+      if (!Number.isInteger(next) || next < 1) {
+        errors.push('invoiceNextNumber: Must be a positive whole number');
+      } else if (next <= highestIssued) {
+        errors.push(`invoiceNextNumber: Must be greater than ${highestIssued}, the last invoice number issued`);
+      } else {
+        updateData.invoiceNextNumber = next;
       }
     }
 

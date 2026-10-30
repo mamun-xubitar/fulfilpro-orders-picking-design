@@ -4,7 +4,7 @@ import { useRef } from 'react';
 import type { Dispatch, RefObject, SetStateAction } from 'react';
 import type { StoreOption, PaginationState } from './usePickingListPage';
 
-const PACKED_FILTERS = [{ value: 'not_packed', label: 'Not Packed' }, { value: 'partially_packed', label: 'Partial Packed' }, { value: 'packed', label: 'Packed' }] as const;
+const PACKED_FILTERS = [{ value: 'not_packed', label: 'Not Packed' }, { value: 'partially_packed', label: 'Partial Packed' }, { value: 'packed', label: 'Packed' }, { value: 'late_unpacked', label: 'Late Unpacked' }, { value: 'shipped_delayed', label: 'Shipped Delayed' }] as const;
 const PRINT_FILTERS = [{ value: 'not_printed', label: 'Slip Not Printed' }, { value: 'printed', label: 'Slip Printed' }] as const;
 const PERIODS = [{ value: 'all', label: 'All Time' }, { value: 'week', label: 'This Week' }, { value: 'month', label: 'This Month' }, { value: 'year', label: 'This Year' }, { value: 'custom', label: 'Custom' }] as const;
 const MONTH_LABELS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];

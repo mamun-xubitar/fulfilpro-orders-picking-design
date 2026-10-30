@@ -92,6 +92,7 @@ export class ProductModel {
           ? {
               OR: [
                 { sku: { contains: token, mode: 'insensitive' } },
+                { title: { contains: token, mode: 'insensitive' } },
                 { product: { title: { contains: token, mode: 'insensitive' } } },
               ],
             }

@@ -1,6 +1,7 @@
 import { StoreInvoiceSettingModel, type InvoiceSettingValues } from '@/models/store-invoice-setting.model.server';
 import { DEFAULT_INVOICE_ACCENT } from '@/lib/invoice-defaults';
 import { removeLogoFile, validateLogoFile, writeLogoFile } from '@/lib/logo-upload.server';
+import { DEFAULT_AUS_TAX_RATE, DEFAULT_NZ_TAX_RATE } from '@/lib/invoice-totals';
 
 const model = new StoreInvoiceSettingModel();
 
@@ -23,6 +24,9 @@ function storeDefaults(store: Store): InvoiceSettingValues {
     invoicePrefix: null,
     paymentInstructions: null,
     accentColor: null,
+    ausTaxRate: DEFAULT_AUS_TAX_RATE,
+    nzTaxRate: DEFAULT_NZ_TAX_RATE,
+    defaultTerms: null,
   };
 }
 
@@ -36,6 +40,9 @@ function toForm(values: InvoiceSettingValues, logoPath: string | null): FormShap
     invoicePrefix: values.invoicePrefix ?? '',
     paymentInstructions: values.paymentInstructions ?? '',
     accentColor: values.accentColor ?? DEFAULT_INVOICE_ACCENT,
+    ausTaxRate: String(values.ausTaxRate),
+    nzTaxRate: String(values.nzTaxRate),
+    defaultTerms: values.defaultTerms ?? '',
     logoPath,
   };
 }
@@ -56,6 +63,19 @@ function parseValues(body: unknown): { values: InvoiceSettingValues } | { errors
   const invoicePrefix = text('invoicePrefix');
   const paymentInstructions = text('paymentInstructions');
   const accentColor = text('accentColor');
+  const defaultTerms = text('defaultTerms');
+  const rate = (key: string, label: string, fallback: number) => {
+    const value = text(key);
+    if (value === '') return fallback;
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || parsed < 0 || parsed > 100) {
+      errors.push(`${key}: ${label} must be between 0 and 100`);
+      return fallback;
+    }
+    return Math.round(parsed * 100) / 100;
+  };
+  const ausTaxRate = rate('ausTaxRate', 'Australian tax rate', DEFAULT_AUS_TAX_RATE);
+  const nzTaxRate = rate('nzTaxRate', 'New Zealand tax rate', DEFAULT_NZ_TAX_RATE);
 
   if (!storeName) errors.push('storeName: Store name is required');
   else if (storeName.length > 100) errors.push('storeName: Store name must be 100 characters or fewer');
@@ -69,6 +89,7 @@ function parseValues(body: unknown): { values: InvoiceSettingValues } | { errors
   if (paymentInstructions.length > 1000) {
     errors.push('paymentInstructions: Payment instructions must be 1000 characters or fewer');
   }
+  if (defaultTerms.length > 2000) errors.push('defaultTerms: Terms must be 2000 characters or fewer');
   if (accentColor && !COLOR_PATTERN.test(accentColor)) errors.push('accentColor: Use a hex color like #A6D3CC');
   if (errors.length) return { errors };
 
@@ -82,6 +103,9 @@ function parseValues(body: unknown): { values: InvoiceSettingValues } | { errors
       invoicePrefix: invoicePrefix || null,
       paymentInstructions: paymentInstructions || null,
       accentColor: accentColor || null,
+      ausTaxRate,
+      nzTaxRate,
+      defaultTerms: defaultTerms || null,
     },
   };
 }

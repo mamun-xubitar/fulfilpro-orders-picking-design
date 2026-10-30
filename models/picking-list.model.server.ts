@@ -4,6 +4,7 @@ import { sendAppMail } from '@/lib/email.server';
 import { OrderModel } from '@/models/order.model.server';
 import { resolvePickerRecipientOptions } from '@/lib/email-rules.server';
 import { createNotification } from '@/lib/notifications.server';
+import { matchesPackingFilter } from '@/lib/late-label-filter.server';
 
 export type PickingLineInput = {
   lineItemId: string;
@@ -82,7 +83,6 @@ export class PickingListModel {
     const orderedAtBounds = getOrderedAtBounds(params);
     const searchTokens = (params.search?.trim() ?? '').split(/\s+/).filter(Boolean);
     const packedStatuses = new Set(params.packedStatuses ?? []);
-    const filterByPacking = packedStatuses.size > 0;
 
     const storeWhere: Prisma.StoreWhereInput = { status: 'connected' };
     if (params.allowedStoreIds !== null && params.allowedStoreIds !== undefined) {
@@ -96,7 +96,7 @@ export class PickingListModel {
         searchTokens,
         searchField: params.searchField,
         printStatuses: params.printStatuses ?? [],
-        filterByPacking,
+        packedStatuses,
         orderedAtFrom: orderedAtBounds.from,
         orderedAtTo: orderedAtBounds.to,
         page: params.page,
@@ -110,15 +110,7 @@ export class PickingListModel {
     ]);
 
     const messageCounts = await getPickingMessageCounts(ordersResult.rows.map((row) => row.id));
-    const rows = ordersResult.rows.map((row) => toPickingOrderRow(row, messageCounts.get(row.id) ?? 0));
-    const filtered = rows.filter((row) => {
-      if (packedStatuses.size > 0 && !packedStatuses.has(row.packingStatus)) return false;
-      return true;
-    });
-
-    const total = filterByPacking ? filtered.length : ordersResult.total;
-    const start = (params.page - 1) * params.pageSize;
-    const pageRows = filterByPacking ? filtered.slice(start, start + params.pageSize) : filtered;
+    const pageRows = ordersResult.rows.map((row) => toPickingOrderRow(row, messageCounts.get(row.id) ?? 0));
     // const rowsWithMetadata = await this.attachMetadata(pageRows);
 
     return {
@@ -128,7 +120,7 @@ export class PickingListModel {
         name: store.name ?? store.storeDomain,
         storeDomain: store.storeDomain,
       })),
-      total,
+      total: ordersResult.total,
     };
   }
 
@@ -138,15 +130,29 @@ export class PickingListModel {
     searchTokens: string[];
     searchField?: string;
     printStatuses: string[];
-    filterByPacking: boolean;
+    packedStatuses: Set<string>;
     orderedAtFrom?: Date;
     orderedAtTo?: Date;
     page: number;
     pageSize: number;
   }) {
     const include = pickingOrderInclude();
+    const filterByPacking = params.packedStatuses.size > 0;
+    const loadPackingPage = async (ids: string[]) => {
+      const start = (params.page - 1) * params.pageSize;
+      const pageIds = ids.slice(start, start + params.pageSize);
+      const rows = pageIds.length > 0
+        ? await prisma.order.findMany({
+          where: { id: { in: pageIds } },
+          include,
+        })
+        : [];
+      const idOrder = new Map(pageIds.map((id, index) => [id, index]));
+      rows.sort((a, b) => (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0));
+      return { rows, total: ids.length };
+    };
 
-    if (params.searchTokens.length > 0 && !params.filterByPacking) {
+    if (params.searchTokens.length > 0 && !filterByPacking) {
       const searchPage = await getRankedPickingOrderSearchPage({
         tokens: params.searchTokens,
         searchField: params.searchField,
@@ -168,7 +174,7 @@ export class PickingListModel {
       return { rows, total: searchPage.total };
     }
 
-    if (!params.filterByPacking) {
+    if (!filterByPacking) {
       const [total, rows] = await Promise.all([
         prisma.order.count({ where: params.where }),
         prisma.order.findMany({
@@ -193,23 +199,11 @@ export class PickingListModel {
         page: 1,
         pageSize: 10000,
       });
-      const rows = searchPage.ids.length > 0
-        ? await prisma.order.findMany({
-          where: { id: { in: searchPage.ids } },
-          include,
-        })
-        : [];
-      const idOrder = new Map(searchPage.ids.map((id, index) => [id, index]));
-      rows.sort((a, b) => (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0));
-      return { rows, total: searchPage.total };
+      const matched = new Set(await getPackingFilteredOrderIds({ id: { in: searchPage.ids } }, undefined, params.packedStatuses));
+      return loadPackingPage(searchPage.ids.filter((id) => matched.has(id)));
     }
 
-    const rows = await prisma.order.findMany({
-      where: params.where,
-      include,
-      orderBy: { orderedAt: 'desc' },
-    });
-    return { rows, total: rows.length };
+    return loadPackingPage(await getPackingFilteredOrderIds(params.where, { orderedAt: 'desc' }, params.packedStatuses));
   }
 
   async listRecipientOptions() {
@@ -716,6 +710,7 @@ function toPickingOrderRow(order: {
   canceled: boolean;
   closed: boolean;
   orderedAt: Date | null;
+  labelPrintedAt: Date | null;
   lineItems: Prisma.JsonValue;
   shippingLines: Prisma.JsonValue | null;
   fulfillmentStatus: string | null;
@@ -735,11 +730,7 @@ function toPickingOrderRow(order: {
   const packedQuantity = [...packedByLine.values()].reduce((sum, qty) => sum + qty, 0);
   const lastPackedAt = activeConfirmations[0]?.confirmedAt?.toISOString() ?? null;
   const lastPackingUpdateAt = order.packingConfirmations[0]?.confirmedAt?.toISOString() ?? null;
-  const packingStatus = packedQuantity >= totalQuantity && totalQuantity > 0
-    ? 'packed'
-    : packedQuantity > 0
-      ? 'partially_packed'
-      : 'not_packed';
+  const packingStatus = getPackingStatus(packedQuantity, totalQuantity);
 
   return {
     id: order.id,
@@ -758,6 +749,7 @@ function toPickingOrderRow(order: {
     canceled: order.canceled,
     closed: order.closed,
     orderedAt: order.orderedAt?.toISOString() ?? '',
+    labelPrintedAt: order.labelPrintedAt?.toISOString() ?? null,
     storeId: order.store.id,
     storeName: order.store.name ?? order.store.storeDomain,
     storeDomain: order.store.storeDomain,
@@ -942,6 +934,52 @@ function normalizePackingLines(
       return { lineItemId: item.id, quantity, full: Boolean(line.full) || quantity === remaining };
     })
     .filter((line): line is PickingLineInput => Boolean(line));
+}
+
+function getPackingStatus(packedQuantity: number, totalQuantity: number) {
+  return packedQuantity >= totalQuantity && totalQuantity > 0
+    ? 'packed'
+    : packedQuantity > 0
+      ? 'partially_packed'
+      : 'not_packed';
+}
+
+// Packing status is derived in JS, so the packing filter scans every candidate order. Select scalar
+// columns only: including relations here would bind one parameter per order in the follow-up
+// queries and exceed Postgres' 32,767 bind-parameter limit on large stores.
+async function getPackingFilteredOrderIds(where: Prisma.OrderWhereInput, orderBy: Prisma.OrderOrderByWithRelationInput | undefined, packedStatuses: Set<string>) {
+  const [candidates, confirmations] = await Promise.all([
+    prisma.order.findMany({
+      where,
+      orderBy,
+      select: { id: true, lineItems: true, labelPrintedAt: true, canceled: true, closed: true, fulfillmentStatus: true },
+    }),
+    prisma.orderPackingConfirmation.findMany({
+      where: { canceledAt: null, order: { is: where } },
+      select: { orderId: true, lines: true },
+    }),
+  ]);
+
+  const confirmationsByOrder = new Map<string, Array<{ lines: Prisma.JsonValue }>>();
+  for (const confirmation of confirmations) {
+    const list = confirmationsByOrder.get(confirmation.orderId) ?? [];
+    list.push(confirmation);
+    confirmationsByOrder.set(confirmation.orderId, list);
+  }
+
+  return candidates
+    .filter((row) => {
+      const totalQuantity = toLineItems(row.lineItems).reduce((sum, item) => sum + Math.max(0, item.qty), 0);
+      const packedQuantity = [...getPackedByLine(confirmationsByOrder.get(row.id) ?? []).values()].reduce((sum, qty) => sum + qty, 0);
+      return matchesPackingFilter(packedStatuses, {
+        labelPrintedAt: row.labelPrintedAt,
+        canceled: row.canceled,
+        closed: row.closed,
+        fulfillmentStatus: row.fulfillmentStatus,
+        packingStatus: getPackingStatus(packedQuantity, totalQuantity),
+      });
+    })
+    .map((row) => row.id);
 }
 
 function getPackedByLine(confirmations: Array<{ lines: Prisma.JsonValue }>) {

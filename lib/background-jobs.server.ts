@@ -5,8 +5,37 @@ import { TrackingModel } from '@/models/tracking.model.server';
 import { resolveCarrierCode } from '@/lib/carrier-resolver.server';
 import { OrderModel } from '@/models/order.model.server';
 import { linkOrderLineItems, refreshProductSales } from '@/lib/product-order-link.server';
+import { syncAllStoreCustomers } from '@/lib/shopify-customer-sync.server';
 
 const trackingModel = new TrackingModel();
+
+export const SYNC_CUSTOMERS_JOB = 'sync_shopify_customers';
+const CUSTOMER_SYNC_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
+/** Queues a Shopify customer sync unless one is already waiting or running. Returns whether it queued. */
+export async function enqueueCustomerSync(storeId?: string) {
+  const pending = await prisma.backgroundJob.findFirst({
+    where: { type: SYNC_CUSTOMERS_JOB, status: { in: ['queued', 'running'] } },
+    select: { id: true },
+  });
+  if (pending) return false;
+  await enqueueJob(SYNC_CUSTOMERS_JOB, storeId ? { storeId } : undefined);
+  return true;
+}
+
+/** Called by the worker on every tick: queues the daily sync once the last one that did not fail
+ * is over a day old, so a failed sync is retried on the next tick. */
+export async function enqueueCustomerSyncIfDue(now = new Date()) {
+  const recent = await prisma.backgroundJob.findFirst({
+    where: {
+      type: SYNC_CUSTOMERS_JOB,
+      status: { not: 'failed' },
+      createdAt: { gt: new Date(now.getTime() - CUSTOMER_SYNC_INTERVAL_MS) },
+    },
+    select: { id: true },
+  });
+  if (!recent) await enqueueCustomerSync();
+}
 
 export async function enqueueJob(
   type: string,
@@ -70,6 +99,8 @@ export async function runJob(jobId: string) {
       await runRescanDecorations(jobId);
     } else if (job.type === 'backfill_order_line_items') {
       await runBackfillOrderLineItems(jobId);
+    } else if (job.type === SYNC_CUSTOMERS_JOB) {
+      await syncAllStoreCustomers(typeof payload.storeId === 'string' ? payload.storeId : undefined);
     } else {
       throw new Error(`Unknown job type: ${job.type}`);
     }

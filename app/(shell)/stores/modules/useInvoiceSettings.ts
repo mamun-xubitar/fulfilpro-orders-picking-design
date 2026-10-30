@@ -18,6 +18,9 @@ export type InvoiceFormValues = {
   invoicePrefix: string;
   paymentInstructions: string;
   accentColor: string;
+  ausTaxRate: string;
+  nzTaxRate: string;
+  defaultTerms: string;
 };
 
 type InvoiceSettingsData = InvoiceFormValues & { logoPath: string | null };
@@ -31,7 +34,18 @@ const EMPTY_FORM: InvoiceFormValues = {
   invoicePrefix: '',
   paymentInstructions: '',
   accentColor: DEFAULT_INVOICE_ACCENT,
+  ausTaxRate: '11',
+  nzTaxRate: '15',
+  defaultTerms: '',
 };
+
+const normalizeValue = (field: keyof InvoiceFormValues, value: string) =>
+  field === 'websiteUrl' ? value : value.toUpperCase();
+
+const normalizeValues = (values: InvoiceFormValues) =>
+  Object.fromEntries(
+    Object.entries(values).map(([field, value]) => [field, normalizeValue(field as keyof InvoiceFormValues, value)]),
+  ) as InvoiceFormValues;
 
 function validateForm(form: InvoiceFormValues) {
   const errors: Record<string, string> = {};
@@ -42,6 +56,12 @@ function validateForm(form: InvoiceFormValues) {
     errors.invoicePrefix = 'Up to 10 letters, numbers, #, / or -';
   }
   if (!/^#[0-9a-fA-F]{6}$/.test(form.accentColor.trim())) errors.accentColor = 'Use a hex color like #A6D3CC';
+  (['ausTaxRate', 'nzTaxRate'] as const).forEach((field) => {
+    const value = Number(form[field]);
+    if (form[field].trim() === '' || !Number.isFinite(value) || value < 0 || value > 100) {
+      errors[field] = 'Enter a rate between 0 and 100';
+    }
+  });
   return errors;
 }
 
@@ -60,7 +80,7 @@ export function useInvoiceSettings() {
 
   const applyData = (data: InvoiceSettingsData) => {
     const { logoPath: nextLogo, ...values } = data;
-    setForm(values);
+    setForm(normalizeValues(values));
     setLogoPath(nextLogo);
   };
 
@@ -77,7 +97,7 @@ export function useInvoiceSettings() {
       onSuccess: ({ data }) => {
         if (activeStoreId.current !== store.id) return;
         const { logoPath: nextLogo, ...values } = data;
-        setForm(values);
+        setForm(normalizeValues(values));
         setLogoPath(nextLogo);
       },
     });
@@ -90,9 +110,9 @@ export function useInvoiceSettings() {
 
   const set = (field: keyof InvoiceFormValues) =>
     (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-      setForm((prev) => ({ ...prev, [field]: event.target.value }));
+      setForm((prev) => ({ ...prev, [field]: normalizeValue(field, event.target.value) }));
 
-  const setAccent = (value: string) => setForm((prev) => ({ ...prev, accentColor: value }));
+  const setAccent = (value: string) => setForm((prev) => ({ ...prev, accentColor: normalizeValue('accentColor', value) }));
 
   const save = () => {
     if (!target) return;
