@@ -30,7 +30,7 @@ import {
 } from '@/models/decoration.model.server';
 import { TrackingModel, type TrackingSummary } from '@/models/tracking.model.server';
 import type { PaymentSummary } from '@/lib/tax-invoice.server';
-import { matchesPackingFilter } from '@/lib/late-label-filter.server';
+import { matchesPackingFilter } from '@/lib/late-slip-filter.server';
 import { Prisma } from '@prisma/client';
 type OrderMessageTypeInput = 'orders' | 'picker';
 
@@ -1947,15 +1947,20 @@ function getPackingStatus(packedQuantity: number, totalQuantity: number): 'packe
 // columns only: including relations here would bind one parameter per order in the follow-up
 // queries and exceed Postgres' 32,767 bind-parameter limit on large stores.
 async function getPackingFilteredOrderIds(where: Prisma.OrderWhereInput, orderBy: Prisma.OrderOrderByWithRelationInput | undefined, packingStatuses: string[]) {
-  const [candidates, confirmations] = await Promise.all([
+  const [candidates, confirmations, slipPrints] = await Promise.all([
     prisma.order.findMany({
       where,
       orderBy,
-      select: { id: true, lineItems: true, labelPrintedAt: true, canceled: true, closed: true, fulfillmentStatus: true },
+      select: { id: true, lineItems: true, canceled: true, closed: true, fulfillmentStatus: true },
     }),
     prisma.orderPackingConfirmation.findMany({
       where: { canceledAt: null, order: { is: where } },
       select: { orderId: true, lines: true },
+    }),
+    prisma.orderPickingSlipPrint.groupBy({
+      by: ['orderId'],
+      where: { order: { is: where } },
+      _min: { printedAt: true },
     }),
   ]);
 
@@ -1965,6 +1970,7 @@ async function getPackingFilteredOrderIds(where: Prisma.OrderWhereInput, orderBy
     list.push(confirmation);
     confirmationsByOrder.set(confirmation.orderId, list);
   }
+  const firstSlipPrintByOrder = new Map(slipPrints.map((print) => [print.orderId, print._min.printedAt]));
 
   const packingSet = new Set(packingStatuses);
   return candidates
@@ -1972,7 +1978,7 @@ async function getPackingFilteredOrderIds(where: Prisma.OrderWhereInput, orderBy
       const totalQuantity = toLineItems(row.lineItems).reduce((sum, item) => sum + Math.max(0, item.qty), 0);
       const packedQuantity = [...computePackedByLine(confirmationsByOrder.get(row.id) ?? []).values()].reduce((sum, qty) => sum + qty, 0);
       return matchesPackingFilter(packingSet, {
-        labelPrintedAt: row.labelPrintedAt,
+        slipPrintedAt: firstSlipPrintByOrder.get(row.id) ?? null,
         canceled: row.canceled,
         closed: row.closed,
         fulfillmentStatus: getDisplayStatus(row),

@@ -4,7 +4,7 @@ import { sendAppMail } from '@/lib/email.server';
 import { OrderModel } from '@/models/order.model.server';
 import { resolvePickerRecipientOptions } from '@/lib/email-rules.server';
 import { createNotification } from '@/lib/notifications.server';
-import { matchesPackingFilter } from '@/lib/late-label-filter.server';
+import { matchesPackingFilter } from '@/lib/late-slip-filter.server';
 
 export type PickingLineInput = {
   lineItemId: string;
@@ -710,7 +710,6 @@ function toPickingOrderRow(order: {
   canceled: boolean;
   closed: boolean;
   orderedAt: Date | null;
-  labelPrintedAt: Date | null;
   lineItems: Prisma.JsonValue;
   shippingLines: Prisma.JsonValue | null;
   fulfillmentStatus: string | null;
@@ -749,7 +748,6 @@ function toPickingOrderRow(order: {
     canceled: order.canceled,
     closed: order.closed,
     orderedAt: order.orderedAt?.toISOString() ?? '',
-    labelPrintedAt: order.labelPrintedAt?.toISOString() ?? null,
     storeId: order.store.id,
     storeName: order.store.name ?? order.store.storeDomain,
     storeDomain: order.store.storeDomain,
@@ -948,15 +946,20 @@ function getPackingStatus(packedQuantity: number, totalQuantity: number) {
 // columns only: including relations here would bind one parameter per order in the follow-up
 // queries and exceed Postgres' 32,767 bind-parameter limit on large stores.
 async function getPackingFilteredOrderIds(where: Prisma.OrderWhereInput, orderBy: Prisma.OrderOrderByWithRelationInput | undefined, packedStatuses: Set<string>) {
-  const [candidates, confirmations] = await Promise.all([
+  const [candidates, confirmations, slipPrints] = await Promise.all([
     prisma.order.findMany({
       where,
       orderBy,
-      select: { id: true, lineItems: true, labelPrintedAt: true, canceled: true, closed: true, fulfillmentStatus: true },
+      select: { id: true, lineItems: true, canceled: true, closed: true, fulfillmentStatus: true },
     }),
     prisma.orderPackingConfirmation.findMany({
       where: { canceledAt: null, order: { is: where } },
       select: { orderId: true, lines: true },
+    }),
+    prisma.orderPickingSlipPrint.groupBy({
+      by: ['orderId'],
+      where: { order: { is: where } },
+      _min: { printedAt: true },
     }),
   ]);
 
@@ -966,13 +969,14 @@ async function getPackingFilteredOrderIds(where: Prisma.OrderWhereInput, orderBy
     list.push(confirmation);
     confirmationsByOrder.set(confirmation.orderId, list);
   }
+  const firstSlipPrintByOrder = new Map(slipPrints.map((print) => [print.orderId, print._min.printedAt]));
 
   return candidates
     .filter((row) => {
       const totalQuantity = toLineItems(row.lineItems).reduce((sum, item) => sum + Math.max(0, item.qty), 0);
       const packedQuantity = [...getPackedByLine(confirmationsByOrder.get(row.id) ?? []).values()].reduce((sum, qty) => sum + qty, 0);
       return matchesPackingFilter(packedStatuses, {
-        labelPrintedAt: row.labelPrintedAt,
+        slipPrintedAt: firstSlipPrintByOrder.get(row.id) ?? null,
         canceled: row.canceled,
         closed: row.closed,
         fulfillmentStatus: row.fulfillmentStatus,
