@@ -4,6 +4,7 @@ import { sendAppMail } from '@/lib/email.server';
 import { OrderModel } from '@/models/order.model.server';
 import { resolvePickerRecipientOptions } from '@/lib/email-rules.server';
 import { createNotification } from '@/lib/notifications.server';
+import { matchesPackingFilter } from '@/lib/late-label-filter.server';
 
 export type PickingLineInput = {
   lineItemId: string;
@@ -112,7 +113,7 @@ export class PickingListModel {
     const messageCounts = await getPickingMessageCounts(ordersResult.rows.map((row) => row.id));
     const rows = ordersResult.rows.map((row) => toPickingOrderRow(row, messageCounts.get(row.id) ?? 0));
     const filtered = rows.filter((row) => {
-      if (packedStatuses.size > 0 && !packedStatuses.has(row.packingStatus)) return false;
+      if (packedStatuses.size > 0 && !matchesPackingFilter(packedStatuses, row)) return false;
       return true;
     });
 
@@ -716,6 +717,7 @@ function toPickingOrderRow(order: {
   canceled: boolean;
   closed: boolean;
   orderedAt: Date | null;
+  labelPrintedAt: Date | null;
   lineItems: Prisma.JsonValue;
   shippingLines: Prisma.JsonValue | null;
   fulfillmentStatus: string | null;
@@ -758,6 +760,7 @@ function toPickingOrderRow(order: {
     canceled: order.canceled,
     closed: order.closed,
     orderedAt: order.orderedAt?.toISOString() ?? '',
+    labelPrintedAt: order.labelPrintedAt?.toISOString() ?? null,
     storeId: order.store.id,
     storeName: order.store.name ?? order.store.storeDomain,
     storeDomain: order.store.storeDomain,

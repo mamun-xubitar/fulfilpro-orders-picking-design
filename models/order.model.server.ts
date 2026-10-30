@@ -30,6 +30,7 @@ import {
 } from '@/models/decoration.model.server';
 import { TrackingModel, type TrackingSummary } from '@/models/tracking.model.server';
 import type { PaymentSummary } from '@/lib/tax-invoice.server';
+import { matchesPackingFilter } from '@/lib/late-label-filter.server';
 import { Prisma } from '@prisma/client';
 type OrderMessageTypeInput = 'orders' | 'picker';
 
@@ -546,7 +547,7 @@ export class OrderModel {
 
       if (filterByPacking) {
         const packingSet = new Set(packingStatuses);
-        const filtered = allOrders.filter((o) => packingSet.has(o.packingStatus));
+        const filtered = allOrders.filter((o) => matchesPackingFilter(packingSet, { ...o, fulfillmentStatus: o.status }));
         const total = filtered.length;
         const sliced = filtered.slice((page - 1) * pageSize, page * pageSize);
         return { total, orders: sliced };
@@ -569,7 +570,7 @@ export class OrderModel {
       const trackingsByOrder = await new TrackingModel().getSummariesByOrderIds(allRows.map((row) => row.id));
       let filtered = allRows
         .map((row) => toOrderRow(row, messageCounts.get(row.id) ?? 0, decorationsByOrder.get(row.id), assignmentsByOrder.get(row.id), summariesByOrder.get(row.id), trackingsByOrder.get(row.id), viewerIsDecorator))
-        .filter((o) => packingSet.has(o.packingStatus));
+        .filter((o) => matchesPackingFilter(packingSet, { ...o, fulfillmentStatus: o.status }));
       if (viewerIsDecorator) filtered = sortDecoratorOrders(filtered);
       const total = filtered.length;
       const sliced = filtered.slice((page - 1) * pageSize, page * pageSize);
