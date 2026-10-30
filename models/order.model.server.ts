@@ -509,6 +509,27 @@ export class OrderModel {
       packingConfirmations: { select: { id: true, lines: true, confirmedAt: true, canceledAt: true }, orderBy: { confirmedAt: 'desc' as const } },
     } satisfies Prisma.OrderInclude;
 
+    const loadOrderRows = async (ids: string[]) => {
+      const rows = ids.length > 0
+        ? await prisma.order.findMany({
+            where: { id: { in: ids } },
+            include: listInclude,
+          })
+        : [];
+
+      const idOrder = new Map(ids.map((id, index) => [id, index]));
+      rows.sort((a, b) => (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0));
+
+      const messageCounts = await getOrderMessageCounts(rows.map((row) => row.id), 'orders');
+      const decorationsByOrder = await getDecorationsByOrder(rows.map((row) => row.id));
+      const assignmentsByOrder = await getAssignmentsByOrder(rows.map((row) => row.id));
+      const summariesByOrder = await getDecorationSummariesByOrder(rows.map((row) => row.id), viewer);
+      const trackingsByOrder = await new TrackingModel().getSummariesByOrderIds(rows.map((row) => row.id));
+      let orders = rows.map((row) => toOrderRow(row, messageCounts.get(row.id) ?? 0, decorationsByOrder.get(row.id), assignmentsByOrder.get(row.id), summariesByOrder.get(row.id), trackingsByOrder.get(row.id), viewerIsDecorator));
+      if (viewerIsDecorator) orders = sortDecoratorOrders(orders);
+      return orders;
+    };
+
     if (tokens.length > 0) {
       const searchPage = await getRankedOrderSearchPage({
         tokens,
@@ -527,54 +548,18 @@ export class OrderModel {
         dir,
       });
 
-      const rows = searchPage.ids.length > 0
-        ? await prisma.order.findMany({
-            where: { id: { in: searchPage.ids } },
-            include: listInclude,
-          })
-        : [];
-
-      const idOrder = new Map(searchPage.ids.map((id, index) => [id, index]));
-      rows.sort((a, b) => (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0));
-
-      const messageCounts = await getOrderMessageCounts(rows.map((row) => row.id), 'orders');
-      const decorationsByOrder = await getDecorationsByOrder(rows.map((row) => row.id));
-      const assignmentsByOrder = await getAssignmentsByOrder(rows.map((row) => row.id));
-      const summariesByOrder = await getDecorationSummariesByOrder(rows.map((row) => row.id), viewer);
-      const trackingsByOrder = await new TrackingModel().getSummariesByOrderIds(rows.map((row) => row.id));
-      let allOrders = rows.map((row) => toOrderRow(row, messageCounts.get(row.id) ?? 0, decorationsByOrder.get(row.id), assignmentsByOrder.get(row.id), summariesByOrder.get(row.id), trackingsByOrder.get(row.id), viewerIsDecorator));
-      if (viewerIsDecorator) allOrders = sortDecoratorOrders(allOrders);
-
       if (filterByPacking) {
-        const packingSet = new Set(packingStatuses);
-        const filtered = allOrders.filter((o) => matchesPackingFilter(packingSet, { ...o, fulfillmentStatus: o.status }));
-        const total = filtered.length;
-        const sliced = filtered.slice((page - 1) * pageSize, page * pageSize);
-        return { total, orders: sliced };
+        const matched = new Set(await getPackingFilteredOrderIds({ id: { in: searchPage.ids } }, undefined, packingStatuses));
+        const ids = searchPage.ids.filter((id) => matched.has(id));
+        return { total: ids.length, orders: await loadOrderRows(ids.slice((page - 1) * pageSize, page * pageSize)) };
       }
 
-      return { total: searchPage.total, orders: allOrders };
+      return { total: searchPage.total, orders: await loadOrderRows(searchPage.ids) };
     }
 
     if (filterByPacking) {
-      const allRows = await prisma.order.findMany({
-        where,
-        include: listInclude,
-        orderBy: buildOrdersOrderBy(sort, dir),
-      });
-      const packingSet = new Set(packingStatuses);
-      const messageCounts = await getOrderMessageCounts(allRows.map((row) => row.id), 'orders');
-      const decorationsByOrder = await getDecorationsByOrder(allRows.map((row) => row.id));
-      const assignmentsByOrder = await getAssignmentsByOrder(allRows.map((row) => row.id));
-      const summariesByOrder = await getDecorationSummariesByOrder(allRows.map((row) => row.id), viewer);
-      const trackingsByOrder = await new TrackingModel().getSummariesByOrderIds(allRows.map((row) => row.id));
-      let filtered = allRows
-        .map((row) => toOrderRow(row, messageCounts.get(row.id) ?? 0, decorationsByOrder.get(row.id), assignmentsByOrder.get(row.id), summariesByOrder.get(row.id), trackingsByOrder.get(row.id), viewerIsDecorator))
-        .filter((o) => matchesPackingFilter(packingSet, { ...o, fulfillmentStatus: o.status }));
-      if (viewerIsDecorator) filtered = sortDecoratorOrders(filtered);
-      const total = filtered.length;
-      const sliced = filtered.slice((page - 1) * pageSize, page * pageSize);
-      return { total, orders: sliced };
+      const ids = await getPackingFilteredOrderIds(where, buildOrdersOrderBy(sort, dir), packingStatuses);
+      return { total: ids.length, orders: await loadOrderRows(ids.slice((page - 1) * pageSize, page * pageSize)) };
     }
 
     const [total, rows] = await Promise.all([
@@ -1770,12 +1755,7 @@ function toOrderRow(row: {
     : new Map<string, number>();
   const totalQuantity = lineItems.reduce((sum, item) => sum + Math.max(0, item.qty), 0);
   const packedQuantity = [...packedByLine.values()].reduce((sum, qty) => sum + qty, 0);
-  const packingStatus: 'packed' | 'partially_packed' | 'not_packed' =
-    packedQuantity >= totalQuantity && totalQuantity > 0
-      ? 'packed'
-      : packedQuantity > 0
-        ? 'partially_packed'
-        : 'not_packed';
+  const packingStatus = getPackingStatus(packedQuantity, totalQuantity);
 
   return {
     id: row.id,
@@ -1953,6 +1933,53 @@ async function getOrderMessageCounts(orderIds: string[], type: OrderMessageTypeI
   });
 
   return new Map(rows.map((row) => [row.orderId, row._count._all]));
+}
+
+function getPackingStatus(packedQuantity: number, totalQuantity: number): 'packed' | 'partially_packed' | 'not_packed' {
+  return packedQuantity >= totalQuantity && totalQuantity > 0
+    ? 'packed'
+    : packedQuantity > 0
+      ? 'partially_packed'
+      : 'not_packed';
+}
+
+// Packing status is derived in JS, so the packing filter scans every candidate order. Select scalar
+// columns only: including relations here would bind one parameter per order in the follow-up
+// queries and exceed Postgres' 32,767 bind-parameter limit on large stores.
+async function getPackingFilteredOrderIds(where: Prisma.OrderWhereInput, orderBy: Prisma.OrderOrderByWithRelationInput | undefined, packingStatuses: string[]) {
+  const [candidates, confirmations] = await Promise.all([
+    prisma.order.findMany({
+      where,
+      orderBy,
+      select: { id: true, lineItems: true, labelPrintedAt: true, canceled: true, closed: true, fulfillmentStatus: true },
+    }),
+    prisma.orderPackingConfirmation.findMany({
+      where: { canceledAt: null, order: { is: where } },
+      select: { orderId: true, lines: true },
+    }),
+  ]);
+
+  const confirmationsByOrder = new Map<string, Array<{ lines: Prisma.JsonValue }>>();
+  for (const confirmation of confirmations) {
+    const list = confirmationsByOrder.get(confirmation.orderId) ?? [];
+    list.push(confirmation);
+    confirmationsByOrder.set(confirmation.orderId, list);
+  }
+
+  const packingSet = new Set(packingStatuses);
+  return candidates
+    .filter((row) => {
+      const totalQuantity = toLineItems(row.lineItems).reduce((sum, item) => sum + Math.max(0, item.qty), 0);
+      const packedQuantity = [...computePackedByLine(confirmationsByOrder.get(row.id) ?? []).values()].reduce((sum, qty) => sum + qty, 0);
+      return matchesPackingFilter(packingSet, {
+        labelPrintedAt: row.labelPrintedAt,
+        canceled: row.canceled,
+        closed: row.closed,
+        fulfillmentStatus: getDisplayStatus(row),
+        packingStatus: getPackingStatus(packedQuantity, totalQuantity),
+      });
+    })
+    .map((row) => row.id);
 }
 
 function computePackedByLine(confirmations: Array<{ lines: Prisma.JsonValue }>) {
