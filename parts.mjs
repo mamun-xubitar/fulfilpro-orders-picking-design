@@ -1,0 +1,255 @@
+import { ic, tile } from './chrome.mjs';
+import * as X from './extras.mjs';
+import { RECIPIENTS, contactOf, confsOf, STORES, ORDERS, QUEUES, countOf, queueFor, stage, totalQty, packedQty, slipOver24, byNo, shopifyUrl, need, isShort, shortCount, PO_LABEL } from './data.mjs';
+let ROLE = 'admin';
+export const setRole = (r) => { ROLE = r; };
+
+/** What each role can see / do. Mirrors today's pages exactly (proxy.ts + page code). */
+export const CAP = {
+  // deco: 2 = manage (assign, toggle, mark done), 1 = read-only state. round 3 adds reqStock, stockAdj, names, lineEdit, attach.
+  admin:  { shopify: 1, stock: 1, poCreate: 1, store: 1, period: 1, sync: 1, ffilter: 1, slip: 1, pack: 1, ful: 1, cust: 1, labels: 1, req: 'direct', approvals: 1, deco: 2, bin: 1, track: 1, invoice: 1, reqStock: 1, stockAdj: 1, names: 1, lineEdit: 1, attach: 1 },
+  staff:  { shopify: 1, stock: 1, poCreate: 0, store: 1, period: 1, sync: 1, ffilter: 1, slip: 0, pack: 0, ful: 1, cust: 1, labels: 1, req: 'request', approvals: 0, deco: 1, bin: 0, track: 0, invoice: 1, reqStock: 1, stockAdj: 0, names: 1, lineEdit: 0, attach: 0 },
+  picker: { shopify: 0, stock: 0, poCreate: 0, store: 0, period: 0, sync: 0, ffilter: 0, slip: 1, pack: 1, ful: 0, cust: 0, labels: 0, req: null, approvals: 0, deco: 0, bin: 1, track: 0, invoice: 0, reqStock: 0, stockAdj: 0, names: 0, lineEdit: 0, attach: 0 },
+};
+
+export const storeChip = (c) => `<span class="store"><i style="background:${STORES[c].hue}"></i>${c}</span>`;
+/** Print-picking-slip button: neutral until printed, then green with a tick (no time-based "late" state any more). */
+export const slipTitle = (r) => (r.slip != null ? `Picking slip printed ${r.slip < 24 ? Math.max(1, Math.round(r.slip)) + ' h ago' : Math.round(r.slip / 24) + ' d ago'} · print again` : 'Print picking slip');
+export const slipText = (r, cls = '', style = '') => `<button class="btn ${r.slip != null ? 'printed' : 'ghost'} ${cls}" style="${style}" title="${slipTitle(r)}">${ic(r.slip != null ? 'check' : 'printer', 'i')}${r.slip != null ? 'Slip printed · Reprint' : 'Picking slip'}</button>`;
+/** Print-label action: turns green once the shipping label is printed (same rule as the slip). */
+export const labelBtn = (r) => `<button class="ib${r.label ? ' printed' : ''}" title="${r.label ? 'Shipping label printed, print again' : 'Print label'}">${ic('tag', 'i')}</button>`;
+export const slipBtn = (r) => `<button class="ib${r.slip != null ? ' printed' : ''}" title="${slipTitle(r)}">${ic('printer', 'i')}</button>`;
+/** Read-only twin for dense lists where the button itself does not fit. */
+export const slipDot = (r) => (r.slip != null ? `<span class="ib printed ro" title="${slipTitle(r)}">${ic('printer', 'i')}</span>` : '');
+
+/* ---------- stage track: nodes are role-shaped (staff never sees the slip, picker never sees fulfilment) ---------- */
+export function stageNodes(cap) {
+  return [cap.slip && ['slip', 'Slip'], ['packed', 'Pack'], cap.ful && ['ful', 'Fulfil'], cap.ful && ['trk', 'Track']].filter(Boolean);
+}
+export function track(r, cap, lg = false) {
+  const s = stage(r), nodes = stageNodes(cap);
+  const st = (k) => (k === 'slip' ? (s.slip ? 'done' : 'none') : s[k]);
+  const out = nodes.map(([k], i) => {
+    const v = st(k), green = k === 'slip' || k === 'ful' || k === 'trk';
+    const cls = v === 'done' ? 'done' + (green ? ' g' : '') : v === 'part' ? 'part' : '';
+    const mark = v === 'done' ? ic('check', 'i') : '';
+    const cn = i ? `<span class="cn ${st(k) === 'done' ? (green ? 'g' : 'done') : ''}"></span>` : '';
+    return cn + `<span class="nd ${cls}" title="${nodes[i][1]}">${mark}</span>`;
+  });
+  return `<span class="trk${lg ? ' lg' : ''}">${out.join('')}</span>`;
+}
+export const trackHead = (cap) => {
+  const n = stageNodes(cap).length;
+  return `<span class="trk-l">${stageNodes(cap).map(([, t]) => `<span style="width:34px;overflow:visible;white-space:nowrap">${t}</span>`).join('')}</span>`;
+};
+export const trackW = (cap) => stageNodes(cap).length * 34 + 4;
+
+export function packBar(r) {
+  const p = packedQty(r), t = totalQty(r), pct = Math.round((p / t) * 100);
+  return `<span class="pb"><b class="tn">${p}/${t}</b><span class="pbar"><i class="${p >= t ? 'done' : p ? 'part' : ''}" style="width:${pct}%"></i></span></span>`;
+}
+export const thumbs = (r, n = 3) => {
+  const its = r.items.slice(0, n), more = r.items.length - n;
+  return `<span class="stack">${its.map((x) => tile(x.kind, x.hex, 22)).join('')}</span>${more > 0 ? `<span class="muted tn">+${more}</span>` : ''}`;
+};
+export const decoBadges = (r) => {
+  if (ROLE === 'picker') return ''; // today's Picking List shows no decoration state
+  const e = r.items.some((x) => x.deco === 'EMB'), p = r.items.some((x) => x.deco === 'PRT');
+  return (e ? '<span class="bdg emb">EMB</span>' : '') + (p ? '<span class="bdg prt">PRT</span>' : '');
+};
+export const decoMini = (r) => {
+  if (ROLE === 'picker') return '';
+  const e = r.items.some((x) => x.deco === 'EMB'), q = r.items.some((x) => x.deco === 'PRT');
+  return (e ? '<span class="bdg emb" title="Embroidery" style="padding:0 4px">E</span>' : '') + (q ? '<span class="bdg prt" title="Print" style="padding:0 4px">P</span>' : '');
+};
+export const flags = (r, cap) => {
+  const b = (icn, n, tip, red) => (n ? `<span class="ib" title="${tip}" style="width:20px">${ic(icn, 'i')}<i class="ct${red ? ' ' + (red === 1 ? 'red' : red) : ''}">${n}</i></span>` : '');
+  return `<span class="cell" style="gap:2px">${b('document', r.notes, 'Order notes')}${b('chat', r.msgs, 'Messages')}${b('userLock', r.req ? 1 : 0, 'Fulfilment edit request awaiting approval', 'amber')}</span>`;
+};
+export const sortHead = (t) => `<span class="srt">${t}${ic('sort', 'i10')}</span>`;
+
+/* ---------- toolbar: filters are chips, not dropdown stacks ---------- */
+export const chip = (k, v, on, ro) => `<button class="fchip${on ? ' on' : ''}${ro ? ' ro' : ''}"><span class="k">${k}</span><b>${v}</b>${ic('chevronDown', 'i12')}</button>`;
+export function searchBox(role) {
+  const ph = role === 'picker' ? 'Scan barcode or search order, customer, product…' : 'Search order, customer, SKU, address…  try  sku:TEE-NVY-L';
+  return `<div class="srch" title="Search by order number, customer, address, product or barcode">${ic('search', 'i')}<span class="fld">All fields${ic('chevronDown', 'i10')}</span><span class="ph">${ph}</span>${ic('scan', 'i')}<kbd>/</kbd></div>`;
+}
+export function toolbar(role, { extra = '', refreshWarn = false } = {}) {
+  const c = CAP[role];
+  return `<div class="row-tb">
+    ${searchBox(role)}
+    ${c.store ? chip('Store', 'All 4', 0) : ''}
+    ${c.period ? chip('Period', 'All time', 0) : ''}
+    ${c.slip ? chip('Slip', 'Any', 0) : ''}
+    ${c.ffilter ? chip('Fulfilment', 'Any', 0) : ''}
+    ${extra}
+    <span class="sp"></span>
+    ${c.sync ? `<span class="muted" style="font-size:10px">${refreshWarn ? 'Synced 14:12 · 3 orders new or updated' : 'Synced 14:12'}</span><span class="split"><button class="btn ghost">${ic('refresh', 'i')}Sync</button><button class="btn ghost sd" title="Choose stores to sync">${ic('chevronDown', 'i12')}</button></span>` : ''}
+    <button class="btn ${refreshWarn ? 'warn' : 'ghost'}" title="${refreshWarn ? 'A sync finished: refresh to see the changes' : 'Reload the list'}">${ic('refresh', 'i')}Refresh</button>
+  </div>`;
+}
+export function queueTabs(role, active) {
+  return `<div class="qtabs" role="tablist">${QUEUES[role]
+    .map(([k, t]) => `<button class="qt${k === active ? ' on' : ''}" role="tab">${t}<span class="qn">${countOf(k, role)}</span></button>`)
+    .join('')}</div>`;
+}
+export const activeChips = (role) =>
+  `<span class="rmv">Unfulfilled ${ic('close', 'i10')}</span>${CAP[role].period ? `<span class="rmv">This month ${ic('close', 'i10')}</span>` : ''}<button class="btn xs ghost" style="border-color:transparent;color:var(--pri-ink)">Clear all</button>`;
+
+export function approvals(role) {
+  if (!CAP[role].approvals) return '';
+  return `<div class="appr">${ic('userLock', 'i')}<b>1 fulfilment request awaiting approval</b><span class="by">Staff · Edit fulfilment on #0702 · “Wrong carrier, parcel not yet scanned”</span><span class="sp"></span><button class="btn xs ghost">View order</button><button class="btn xs pri">Approve</button><button class="btn xs dngr">Reject</button></div>`;
+}
+
+
+/* ---------- round 2: colour swatch, Shopify link, available qty, purchase order ---------- */
+export const swatch = (x) => `<span class="sw"><i style="background:${x.hex}"></i>${x.colour}</span>`;
+export const shopifyLink = (r, x) => `<a class="shl" title="Open in Shopify admin · ${STORES[r.store].domain}/admin/products/${x.productId}" href="${shopifyUrl(r, x)}">${ic('external', 'i10')}</a>`;
+export const availCell = (r, x) => {
+  const n = need(x), cls = r.canceled || r.ful === 'full' ? '' : x.avail < n ? 'bad' : x.avail === n ? 'low' : '';
+  return `<span class="av-n tn ${cls}" title="Available = on hand − allocated (hub pool, shared by all stores)">${x.avail}</span>`;
+};
+const PO_SHORT = { REQUESTED: 'Requested', PARTIALLY_RECEIVED: 'Part received', RECEIVED: 'Received', CANCELLED: 'Cancelled' };
+export const poBadgeCls = { REQUESTED: 'info', PARTIALLY_RECEIVED: 'warn', RECEIVED: 'ok', CANCELLED: '' };
+export function poCell(r, x, cap) {
+  const short = isShort(r, x) || (x.avail <= 2 && !x.po);
+  if (x.po) {
+    const p = x.po, sub = p.status === 'RECEIVED' ? `${p.received}/${p.ordered} in` : p.status === 'PARTIALLY_RECEIVED' ? `${p.received}/${p.ordered} in · ETA ${p.eta}` : `${p.ordered} on PO · ETA ${p.eta}`;
+    return `<span class="cell col" style="gap:2px"><span class="bdg ${poBadgeCls[p.status]}" title="Purchase order #${p.no} · ${PO_LABEL[p.status]}">#${p.no} ${PO_SHORT[p.status]}</span><span class="muted" style="font-size:10.5px">${sub}</span></span>`;
+  }
+  if (!short) return `<span class="muted">—</span>`;
+  return cap.poCreate ? `<button class="btn xs soft" title="Create a purchase order for ${x.supplier}">${ic('plus', 'i10')}PO</button>` : `<span class="cell"><span class="bdg bad">No PO</span></span>`;
+}
+export function shortBadge(r, cap) {
+  const n = cap.stock ? shortCount(r) : 0;
+  return n ? `<span class="bdg warn" title="${n} line${n > 1 ? 's' : ''} not covered by available stock">Short ${n}</span>` : '';
+}
+
+/* ---------- pack lines ---------- */
+export function lineCols(cap, dense = false) {
+  const cols = [['item', 'minmax(0,1fr)']];
+  if (!cap.stock) cols.push(['sku', '96px']);
+  if (cap.bin && !dense) cols.push(['bin', '44px']);
+  if (cap.deco && !dense) cols.push(['deco', '68px']);
+  cols.push(['qty', '28px'], ['packed', '52px']);
+  if (cap.stock) cols.push(['avail', '40px'], ['po', '136px']);
+  if (cap.pack) cols.push(['full', '34px'], ['part', '96px']);
+  return cols;
+}
+const colsCss = (cols) => cols.map((c) => c[1]).join(' ');
+const xchips = (x, cap) => { const c = [X.nameChip(x, cap), cap.reqStock ? X.restockLine(x) : ''].filter(Boolean).join(''); return c ? `<span class="cell" style="gap:4px;margin-top:1px">${c}</span>` : ''; };
+export function lines(r, cap, { rowH = 36, sel = 1, skuSub = true, head: showHead = true, dense = false } = {}) {
+  const cols = lineCols(cap, dense), css = colsCss(cols), N = { item: 'Item', sku: 'SKU', bin: 'Bin', deco: 'Deco', qty: 'Qty', packed: 'Packed', avail: 'Avail', po: 'PO status', full: 'Full', part: 'Partial' };
+  const head = `<div class="lnh" style="--lcols:${css}">${cols.map(([k]) => `<span style="${['qty', 'packed', 'full', 'avail'].includes(k) ? 'text-align:center' : ''}">${N[k]}</span>`).join('')}</div>`;
+  const rows = r.items.map((x, idx) => {
+    const done = x.packed >= x.qty, part = x.packed > 0 && !done, fullOn = done || (sel && idx === 0);
+    const cell = {
+      item: `<span class="cell">${tile(x.kind, x.hex, rowH > 40 ? 32 : 26)}<span class="cell col" style="min-width:0" title="${x.sku}"><span class="cell" style="gap:4px;max-width:100%"><b class="strong ell" style="font-size:11.5px">${x.name}</b>${cap.shopify ? shopifyLink(r, x) : ''}</span><span class="muted ell" style="font-size:10px;display:flex;align-items:center;gap:4px">${swatch(x)}<span>· ${x.size}</span>${cap.stock && skuSub ? `<span class="mono">· ${x.sku}</span>` : ''}${dense && cap.bin ? `<span class="bin">${x.bin}</span>` : ''}</span>${xchips(x, cap)}</span></span>`,
+      sku: `<span class="mono muted">${x.sku}</span>`,
+      bin: `<span class="bin">${x.bin}</span>`,
+      deco: X.lineDeco(x, cap),
+      qty: `<b class="tn" style="text-align:center">${x.qty}</b>`,
+      avail: `<span style="display:flex;justify-content:center">${cap.stock ? availCell(r, x) : ''}</span>`,
+      po: cap.stock ? poCell(r, x, cap) : '',
+      packed: `<span class="pb" style="justify-content:center"><b class="tn" style="color:${done ? 'var(--e700)' : part ? 'var(--a800)' : 'var(--tx-s)'}">${x.packed}/${x.qty}</b></span>`,
+      full: `<span style="display:flex;justify-content:center"><span class="ck${fullOn ? ' on' : ''}"></span></span>`,
+      part: `<span class="step${fullOn ? ' dis' : ''}" style="justify-self:end"><button>−</button><span>${fullOn ? x.qty : idx === 1 && sel ? 2 : 0}</span><button>+</button></span>`,
+    };
+    return `<div class="ln${done ? ' done' : part ? ' part' : ''}" style="--lcols:${css};--lh:${rowH}px">${cols.map(([k]) => cell[k] || '<span></span>').join('')}</div>`;
+  });
+  return (showHead ? head : '') + rows.join('');
+}
+
+/* ---------- role-gated side boxes (shared by A expanded row, B inspector, C detail zone) ---------- */
+export function packBox(r, cap, { big = false } = {}) {
+  if (!cap.pack) return '';
+  const allPacked = packedQty(r) >= totalQty(r);
+  const hist = packedQty(r) > 0 ? `<div class="hist"><span><b>Packed Wed 14:02</b> · ${packedQty(r)} items</span><button class="ib" title="Cancel confirmation (sends notification)">${ic('trash', 'i')}</button></div>` : `<div class="hist muted">No packing history.</div>`;
+  const h = big ? 38 : 28;
+  return `<div style="display:flex;flex-direction:column;gap:6px">
+    <div class="rcp"><div class="rcp-h"><b>Notify users</b><span class="muted">${RECIPIENTS.length} of ${RECIPIENTS.length}</span><button class="lnk" title="Add an email message to the notification">+ message</button></div><div class="rcp-l">${RECIPIENTS.map((u) => `<span class="rcp-r"><span class="ck on"></span><span class="cell col" style="gap:0;min-width:0"><b class="ell">${u.name}</b><span class="muted ell">${u.email}</span></span></span>`).join('')}</div></div>
+    ${allPacked ? `<button class="btn off" style="height:${h}px;width:100%">${ic('check', 'i')}All ${totalQty(r)} items packed</button>` : `<button class="btn pri" style="height:${h}px;font-size:${big ? 13 : 11}px;width:100%">${ic('check', 'i')}Confirm packed</button>`}
+    <div style="display:flex;gap:5px">
+      <button class="btn ${r.slip != null ? 'printed' : 'soft'}" style="flex:1;height:${big ? 34 : 26}px" title="${slipTitle(r)}">${ic(r.slip != null ? 'check' : 'printer', 'i')}${r.slip != null ? 'Slip printed · Reprint' : 'Print picking slip'}</button>
+    </div>
+    ${hist}
+  </div>`;
+}
+export function fulBox(r, cap, { confirm = true } = {}) {
+  if (!cap.ful) return '';
+  const locked = r.canceled || r.closed;
+  const lockNote = locked ? `<div class="lockb">${ic('lock', 'i')}<span><b class="strong">Fulfilment locked</b><br>${r.canceled ? 'Canceled' : 'Closed'} orders cannot be fulfilled.</span></div>` : '';
+  if (locked && !r.ful) return lockNote;
+  const editBtns = cap.req === 'direct'
+    ? `<button class="btn xs ghost">${ic('pencil', 'i12')}Edit</button><button class="btn xs dngr">Cancel</button>`
+    : r.req ? `<span class="bdg warn">${ic('clock', 'i10')}Edit request pending</span>` : `<button class="btn xs ghost">${ic('userLock', 'i12')}Request edit</button><button class="btn xs dngr">Request cancel</button>`;
+  if (r.ful) {
+    const cs = confsOf(r), c = cs[cs.length - 1], left = r.ful === 'partial' ? r.items.length - 1 : 0;
+    return `<div style="display:flex;flex-direction:column;gap:6px">${lockNote}
+      <div class="row-b"><span class="cell" style="gap:4px"><span class="bdg ok">${r.ful === 'full' ? 'Fulfilled' : 'Partial'}</span>${cs.length > 1 ? `<span class="bdg">${cs.length} parcels</span>` : ''}</span><span class="muted tn" style="font-size:10px">${c.date}</span></div>
+      <dl class="kv"><dt>Carrier</dt><dd>${c.carrier}</dd><dt>Tracking</dt><dd class="mono">${c.no} ${ic('external', 'i10')}</dd><dt>Status</dt><dd><span class="cell"><span class="bdg ${c.st === 'Delivered' ? 'ok' : 'info'}">${c.st}</span>${X.trackingIcon(r, cap)}</span></dd></dl>
+      ${left ? `<span class="muted" style="font-size:10px">${left} line still to fulfil</span>` : ''}
+      <div style="display:flex;gap:5px;flex-wrap:wrap">${locked ? '' : editBtns}<button class="btn xs ghost" title="Confirmations, barcodes and shipped lines">${ic('clipboard', 'i12')}Fulfilments (${cs.length})</button></div>
+    </div>`;
+  }
+  const ready = packedQty(r) >= totalQty(r);
+  return `<div style="display:flex;flex-direction:column;gap:6px">
+    <div class="row-b"><span class="bdg ${ready ? 'info' : 'warn'}">${ready ? 'Ready to fulfil' : 'Not fully packed'}</span><span class="muted tn" style="font-size:10px">${ready ? 'All lines packed' : packedQty(r) + '/' + totalQty(r) + ' packed'}</span></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px"><span class="inp" style="justify-content:space-between" title="Searchable carrier list">Australia Post ${ic('chevronDown', 'i10')}</span><span class="inp muted">Tracking no.</span></div>
+    <div style="display:grid;grid-template-columns:1fr auto;gap:5px;align-items:center"><span class="inp muted">${ic('scan', 'i10')}&nbsp;Barcodes</span><button class="lnk">+ Tracking URL</button></div>
+    <label class="ckl"><span class="ck on"></span>Send notification to customer</label>
+    ${confirm ? `<div style="display:flex;gap:5px"><button class="btn pri" style="flex:1;height:26px">Confirm fulfilment</button><button class="btn ghost" style="height:26px" title="Confirm and print the shipping label">${ic('printer', 'i')}& label</button></div>` : ''}
+  </div>`;
+}
+export function custBox(r, cap) {
+  if (!cap.cust) return '';
+  return `<div style="display:flex;flex-direction:column;gap:6px">
+    <dl class="kv" style="grid-template-columns:58px 1fr"><dt>Customer</dt><dd><b class="strong">${r.customer}</b></dd><dt>Email</dt><dd style="overflow-wrap:anywhere;font-size:10.5px">${contactOf(r).email}</dd><dt>Phone</dt><dd class="tn">${contactOf(r).phone}</dd><dt>Ship to</dt><dd>${contactOf(r).lines.join('<br>')}</dd><dt>Method</dt><dd><span class="cell" style="flex-wrap:wrap"><span class="bdg ${r.ship === 'Express' ? 'warn' : 'ok'}">${r.ship} · ${r.ship === 'Express' ? 'Paid $14' : 'Free'}</span>${(r.codes || []).map((c) => `<span class="bdg info" title="Discount code">${c}</span>`).join('')}</span></dd></dl>
+    ${r.notes ? `<div class="note-a"><b>Order note</b> · Please hold until the team captain collects the box.</div>` : ''}
+    ${cap.labels ? `<div style="display:flex;gap:5px"><button class="btn xs ghost">${ic('printer', 'i12')}Label</button><button class="btn xs ghost">${ic('document', 'i12')}Tax invoice</button></div>` : ''}
+  </div>`;
+}
+export function thread(r, cap) {
+  const mine = cap.pack && !cap.cust; // picker sees picker-type messages only; staff/admin see admin-type
+  const a = r.notes ? `<div class="msg"><span class="av">S</span><div><b>Staff</b> <span class="muted">· Order note · Wed 15:10</span><br>Captain collects Saturday, keep the box sealed with the club label.</div></div>` : '';
+  const b = r.msgs ? (mine
+    ? `<div class="msg"><span class="av p">P</span><div><b>Picker</b> <span class="muted">· To admin · Thu 08:42</span><br>Bin ${r.items[0].bin} is short by 1, can the last piece come from the stock room?</div></div>`
+    : `<div class="msg"><span class="av a">A</span><div><b>Admin</b> <span class="muted">· Message · Thu 08:42</span><br>Hold until the club coordinator confirms the final head count.</div></div>`) : '';
+  const empty = !a && !b ? `<div class="muted" style="font-size:10.5px">No notes or messages on this order yet.</div>` : '';
+  return `<div class="thr">${a}${b}${empty}<div class="row-b" style="gap:5px"><span class="inp" style="flex:1;color:var(--g500)">Add a note or message…</span><button class="btn sm soft">${ic('chat', 'i')}Send</button></div></div>`;
+}
+export function pickRoute(r) {
+  const seq = [...r.items].sort((a, b) => a.bin.localeCompare(b.bin));
+  return `<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;padding:8px">${seq.map((x, i) => `${i ? `<span class="muted">${ic('chevronRight', 'i12')}</span>` : ''}<span class="hist" style="padding:3px 8px 3px 4px;gap:6px;background:var(--surf)"><span class="bin">${x.bin}</span>${tile(x.kind, x.hex, 20)}<b class="tn">× ${x.qty - x.packed || x.qty}</b></span>`).join('')}</div>`;
+}
+export const secHead = (icn, t, right = '') => `<div class="sh"><h4>${ic(icn, 'i12')}${t}</h4><span>${right}</span></div>`;
+
+export function bulkBar(role, n = 3, compact = false) {
+  const c = CAP[role];
+  const L = compact ? { s: 'Slips', l: 'Labels', e: 'Names' } : { s: 'Print picking slips', l: 'Print labels', e: 'Export names' };
+  return `<div class="bulk"><b>${n} selected</b><span class="sep"></span>
+    ${c.slip ? `<button class="btn ghost">${ic('printer', 'i')}${L.s}</button>` : ''}
+    ${c.labels ? `<button class="btn ghost">${ic('printer', 'i')}${L.l}</button>` : ''}
+    ${c.labels ? `<button class="btn ghost" title="Export name attributes as CSV or print">${ic('download', 'i')}${L.e}${ic('chevronDown', 'i10')}</button>` : ''}
+    <button class="btn ghost">${ic('expand', 'i')}Expand</button><span class="sep"></span><button class="x ib" title="Clear selection">${ic('close', 'i')}</button></div>`;
+}
+export const pager = (n = 21, size = false) => `<div class="foot"><span>Showing <b class="tn strong">1–${Math.min(n, 20)}</b> of <b class="tn strong">${n}</b> ${size === 'products' ? 'products' : 'orders'}</span><div style="display:flex;align-items:center;gap:10px">${size ? `<span class="row-b" style="gap:5px"><span class="muted">Rows per page</span><span class="inp" style="height:20px;font-size:10.5px">20 ${ic('chevronDown', 'i10')}</span></span>` : ''}<div class="pager"><span>${ic('chevronLeft', 'i12')}</span><span class="on">1</span>${n > 20 ? '<span>2</span>' : ''}<span>${ic('chevronRight', 'i12')}</span></div></div></div>`;
+/** Create-PO popover (admin only). Created as REQUESTED, prefilled with the shortfall. */
+export function poPopover(r, x, { left, top, caretTop = 60 }) {
+  const short = Math.max(1, need(x) - x.avail);
+  return `<div class="pop" style="left:${left}px;top:${top}px" role="dialog" aria-label="Create purchase order"><i class="caret r" style="top:${caretTop}px"></i>
+    <div class="ph2"><b>Create purchase order</b><button class="ib">${ic('close', 'i')}</button></div>
+    <div class="fb">
+      <div class="fr"><label>Supplier</label><span class="inp" style="justify-content:space-between;height:28px">${x.supplier}${ic('chevronDown', 'i10')}</span></div>
+      <div class="fr"><label>Product</label><span class="cell" style="gap:8px">${tile(x.kind, x.hex, 30)}<span class="cell col"><b class="strong">${x.name}</b><span class="muted" style="font-size:10.5px;display:flex;gap:4px;align-items:center">${swatch(x)}<span>· ${x.size}</span><span class="mono">· ${x.sku}</span></span></span></span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="fr"><label>Quantity</label><span class="step" style="height:28px;width:100%"><button>−</button><span style="flex:1">${short}</span><button>+</button></span></div>
+        <div class="fr"><label>Delivery date</label><span class="inp" style="height:28px">6 Nov 2026</span></div>
+      </div>
+      <div class="row-b" style="font-size:10.5px;color:var(--tx-m);background:var(--a50);border:1px solid var(--a200);border-radius:7px;padding:5px 8px"><span><b>Needs ${need(x)}</b> · available <b>${x.avail}</b></span><span>Shortfall <b>${short}</b></span></div>
+      <div class="fr"><label>PO remark</label><span class="inp" style="height:28px;color:var(--g500)">Optional note to supplier…</span></div>
+    </div>
+    <div class="ft"><span class="muted" style="margin-right:auto;font-size:10px;align-self:center">Created as Requested</span><button class="btn ghost">Cancel</button><button class="btn pri">${ic('check', 'i')}Create PO</button></div>
+  </div>`;
+}
+export { ORDERS, byNo, queueFor, totalQty, packedQty, tile, ic };

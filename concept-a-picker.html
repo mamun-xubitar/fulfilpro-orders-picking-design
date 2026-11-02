@@ -1,0 +1,426 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Concept A · Order Picker</title><style>
+:root{
+ --g50:#f9fafb;--g100:#f3f4f6;--g200:#e5e7eb;--g300:#d1d5db;--g400:#9ca3af;--g500:#6b7280;--g600:#4b5563;--g700:#374151;--g800:#1f2937;--g900:#111827;
+ --b50:#eff6ff;--b100:#dbeafe;--b200:#bfdbfe;--b500:#3b82f6;--b600:#2563eb;--b700:#1d4ed8;
+ --e50:#ecfdf5;--e100:#d1fae5;--e200:#a7f3d0;--e600:#059669;--e700:#047857;
+ --a50:#fffbeb;--a100:#fef3c7;--a200:#fde68a;--a500:#f59e0b;--a600:#d97706;--a800:#92400e;
+ --r50:#fef2f2;--r100:#fee2e2;--r200:#fecaca;--r500:#ef4444;--r600:#dc2626;--r700:#b91c1c;
+ --p50:#f5f3ff;--p200:#ddd6fe;--p700:#6d28d9; --s50:#f0f9ff;--s200:#bae6fd;--s700:#0369a1;
+ /* skin hooks */
+ --st:#2563eb;--pri:#2563eb;--pri-h:#1d4ed8;--pri-soft:#eff6ff;--pri-ring:#bfdbfe;--pri-ink:#1d4ed8;
+ --canvas:#f3f4f6;--surf:#fff;--surf-m:#f9fafb;--bd:#e5e7eb;--bd-s:#d1d5db;--div:#f3f4f6;
+ --tx:#111827;--tx-b:#374151;--tx-m:#4b5563;--tx-s:#5b6472;--ctl-h:28px;--rad:8px;--rad-card:10px;
+ --shadow:0 1px 2px 0 rgb(0 0 0/.05);
+}
+.inv{
+ --pri:#5b3fd6;--pri-h:#4a2fbf;--pri-soft:#f1eef9;--pri-ring:#c9bdf7;--pri-ink:#4a2fbf;
+ --canvas:#eeedf6;--surf:#fff;--surf-m:#f8f7fc;--bd:#cfcae3;--bd-s:#aea7cc;--div:#e6e2f2;
+ --tx:#1d1a36;--tx-b:#35314f;--tx-m:#524e6e;--tx-s:#5c5876;--ctl-h:28px;--rad:7px;--rad-card:10px;
+ --shadow:0 1px 3px rgb(91 63 214/.10),0 1px 2px rgb(91 63 214/.06);
+ --sec-queue:#4338ca;--sec-detail:#6d28d9;--sec-pack:#0f766e;--sec-ful:#047857;--sec-act:#b45309;--sec-note:#0369a1;--sec-tool:#4d7c0f;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,Helvetica,sans-serif;background:#e9edf3;color:var(--tx);-webkit-font-smoothing:antialiased;font-size:11.5px}
+::selection{background:var(--pri-ring);color:var(--tx)}
+svg.i{width:14px;height:14px;flex:none}svg.i18{width:18px;height:18px;flex:none}svg.i16{width:14px;height:14px;flex:none}svg.i12{width:11px;height:11px;flex:none}svg.i10{width:10px;height:10px;flex:none}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+button:focus-visible,.tab:focus-visible{outline:2px solid var(--pri);outline-offset:1px}
+.tn{font-variant-numeric:tabular-nums}.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10.5px}
+.muted{color:var(--tx-s)}.strong{font-weight:700;color:var(--tx)}
+.thin{scrollbar-width:thin;scrollbar-color:var(--bd-s) transparent}
+
+/* ---------- artboard (1280x800 = Tailwind xl) ---------- */
+.art{width:1280px;height:800px;background:var(--canvas);border:1px solid var(--bd-s);border-radius:10px;overflow:hidden;display:flex;box-shadow:0 8px 26px rgb(15 23 42/.12);position:relative}
+.sb{width:56px;background:#111827;flex:none;display:flex;flex-direction:column;align-items:center;padding:8px 0;gap:3px}
+.sb-top{width:36px;height:32px;display:flex;align-items:center;justify-content:center;color:#9ca3af;margin-bottom:6px}
+.sb-i{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;color:#9ca3af}
+.sb-i.on{background:var(--b600);color:#fff}
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.hd{height:46px;flex:none;background:#fff;border-bottom:1px solid var(--g200);display:flex;align-items:center;justify-content:space-between;padding:0 14px}
+.hd-title{font-size:15px;display:flex;align-items:center;gap:7px;min-width:0}.hd-title b{font-weight:700;color:var(--g900)}
+.hd-sep{color:var(--g300)}.hd-sub{color:var(--g500);font-size:13px}
+.hd-right{display:flex;align-items:center;gap:9px}.hd-div{width:1px;height:20px;background:var(--g200)}
+.hd-ic{position:relative;color:var(--g600);display:flex}
+.badge{position:absolute;top:-6px;right:-7px;font-size:8.5px;font-style:normal;font-weight:700;color:#fff;background:var(--r600);border-radius:999px;padding:1px 4px;line-height:1.3}
+.hd-user{font-size:12.5px;color:var(--g700);font-weight:600}
+.avatar{width:26px;height:26px;border-radius:999px;background:var(--b600);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.zoom{display:flex;align-items:center;border:1px solid var(--g300);border-radius:8px;overflow:hidden;background:#fff}
+.zb{display:flex;align-items:center;gap:4px;padding:4px 7px;color:var(--g600)}.zb:hover{background:var(--g50)}
+.zb-mid{border-left:1px solid var(--g200);border-right:1px solid var(--g200);background:var(--g50)}
+.zpct{font-size:11px;font-weight:700;color:var(--g700);font-variant-numeric:tabular-nums;min-width:26px;text-align:center}
+.zoomable{flex:1;min-height:0;display:flex;flex-direction:column;overflow:auto;background:var(--canvas)}
+.zoomable>.page{flex:1;min-height:0}
+.page{padding:8px;display:flex;flex-direction:column;gap:6px;min-height:0}
+
+/* ---------- controls ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:4px;border-radius:var(--rad);font-size:11px;font-weight:700;padding:0 9px;white-space:nowrap;border:1px solid transparent;height:var(--ctl-h);transition:background .15s,border-color .15s}
+.btn.sm{height:24px;font-size:10.5px;padding:0 7px;border-radius:6px}
+.btn.xs{height:20px;font-size:9.5px;padding:0 6px;border-radius:5px}
+.btn.pri{background:var(--pri);color:#fff}.btn.pri:hover{background:var(--pri-h)}
+.btn.ok{background:var(--e600);color:#fff}
+.btn.ghost{border-color:var(--bd-s);color:var(--tx-b);background:var(--surf)}.btn.ghost:hover{background:var(--surf-m)}
+.btn.soft{background:var(--pri-soft);color:var(--pri-ink);border-color:var(--pri-ring)}
+.btn.dngr{border-color:var(--r200);background:var(--r50);color:var(--r700)}
+.btn.warn{border-color:var(--a200);background:var(--a50);color:var(--a800)}
+.btn.printed{border-color:var(--e200);background:var(--e50);color:var(--e700)}.btn.printed:hover{background:var(--e100)}
+.btn.off{border-color:var(--bd);color:var(--g500);background:var(--surf-m);cursor:not-allowed}
+.ib{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;color:var(--tx-s);flex:none;position:relative}
+.ib:hover{background:var(--div);color:var(--tx)}
+.ib.off{color:var(--g500)}
+.ib.printed{color:var(--e700);background:var(--e50);box-shadow:inset 0 0 0 1px var(--e200)}.ib.printed:hover{background:var(--e100);color:var(--e700)}
+.ib.printed::after{content:"";position:absolute;right:-2px;bottom:-2px;width:8px;height:8px;border-radius:50%;background:var(--e600) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M2.3 5.2l1.8 1.8 3.6-3.8' fill='none' stroke='%23fff' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/8px no-repeat;box-shadow:0 0 0 1.5px var(--surf)}
+.ib.ro{cursor:default;width:20px;height:20px}
+.ib .ct{position:absolute;top:-2px;right:-3px;background:var(--pri);color:#fff;font-size:8px;font-weight:700;border-radius:999px;padding:0 3.5px;line-height:12px;font-style:normal}
+.ib .ct.red{background:var(--r600)}.ib .ct.amber{background:var(--a800)}
+.srch{display:flex;align-items:center;gap:6px;height:var(--ctl-h);flex:1;min-width:230px;max-width:430px;border:1px solid var(--bd-s);border-radius:var(--rad);background:var(--surf);padding:0 4px 0 8px;color:var(--tx-s)}
+.srch:focus-within{border-color:var(--pri);box-shadow:0 0 0 2px var(--pri-ring)}
+.srch .fld{display:inline-flex;align-items:center;gap:3px;background:var(--pri-soft);color:var(--pri-ink);border:1px solid var(--pri-ring);border-radius:5px;font-size:10px;font-weight:700;padding:1px 3px 1px 6px;white-space:nowrap}
+.srch .ph{flex:1;color:var(--g500);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.srch kbd{font:700 9.5px Arial;color:var(--tx-s);border:1px solid var(--bd);border-bottom-width:2px;border-radius:4px;padding:0 4px;background:var(--surf-m)}
+.fchip{display:inline-flex;align-items:center;gap:5px;height:var(--ctl-h);border:1px solid var(--bd-s);border-radius:var(--rad);padding:0 7px 0 8px;font-size:11px;background:var(--surf);color:var(--tx-b);white-space:nowrap}
+.fchip .k{color:var(--tx-m);font-weight:400}.fchip b{font-weight:700;color:var(--tx)}.fchip svg{color:var(--g400)}
+.fchip.on{background:var(--pri-soft);border-color:var(--pri-ring)}.fchip.on b{color:var(--pri-ink)}
+.fchip.ro{background:var(--surf-m);border-style:dashed}
+.rmv{display:inline-flex;align-items:center;gap:3px;height:20px;border-radius:999px;background:var(--pri-soft);border:1px solid var(--pri-ring);color:var(--pri-ink);font-size:10px;font-weight:700;padding:0 4px 0 7px}
+.rmv svg{color:var(--pri-ink)}
+.qtabs{display:flex;gap:2px;background:var(--div);border:1px solid var(--bd);border-radius:10px;padding:2px;flex:none}
+.qt{display:flex;align-items:center;gap:6px;padding:0 10px;height:26px;border-radius:8px;font-size:11.5px;font-weight:700;color:var(--tx-m);white-space:nowrap}
+.qt:hover{color:var(--tx)}
+.qt.on{background:var(--surf);color:var(--tx);box-shadow:var(--shadow)}
+.qn{font-size:10px;min-width:18px;text-align:center;padding:1px 5px;border-radius:999px;background:var(--bd);color:var(--tx-b);font-variant-numeric:tabular-nums}
+.qt.on .qn{background:var(--pri);color:#fff}
+.qt.hot .qn{background:var(--a100);color:var(--a800)}.qt.hot.on .qn{background:var(--a600);color:#fff}
+.ck{width:13px;height:13px;border:1.5px solid var(--g400);border-radius:3px;flex:none;display:inline-block;background:#fff}
+.ck.on{background:var(--pri);border-color:var(--pri);position:relative}
+.ck.on::after{content:"";position:absolute;left:3.2px;top:.4px;width:3.5px;height:7px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
+.ck.mix{background:var(--pri);border-color:var(--pri);position:relative}.ck.mix::after{content:"";position:absolute;left:2px;top:4.5px;width:6px;height:2px;background:#fff}
+.inp{border:1px solid var(--bd-s);border-radius:6px;padding:0 6px;font-size:11px;background:var(--surf);color:var(--tx);display:inline-flex;align-items:center;height:24px;white-space:nowrap}
+.step{display:inline-flex;align-items:center;border:1px solid var(--bd-s);border-radius:7px;overflow:hidden;background:var(--surf);height:24px}
+.step button{width:22px;height:100%;color:var(--tx-m);font-weight:700;font-size:13px;line-height:1}.step button:hover{background:var(--div)}
+.step.dis{opacity:.5;background:var(--surf-m)}
+.step span{min-width:24px;text-align:center;font-weight:700;font-variant-numeric:tabular-nums;border-left:1px solid var(--bd);border-right:1px solid var(--bd);line-height:22px;font-size:11.5px}
+
+/* ---------- badges + product tile ---------- */
+.bdg{display:inline-flex;align-items:center;gap:3px;height:16px;padding:0 6px;border-radius:999px;font-size:9.5px;font-weight:700;border:1px solid var(--bd);background:var(--surf-m);color:var(--tx-m);white-space:nowrap}
+.bdg.bad{background:var(--r50);border-color:var(--r200);color:var(--r700)}
+.bdg.warn{background:var(--a50);border-color:var(--a200);color:var(--a800)}
+.bdg.ok{background:var(--e50);border-color:var(--e200);color:var(--e700)}
+.bdg.info{background:var(--b50);border-color:var(--b200);color:var(--b700)}
+.bdg.emb{background:var(--p50);border-color:var(--p200);color:var(--p700)}
+.bdg.prt{background:var(--s50);border-color:var(--s200);color:var(--s700)}
+.pt{display:inline-flex;align-items:center;justify-content:center;border-radius:6px;background:color-mix(in srgb,var(--pc) 13%,#fff);border:1px solid color-mix(in srgb,var(--pc) 22%,#fff);flex:none}
+.store{display:inline-flex;align-items:center;gap:4px;font-size:9.5px;font-weight:700;color:var(--tx-m);background:var(--surf-m);border:1px solid var(--bd);border-radius:5px;padding:0 5px;height:16px;white-space:nowrap}
+.store i{width:6px;height:6px;border-radius:50%;display:inline-block}
+.stack{display:inline-flex}.stack .pt{margin-left:-6px;border:1.5px solid var(--surf)}.stack .pt:first-child{margin-left:0}
+
+/* ---------- round 2 ---------- */
+.sw{display:inline-flex;align-items:center;gap:4px;color:var(--tx-m)}
+.sw i{width:9px;height:9px;border-radius:50%;border:1px solid rgba(17,24,39,.35);display:inline-block;flex:none}
+.shl{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:4px;color:var(--pri-ink);flex:none;text-decoration:none}
+.shl:hover{background:var(--pri-soft)}
+.av-n{font-weight:700;color:var(--tx)}.av-n.bad{color:var(--r700)}.av-n.low{color:var(--a800)}
+.pop{position:absolute;z-index:20;width:316px;background:#fff;border:1px solid var(--bd-s);border-radius:12px;box-shadow:0 18px 44px rgb(15 23 42/.28),0 3px 8px rgb(15 23 42/.12)}
+.pop .caret{position:absolute;top:-7px;width:12px;height:12px;background:#fff;border-left:1px solid var(--bd-s);border-top:1px solid var(--bd-s);transform:rotate(45deg)}
+.pop .caret.r{right:-7px;left:auto;border:0;border-right:1px solid var(--bd-s);border-bottom:1px solid var(--bd-s)}
+.pop .ph2{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-bottom:1px solid var(--div)}
+.pop .ph2 b{font-size:13px}.pop .fb{padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.pop .fr{display:flex;flex-direction:column;gap:3px}.pop .fr label{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--tx-s)}
+.pop .ft{display:flex;justify-content:flex-end;gap:6px;padding:9px 12px;border-top:1px solid var(--bd);background:var(--surf-m);border-radius:0 0 12px 12px}
+/* ---------- stage track ---------- */
+.trk{display:flex;align-items:center}
+.nd{width:15px;height:15px;border-radius:50%;border:2px solid var(--g300);background:#fff;display:flex;align-items:center;justify-content:center;color:#fff;flex:none}
+.nd svg{width:8px;height:8px;stroke-width:3.4}
+.nd.done{background:var(--st);border-color:var(--st)}.nd.done.g{background:var(--e600);border-color:var(--e600)}
+.nd.part{border-color:var(--a500);background:linear-gradient(90deg,var(--a500) 50%,#fff 50%)}
+.cn{width:19px;height:2px;background:var(--g200);flex:none}.cn.done{background:var(--st)}.cn.g{background:var(--e600)}
+.trk.lg .nd{width:20px;height:20px}.trk.lg .nd svg{width:11px;height:11px}.trk.lg .cn{width:26px}
+.trk-l{display:flex;font-size:9px;font-weight:700;letter-spacing:0;text-transform:uppercase;color:var(--tx-s)}
+.pb{display:flex;align-items:center;gap:6px}.pbar{width:38px;height:4px;background:var(--bd);border-radius:2px;overflow:hidden}
+.pbar i{display:block;height:100%;background:var(--st)}.pbar i.part{background:var(--a500)}.pbar i.done{background:var(--st)}
+
+/* ---------- table ---------- */
+.card{background:var(--surf);border:1px solid var(--bd);border-radius:var(--rad-card);box-shadow:var(--shadow);display:flex;flex-direction:column;min-width:0;min-height:0}
+.thead{display:grid;grid-template-columns:var(--cols);gap:8px;align-items:center;padding:0 10px;height:26px;background:var(--surf-m);border-bottom:1px solid var(--bd);font-size:9.5px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--tx-s);flex:none;border-radius:var(--rad-card) var(--rad-card) 0 0}
+.thead .srt{display:inline-flex;align-items:center;gap:3px}
+.tbody{flex:1;min-height:0;overflow:hidden;position:relative}
+.tr{display:grid;grid-template-columns:var(--cols);gap:8px;align-items:center;padding:0 10px;height:var(--rh,36px);border-bottom:1px solid var(--div);font-size:11.5px;color:var(--tx-b)}
+.tr:hover{background:var(--surf-m)}
+.tr.sel{background:var(--pri-soft)}
+.tr.cx{color:var(--g400)}.tr.cx .ono{text-decoration:line-through;color:var(--g400)}
+.tr.open{background:#fff;box-shadow:inset 0 0 0 1.5px var(--pri);border-bottom-color:var(--pri-ring)}
+.ono{font-weight:700;color:var(--tx);font-variant-numeric:tabular-nums}
+.cell{display:flex;align-items:center;gap:5px;min-width:0;white-space:nowrap}
+.cell.col{flex-direction:column;align-items:flex-start;gap:1px;justify-content:center}
+.ell{overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.acts{display:flex;align-items:center;justify-content:flex-end;gap:0}
+.foot{display:flex;align-items:center;justify-content:space-between;padding:0 10px;height:28px;border-top:1px solid var(--bd);background:var(--surf-m);flex:none;font-size:10.5px;color:var(--tx-s);border-radius:0 0 var(--rad-card) var(--rad-card)}
+.pager{display:flex;gap:2px}.pager span{min-width:20px;height:20px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--tx-m);border:1px solid transparent}
+.pager .on{background:var(--pri);color:#fff}
+
+/* keep rows clear of the floating bulk bar */
+.tbody:has(.bulk),.sheet-body:has(.bulk){padding-bottom:70px}
+/* ---------- bulk bar (floating = allowed heavy shadow) ---------- */
+.bulk{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);background:#111827;color:#e5e7eb;border-radius:12px;padding:5px 6px 5px 12px;display:flex;align-items:center;gap:6px;box-shadow:0 12px 30px rgb(0 0 0/.28),0 2px 6px rgb(0 0 0/.2);font-size:11px;white-space:nowrap;z-index:5}
+.bulk b{color:#fff;font-variant-numeric:tabular-nums}.bulk .sep{width:1px;height:18px;background:#374151;margin:0 2px}
+.bulk .btn{height:26px}.bulk .btn.ghost{background:#1f2937;border-color:#374151;color:#e5e7eb}.bulk .btn.ghost:hover{background:#374151}
+.bulk .x{color:#9ca3af}
+
+/* ---------- approvals strip ---------- */
+.appr{display:flex;align-items:center;gap:8px;background:var(--a50);border:1px solid var(--a200);color:var(--a800);border-radius:var(--rad);padding:0 6px 0 9px;height:30px;font-size:11px;flex:none}
+.appr b{font-weight:700}.appr .sp{flex:1}
+.appr .by{color:#b45309}
+
+/* ---------- pack lines ---------- */
+.ln{display:grid;grid-template-columns:var(--lcols);gap:8px;align-items:center;padding:0 8px;min-height:var(--lh,36px);border-bottom:1px solid var(--div);font-size:11.5px}
+.ln:last-child{border-bottom:0}
+.ln.done{background:#f0fdf4}.ln.part{background:#fffbeb}
+.lnh{display:grid;grid-template-columns:var(--lcols);gap:8px;padding:0 8px;height:22px;align-items:center;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--tx-s);border-bottom:1px solid var(--bd);background:var(--surf-m)}
+.bin{display:inline-flex;align-items:center;gap:3px;font:700 10px ui-monospace,Menlo,monospace;color:var(--tx-b);background:var(--div);border-radius:4px;padding:1px 5px}
+.kv{display:grid;grid-template-columns:78px 1fr;gap:3px 8px;font-size:11px;align-items:baseline}
+.kv dt{color:var(--tx-s);font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.35px}.kv dd{color:var(--tx-b);min-width:0}
+.sh{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:0 9px;height:26px;border-bottom:1px solid var(--div);flex:none}
+.sh h4{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--tx-s);display:flex;align-items:center;gap:5px}
+.hist{display:flex;align-items:center;justify-content:space-between;gap:6px;border:1px solid var(--bd);border-radius:7px;padding:3px 4px 3px 8px;background:var(--surf-m);font-size:10.5px}
+.tabs{display:flex;gap:1px;border-bottom:1px solid var(--bd);padding:0 6px;flex:none}
+.tab{font-size:10.5px;font-weight:700;color:var(--tx-s);padding:0 9px;height:30px;display:flex;align-items:center;gap:5px;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap}
+.tab.on{color:var(--pri-ink);border-bottom-color:var(--pri)}
+.tab .qn{font-size:9px;padding:0 4px}
+.lock{display:inline-flex;align-items:center;gap:4px;font-size:10px;color:var(--tx-s);font-weight:700}
+.note-a{background:var(--a50);border:1px solid var(--a200);color:var(--a800);border-radius:7px;padding:4px 7px;font-size:10.5px;line-height:1.35}
+.hr{height:1px;background:var(--div);flex:none}
+
+.row-tb{display:flex;align-items:center;gap:6px;flex:none}.sp{flex:1}
+.row-b{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.split{display:inline-flex}.split .btn:first-child{border-radius:var(--rad) 0 0 var(--rad)}.split .sd{border-radius:0 var(--rad) var(--rad) 0;border-left:0;padding:0 5px}
+.qrow{display:flex;align-items:center;justify-content:space-between;gap:8px;flex:none}
+.qrow .r{display:flex;align-items:center;gap:6px}
+.xp{background:var(--surf-m);border-bottom:1px solid var(--pri-ring);padding:8px 10px 10px;display:flex;gap:8px;align-items:stretch}
+.xp .bx{background:var(--surf);border:1px solid var(--bd);border-radius:9px;display:flex;flex-direction:column;min-width:0}
+.ckl{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;color:var(--tx-b);font-weight:600;white-space:nowrap}
+.thr{padding:8px;display:flex;flex-direction:column;gap:7px}
+.msg{display:flex;gap:7px;font-size:11px;line-height:1.4;color:var(--tx-b)}
+.av{width:20px;height:20px;border-radius:50%;background:var(--pri);color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none}.av.p{background:#0f766e}.av.a{background:#1f2937}
+.xp .bx .in{padding:8px;display:flex;flex-direction:column;gap:6px}
+
+.split2{display:grid;grid-template-columns:448px 1fr;gap:8px;flex:1;min-height:0}
+.lst{display:flex;flex-direction:column;min-height:0}
+.lh{display:flex;align-items:center;justify-content:space-between;height:28px;padding:0 10px;border-bottom:1px solid var(--bd);background:var(--surf-m);border-radius:var(--rad-card) var(--rad-card) 0 0;flex:none;font-size:9.5px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--tx-s)}
+.lb{flex:1;min-height:0;overflow:hidden}
+.li{display:grid;grid-template-columns:18px 1fr auto;gap:8px;align-items:center;padding:0 10px;height:var(--lih,54px);border-bottom:1px solid var(--div);position:relative}
+.li:hover{background:var(--surf-m)}
+.li.cx{color:var(--g400)}
+.li.sel{background:var(--pri-soft);box-shadow:inset 0 0 0 1.5px var(--pri)}
+.li .l1,.li .l2{display:flex;align-items:center;gap:6px;min-width:0;white-space:nowrap}
+.li .l2{margin-top:4px;color:var(--tx-s);font-size:10.5px}
+.li .rt{display:flex;flex-direction:column;align-items:flex-end;gap:5px}
+.insp{display:flex;flex-direction:column;min-height:0}
+.ih{padding:9px 12px 8px;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;border-bottom:1px solid var(--div);flex:none}
+.ih h2{font-size:17px;letter-spacing:-.2px;display:flex;align-items:center;gap:7px}
+.ih .sub{margin-top:4px;color:var(--tx-s);font-size:11px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.tl{display:flex;flex-direction:column;gap:3px;align-items:flex-start}
+.tl .lab{display:flex;gap:0;font-size:8px;font-weight:700;color:var(--tx-s);text-transform:uppercase}.tl .lab span{width:46px}
+.ibody{flex:1;min-height:0;overflow:hidden;padding:10px;display:flex;flex-direction:column;gap:8px}
+.sbx{border:1px solid var(--bd);border-radius:9px;background:var(--surf);min-width:0}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.iact{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 12px;border-top:1px solid var(--bd);background:var(--surf-m);border-radius:0 0 var(--rad-card) var(--rad-card);flex:none}
+.big .step{height:36px;border-radius:9px}.big .step button{width:36px;font-size:18px}.big .step span{min-width:34px;font-size:14px;line-height:34px}
+.big .ck{width:22px;height:22px;border-radius:6px}.big .ck.on::after{left:6.5px;top:2px;width:5px;height:10px}
+.big .ln{font-size:12.5px}
+.kb{display:flex;gap:10px;font-size:10px;color:var(--tx-s);align-items:center}.kb kbd{font:700 9.5px Arial;border:1px solid var(--bd);border-bottom-width:2px;border-radius:4px;padding:0 4px;background:var(--surf);color:var(--tx-m)}
+
+.cc .page{gap:6px}
+.itabs{display:flex;align-items:center;gap:2px;background:var(--surf);border:1px solid var(--bd);border-radius:10px;padding:3px;box-shadow:var(--shadow);flex:none}
+.itab{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--pri);padding:0 9px;height:24px;display:flex;align-items:center;gap:5px;border-radius:6px;white-space:nowrap}
+.itab.on{background:var(--pri);color:#fff}
+.itabs .sp{flex:1}
+.strip{display:grid;background:var(--surf);border:1px solid var(--bd);border-radius:10px;box-shadow:var(--shadow);flex:none;overflow:hidden}
+.sg{display:flex;flex-direction:column;gap:2px;text-align:left;padding:6px 12px;border-right:1px solid var(--div);border-bottom:2px solid transparent;min-width:0}
+.sg:last-child{border-right:0}.sg.on{border-bottom-color:var(--pri);background:var(--pri-soft)}
+.sg .n{font-size:16px;font-weight:700;color:var(--tx);font-variant-numeric:tabular-nums;line-height:1}
+.sg .t{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.35px;color:var(--tx-m);white-space:nowrap}
+.sg .h{font-size:10px;color:var(--tx-s);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpis{display:none}
+.kp{display:flex;align-items:center;gap:8px;text-align:left;background:var(--surf);border:1px solid var(--bd);border-radius:10px;padding:6px 9px;box-shadow:var(--shadow);min-width:0}
+.kp.on{border-color:var(--pri);box-shadow:0 0 0 2px var(--pri-ring)}
+.kp .ico{width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--h) 12%,#fff);color:var(--h);flex:none}
+.kp .n{font-size:17px;font-weight:700;color:var(--tx);font-variant-numeric:tabular-nums;line-height:1}
+.kp .t{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.35px;color:var(--tx-m);white-space:nowrap}
+.kp .h{font-size:9.5px;color:var(--tx-s);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.grid-c{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,1fr);gap:6px;flex:1;min-height:0}
+.col{display:flex;flex-direction:column;gap:6px;min-height:0;min-width:0}
+.zone{background:var(--surf);border:1px solid var(--bd);border-radius:10px;box-shadow:var(--shadow);display:flex;flex-direction:column;min-height:0;min-width:0}
+.zh{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:0 9px;height:26px;border-bottom:1px solid var(--div);flex:none}
+.zh h3{display:flex;align-items:center;gap:5px;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--h)}
+.zh h3 svg{color:var(--h)}
+.zh .mp{background:var(--surf-m);color:var(--tx-m);font-size:9.5px;font-weight:700;border-radius:999px;padding:1px 7px;border:1px solid var(--div)}
+.zb2{padding:8px;display:flex;flex-direction:column;gap:6px;min-height:0;overflow:hidden}
+.al{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;padding:0 9px;height:34px;border-bottom:1px solid var(--div)}
+.al:last-child{border-bottom:0}
+.cc .ln.done{background:#f2fbf6}.cc .ln.part{background:#fffbef}
+.cc .thead{background:var(--surf-m)}
+.cc .qn{background:var(--div)}
+.cc .btn.ghost{color:var(--tx-m)}
+.cc .appr{border-radius:10px}
+.cc .bulk .btn.ghost{color:#e5e7eb}
+.zone .thr{padding:6px 8px;gap:5px;overflow:hidden}
+
+.ob{background:var(--surf);border:1px solid var(--bd);border-radius:10px;box-shadow:var(--shadow);flex:none;overflow:hidden}
+.oh{display:flex;align-items:center;gap:10px;height:34px;padding:0 8px 0 10px;background:var(--surf-m);border-bottom:1px solid var(--bd)}
+.oh .sp{flex:1}
+.oh .nm{display:flex;flex-direction:column;line-height:1.15;min-width:0}
+.ols{padding:0 10px}
+.sheet-body{flex:1;min-height:0;overflow:hidden;padding:8px;display:flex;flex-direction:column;gap:8px;position:relative}
+.seg2{display:inline-flex;background:var(--div);border:1px solid var(--bd);border-radius:9px;padding:2px;gap:2px;flex:none}
+.seg2 button{height:24px;padding:0 12px;border-radius:7px;font-size:11.5px;font-weight:700;color:var(--tx-m);display:flex;align-items:center;gap:5px}
+.seg2 button.on{background:var(--surf);color:var(--tx);box-shadow:var(--shadow)}
+.view{flex-direction:column;gap:6px;flex:1;min-height:0}
+.selbar{display:flex;align-items:center;gap:8px;height:30px;padding:0 8px;flex:none;font-size:11px;color:var(--tx-b)}
+.selbar .pill{background:var(--pri-soft);border:1px solid var(--pri-ring);color:var(--pri-ink);font-weight:700;border-radius:999px;padding:1px 8px}
+.selbar .sp{flex:1}
+
+.rcp{border:1px solid var(--bd);border-radius:8px;background:var(--surf)}
+.rcp-h{display:flex;align-items:center;gap:6px;padding:3px 7px;border-bottom:1px solid var(--div);font-size:9.5px}.rcp-h b{font-size:9.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--tx-s)}.rcp-h .lnk{margin-left:auto}
+.rcp-l{max-height:78px;overflow:hidden;padding:2px 4px;display:flex;flex-direction:column}
+.rcp-r{display:flex;align-items:center;gap:6px;padding:2px 3px;min-height:26px;font-size:10.5px}.rcp-r .muted{font-size:9.5px}
+.lnk{font-size:10px;font-weight:700;color:var(--pri-ink);white-space:nowrap}.lnk:hover{text-decoration:underline}
+.nm-a{display:inline-flex;align-items:center;gap:4px;font-size:9.5px;font-weight:700;color:var(--tx-m);background:var(--surf-m);border:1px solid var(--bd-s);border-radius:4px;padding:0 4px;height:15px;white-space:nowrap}
+.nm-a .ck{width:10px;height:10px;border-width:1.3px}
+.rs-c{display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:700;color:var(--a800);background:var(--a50);border:1px solid var(--a200);border-radius:4px;padding:0 4px;height:15px;white-space:nowrap}
+.rs-c.ok{color:var(--e700);background:var(--e50);border-color:var(--e200)}
+.dcl{display:flex;flex-direction:column;gap:2px;align-items:flex-start;line-height:1.1}
+.dcl .w{font-size:9.5px;color:var(--tx-s);white-space:nowrap}.dcl .w.w-u{color:var(--a800);font-weight:700}.dcl .w.w-d{color:var(--e700);font-weight:700}
+.xbar{display:flex;align-items:center;gap:6px;flex-wrap:nowrap;min-height:30px;padding:3px 8px;border-bottom:1px solid var(--div);background:var(--surf)}
+.xbar .sp{flex:1}
+.xbar .btn.xs{gap:3px}
+.xbar .cnt{background:var(--a800);color:#fff;border-radius:999px;font-size:8.5px;padding:0 4px;line-height:12px}
+.att{display:flex;align-items:center;gap:6px;min-height:28px;padding:3px 8px;border-top:1px solid var(--div);font-size:10.5px;background:var(--surf-m);white-space:nowrap;overflow:hidden}
+.att b{font-size:9.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--tx-s)}
+.chp{display:inline-flex;align-items:center;gap:3px;border:1px solid var(--bd);background:var(--surf);border-radius:999px;padding:0 6px;height:18px;font-size:10px;font-weight:700;color:var(--tx-b)}
+.chp.on{border-color:var(--pri-ring);background:var(--pri-soft);color:var(--pri-ink)}
+.trkic{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px}
+.trkic.reg{color:var(--e700);background:var(--e50)}.trkic.pause{color:var(--a800);background:var(--a50)}.trkic.none{color:var(--g500);background:var(--div)}
+.lockb{display:flex;align-items:center;gap:6px;border:1px dashed var(--bd-s);border-radius:8px;background:var(--surf-m);padding:7px 9px;font-size:10.5px;color:var(--tx-m);line-height:1.35}
+.sl{display:inline-flex;align-items:center;gap:3px;font-size:9.5px;font-weight:700}
+.art{border:0;border-radius:0;box-shadow:none}</style></head><body style="background:#fff"><div class="art " data-role="picker">
+<aside class="sb">
+  <div class="sb-top"><svg class="i18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5l7 7-7 7M5 5l7 7-7 7"/></svg></div>
+  <div class="sb-i on" title="Pick & Pack"><svg class="i18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg></div><div class="sb-i" title="Tasks"><svg class="i18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg></div><div class="sb-i" title="Messages"><svg class="i18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg></div>
+</aside><div class="main">
+<header class="hd">
+  <div class="hd-title"><b>Pick & Pack</b><span class="hd-sep">/</span><span class="hd-sub">Queue</span></div>
+  <div class="hd-right">
+    
+<div class="zoom" role="group" aria-label="Page zoom">
+  <button class="zb" data-z="-10" title="Zoom out (Ctrl -)" aria-label="Zoom out"><svg class="i16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7"/></svg></button>
+  <button class="zb zb-mid" data-z="0" title="Reset zoom to 100% (Ctrl 0)" aria-label="Reset zoom"><svg class="i16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg><span class="zpct">100%</span></button>
+  <button class="zb" data-z="10" title="Zoom in (Ctrl +)" aria-label="Zoom in"><svg class="i16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7"/></svg></button>
+</div>
+    <span class="hd-div"></span>
+    <button class="hd-ic" title="Tasks"><svg class="i18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg><i class="badge red">3</i></button>
+    <button class="hd-ic" title="Messages"><svg class="i18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg></button>
+    <button class="hd-ic" title="Notifications"><svg class="i18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.158c0 .538-.214 1.055-.595 1.437L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg><i class="badge red">5</i></button>
+    <span class="hd-user">Order Picker</span><span class="avatar">P</span>
+  </div>
+</header><div class="zoomable"><div class="page">
+    
+    <div class="row-tb">
+    <div class="srch" title="Search by order number, customer, address, product or barcode"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg><span class="fld">All fields<svg class="i10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 9l-7 7-7-7"/></svg></span><span class="ph">Scan barcode or search order, customer, product…</span><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V6a2 2 0 012-2h2M16 4h2a2 2 0 012 2v2M20 16v2a2 2 0 01-2 2h-2M8 20H6a2 2 0 01-2-2v-2M7 12h10"/></svg><kbd>/</kbd></div>
+    
+    
+    <button class="fchip"><span class="k">Slip</span><b>Any</b><svg class="i12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 9l-7 7-7-7"/></svg></button>
+    
+    
+    <span class="sp"></span>
+    
+    <button class="btn ghost" title="Reload the list"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>Refresh</button>
+  </div>
+    <div class="qrow"><div class="qtabs" role="tablist"><button class="qt on" role="tab">Open<span class="qn">14</span></button><button class="qt" role="tab">Slip not printed<span class="qn">4</span></button><button class="qt" role="tab">Slip printed<span class="qn">7</span></button><button class="qt" role="tab">Packed<span class="qn">3</span></button></div><div class="r"><span class="muted" style="font-size:10.5px">Sort</span><button class="fchip"><span class="k"></span><b>Newest first</b><svg class="i12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 9l-7 7-7-7"/></svg></button></div></div>
+    <div class="card" style="flex:1">
+      <div class="thead" style="--cols:20px 196px minmax(120px,1.1fr) minmax(110px,1fr) 72px 92px 116px 84px 104px"><span class="ck mix"></span><span><span class="srt">Order<svg class="i10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/></svg></span></span><span><span class="srt">Customer<svg class="i10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/></svg></span></span><span>Items</span><span class="trk-l"><span style="width:34px;overflow:visible;white-space:nowrap">Slip</span><span style="width:34px;overflow:visible;white-space:nowrap">Pack</span></span><span>Packed</span><span>Deco</span><span>Notes</span><span style="text-align:right">Actions</span></div>
+      <div class="tbody"><div class="tr" style="--cols:20px 196px minmax(120px,1.1fr) minmax(110px,1fr) 72px 92px 116px 84px 104px;--rh:40px">
+    <span class="ck"></span>
+    <span class="cell"><span class="ono">#4821</span><span class="store"><i style="background:#4f46e5"></i>HFC</span></span>
+    <span class="cell col"><b class="ell strong" style="font-size:11.5px">Amelia Brooks</b><span class="muted ell" style="font-size:10px">Today 09:42</span></span>
+    <span class="cell"><span class="stack"><span class="pt" style="width:22px;height:22px;--pc:#1e3a8a"><svg viewBox="0 0 24 24" fill="#1e3a8a" stroke="rgba(17,24,39,.28)" stroke-width=".7" stroke-linejoin="round" style="width:16px;height:16px"><path d="M8 3L3 6.5 5.3 10 7.5 9v12h9V9l2.2 1L21 6.5 16 3c-.6 1.6-2.2 2.4-4 2.4S8.6 4.6 8 3z"/></svg></span><span class="pt" style="width:22px;height:22px;--pc:#1f2937"><svg viewBox="0 0 24 24" fill="#1f2937" stroke="rgba(17,24,39,.28)" stroke-width=".7" stroke-linejoin="round" style="width:16px;height:16px"><path d="M8 3L3 6.5 5.3 10 7.5 9v12h9V9l2.2 1L21 6.5 16 3l-4 4.2L8 3z"/><path d="M12 7.2V12" stroke="rgba(255,255,255,.55)" stroke-width="1.3" fill="none"/></svg></span></span><span class="muted tn" style="font-size:10.5px">3 pcs</span></span>
+    <span class="trk"><span class="nd " title="Slip"></span><span class="cn "></span><span class="nd " title="Pack"></span></span>
+    <span class="pb"><b class="tn">0/3</b><span class="pbar"><i class="" style="width:0%"></i></span></span>
+    <span class="cell"></span>
+    <span class="cell"><span class="cell" style="gap:2px"></span></span>
+    <span class="acts"><button class="ib" title="Print picking slip"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg></button><button class="ib" title="Refresh order from Shopify"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg></button><button class="ib" title="View details"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 9l-7 7-7-7"/></svg></button></span>
+  </div><div class="tr" style="--cols:20px 196px minmax(120px,1.1fr) minmax(110px,1fr) 72px 92px 116px 84px 104px;--rh:40px">
+    <span class="ck"></span>
+    <span class="cell"><span class="ono">#1190</span><span class="store"><i style="background:#0891b2"></i>NNC</span></span>
+    <span class="cell col"><b class="ell strong" style="font-size:11.5px">Priya Nair</b><span class="muted ell" style="font-size:10px">Today 09:15</span></span>
+    <span class="cell"><span class="stack"><span class="pt" style="width:22px;height:22px;--pc:#9ca3af"><svg viewBox="0 0 24 24" fill="#9ca3af" stroke="rgba(17,24,39,.28)" stroke-width=".7" stroke-linejoin="round" style="width:16px;height:16px"><path d="M9 3c0 2.4 6 2.4 6 0l5 2.8 2 6.4-3 1V21H5v-7.8l-3-1 2-6.4L9 3z"/><path d="M12 7v5" stroke="rgba(255,255,255,.5)" stroke-width="1.3" fill="none"/></svg></span></span><span class="muted tn" style="font-size:10.5px">3 pcs</span></span>
+    <span class="trk"><span class="nd " title="Slip"></span><span class="cn "></span><span class="nd " title="Pack"></span></span>
+    <span class="pb"><b class="tn">0/3</b><span class="pbar"><i class="" style="width:0%"></i></span></span>
+    <span class="cell"></span>
+    <span class="cell"><span class="cell" style="gap:2px"><span class="ib" title="Order notes" style="width:20px"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a1 1 0 01-1 1z"/></svg><i class="ct">1</i></span></span></span>
+    <span class="acts"><button class="ib" title="Print picking slip"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg></button><button class="ib" title="Refresh order from Shopify"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg></button><button class="ib" title="View details"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 9l-7 7-7-7"/></svg></button></span>
+  </div><div class="tr" style="--cols:20px 196px minmax(120px,1.1fr) minmax(110px,1fr) 72px 92px 116px 84px 104px;--rh:40px">
+    <span class="ck"></span>
+    <span class="cell"><span class="ono">#0733</span><span class="store"><i style="background:#c026d3"></i>BSC</span></span>
+    <span class="cell col"><b class="ell strong" style="font-size:11.5px">Liam O’Connor</b><span class="muted ell" style="font-size:10px">Today 08:58</span></span>
+    <span class="cell"><span class="stack"><span class="pt" style="width:22px;height:22px;--pc:#1e3a8a"><svg viewBox="0 0 24 24" fill="#1e3a8a" stroke="rgba(17,24,39,.28)" stroke-width=".7" stroke-linejoin="round" style="width:16px;height:16px"><path d="M4 15c0-5 3.6-9 8-9s8 4 8 9H4z"/><path d="M3 16.2h18c0 1.8-4 2.6-9 2.6s-9-.8-9-2.6z"/></svg></span></span><span class="muted tn" style="font-size:10.5px">4 pcs</span></span>
+    <span class="trk"><span class="nd done g" title="Slip"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span><span class="cn "></span><span class="nd " title="Pack"></span></span>
+    <span class="pb"><b class="tn">0/4</b><span class="pbar"><i class="" style="width:0%"></i></span></span>
+    <span class="cell"></span>
+    <span class="cell"><span class="cell" style="gap:2px"><span class="ib" title="Order notes" style="width:20px"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a1 1 0 01-1 1z"/></svg><i class="ct">2</i></span></span></span>
+    <span class="acts"><button class="ib printed" title="Picking slip printed 1 h ago · print again"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg></button><button class="ib" title="Refresh order from Shopify"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg></button><button class="ib" title="View details"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 9l-7 7-7-7"/></svg></button></span>
+  </div><div class="tr open" style="--cols:20px 196px minmax(120px,1.1fr) minmax(110px,1fr) 72px 92px 116px 84px 104px;--rh:40px">
+    <span class="ck"></span>
+    <span class="cell"><span class="ono">#2204</span><span class="store"><i style="background:#475569"></i>WRU</span></span>
+    <span class="cell col"><b class="ell strong" style="font-size:11.5px">Tom Whitaker</b><span class="muted ell" style="font-size:10px">Yesterday 17:21</span></span>
+    <span class="cell"><span class="stack"><span class="pt" style="width:22px;height:22px;--pc:#9f1239"><svg viewBox="0 0 24 24" fill="#9f1239" stroke="rgba(17,24,39,.28)" stroke-width=".7" stroke-linejoin="round" style="width:16px;height:16px"><path d="M8 3L3 6.5 5.3 10 7.5 9v12h9V9l2.2 1L21 6.5 16 3c-.6 1.6-2.2 2.4-4 2.4S8.6 4.6 8 3z"/></svg></span><span class="pt" style="width:22px;height:22px;--pc:#1f2937"><svg viewBox="0 0 24 24" fill="#1f2937" stroke="rgba(17,24,39,.28)" stroke-width=".7" stroke-linejoin="round" style="width:16px;height:16px"><path d="M9 3c0 2.4 6 2.4 6 0l5 2.8 2 6.4-3 1V21H5v-7.8l-3-1 2-6.4L9 3z"/><path d="M12 7v5" stroke="rgba(255,255,255,.5)" stroke-width="1.3" fill="none"/></svg></span><span class="pt" style="width:22px;height:22px;--pc:#1f2937"><svg viewBox="0 0 24 24" fill="#1f2937" stroke="rgba(17,24,39,.28)" stroke-width=".7" stroke-linejoin="round" style="width:16px;height:16px"><path d="M4.5 9h15l.9 11.5H3.6L4.5 9z"/><path d="M9 9V7a3 3 0 016 0v2" stroke="currentColor" stroke-width="1.8" fill="none"/></svg></span></span><span class="muted tn" style="font-size:10.5px">8 pcs</span></span>
+    <span class="trk"><span class="nd done g" title="Slip"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span><span class="cn "></span><span class="nd part" title="Pack"></span></span>
+    <span class="pb"><b class="tn">3/8</b><span class="pbar"><i class="part" style="width:38%"></i></span></span>
+    <span class="cell"></span>
+    <span class="cell"><span class="cell" style="gap:2px"><span class="ib" title="Messages" style="width:20px"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg><i class="ct">1</i></span></span></span>
+    <span class="acts"><button class="ib printed" title="Picking slip printed 21 h ago · print again"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg></button><button class="ib" title="Refresh order from Shopify"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg></button><button class="ib" title="Collapse"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 15l7-7 7 7"/></svg></button></span>
+  </div><div class="xp"><div class="bx" style="flex:1 1 0"><div class="sh"><h4><svg class="i12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7l-8-4-8 4m16 0v10l-8 4m8-14l-8 4m0 10l-8-4V7m8 4v10M4 7l8 4"/></svg>Order items</h4><span><span class="muted tn">8 pcs · 3 packed</span></span></div><div class="lnh" style="--lcols:minmax(0,1fr) 96px 44px 28px 52px 34px 96px"><span style="">Item</span><span style="">SKU</span><span style="">Bin</span><span style="text-align:center">Qty</span><span style="text-align:center">Packed</span><span style="text-align:center">Full</span><span style="">Partial</span></div><div class="ln part" style="--lcols:minmax(0,1fr) 96px 44px 28px 52px 34px 96px;--lh:42px"><span class="cell"><span class="pt" style="width:32px;height:32px;--pc:#9f1239"><svg viewBox="0 0 24 24" fill="#9f1239" stroke="rgba(17,24,39,.28)" stroke-width=".7" stroke-linejoin="round" style="width:23px;height:23px"><path d="M8 3L3 6.5 5.3 10 7.5 9v12h9V9l2.2 1L21 6.5 16 3c-.6 1.6-2.2 2.4-4 2.4S8.6 4.6 8 3z"/></svg></span><span class="cell col" style="min-width:0" title="TEE-MAR-XL"><span class="cell" style="gap:4px;max-width:100%"><b class="strong ell" style="font-size:11.5px">Club Training Tee</b></span><span class="muted ell" style="font-size:10px;display:flex;align-items:center;gap:4px"><span class="sw"><i style="background:#9f1239"></i>Maroon</span><span>· XL</span></span></span></span><span class="mono muted">TEE-MAR-XL</span><span class="bin">A-04</span><b class="tn" style="text-align:center">4</b><span class="pb" style="justify-content:center"><b class="tn" style="color:var(--a800)">3/4</b></span><span style="display:flex;justify-content:center"><span class="ck on"></span></span><span class="step dis" style="justify-self:end"><button>−</button><span>4</span><button>+</button></span></div><div class="ln" style="--lcols:minmax(0,1fr) 96px 44px 28px 52px 34px 96px;--lh:42px"><span class="cell"><span class="pt" style="width:32px;height:32px;--pc:#1f2937"><svg viewBox="0 0 24 24" fill="#1f2937" stroke="rgba(17,24,39,.28)" stroke-width=".7" stroke-linejoin="round" style="width:23px;height:23px"><path d="M9 3c0 2.4 6 2.4 6 0l5 2.8 2 6.4-3 1V21H5v-7.8l-3-1 2-6.4L9 3z"/><path d="M12 7v5" stroke="rgba(255,255,255,.5)" stroke-width="1.3" fill="none"/></svg></span><span class="cell col" style="min-width:0" title="HOD-BLA-L"><span class="cell" style="gap:4px;max-width:100%"><b class="strong ell" style="font-size:11.5px">Team Hoodie</b></span><span class="muted ell" style="font-size:10px;display:flex;align-items:center;gap:4px"><span class="sw"><i style="background:#1f2937"></i>Black</span><span>· L</span></span></span></span><span class="mono muted">HOD-BLA-L</span><span class="bin">B-02</span><b class="tn" style="text-align:center">2</b><span class="pb" style="justify-content:center"><b class="tn" style="color:var(--tx-s)">0/2</b></span><span style="display:flex;justify-content:center"><span class="ck"></span></span><span class="step" style="justify-self:end"><button>−</button><span>2</span><button>+</button></span></div><div class="ln" style="--lcols:minmax(0,1fr) 96px 44px 28px 52px 34px 96px;--lh:42px"><span class="cell"><span class="pt" style="width:32px;height:32px;--pc:#1f2937"><svg viewBox="0 0 24 24" fill="#1f2937" stroke="rgba(17,24,39,.28)" stroke-width=".7" stroke-linejoin="round" style="width:23px;height:23px"><path d="M4.5 9h15l.9 11.5H3.6L4.5 9z"/><path d="M9 9V7a3 3 0 016 0v2" stroke="currentColor" stroke-width="1.8" fill="none"/></svg></span><span class="cell col" style="min-width:0" title="BAG-BLA-OS"><span class="cell" style="gap:4px;max-width:100%"><b class="strong ell" style="font-size:11.5px">Kit Bag 60L</b></span><span class="muted ell" style="font-size:10px;display:flex;align-items:center;gap:4px"><span class="sw"><i style="background:#1f2937"></i>Black</span><span>· OS</span></span></span></span><span class="mono muted">BAG-BLA-OS</span><span class="bin">D-01</span><b class="tn" style="text-align:center">2</b><span class="pb" style="justify-content:center"><b class="tn" style="color:var(--tx-s)">0/2</b></span><span style="display:flex;justify-content:center"><span class="ck"></span></span><span class="step" style="justify-self:end"><button>−</button><span>0</span><button>+</button></span></div><div class="hr"></div><div class="sh"><h4><svg class="i12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>Notes & messages</h4><span><span class="muted">1</span></span></div><div class="thr"><div class="msg"><span class="av p">P</span><div><b>Picker</b> <span class="muted">· To admin · Thu 08:42</span><br>Bin A-04 is short by 1, can the last piece come from the stock room?</div></div><div class="row-b" style="gap:5px"><span class="inp" style="flex:1;color:var(--g500)">Add a note or message…</span><button class="btn sm soft"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>Send</button></div></div></div><div class="bx" style="width:280px;flex:none"><div class="sh"><h4><svg class="i12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>Packing & slip</h4><span></span></div><div class="in"><div style="display:flex;flex-direction:column;gap:6px">
+    <div class="rcp"><div class="rcp-h"><b>Notify users</b><span class="muted">5 of 5</span><button class="lnk" title="Add an email message to the notification">+ message</button></div><div class="rcp-l"><span class="rcp-r"><span class="ck on"></span><span class="cell col" style="gap:0;min-width:0"><b class="ell">Alice Wong</b><span class="muted ell">alice.wong@example.com</span></span></span><span class="rcp-r"><span class="ck on"></span><span class="cell col" style="gap:0;min-width:0"><b class="ell">John Doe</b><span class="muted ell">admin@example.com</span></span></span><span class="rcp-r"><span class="ck on"></span><span class="cell col" style="gap:0;min-width:0"><b class="ell">Mamun K.</b><span class="muted ell">mamun@example.com</span></span></span><span class="rcp-r"><span class="ck on"></span><span class="cell col" style="gap:0;min-width:0"><b class="ell">Customer service</b><span class="muted ell">service@example.com</span></span></span><span class="rcp-r"><span class="ck on"></span><span class="cell col" style="gap:0;min-width:0"><b class="ell">Warehouse lead</b><span class="muted ell">warehouse@example.com</span></span></span></div></div>
+    <button class="btn pri" style="height:38px;font-size:13px;width:100%"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>Confirm packed</button>
+    <div style="display:flex;gap:5px">
+      <button class="btn printed" style="flex:1;height:34px" title="Picking slip printed 21 h ago · print again"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>Slip printed · Reprint</button>
+    </div>
+    <div class="hist"><span><b>Packed Wed 14:02</b> · 3 items</span><button class="ib" title="Cancel confirmation (sends notification)"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button></div>
+  </div></div><div class="hr"></div><div class="sh"><h4><svg class="i12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0zM12 13a3 3 0 100-6 3 3 0 000 6z"/></svg>Pick route by bin</h4><span></span></div><div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;padding:8px"><span class="hist" style="padding:3px 8px 3px 4px;gap:6px;background:var(--surf)"><span class="bin">A-04</span><span class="pt" style="width:20px;height:20px;--pc:#9f1239"><svg viewBox="0 0 24 24" fill="#9f1239" stroke="rgba(17,24,39,.28)" stroke-width=".7" stroke-linejoin="round" style="width:14px;height:14px"><path d="M8 3L3 6.5 5.3 10 7.5 9v12h9V9l2.2 1L21 6.5 16 3c-.6 1.6-2.2 2.4-4 2.4S8.6 4.6 8 3z"/></svg></span><b class="tn">× 1</b></span><span class="muted"><svg class="i12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></span><span class="hist" style="padding:3px 8px 3px 4px;gap:6px;background:var(--surf)"><span class="bin">B-02</span><span class="pt" style="width:20px;height:20px;--pc:#1f2937"><svg viewBox="0 0 24 24" fill="#1f2937" stroke="rgba(17,24,39,.28)" stroke-width=".7" stroke-linejoin="round" style="width:14px;height:14px"><path d="M9 3c0 2.4 6 2.4 6 0l5 2.8 2 6.4-3 1V21H5v-7.8l-3-1 2-6.4L9 3z"/><path d="M12 7v5" stroke="rgba(255,255,255,.5)" stroke-width="1.3" fill="none"/></svg></span><b class="tn">× 2</b></span><span class="muted"><svg class="i12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></span><span class="hist" style="padding:3px 8px 3px 4px;gap:6px;background:var(--surf)"><span class="bin">D-01</span><span class="pt" style="width:20px;height:20px;--pc:#1f2937"><svg viewBox="0 0 24 24" fill="#1f2937" stroke="rgba(17,24,39,.28)" stroke-width=".7" stroke-linejoin="round" style="width:14px;height:14px"><path d="M4.5 9h15l.9 11.5H3.6L4.5 9z"/><path d="M9 9V7a3 3 0 016 0v2" stroke="currentColor" stroke-width="1.8" fill="none"/></svg></span><b class="tn">× 2</b></span></div></div></div><div class="tr sel" style="--cols:20px 196px minmax(120px,1.1fr) minmax(110px,1fr) 72px 92px 116px 84px 104px;--rh:40px">
+    <span class="ck on"></span>
+    <span class="cell"><span class="ono">#4809</span><span class="store"><i style="background:#4f46e5"></i>HFC</span></span>
+    <span class="cell col"><b class="ell strong" style="font-size:11.5px">Grace Lim</b><span class="muted ell" style="font-size:10px">Yesterday 15:40</span></span>
+    <span class="cell"><span class="stack"><span class="pt" style="width:22px;height:22px;--pc:#38bdf8"><svg viewBox="0 0 24 24" fill="#38bdf8" stroke="rgba(17,24,39,.28)" stroke-width=".7" stroke-linejoin="round" style="width:16px;height:16px"><path d="M8 3L3 6.5 5.3 10 7.5 9v12h9V9l2.2 1L21 6.5 16 3c-.6 1.6-2.2 2.4-4 2.4S8.6 4.6 8 3z"/></svg></span><span class="pt" style="width:22px;height:22px;--pc:#1e3a8a"><svg viewBox="0 0 24 24" fill="#1e3a8a" stroke="rgba(17,24,39,.28)" stroke-width=".7" stroke-linejoin="round" style="width:16px;height:16px"><path d="M6.5 12C6.5 6.5 9 4.5 12 4.5s5.5 2 5.5 7.5h-11z"/><path d="M3 14c0-1.6 4-2.4 9-2.4s9 .8 9 2.4c0 2-4 3-9 3s-9-1-9-3z"/></svg></span></span><span class="muted tn" style="font-size:10.5px">7 pcs</span></span>
+    <span class="trk"><span class="nd done g" title="Slip"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span><span class="cn "></span><span class="nd " title="Pack"></span></span>
+    <span class="pb"><b class="tn">0/7</b><span class="pbar"><i class="" style="width:0%"></i></span></span>
+    <span class="cell"></span>
+    <span class="cell"><span class="cell" style="gap:2px"><span class="ib" title="Order notes" style="width:20px"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a1 1 0 01-1 1z"/></svg><i class="ct">1</i></span></span></span>
+    <span class="acts"><button class="ib printed" title="Picking slip printed 1 d ago · print again"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg></button><button class="ib" title="Refresh order from Shopify"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg></button><button class="ib" title="View details"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 9l-7 7-7-7"/></svg></button></span>
+  </div><div class="tr sel" style="--cols:20px 196px minmax(120px,1.1fr) minmax(110px,1fr) 72px 92px 116px 84px 104px;--rh:40px">
+    <span class="ck on"></span>
+    <span class="cell"><span class="ono">#1184</span><span class="store"><i style="background:#0891b2"></i>NNC</span></span>
+    <span class="cell col"><b class="ell strong" style="font-size:11.5px">Hannah Wójcik</b><span class="muted ell" style="font-size:10px">Yesterday 14:05</span></span>
+    <span class="cell"><span class="stack"><span class="pt" style="width:22px;height:22px;--pc:#e5e7eb"><svg viewBox="0 0 24 24" fill="#e5e7eb" stroke="rgba(17,24,39,.28)" stroke-width=".7" stroke-linejoin="round" style="width:16px;height:16px"><path d="M8 3L3 6.5 5.3 10 7.5 9v12h9V9l2.2 1L21 6.5 16 3l-4 4.2L8 3z"/><path d="M12 7.2V12" stroke="rgba(255,255,255,.55)" stroke-width="1.3" fill="none"/></svg></span><span class="pt" style="width:22px;height:22px;--pc:#e5e7eb"><svg viewBox="0 0 24 24" fill="#e5e7eb" stroke="rgba(17,24,39,.28)" stroke-width=".7" stroke-linejoin="round" style="width:16px;height:16px"><path d="M5 12V10.5C5 8.5 8 7 12 7s7 1.5 7 3.5V12H5z"/><path d="M3 14c0-1.3 4-2 9-2s9 .7 9 2c0 1.6-4 2.6-9 2.6S3 15.6 3 14z"/></svg></span></span><span class="muted tn" style="font-size:10.5px">10 pcs</span></span>
+    <span class="trk"><span class="nd done g" title="Slip"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span><span class="cn "></span><span class="nd " title="Pack"></span></span>
+    <span class="pb"><b class="tn">0/10</b><span class="pbar"><i class="" style="width:0%"></i></span></span>
+    <span class="cell"></span>
+    <span class="cell"><span class="cell" style="gap:2px"></span></span>
+    <span class="acts"><button class="ib printed" title="Picking slip printed 1 d ago · print again"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg></button><button class="ib" title="Refresh order from Shopify"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg></button><button class="ib" title="View details"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 9l-7 7-7-7"/></svg></button></span>
+  </div><div class="bulk"><b>3 selected</b><span class="sep"></span>
+    <button class="btn ghost"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>Print picking slips</button>
+    
+    
+    <button class="btn ghost"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V4m0 0h4M4 4l5 5m11-5v4m0-4h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5"/></svg>Expand</button><span class="sep"></span><button class="x ib" title="Clear selection"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 18L18 6M6 6l12 12"/></svg></button></div></div>
+      <div class="foot"><span>Showing <b class="tn strong">1–14</b> of <b class="tn strong">14</b> orders</span><div style="display:flex;align-items:center;gap:10px"><div class="pager"><span><svg class="i12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 19l-7-7 7-7"/></svg></span><span class="on">1</span><span><svg class="i12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></span></div></div></div>
+    </div></div></div></div></div><script>
+(function(){
+  var cur=null;
+  function set(art,v){if(!art)return;v=Math.max(50,Math.min(150,v));art.dataset.z=v;
+    art.querySelectorAll('.zoomable').forEach(function(e){e.style.zoom=v+'%'});
+    art.querySelectorAll('.zpct').forEach(function(p){p.textContent=v+'%'});}
+  function val(art){return +(art.dataset.z||100)}
+  document.addEventListener('mouseover',function(e){var a=e.target.closest&&e.target.closest('.art');if(a)cur=a});
+  document.addEventListener('click',function(e){var t=e.target.closest('[data-vt]');if(t){var a2=t.closest('.art');a2.querySelectorAll('[data-vt]').forEach(function(x){x.classList.toggle('on',x===t)});a2.querySelectorAll('.view').forEach(function(v){v.style.display=v.dataset.view===t.dataset.vt?'flex':'none'});return;}
+    var b=e.target.closest('[data-z]');if(!b)return;var a=b.closest('.art'),d=+b.dataset.z;set(a,d===0?100:val(a)+d);});
+  document.addEventListener('keydown',function(e){if(!(e.ctrlKey||e.metaKey)||!cur)return;
+    if(e.key==='-'||e.key==='_'){e.preventDefault();set(cur,val(cur)-10)}else if(e.key==='='||e.key==='+'){e.preventDefault();set(cur,val(cur)+10)}else if(e.key==='0'){e.preventDefault();set(cur,100)}});
+})();
+</script></body></html>
