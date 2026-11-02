@@ -77,9 +77,9 @@ function rowA(r, role, { open = false, checked = false }) {
 function expandedA(r, role) {
   const cap = CAP[role], boxes = [];
   const lnH = role === 'picker' ? 42 : 34;
-  boxes.push(`<div class="bx" style="flex:1 1 0">${P.secHead('package', 'Order items', `<span class="muted tn">${totalQty(r)} pcs · ${packedQty(r)} packed</span>`)}${X.extrasBar(r, cap)}${P.lines(r, cap, { rowH: lnH, skuSub: false })}${cap.ful ? '' : (X.customerNote(r, cap) ? `<div class="in">${X.customerNote(r, cap)}</div>` : '')}</div>`);
-  if (cap.pack) boxes.push(`<div class="bx" style="width:${role === 'picker' ? 280 : 212}px;flex:none">${P.secHead('check', 'Packing & slip')}<div class="in">${P.packBox(r, cap, { big: role === 'picker' })}</div>${role === 'picker' ? `<div class="hr"></div>${P.secHead('mapPin', 'Pick route by bin')}${P.pickRoute(r)}` : ''}</div>`);
-  if (cap.ful) boxes.push(`<div class="bx" style="width:256px;flex:none">${P.secHead('truck', 'Fulfilment')}<div class="in">${P.fulBox(r, cap)}${X.customerNote(r, cap)}</div>${cap.cust ? `<div class="hr"></div>${P.secHead('mapPin', 'Customer & shipping')}<div class="in">${P.custBox(r, cap)}</div>` : ''}</div>`);
+  boxes.push(`<div class="bx" style="flex:1 1 0">${P.secHead('package', 'Order items', `<span class="muted tn">${totalQty(r)} pcs · ${packedQty(r)} packed</span>`)}${X.extrasBar(r, cap)}${P.lines(r, cap, { rowH: lnH, skuSub: false, workCol: true })}${cap.ful ? '' : (X.customerNote(r, cap) ? `<div class="in">${X.customerNote(r, cap)}</div>` : '')}</div>`);
+  if (cap.pack) boxes.push(`<div class="bx" style="width:${role === 'picker' ? 280 : 200}px;flex:none">${P.secHead('check', 'Packing & slip')}<div class="in">${P.packBox(r, cap, { big: role === 'picker' })}</div></div>`);
+  if (cap.ful) boxes.push(`<div class="bx" style="width:250px;flex:none">${P.secHead('truck', 'Fulfilment')}<div class="in">${P.fulBox(r, cap)}${X.customerNote(r, cap)}</div>${cap.cust ? `<div class="hr"></div>${P.secHead('mapPin', 'Customer & shipping')}<div class="in">${P.custBox(r, cap)}</div>` : ''}</div>`);
   return `<div class="xp">${boxes.join('')}</div>`;
 }
 export function conceptA(role) {

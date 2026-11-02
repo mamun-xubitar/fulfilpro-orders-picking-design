@@ -7,9 +7,9 @@ export const setRole = (r) => { ROLE = r; };
 /** What each role can see / do. Mirrors today's pages exactly (proxy.ts + page code). */
 export const CAP = {
   // deco: 2 = manage (assign, toggle, mark done), 1 = read-only state. round 3 adds reqStock, stockAdj, names, lineEdit, attach.
-  admin:  { shopify: 1, stock: 1, poCreate: 1, store: 1, period: 1, sync: 1, ffilter: 1, slip: 1, pack: 1, ful: 1, cust: 1, labels: 1, req: 'direct', approvals: 1, deco: 2, bin: 1, track: 1, invoice: 1, reqStock: 1, stockAdj: 1, names: 1, lineEdit: 1, attach: 1 },
+  admin:  { shopify: 1, stock: 1, poCreate: 1, store: 1, period: 1, sync: 1, ffilter: 1, slip: 1, pack: 1, ful: 1, cust: 1, labels: 1, req: 'direct', approvals: 1, deco: 2, bin: 0, track: 1, invoice: 1, reqStock: 1, stockAdj: 1, names: 1, lineEdit: 1, attach: 1 },
   staff:  { shopify: 1, stock: 1, poCreate: 0, store: 1, period: 1, sync: 1, ffilter: 1, slip: 0, pack: 0, ful: 1, cust: 1, labels: 1, req: 'request', approvals: 0, deco: 1, bin: 0, track: 0, invoice: 1, reqStock: 1, stockAdj: 0, names: 1, lineEdit: 0, attach: 0 },
-  picker: { shopify: 0, stock: 0, poCreate: 0, store: 0, period: 0, sync: 0, ffilter: 0, slip: 1, pack: 1, ful: 0, cust: 0, labels: 0, req: null, approvals: 0, deco: 0, bin: 1, track: 0, invoice: 0, reqStock: 0, stockAdj: 0, names: 0, lineEdit: 0, attach: 0 },
+  picker: { shopify: 0, stock: 0, poCreate: 0, store: 0, period: 0, sync: 0, ffilter: 0, slip: 1, pack: 1, ful: 0, cust: 0, labels: 0, req: null, approvals: 0, deco: 0, bin: 0, track: 0, invoice: 0, reqStock: 0, stockAdj: 0, names: 0, lineEdit: 0, attach: 0 },
 };
 
 /** Row background by status. Same priority as today's table (back-in-stock, then status, then decoration), with canceled / closed first. */
@@ -149,26 +149,32 @@ export function shortBadge(r, cap) {
 }
 
 /* ---------- pack lines ---------- */
-export function lineCols(cap, dense = false) {
+export function lineCols(cap, dense = false, work = false, showWork = work) {
   const cols = [['item', 'minmax(0,1fr)']];
   if (!cap.stock) cols.push(['sku', '96px']);
-  if (cap.bin && !dense) cols.push(['bin', '44px']);
-  if (cap.deco && !dense) cols.push(['deco', '68px']);
-  cols.push(['qty', '28px'], ['packed', '52px']);
-  if (cap.stock) cols.push(['avail', '40px'], ['po', '136px']);
-  if (cap.pack) cols.push(['full', '34px'], ['part', '96px']);
+  else if (work) cols.push(['sku', '62px']);
+  if (cap.bin && !dense && !(work && cap.stock)) cols.push(['bin', '44px']);
+  if (cap.deco && !dense) cols.push(['deco', work && cap.stock ? '60px' : '68px']);
+  cols.push(['qty', work ? '22px' : '28px'], ['packed', work ? '38px' : '52px']);
+  if (cap.stock) cols.push(['avail', work ? '28px' : '40px'], ['po', work ? '98px' : '136px']);
+  if (showWork && cap.deco) cols.push(['work', '34px']);
+  if (cap.pack) cols.push(['full', work ? '28px' : '34px'], ['part', work ? '72px' : '96px']);
+  if (work && cap.lineEdit) cols.push(['act', '46px']);
   return cols;
 }
 const colsCss = (cols) => cols.map((c) => c[1]).join(' ');
 const xchips = (x, cap) => { const c = [X.nameChip(x, cap), cap.reqStock ? X.restockLine(x) : ''].filter(Boolean).join(''); return c ? `<span class="cell" style="gap:4px;margin-top:1px">${c}</span>` : ''; };
-export function lines(r, cap, { rowH = 36, sel = 1, skuSub = true, head: showHead = true, dense = false } = {}) {
-  const cols = lineCols(cap, dense), css = colsCss(cols), N = { item: 'Item', sku: 'SKU', bin: 'Bin', deco: 'Deco', qty: 'Qty', packed: 'Packed', avail: 'Avail', po: 'PO status', full: 'Full', part: 'Partial' };
-  const head = `<div class="lnh" style="--lcols:${css}">${cols.map(([k]) => `<span style="${['qty', 'packed', 'full', 'avail'].includes(k) ? 'text-align:center' : ''}">${N[k]}</span>`).join('')}</div>`;
+export function lines(r, cap, { rowH = 36, sel = 1, skuSub = true, head: showHead = true, dense = false, workCol = false } = {}) {
+  const hasWork = workCol && r.items.some((x) => x.work);
+  const cols = lineCols(cap, dense, workCol, hasWork), css = colsCss(cols), lgap = workCol && cap.stock ? 4 : 8, N = { item: 'Item', sku: 'SKU', bin: 'Bin', deco: 'Deco', work: 'Work', act: 'Actions', qty: 'Qty', packed: 'Packed', avail: 'Avail', po: 'PO status', full: 'Full', part: 'Partial' };
+  const head = `<div class="lnh" style="--lcols:${css};--lgap:${lgap}px">${cols.map(([k]) => `<span style="${['qty', 'packed', 'full', 'avail', 'act'].includes(k) ? 'text-align:center' : ''}">${N[k]}</span>`).join('')}</div>`;
   const rows = r.items.map((x, idx) => {
     const done = x.packed >= x.qty, part = x.packed > 0 && !done, fullOn = done || (sel && idx === 0);
     const cell = {
       item: `<span class="cell">${tile(x.kind, x.hex, rowH > 40 ? 32 : 26)}<span class="cell col" style="min-width:0" title="${x.sku}"><span class="cell" style="gap:4px;max-width:100%"><b class="strong ell" style="font-size:11.5px">${x.name}</b>${cap.shopify ? shopifyLink(r, x) : ''}</span><span class="muted ell" style="font-size:10px;display:flex;align-items:center;gap:4px">${swatch(x)}<span>· ${x.size}</span>${cap.stock && skuSub ? `<span class="mono">· ${x.sku}</span>` : ''}${dense && cap.bin ? `<span class="bin">${x.bin}</span>` : ''}</span>${xchips(x, cap)}</span></span>`,
-      sku: `<span class="mono muted">${x.sku}</span>`,
+      sku: cap.stock ? `<span class="cell col" style="gap:2px;align-items:flex-start;min-width:0"><span class="mono muted ell" style="font-size:10px;max-width:100%">${x.sku || '-'}</span></span>` : `<span class="mono muted">${x.sku}</span>`,
+      work: X.lineWork(x, cap),
+      act: X.lineActions(r, x, r.ful === 'full' ? 'full' : r.ful === 'partial' && idx < r.items.length - 1 ? 'part' : '', cap),
       bin: `<span class="bin">${x.bin}</span>`,
       deco: X.lineDeco(x, cap),
       qty: `<b class="tn" style="text-align:center">${x.qty}</b>`,
@@ -178,7 +184,7 @@ export function lines(r, cap, { rowH = 36, sel = 1, skuSub = true, head: showHea
       full: `<span style="display:flex;justify-content:center"><span class="ck${fullOn ? ' on' : ''}"></span></span>`,
       part: `<span class="step${fullOn ? ' dis' : ''}" style="justify-self:end"><button>−</button><span>${fullOn ? x.qty : idx === 1 && sel ? 2 : 0}</span><button>+</button></span>`,
     };
-    return `<div class="ln${done ? ' done' : part ? ' part' : ''}" style="--lcols:${css};--lh:${rowH}px">${cols.map(([k]) => cell[k] || '<span></span>').join('')}</div>`;
+    return `<div class="ln${done ? ' done' : part ? ' part' : ''}" style="--lcols:${css};--lh:${rowH}px;--lgap:${lgap}px">${cols.map(([k]) => cell[k] || '<span></span>').join('')}</div>`;
   });
   return (showHead ? head : '') + rows.join('');
 }
@@ -190,7 +196,6 @@ export function packBox(r, cap, { big = false } = {}) {
   const hist = packedQty(r) > 0 ? `<div class="hist"><span><b>Packed Wed 14:02</b> · ${packedQty(r)} items</span><button class="ib" title="Cancel confirmation (sends notification)">${ic('trash', 'i')}</button></div>` : `<div class="hist muted">No packing history.</div>`;
   const h = big ? 38 : 28;
   return `<div style="display:flex;flex-direction:column;gap:6px">
-    <div class="rcp"><div class="rcp-h"><b>Notify users</b><span class="muted">${RECIPIENTS.length} of ${RECIPIENTS.length}</span><button class="lnk" title="Add an email message to the notification">+ message</button></div><div class="rcp-l">${RECIPIENTS.map((u) => `<span class="rcp-r"><span class="ck on"></span><span class="cell col" style="gap:0;min-width:0"><b class="ell">${u.name}</b><span class="muted ell">${u.email}</span></span></span>`).join('')}</div></div>
     ${allPacked ? `<button class="btn off" style="height:${h}px;width:100%">${ic('check', 'i')}All ${totalQty(r)} items packed</button>` : `<button class="btn pri" style="height:${h}px;font-size:${big ? 13 : 11}px;width:100%">${ic('check', 'i')}Confirm packed</button>`}
     <div style="display:flex;gap:5px">
       <button class="btn ${r.slip != null ? 'printed' : 'soft'}" style="flex:1;height:${big ? 34 : 26}px" title="${slipTitle(r)}">${ic(r.slip != null ? 'check' : 'printer', 'i')}${r.slip != null ? 'Slip printed · Reprint' : 'Print picking slip'}</button>
@@ -198,6 +203,11 @@ export function packBox(r, cap, { big = false } = {}) {
     ${hist}
   </div>`;
 }
+/** Print Label + Message under the confirm buttons, as today's Actions column (message count badge; both locked once fully fulfilled). */
+const fulMsg = (r, cap) => {
+  const cls = r.ful === 'full' ? 'off' : 'ghost';
+  return `<div style="display:flex;gap:5px">${cap.labels ? `<button class="btn ${cls}" style="flex:1;height:26px" title="Print the 4×6 shipping label">${ic('printer', 'i')}Print Label</button>` : ''}<button class="btn ${cls}" style="flex:1;height:26px" title="Message the admins about this order">${ic('chat', 'i')}Message${r.msgs ? `<span style="background:var(--pri);color:#fff;border-radius:999px;font-size:9px;font-weight:700;padding:0 5px;line-height:14px;margin-left:2px">${r.msgs}</span>` : ''}</button></div>`;
+};
 export function fulBox(r, cap, { confirm = true } = {}) {
   if (!cap.ful) return '';
   const locked = r.canceled || r.closed;
@@ -222,6 +232,7 @@ export function fulBox(r, cap, { confirm = true } = {}) {
     <div style="display:grid;grid-template-columns:1fr auto;gap:5px;align-items:center"><span class="inp muted">${ic('scan', 'i10')}&nbsp;Barcodes</span><button class="lnk">+ Tracking URL</button></div>
     <label class="ckl"><span class="ck on"></span>Send notification to customer</label>
     ${confirm ? `<div style="display:flex;gap:5px"><button class="btn pri" style="flex:1;height:26px">Confirm fulfilment</button><button class="btn ghost" style="flex:1;height:26px" title="Confirm fulfilment and print the shipping label">${ic('printer', 'i')}Confirm & Print</button></div>` : ''}
+    ${confirm ? fulMsg(r, cap) : ''}
   </div>`;
 }
 export function custBox(r, cap) {

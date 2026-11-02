@@ -56,8 +56,8 @@ has its own green state ("Label printed"). Confirm with the client.
 | Tracking icon states, register / pause / restart (Admin) | Added | tracking icon in the fulfil box of fulfilled orders; modal [10], states [13] |
 | View details expand, Refresh order, Tax invoice, Label | Covered | row action icons (tax invoice and label for Admin/Staff); no longer repeated in the expanded customer box |
 | Expanded: customer name, full address (street, city, state, zip, country), shipping lines (Free/Paid, discount codes) | Added | customer box. Email and phone are order fields that **today's pages do not display**; shown here for Admin/Staff as a proposal, easy to remove |
-| Product table: Product, SKU, Emb, Print, QTY, Packed, Restock, Work, Full, Partial | Covered / Added | lines grid (SKU under name; Restock chip; Deco column with progress and Assign) |
-| Line edit / delete / add (Admin), custom item, restock on delete | Added | `Edit lines`, `Add line`; modals [8] |
+| Product table: Product, SKU, Emb, Print, QTY, Packed, Restock, Work, Full, Partial | Covered / Added | lines grid in Concept A: **SKU** column and **Work** `done/qty` pill (green / amber / grey) are columns again; Emb and Print share one **Deco** column (progress and Assign); Restock stays a chip under the name (columns tightened so Admin still fits beside the Packing and Fulfilment boxes) |
+| Line edit / delete / add (Admin), custom item, restock on delete | Added | per-line **Actions** column (edit, delete; locked when closed / canceled or fulfilled, as today) plus the header `Add line`; modals [8] |
 | Decoration: toggle, Assign, Mark done, View decorations, Work badge | Added | Deco column `+ Assign`; modals [7] |
 | Attachments row (Files, Customer design, Photos, remarks) | Added | strip under the lines (Admin, decorated orders) |
 | Request Stock modal | Added | `Request stock` button with count; modal [3], cross-linked to PO status |
@@ -84,7 +84,7 @@ has its own green state ("Label printed"). Confirm with the client.
 | Print modal: per-line qty, Remove / Restore, Location + Remark rows, note | Added | modal [1] |
 | A4 slip layout (one page per order, write-in boxes) | Added | paper preview [1] |
 | Confirm packed: Full / Partial per line | Covered | lines grid |
-| Notify: list of users (name + email, all ticked by default), optional email message; cancel packed | Added | `Notify users` list with emails in the pack box (A–F), `+ message`; modals [2]. Round 3 first showed only two generic labels; corrected after client feedback. Reference screenshots of today's modal: `current-system/` (local only, contains real addresses) |
+| Notify: list of users (name + email, all ticked by default), optional email message; cancel packed | Added | opens from **Confirm packed** as a modal, as today (users with emails, optional message); not shown inline in the pack box. Modal [2]. Round 3 first showed only two generic labels; corrected after client feedback. Reference screenshots of today's modal: `current-system/` (local only, contains real addresses) |
 | Packing history (up to 5, each cancellable) | Changed | latest entry inline with cancel icon; same row repeats |
 | Messages to admin (`type=picker`), notes | Covered / Added modal | thread; modal [12] |
 | Per-order Refresh | Covered | refresh icon |

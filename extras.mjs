@@ -70,7 +70,20 @@ export function lineDeco(x, cap) {
   const cls = w.state === 'done' ? 'w-d' : '';
   return `<span class="dcl">${kind}<span class="w ${cls}" title="${w.who} · due ${w.due}">${w.state === 'done' ? '✓ Done' : `${w.done}/${x.qty}`} · ${w.who.split(' ')[0]}</span></span>`;
 }
-export const lineEdit = () => `<span class="cell" style="gap:0;justify-content:flex-end"><button class="ib" title="Edit line item" style="width:22px">${ic('pencil', 'i')}</button><button class="ib" title="Remove line item" style="width:22px">${ic('trash', 'i')}</button></span>`;
+/** Work column (as today's Work badge): done / qty, green when finished, amber when started, grey otherwise. Admin opens View decorations. */
+export function lineWork(x, cap) {
+  const w = x.work;
+  if (!w || w.state === 'unassigned') return `<span class="muted" style="text-align:center">-</span>`;
+  const done = w.state === 'done' ? x.qty : w.done, cls = done >= x.qty ? 'ok' : done > 0 ? 'warn' : '';
+  return `<span style="display:flex;justify-content:center"><${cap.deco === 2 ? 'button' : 'span'} class="bdg ${cls}" title="${cap.deco === 2 ? 'View decoration work' : 'Decoration work'} · ${w.who}">${done}/${x.qty}</${cap.deco === 2 ? 'button' : 'span'}></span>`;
+}
+/** Per-line Actions (Admin), as today's OrderItemActions: edit and remove. Locked when closed / canceled; fulfilled lines cannot be removed. */
+export function lineActions(r, x, fulfilled, cap) {
+  if (!cap.lineEdit) return '';
+  const locked = r.canceled || r.closed, why = 'Order is closed or canceled';
+  const btn = (icon, color, title, off) => `<button class="ib" title="${title}" style="width:22px;height:22px;color:${color};${off ? 'opacity:.3;cursor:not-allowed' : ''}">${ic(icon, 'i')}</button>`;
+  return `<span class="cell" style="gap:0;justify-content:center">${btn('pencil', '#3b82f6', locked ? why : fulfilled === 'full' ? 'Fully fulfilled' : 'Edit line item', locked || fulfilled === 'full')}${btn('trash', '#ef4444', locked ? why : fulfilled ? 'Partially fulfilled. Cancel the fulfilment first' : 'Remove line item', locked || fulfilled)}</span>`;
+}
 
 /* ----- order level chips ----- */
 export const labelChip = (r, cap) => (cap.labels && r.label ? `<span class="bdg ok" title="Shipping label printed">${ic('tag', 'i10')}Label printed</span>` : '');
@@ -101,7 +114,7 @@ export function extrasBar(r, cap, { names = true, track = true } = {}) {
     cap.reqStock && !r.canceled ? `<button class="btn xs ghost" title="Ask for a supplier restock of lines that are out of stock">${ic('cube', 'i10')}Request stock${restockCount(r) ? `<i class="cnt">${restockCount(r)}</i>` : ''}</button>` : '',
     cap.stockAdj ? `<button class="btn xs ghost" title="Manage stock adjustment">${ic('adjust', 'i10')}Stock ${stockAdjOf(r) ? `${stockAdjOf(r).managed}/${stockAdjOf(r).total}` : '-'}</button>` : '',
     names && cap.names && nNames ? `<button class="btn xs ghost" title="Export name attributes as CSV or print">${ic('download', 'i10')}Export names (${nNames})${ic('chevronDown', 'i10')}</button>` : '',
-    cap.lineEdit && !r.canceled && !r.closed ? `<button class="btn xs ghost" title="Edit or remove lines, add a store product or custom item">${ic('pencil', 'i10')}Edit lines</button><button class="btn xs ghost">${ic('plus', 'i10')}Add line</button>` : '',
+    cap.lineEdit && !r.canceled && !r.closed ? `<button class="btn xs ghost">${ic('plus', 'i10')}Add line</button>` : '',
     track ? trackingIcon(r, cap) : '',
   ].filter(Boolean).join('');
   if (!chips && !acts) return '';
