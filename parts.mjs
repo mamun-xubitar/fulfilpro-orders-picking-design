@@ -1,6 +1,6 @@
 import { ic, tile } from './chrome.mjs';
 import * as X from './extras.mjs';
-import { RECIPIENTS, contactOf, confsOf, STORES, ORDERS, QUEUES, countOf, queueFor, stage, totalQty, packedQty, slipOver24, byNo, shopifyUrl, need, isShort, shortCount, PO_LABEL } from './data.mjs';
+import { restockState, RECIPIENTS, contactOf, confsOf, STORES, ORDERS, QUEUES, countOf, queueFor, stage, totalQty, packedQty, slipOver24, byNo, shopifyUrl, need, isShort, shortCount, PO_LABEL } from './data.mjs';
 let ROLE = 'admin';
 export const setRole = (r) => { ROLE = r; };
 
@@ -12,6 +12,20 @@ export const CAP = {
   picker: { shopify: 0, stock: 0, poCreate: 0, store: 0, period: 0, sync: 0, ffilter: 0, slip: 1, pack: 1, ful: 0, cust: 0, labels: 0, req: null, approvals: 0, deco: 0, bin: 1, track: 0, invoice: 0, reqStock: 0, stockAdj: 0, names: 0, lineEdit: 0, attach: 0 },
 };
 
+/** Row background by status. Same priority as today's table (back-in-stock, then status, then decoration), with canceled / closed first. */
+export function rowTone(r, role) {
+  const cap = CAP[role];
+  if (r.canceled) return 'tone-red';
+  if (r.closed) return 'tone-gray';
+  if (cap.reqStock && restockState(r) && r.ful !== 'full') return 'tone-restock';
+  if (r.req) return 'tone-amber';
+  if (r.ful === 'full') return 'tone-blue';
+  if (r.ful === 'partial') return 'tone-amber';
+  if (packedQty(r) >= totalQty(r)) return 'tone-green';
+  if (cap.deco && r.items.some((x) => x.deco === 'EMB')) return 'tone-emb';
+  if (cap.deco && r.items.some((x) => x.deco === 'PRT')) return 'tone-prt';
+  return '';
+}
 export const storeChip = (c) => `<span class="store"><i style="background:${STORES[c].hue}"></i>${c}</span>`;
 /** Print-picking-slip button: neutral until printed, then green with a tick (no time-based "late" state any more). */
 export const slipTitle = (r) => (r.slip != null ? `Picking slip printed ${r.slip < 24 ? Math.max(1, Math.round(r.slip)) + ' h ago' : Math.round(r.slip / 24) + ' d ago'} · print again` : 'Print picking slip');
@@ -66,7 +80,16 @@ export const flags = (r, cap) => {
   const b = (icn, n, tip, red) => (n ? `<span class="ib" title="${tip}" style="width:20px">${ic(icn, 'i')}<i class="ct${red ? ' ' + (red === 1 ? 'red' : red) : ''}">${n}</i></span>` : '');
   return `<span class="cell" style="gap:2px">${b('document', r.notes, 'Order notes')}${b('chat', r.msgs, 'Messages')}${b('userLock', r.req ? 1 : 0, 'Fulfilment edit request awaiting approval', 'amber')}</span>`;
 };
-export const sortHead = (t) => `<span class="srt">${t}${ic('sort', 'i10')}</span>`;
+/** Notes column: order-note icon (always shown so a first note can be added) + pending-request flag. Opens the Notes modal. */
+export const noteFlags = (r) => {
+  const ct = (n, cls = '') => (n ? `<i class="ct${cls}">${n}</i>` : '');
+  return `<span class="cell" style="gap:2px"><span class="ib" title="Order notes" style="width:20px">${ic('document', 'i')}${ct(r.notes)}</span>${r.req ? `<span class="ib" title="Fulfilment edit request awaiting approval" style="width:20px">${ic('userLock', 'i')}<i class="ct amber">1</i></span>` : ''}</span>`;
+};
+/** Actions column: message icon (always shown so a first message can be sent). Opens the Messages modal. */
+export const msgBtn = (r) => `<button class="ib" title="Messages">${ic('chat', 'i')}${r.msgs ? `<i class="ct">${r.msgs}</i>` : ''}</button>`;
+/** Actions column: tax invoice icon. */
+export const invoiceBtn = () => `<button class="ib" title="Print tax invoice">${ic('document', 'i')}</button>`;
+export const sortHead =(t) => `<span class="srt">${t}${ic('sort', 'i10')}</span>`;
 
 /* ---------- toolbar: filters are chips, not dropdown stacks ---------- */
 export const chip = (k, v, on, ro) => `<button class="fchip${on ? ' on' : ''}${ro ? ' ro' : ''}"><span class="k">${k}</span><b>${v}</b>${ic('chevronDown', 'i12')}</button>`;
@@ -198,7 +221,7 @@ export function fulBox(r, cap, { confirm = true } = {}) {
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px"><span class="inp" style="justify-content:space-between" title="Searchable carrier list">Australia Post ${ic('chevronDown', 'i10')}</span><span class="inp muted">Tracking no.</span></div>
     <div style="display:grid;grid-template-columns:1fr auto;gap:5px;align-items:center"><span class="inp muted">${ic('scan', 'i10')}&nbsp;Barcodes</span><button class="lnk">+ Tracking URL</button></div>
     <label class="ckl"><span class="ck on"></span>Send notification to customer</label>
-    ${confirm ? `<div style="display:flex;gap:5px"><button class="btn pri" style="flex:1;height:26px">Confirm fulfilment</button><button class="btn ghost" style="height:26px" title="Confirm and print the shipping label">${ic('printer', 'i')}& label</button></div>` : ''}
+    ${confirm ? `<div style="display:flex;gap:5px"><button class="btn pri" style="flex:1;height:26px">Confirm fulfilment</button><button class="btn ghost" style="flex:1;height:26px" title="Confirm fulfilment and print the shipping label">${ic('printer', 'i')}Confirm & Print</button></div>` : ''}
   </div>`;
 }
 export function custBox(r, cap) {
@@ -206,7 +229,6 @@ export function custBox(r, cap) {
   return `<div style="display:flex;flex-direction:column;gap:6px">
     <dl class="kv" style="grid-template-columns:58px 1fr"><dt>Customer</dt><dd><b class="strong">${r.customer}</b></dd><dt>Email</dt><dd style="overflow-wrap:anywhere;font-size:10.5px">${contactOf(r).email}</dd><dt>Phone</dt><dd class="tn">${contactOf(r).phone}</dd><dt>Ship to</dt><dd>${contactOf(r).lines.join('<br>')}</dd><dt>Method</dt><dd><span class="cell" style="flex-wrap:wrap"><span class="bdg ${r.ship === 'Express' ? 'warn' : 'ok'}">${r.ship} · ${r.ship === 'Express' ? 'Paid $14' : 'Free'}</span>${(r.codes || []).map((c) => `<span class="bdg info" title="Discount code">${c}</span>`).join('')}</span></dd></dl>
     ${r.notes ? `<div class="note-a"><b>Order note</b> · Please hold until the team captain collects the box.</div>` : ''}
-    ${cap.labels ? `<div style="display:flex;gap:5px"><button class="btn xs ghost">${ic('printer', 'i12')}Label</button><button class="btn xs ghost">${ic('document', 'i12')}Tax invoice</button></div>` : ''}
   </div>`;
 }
 export function thread(r, cap) {
@@ -224,14 +246,15 @@ export function pickRoute(r) {
 }
 export const secHead = (icn, t, right = '') => `<div class="sh"><h4>${ic(icn, 'i12')}${t}</h4><span>${right}</span></div>`;
 
-export function bulkBar(role, n = 3, compact = false) {
+export function bulkBar(role, n = 3, compact = false, names = null) {
   const c = CAP[role];
   const L = compact ? { s: 'Slips', l: 'Labels', e: 'Names' } : { s: 'Print picking slips', l: 'Print labels', e: 'Export names' };
+  const cnt = names == null ? '' : ` (${names})`;
   return `<div class="bulk"><b>${n} selected</b><span class="sep"></span>
     ${c.slip ? `<button class="btn ghost">${ic('printer', 'i')}${L.s}</button>` : ''}
     ${c.labels ? `<button class="btn ghost">${ic('printer', 'i')}${L.l}</button>` : ''}
-    ${c.labels ? `<button class="btn ghost" title="Export name attributes as CSV or print">${ic('download', 'i')}${L.e}${ic('chevronDown', 'i10')}</button>` : ''}
-    <button class="btn ghost">${ic('expand', 'i')}Expand</button><span class="sep"></span><button class="x ib" title="Clear selection">${ic('close', 'i')}</button></div>`;
+    ${c.names ? `<button class="btn ghost" title="Export name attributes as CSV or print">${ic('download', 'i')}${L.e}${cnt}${ic('chevronDown', 'i10')}</button>` : ''}
+    <span class="sep"></span><button class="x ib" title="Clear selection">${ic('close', 'i')}</button></div>`;
 }
 export const pager = (n = 21, size = false) => `<div class="foot"><span>Showing <b class="tn strong">1–${Math.min(n, 20)}</b> of <b class="tn strong">${n}</b> ${size === 'products' ? 'products' : 'orders'}</span><div style="display:flex;align-items:center;gap:10px">${size ? `<span class="row-b" style="gap:5px"><span class="muted">Rows per page</span><span class="inp" style="height:20px;font-size:10.5px">20 ${ic('chevronDown', 'i10')}</span></span>` : ''}<div class="pager"><span>${ic('chevronLeft', 'i12')}</span><span class="on">1</span>${n > 20 ? '<span>2</span>' : ''}<span>${ic('chevronRight', 'i12')}</span></div></div></div>`;
 /** Create-PO popover (admin only). Created as REQUESTED, prefilled with the shortfall. */

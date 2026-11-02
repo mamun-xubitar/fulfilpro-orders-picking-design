@@ -201,6 +201,26 @@ for (const r of ORDERS) for (const x of r.items) {
   else if (x.deco) x.work = { state: 'unassigned', done: 0 };
   if (NAMEATTR[x.sku]) x.nameAttr = NAMEATTR[x.sku];
 }
+// Customer note = Order.note (the Shopify checkout note). Shown for every role, as on today's Orders and Picking List pages.
+const CUSTOMER_NOTE = {
+  '4821': 'Please pack the polo separately, it is a gift.',
+  '4809': 'Deliver to the club house, not the home address. Gate code 4471.',
+  '1184': 'Crest on left chest only. Match the club navy.',
+  '2204': 'Captain collects Saturday morning, keep the box sealed.',
+  '0702': 'Please leave the parcel with the neighbour at no. 14 if nobody is home.',
+  '1176': 'Gift wrap the hoodie please.',
+  '2181': 'Split delivery is fine if the caps are late.',
+  '0718': 'Need these before the 31st if at all possible, thank you!',
+};
+// Decoration attachments per order (today: OrderDecorationAttachment). Counts of uploaded files + customer remarks.
+const ATTACH = {
+  '4809': { files: 2, design: 1, photos: 0, remark: 'Crest on left chest, 80 mm, thread matches the club navy.' },
+  '1184': { files: 1, design: 0, photos: 2, remark: '' },
+};
+for (const r of ORDERS) {
+  if (CUSTOMER_NOTE[r.no]) r.note = CUSTOMER_NOTE[r.no];
+  r.att = ATTACH[r.no] || { files: 0, design: 0, photos: 0, remark: '' };
+}
 export const hasRestock = (r) => r.items.some((x) => x.restock);
 /** Order-level back-in-stock state: Need restock (pending) / Partially restocked / Restocked. */
 export function restockState(r) {
@@ -213,3 +233,10 @@ export const RESTOCK_LABEL = { pending: 'Need restock', partial: 'Partly restock
 export const decoDone = (r, kind) => { const l = r.items.filter((x) => x.deco === kind); return { done: l.filter((x) => x.work && x.work.state === 'done').length, total: l.length }; };
 /** Fulfilment confirmations (an order can be fulfilled in several parcels). Derived from trk unless set. */
 export const confsOf = (r) => r.confs || (r.trk ? [{ date: 'Mon 26 Oct · 11:31', carrier: r.trk.carrier, no: r.trk.no, st: r.trk.st, lines: r.items.map((x) => `${x.name} · ${x.colour} ${x.size} × ${x.qty}`), barcodes: '' }] : []);
+
+/** Stock-adjustment state, as in today's Orders column: lines whose hub stock is settled (fully packed) / all lines. null = nothing to adjust. */
+export function stockAdjOf(r) {
+  if (r.canceled) return null;
+  const total = r.items.length, managed = r.items.filter((x) => x.packed >= x.qty).length;
+  return { managed, total, status: managed === total ? 'managed' : managed > 0 ? 'partial' : 'none' };
+}

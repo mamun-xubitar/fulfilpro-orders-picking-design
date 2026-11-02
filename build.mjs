@@ -14,8 +14,8 @@ const ROLE_NOTE = {
   staff: ['Today’s Orders page, nothing more.', 'No picking slip or packing controls, no “slip printed” state or filter. Fulfilment edits and cancels stay request-and-approval (“Request edit”). Queue tabs follow packing status only. Request stock, decoration state and name export stay.'],
   picker: ['Today’s Picking List, nothing more.', 'No Store, Period or Sync filters, no fulfilment, no customer details, labels or invoices. Bin locations, slip printing, Full / Partial packing and the notify step stay. Larger touch targets.'],
 };
-const CONCEPTS = [
-  { id: 'a', fn: D.conceptA, t: 'A · Queue table with inline pack', rec: 'Recommended · gray/blue shell skin',
+const ALL_CONCEPTS = [
+  { id: 'a', fn: D.conceptA, t: 'A · Queue table with inline pack', rec: 'Chosen · gray/blue shell skin',
     d: 'Today’s table, made faster to read. Queue tabs with live counts replace the status dropdowns, a four-step stage track shows where every order is at a glance, the slip icon turns green once the picking slip is printed, and a row opens in place into items, packing and fulfilment. One bulk bar replaces three selection systems.',
     tags: [['Lowest retraining cost', 'good'], ['Everything in one scroll-free page', 'good'], ['Only one order open at a time', 'warn']] },
   { id: 'b', fn: D.conceptB, t: 'B · Split queue with order inspector', rec: 'Recommended · gray/blue shell skin',
@@ -28,6 +28,9 @@ const CONCEPTS = [
   { id: 'e', fn: D2.conceptE, t: 'E · Today’s Orders table, refreshed', rec: 'Closest to today · gray/blue shell skin', d: 'The current Orders page columns, search, dropdown filters, selection bar, pagination (with page size) and three-column expanded row, with the stage track, the green slip icon and short badges added. Pickers get today’s Picking List in the same style.', tags: [['Almost no retraining', 'good'], ['Same filters and actions as today', 'good'], ['Product info needs an expand', 'warn']] },
   { id: 'f', fn: D2.conceptF, t: 'F · Orders table with Orders / Products toggle', rec: 'Gray/blue shell skin', d: 'The same table shell as E, plus a Products view that groups open order lines by product: how many are needed across orders, packed so far, available, PO status and a bulk Create POs for admins. For pickers it becomes a bin-sorted pick list. Switch views with the toggle.', tags: [['Purchasing and picking meet', 'good'], ['Product-first planning', 'good'], ['A second view to learn', 'warn']] },
 ];
+// Concept A is the chosen layout; B–F are archived in ./archive. Rebuild them with CONCEPTS=a,b,c,d,e,f.
+const ACTIVE = (process.env.CONCEPTS ?? 'a').split(',');
+const CONCEPTS = ALL_CONCEPTS.filter((c) => ACTIVE.includes(c.id));
 
 const FILE_CSS = CSS + D.CSS2 + D.CSS_B + D.CSS_C + D2.CSS_D + CSS_X;
 const arts = {};
@@ -67,15 +70,18 @@ ${row('Store, Period filters and Sync', 1, 1, 0)}${row('Fulfilment status, fulfi
 ${row('Packing: Full / Partial, Confirm packed, notify, cancel confirmation', 1, 0, 1)}${row('Customer details, labels, tax invoice, name export, new invoice', 1, 1, 0)}
 ${row('Confirm fulfilment; edit / cancel fulfilment', 1, 1, 0)}${row('Pending-request approvals, stock adjustment, decoration assign / mark done, line-item edit, attachments', 1, 0, 0)}${row('Request stock (back in stock), decoration state, name-attribute export, label-printed state', 1, 1, 0)}${row('Notes, messages, refresh order', 1, 1, 1)}${row('Product colour swatch and name', 1, 1, 1)}${row('Product link to Shopify admin', 1, 1, 0)}${row('Available quantity and purchase-order status on each line', 1, 1, 0)}${row('Create purchase order (+ PO), prefilled with the shortfall', 1, 0, 0)}${row('Copy protection (text selection blocked) on order surfaces', 0, 1, 1)}</table></div>`;
 
-arts.dpo = D2.conceptDPo();
-writeFileSync(new URL('./concept-d-admin-po.html', import.meta.url), D.wrapDoc('Concept D · Create PO', FILE_CSS + '.art{border:0;border-radius:0;box-shadow:none}', arts.dpo));
-const rolesOf = (c) => (c.id === 'd' ? [...ROLES, 'po'] : ROLES);
-const index = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>FulfilPro · Orders + Picking merged · 3 concepts</title><style>${FILE_CSS}${INDEX_CSS}</style></head><body><div class="sheet">
-<div class="sh-hd"><h1>Orders + Picking List: one page, six layouts</h1>
-<p>Six ways to merge the Orders page and the Picking List into one compact page. Each is shown for the three roles that reach it today, so you can see exactly what each person gets and what stays hidden. Every order line now also shows the <b>product colour</b>, a <b>Shopify admin link</b> and, for Admin and Staff, the <b>available quantity</b> and <b>purchase order status</b>; Admin gets a <b>+ PO</b> button on short lines. All concepts share the same ideas: queue tabs with live counts, one smart search, filters as chips, a stage track per order, a <b>slip-printed filter with a green printer icon</b> once the picking slip is printed (the old “late after 24 h” rule is now an optional extra inside that filter), one bulk bar, and the zoom control from Inventory (50–150%, Ctrl +/−/0; try it on any screen). Artboards are 1280 × 800 and need no page scroll.</p>
+const withPo = ACTIVE.includes('d');
+if (withPo) {
+  arts.dpo = D2.conceptDPo();
+  writeFileSync(new URL('./concept-d-admin-po.html', import.meta.url), D.wrapDoc('Concept D · Create PO', FILE_CSS + '.art{border:0;border-radius:0;box-shadow:none}', arts.dpo));
+}
+const rolesOf = (c) => (c.id === 'd' && withPo ? [...ROLES, 'po'] : ROLES);
+const index = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>FulfilPro · Orders + Picking merged · Concept A</title><style>${FILE_CSS}${INDEX_CSS}</style></head><body><div class="sheet">
+<div class="sh-hd"><h1>Orders + Picking List: one page, Concept A (chosen)</h1>
+<p>The chosen way to merge the Orders page and the Picking List into one compact page (the other five concepts are archived). It is shown for the three roles that reach it today, so you can see exactly what each person gets and what stays hidden. Every order line now also shows the <b>product colour</b>, a <b>Shopify admin link</b> and, for Admin and Staff, the <b>available quantity</b> and <b>purchase order status</b>; Admin gets a <b>+ PO</b> button on short lines. The layout is built on these ideas: queue tabs with live counts, one smart search, filters as chips, a stage track per order, a <b>slip-printed filter with a green printer icon</b> once the picking slip is printed (the old “late after 24 h” rule is now an optional extra inside that filter), one bulk bar, and the zoom control from Inventory (50–150%, Ctrl +/−/0; try it on any screen). Artboards are 1280 × 800 and need no page scroll.</p>
 <p style="font-size:11.5px;color:#6b7280">All orders, customers and numbers on these screens are synthetic samples. Round 3 added what the first rounds left out (request stock, decoration, attachments, name export, fulfilment depth, picking-slip and notify dialogs): see <a href="dialogs.html" style="color:#1d4ed8;font-weight:700">dialogs.html</a> for the dialogs and menus and <b>PARITY.md</b> for the full old-vs-new checklist.</p></div>
 ${matrix}
-${CONCEPTS.map((c, n) => `<section class="case" data-case="${c.id}"><div class="case-hd"><div class="case-no">${'ABCDEF'[n]}</div><div><div class="case-t">${c.t}<span class="rec">${c.rec}</span></div><div class="case-d">${c.d}</div><div class="tags">${c.tags.map(([l, k]) => `<span class="tg ${k}">${l}</span>`).join('')}</div></div></div>
+${CONCEPTS.map((c) => `<section class="case" data-case="${c.id}"><div class="case-hd"><div class="case-no">${c.id.toUpperCase()}</div><div><div class="case-t">${c.t}<span class="rec">${c.rec}</span></div><div class="case-d">${c.d}</div><div class="tags">${c.tags.map(([l, k]) => `<span class="tg ${k}">${l}</span>`).join('')}</div></div></div>
 <div class="rs">${rolesOf(c).map((r, i) => `<button data-r="${r}" class="${i ? '' : 'on'}">${ROLE_LABEL[r]}</button>`).join('')}<span class="note" data-note></span></div>
 ${rolesOf(c).map((r, i) => `<div class="pane${i ? '' : ' on'}" data-r="${r}" data-n="${ROLE_NOTE[r][0]}||${ROLE_NOTE[r][1]}">${r === 'po' ? arts.dpo : arts[c.id + r]}</div>`).join('')}</section>`).join('')}
 <div class="faq"><h2>Questions for the client</h2><ul>
@@ -98,4 +104,4 @@ document.querySelectorAll('.case').forEach(function(c){
 </script></body></html>`;
 writeFileSync(new URL('./index.html', import.meta.url), index);
 writeFileSync(new URL('./dialogs.html', import.meta.url), buildDialogs());
-console.log('built index.html, dialogs.html + 19 artboards');
+console.log(`built index.html, dialogs.html + ${CONCEPTS.length * ROLES.length + (withPo ? 1 : 0)} artboards`);

@@ -1,6 +1,7 @@
 import { sidebar, header, ZOOM_JS } from './chrome.mjs';
 import * as P from './parts.mjs';
 import * as X from './extras.mjs';
+import { stockAdjOf, confsOf } from './data.mjs';
 const { ic, tile, CAP, ORDERS, byNo, queueFor, totalQty, packedQty } = P;
 
 export const CSS2 = `
@@ -32,36 +33,53 @@ export const rowsFor = (role) => (role === 'picker' ? ORDERS.filter((r) => !['sh
 /* ======================================================================================== */
 /* CONCEPT A · Queue table + inline pack                                                    */
 /* ======================================================================================== */
+const actsW = (cap) => (2 + (cap.slip ? 1 : 0) + (cap.labels ? 1 : 0) + (cap.invoice ? 1 : 0) + 1) * 24 + 4;
 function colsA(cap) {
-  return `20px 196px minmax(120px,1.1fr) minmax(110px,1fr) ${P.trackW(cap)}px 92px ${cap.deco ? 156 : 116}px 84px ${cap.slip ? 104 : 96}px`;
+  return `20px 116px 50px minmax(90px,1.1fr) ${cap.stockAdj ? '58px ' : ''}minmax(84px,1fr) ${P.trackW(cap)}px ${cap.ful ? '112px ' : ''}84px ${cap.deco ? 140 : 108}px 52px ${actsW(cap)}px`;
 }
+/** Stock adjustment pill (admin): managed / total lines, green / amber / red, as today's column. */
+const stockAdjCell = (r) => {
+  const a = stockAdjOf(r);
+  return `<span class="cell" style="justify-content:center">${a ? `<span class="bdg ${a.status === 'managed' ? 'ok' : a.status === 'partial' ? 'warn' : 'bad'}" title="Stock adjustment: ${a.managed} of ${a.total} lines managed">${a.managed}/${a.total}</span>` : '<span class="muted">-</span>'}</span>`;
+};
+/** Fulfilment info (admin, staff): date, carrier, tracking number of the first confirmation, +N for more. */
+const fulCell = (r) => {
+  const c = confsOf(r), f = c[0];
+  if (!f) return `<span class="cell"><span class="muted">-</span></span>`;
+  return `<span class="cell col"><span class="ell strong" style="font-size:10.5px">${f.date.split(' · ')[0]}${c.length > 1 ? ` <span class="muted">+${c.length - 1}</span>` : ''}</span><span class="ell muted" style="font-size:10px">${f.carrier} · <span style="color:var(--pri)">${f.no}</span></span></span>`;
+};
 function rowActsA(r, cap) {
   const a = [];
   if (cap.slip) a.push(P.slipBtn(r));
   if (cap.labels) a.push(P.labelBtn(r));
+  if (cap.invoice) a.push(P.invoiceBtn());
+  a.push(P.msgBtn(r));
   a.push(`<button class="ib" title="Refresh order from Shopify">${ic('refresh', 'i')}</button>`);
   return a.join('');
 }
 function rowA(r, role, { open = false, checked = false }) {
   const cap = CAP[role], cx = r.canceled;
-  return `<div class="tr${open ? ' open' : ''}${checked ? ' sel' : ''}${cx ? ' cx' : ''}" style="--cols:${colsA(cap)};${role === 'picker' ? '--rh:40px' : ''}">
+  return `<div class="tr${open ? ' open' : ''}${checked ? ' sel' : ''}${cx ? ' cx' : ''} ${P.rowTone(r, role)}" style="--cols:${colsA(cap)};${role === 'picker' ? '--rh:40px' : ''}">
     <span class="ck${checked ? ' on' : ''}"></span>
-    <span class="cell"><span class="ono${X.lbl(r, cap)}">#${r.no}</span>${P.storeChip(r.store)}${X.miniChips(r, cap)}${cx ? '<span class="bdg">Canceled</span>' : ''}</span>
-    <span class="cell col"><b class="ell strong" style="font-size:11.5px">${r.customer}</b><span class="muted ell" style="font-size:10px">${r.placed}</span></span>
+    <span class="cell col"><span class="cell"><span class="ono${X.lbl(r, cap)}">#${r.no}</span>${X.miniChips(r, cap)}${cx ? '<span class="bdg">Canceled</span>' : ''}</span><span class="muted ell" style="font-size:10px">${r.placed}</span></span>
+    <span class="cell">${P.storeChip(r.store)}</span>
+    <span class="cell"><b class="ell strong" style="font-size:11.5px">${r.customer}</b></span>
+    ${cap.stockAdj ? stockAdjCell(r) : ''}
     <span class="cell">${P.thumbs(r, 3)}<span class="muted tn" style="font-size:10.5px">${totalQty(r)} pcs</span></span>
     ${P.track(r, cap)}
+    ${cap.ful ? fulCell(r) : ''}
     ${P.packBar(r)}
     <span class="cell">${P.shortBadge(r, cap)}${X.decoProg(r, cap)}</span>
-    <span class="cell">${P.flags(r, cap)}</span>
+    <span class="cell">${P.noteFlags(r)}</span>
     <span class="acts">${rowActsA(r, cap)}<button class="ib" title="${open ? 'Collapse' : 'View details'}">${ic(open ? 'chevUp' : 'chevronDown', 'i')}</button></span>
   </div>`;
 }
 function expandedA(r, role) {
   const cap = CAP[role], boxes = [];
   const lnH = role === 'picker' ? 42 : 34;
-  boxes.push(`<div class="bx" style="flex:1 1 0">${P.secHead('package', 'Order items', `<span class="muted tn">${totalQty(r)} pcs · ${packedQty(r)} packed</span>`)}${X.extrasBar(r, cap)}${P.lines(r, cap, { rowH: lnH, skuSub: false })}${X.attachmentsStrip(r, cap)}<div class="hr"></div>${P.secHead('chat', 'Notes & messages', `<span class="muted">${(r.notes || 0) + (r.msgs || 0)}</span>`)}${P.thread(r, cap)}</div>`);
+  boxes.push(`<div class="bx" style="flex:1 1 0">${P.secHead('package', 'Order items', `<span class="muted tn">${totalQty(r)} pcs · ${packedQty(r)} packed</span>`)}${X.extrasBar(r, cap)}${P.lines(r, cap, { rowH: lnH, skuSub: false })}${cap.ful ? '' : (X.customerNote(r, cap) ? `<div class="in">${X.customerNote(r, cap)}</div>` : '')}</div>`);
   if (cap.pack) boxes.push(`<div class="bx" style="width:${role === 'picker' ? 280 : 212}px;flex:none">${P.secHead('check', 'Packing & slip')}<div class="in">${P.packBox(r, cap, { big: role === 'picker' })}</div>${role === 'picker' ? `<div class="hr"></div>${P.secHead('mapPin', 'Pick route by bin')}${P.pickRoute(r)}` : ''}</div>`);
-  if (cap.ful) boxes.push(`<div class="bx" style="width:226px;flex:none">${P.secHead('truck', 'Fulfilment')}<div class="in">${P.fulBox(r, cap)}</div>${cap.cust ? `<div class="hr"></div>${P.secHead('mapPin', 'Customer & shipping')}<div class="in">${P.custBox(r, cap)}</div>` : ''}</div>`);
+  if (cap.ful) boxes.push(`<div class="bx" style="width:256px;flex:none">${P.secHead('truck', 'Fulfilment')}<div class="in">${P.fulBox(r, cap)}${X.customerNote(r, cap)}</div>${cap.cust ? `<div class="hr"></div>${P.secHead('mapPin', 'Customer & shipping')}<div class="in">${P.custBox(r, cap)}</div>` : ''}</div>`);
   return `<div class="xp">${boxes.join('')}</div>`;
 }
 export function conceptA(role) {
@@ -70,15 +88,15 @@ export function conceptA(role) {
   const take = role === 'picker' ? 6 : 7;
   const idx = rows.findIndex((r) => r.no === focus);
   // window the list so the open row sits near the top and the bottom is filled
-  const start = role === 'admin' ? 1 : Math.max(0, idx - 3), win = rows.slice(start, start + take);
-  const body = win.map((r) => rowA(r, role, { open: r.no === focus, checked: chk.includes(r.no) }) + (r.no === focus ? expandedA(r, role) : '')).join('');
+  const start = role === 'admin' ? 3 : Math.max(0, idx - 3), win = rows.slice(start, start + take);
+  const body = win.map((r) => rowA(r, role, { open: r.no === focus, checked: chk.includes(r.no) }) + X.underRow(r, cap, P.rowTone(r, role)) + (r.no === focus ? expandedA(r, role) : '')).join('');
   const content = `
     ${P.approvals(role)}
     ${P.toolbar(role, { refreshWarn: role === 'admin' })}
-    <div class="qrow">${P.queueTabs(role, 'all')}<div class="r"><span class="muted" style="font-size:10.5px">Sort</span>${P.chip('', 'Newest first', 0)}${cap.labels ? `<button class="btn ghost">${ic('plus', 'i')}New invoice</button>` : ''}</div></div>
+    <div class="qrow">${P.queueTabs(role, 'all')}<div class="r"><span class="muted" style="font-size:10.5px">Sort</span>${P.chip('', 'Newest first', 0)}${cap.labels ? `<button class="btn ghost">${ic('plus', 'i')}New invoice</button>` : ''}<button class="btn ghost">${ic('expand', 'i')}Expand all</button></div></div>
     <div class="card" style="flex:1">
-      <div class="thead" style="--cols:${colsA(cap)}"><span class="ck mix"></span><span>${P.sortHead('Order')}</span><span>${P.sortHead('Customer')}</span><span>Items</span>${P.trackHead(cap)}<span>Packed</span><span>Deco</span><span>Notes</span><span style="text-align:right">Actions</span></div>
-      <div class="tbody">${body}${P.bulkBar(role, 3)}</div>
+      <div class="thead" style="--cols:${colsA(cap)}"><span class="ck mix"></span><span>${P.sortHead('Order')}</span><span>Store</span><span>${P.sortHead('Customer')}</span>${cap.stockAdj ? '<span style="text-align:center" title="Stock adjustment">Stock adj.</span>' : ''}<span>Items</span>${P.trackHead(cap)}${cap.ful ? '<span>Fulfilment</span>' : ''}<span>Packed</span><span>Deco</span><span>Notes</span><span style="text-align:right">Actions</span></div>
+      <div class="tbody">${body}${P.bulkBar(role, 3, false, chk.reduce((a, n) => a + byNo(n).items.filter((x) => x.nameAttr).length, 0))}</div>
       ${P.pager(rows.length)}
     </div>`;
   return shell(role, content, { sub: 'Queue' });

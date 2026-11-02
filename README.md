@@ -5,6 +5,8 @@
 Design prototype for merging `app/(shell)/orders` and `app/(shell)/picking-list` into one page.
 Round 3 changes: the filter now follows the picking slip with a green printed icon (the old 24 h “late” rule is an optional extra), and every gap found against today's pages was closed. See **`PARITY.md`** for the old-vs-new checklist and **`dialogs.html`** for all dialogs, menus and popovers.
 
+Round 4 (Concept A): the **decoration attachments strip** (Files / Customer design / Photo / Customer remarks, Admin) now sits under each row without expanding, the **Customer note** shows in the expanded order as today, and rows are **tinted by status** again (see PARITY.md).
+
 Open **`index.html`**: it shows every concept, a role switcher (Admin / Staff / Picker) per concept, the role
 matrix and the questions for the client. The zoom control works on every artboard (50–150%, Ctrl +/−/0 while the
 pointer is over an artboard). Concept F has an Orders / Products toggle; concept D has an extra artboard with the

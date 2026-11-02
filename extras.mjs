@@ -2,7 +2,7 @@
 // Pure renderers (no state): parts.mjs and the concepts place them, role-gated through CAP.
 import { ic } from './chrome.mjs';
 import { P as ICONS } from './chrome-base.mjs';
-import { restockState, RESTOCK_LABEL, decoDone } from './data.mjs';
+import { restockState, RESTOCK_LABEL, decoDone, stockAdjOf } from './data.mjs';
 
 Object.assign(ICONS, {
   calendar: 'M8 2v4m8-4v4M3 10h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z',
@@ -36,6 +36,25 @@ export const CSS_X = `
 .trkic.reg{color:var(--e700);background:var(--e50)}.trkic.pause{color:var(--a800);background:var(--a50)}.trkic.none{color:var(--g500);background:var(--div)}
 .lockb{display:flex;align-items:center;gap:6px;border:1px dashed var(--bd-s);border-radius:8px;background:var(--surf-m);padding:7px 9px;font-size:10.5px;color:var(--tx-m);line-height:1.35}
 .sl{display:inline-flex;align-items:center;gap:3px;font-size:9.5px;font-weight:700}
+/* row tint by status (today: STATUS_MAP[].row + decoration tint); wins over .sel/.open, the ring stays */
+.tone-red{background:#fee2e2}.tr.tone-red:hover{background:#fecaca}
+.tone-gray{background:#f3f4f6}.tr.tone-gray:hover{background:#e5e7eb}
+.tone-amber{background:#fef3c7}.tr.tone-amber:hover{background:#fde68a}
+.tone-blue{background:#dbeafe}.tr.tone-blue:hover{background:#bfdbfe}
+.tone-green{background:#dcfce7}.tr.tone-green:hover{background:#bbf7d0}
+.tone-restock{background:#fffbeb}.tr.tone-restock:hover{background:#fef3c7}
+.tone-emb{background:#f5f3ff}.tr.tone-emb:hover{background:#ede9fe}
+.tone-prt{background:#f0f9ff}.tr.tone-prt:hover{background:#e0f2fe}
+/* always-visible strip under a row: decoration files + remarks (Admin only, as today) */
+.under{display:flex;align-items:center;gap:16px;min-height:var(--uh,32px);padding:3px 10px 3px 38px;border-bottom:1px solid var(--div);font-size:10.5px;color:var(--tx-b);white-space:nowrap}
+.under .uf{display:flex;align-items:center;gap:6px;flex:none}
+.under .uf>b{font-size:9.5px;font-weight:400;color:var(--tx-s)}
+.under .uf .lnk{display:inline-flex;align-items:center;gap:3px}
+.under .uf .cn2{font-weight:700;color:var(--tx-b)}
+.under .rem{display:flex;align-items:center;gap:6px;flex:1;min-width:150px}
+.under .rem>b{font-size:9.5px;font-weight:400;color:var(--tx-s)}
+.under .rem .inp{flex:1;min-width:0;height:22px;background:var(--surf);color:var(--tx-b);overflow:hidden;text-overflow:ellipsis;display:block;line-height:20px}
+.under .rem .inp.ph{color:var(--g400)}
 `;
 
 /* ----- line level ----- */
@@ -80,8 +99,8 @@ export function extrasBar(r, cap, { names = true, track = true } = {}) {
   const nNames = r.items.filter((x) => x.nameAttr).length;
   const acts = [
     cap.reqStock && !r.canceled ? `<button class="btn xs ghost" title="Ask for a supplier restock of lines that are out of stock">${ic('cube', 'i10')}Request stock${restockCount(r) ? `<i class="cnt">${restockCount(r)}</i>` : ''}</button>` : '',
-    cap.stockAdj ? `<button class="btn xs ghost" title="Manage stock adjustment">${ic('adjust', 'i10')}Stock 1/${r.items.length}</button>` : '',
-    names && cap.names && nNames ? `<button class="btn xs ghost" title="Export name attributes">${ic('download', 'i10')}Names (${nNames})${ic('chevronDown', 'i10')}</button>` : '',
+    cap.stockAdj ? `<button class="btn xs ghost" title="Manage stock adjustment">${ic('adjust', 'i10')}Stock ${stockAdjOf(r) ? `${stockAdjOf(r).managed}/${stockAdjOf(r).total}` : '-'}</button>` : '',
+    names && cap.names && nNames ? `<button class="btn xs ghost" title="Export name attributes as CSV or print">${ic('download', 'i10')}Export names (${nNames})${ic('chevronDown', 'i10')}</button>` : '',
     cap.lineEdit && !r.canceled && !r.closed ? `<button class="btn xs ghost" title="Edit or remove lines, add a store product or custom item">${ic('pencil', 'i10')}Edit lines</button><button class="btn xs ghost">${ic('plus', 'i10')}Add line</button>` : '',
     track ? trackingIcon(r, cap) : '',
   ].filter(Boolean).join('');
@@ -96,6 +115,15 @@ export function attachmentsStrip(r, cap) {
   return `<div class="att"><b>${ic('paperclip', 'i10')} Attachments</b><span class="chp on">Files 2</span><span class="chp">Customer design 1</span><span class="chp">Photos 0</span><button class="lnk">${ic('upload', 'i10')} Upload</button><span class="muted ell" style="min-width:0">Customer remark: Crest on left chest, 80 mm, thread matches the club navy.</span></div>`;
 }
 
+/** Strip rendered directly under a row, no expanding needed (Admin, EMB / PRT orders; as on today's Orders page):
+ *  Files / Customer design / Photo (add files) + Customer remarks. Returns '' for everyone else. */
+export function underRow(r, cap, tone = '') {
+  if (!(cap.attach && r.items.some((x) => x.deco))) return '';
+  const a = r.att || { files: 0, design: 0, photos: 0, remark: '' };
+  const f = (label, n, unit) => `<span class="uf"><b>${label}</b><button class="lnk">${ic('paperclip', 'i10')}${n ? `<span class="cn2">${n} ${unit} ·</span> ` : ''}Add files</button></span>`;
+  return `<div class="under ${tone}">${f('Files', a.files, a.files === 1 ? 'file' : 'files')}${f('Customer design', a.design, a.design === 1 ? 'file' : 'files')}${f('Photo', a.photos, a.photos === 1 ? 'photo' : 'photos')}<span class="rem"><b>Customer remarks</b><span class="inp${a.remark ? '' : ' ph'}">${a.remark || 'Add a remark for the decorator…'}</span></span></div>`;
+}
+
 /** Icon-only order flags for tight rows (full wording in the title). */
 export function miniChips(r, cap) {
   const out = [];
@@ -105,3 +133,12 @@ export function miniChips(r, cap) {
   return out.join('');
 }
 export const lbl = (r, cap) => (cap.labels && r.label ? ' lbl' : '');
+
+/** Customer note (Order.note), shown only inside the expanded order, as today.
+ *  Orders page: "Note" box in the actions panel (white, blue border). Picking List (picker): amber box. */
+export function customerNote(r, cap) {
+  if (!r.note) return '';
+  return cap.ful
+    ? `<div class="allow-copy" style="border:1px solid var(--b100);border-radius:6px;background:rgba(255,255,255,.7);padding:6px 9px"><h4 style="font-size:9.5px;font-weight:700;text-transform:uppercase;color:var(--g400)">Note</h4><p style="margin-top:3px;font-size:11px;color:var(--tx-m);line-height:1.4;white-space:pre-wrap">${r.note}</p></div>`
+    : `<div class="allow-copy" style="border:1px solid var(--a200);border-radius:6px;background:var(--a50);padding:6px 9px;font-size:11px;color:var(--a800);line-height:1.4;white-space:pre-wrap">${r.note}</div>`;
+}

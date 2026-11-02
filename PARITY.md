@@ -41,15 +41,17 @@ has its own green state ("Label printed"). Confirm with the client.
 | Refresh turns amber after a sync | Added | toolbar (A and D Admin boards show it) |
 | Selection bar: select page, select all matching filters, N selected, Clear | Covered / Added | E, F selection bar; others use the floating bulk bar |
 | Print labels (N), + New invoice, Expand all | Covered | Print labels in the bulk bar; + New invoice and Expand all in the queue header (Expand all replaces the bulk Expand) |
-| Name attributes: per-line "Name:" chip with tick, export CSV / Print | Added | line chip, `Names (n) ▾` in every expanded order; menu + CSV [9] |
-| Table columns (order, store, customer, date, status, items, fulfilment, note, actions) | Covered | A, E, F tables; B, C, D recompose them |
-| Row tint rules (back-in-stock amber, decoration purple/sky, status colours) | Changed | tint dropped; state is carried by the stage track, chips and the Short badge (colour only for state) |
+| Name attributes: per-line "Name:" chip with tick, export CSV / Print | Added | line chip, `Export names (n) ▾` (same label in the bulk bar, the expanded order and the dialog; today's button reads "Export attributes (n)"); menu + CSV [9] |
+| Table columns (order, store, customer, date, status, stock adjustment, items, fulfilment, note, actions) | Covered | Concept A has a Store column (all roles), Stock adj. (Admin) and Fulfilment (Admin, Staff: date, carrier, tracking no., `+N` for more parcels); status is the stage track |
+| Row tint rules (back-in-stock amber, decoration purple/sky, status colours) | Restored | Row (and its strip) is tinted by status: canceled red, closed gray, pending request / partial fulfilment amber, fulfilled blue, **packed green (new)**, back-in-stock light amber, otherwise EMB purple / PRT sky. Slip state stays on the green printer icon. `rowTone()` in `parts.mjs` |
+| Customer note (`Order.note`) | Added | Only inside the expanded order, as today: Admin / Staff get a "Note" box under the fulfilment box (Orders page), Picker gets the amber box under the lines (Picking List). Not the internal order notes in the Notes column |
+| Attachments row (Files, Customer design, Photo, Customer remarks) | Changed | Now always visible under every EMB / PRT row for Admin, without expanding, with "Add files" per field and the remarks input, as today. `underRow()` in `extras.mjs` |
 | Order No. green once the label is printed; Label printed chip | Added | green order number, tag chip (all concepts) |
 | Closed status (distinct from Canceled) | Added | "Closed" badge on the row, Issues queue; locked fulfilment box [13] |
 | Fulfilment status chip, Packed / Partial Packed chip | Covered | stage track |
 | Back-in-stock chip (Need restock / Partly restocked / Restocked) | Added | order chip, line chip `Restock 0/5` |
 | Decoration chips `x/y Emb`, `x/y Print` with assignee | Added | A–F row / expanded order |
-| Stock Adjustment column + modal (Admin) | Added | `Stock 1/2` button; modal [4] |
+| Stock Adjustment column + modal (Admin) | Restored as a column | `Stock adj.` column, green / amber / red `managed/total` pill (Concept A); the expanded order keeps the `Stock m/t` button; modal [4] |
 | Notes count + modal, admin messages count + modal | Covered / Added modal | note icon in the Notes column, message icon in the Actions column (as today); modal [12] |
 | Tracking icon states, register / pause / restart (Admin) | Added | tracking icon in the fulfil box of fulfilled orders; modal [10], states [13] |
 | View details expand, Refresh order, Tax invoice, Label | Covered | row action icons (tax invoice and label for Admin/Staff); no longer repeated in the expanded customer box |
