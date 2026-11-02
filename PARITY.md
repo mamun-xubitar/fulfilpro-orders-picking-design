@@ -1,5 +1,7 @@
 # Parity check: current Orders + Picking List vs the merged prototype
 
+> **Decision:** Concept A is chosen; B–F are archived in `archive/`. Rows below that name other concepts (B–F) are history.
+
 Source of truth: the stable code on branch `merge-orders-and-picking-page-and-redesign-this-UI`
 (`app/(shell)/orders/modules`, `app/(shell)/picking-list/modules`, `proxy.ts`, `lib/roles.ts`,
 `lib/late-slip-filter.server.ts`). Checked in round 3 against the round-2 prototype.
@@ -38,7 +40,7 @@ has its own green state ("Label printed"). Confirm with the client.
 | Sync split button (store picker), sync message | Covered / Added menu | toolbar; menu [11] |
 | Refresh turns amber after a sync | Added | toolbar (A and D Admin boards show it) |
 | Selection bar: select page, select all matching filters, N selected, Clear | Covered / Added | E, F selection bar; others use the floating bulk bar |
-| Print labels (N), + New invoice, Expand all | Covered | bulk bar / selection bar |
+| Print labels (N), + New invoice, Expand all | Covered | Print labels in the bulk bar; + New invoice and Expand all in the queue header (Expand all replaces the bulk Expand) |
 | Name attributes: per-line "Name:" chip with tick, export CSV / Print | Added | line chip, `Names (n) ▾` in every expanded order; menu + CSV [9] |
 | Table columns (order, store, customer, date, status, items, fulfilment, note, actions) | Covered | A, E, F tables; B, C, D recompose them |
 | Row tint rules (back-in-stock amber, decoration purple/sky, status colours) | Changed | tint dropped; state is carried by the stage track, chips and the Short badge (colour only for state) |
@@ -48,9 +50,9 @@ has its own green state ("Label printed"). Confirm with the client.
 | Back-in-stock chip (Need restock / Partly restocked / Restocked) | Added | order chip, line chip `Restock 0/5` |
 | Decoration chips `x/y Emb`, `x/y Print` with assignee | Added | A–F row / expanded order |
 | Stock Adjustment column + modal (Admin) | Added | `Stock 1/2` button; modal [4] |
-| Notes count + modal, admin messages count + modal | Covered / Added modal | note / message icons; modal [12] |
+| Notes count + modal, admin messages count + modal | Covered / Added modal | note icon in the Notes column, message icon in the Actions column (as today); modal [12] |
 | Tracking icon states, register / pause / restart (Admin) | Added | tracking icon in the fulfil box of fulfilled orders; modal [10], states [13] |
-| View details expand, Refresh order, Tax invoice, Label | Covered | all |
+| View details expand, Refresh order, Tax invoice, Label | Covered | row action icons (tax invoice and label for Admin/Staff); no longer repeated in the expanded customer box |
 | Expanded: customer name, full address (street, city, state, zip, country), shipping lines (Free/Paid, discount codes) | Added | customer box. Email and phone are order fields that **today's pages do not display**; shown here for Admin/Staff as a proposal, easy to remove |
 | Product table: Product, SKU, Emb, Print, QTY, Packed, Restock, Work, Full, Partial | Covered / Added | lines grid (SKU under name; Restock chip; Deco column with progress and Assign) |
 | Line edit / delete / add (Admin), custom item, restock on delete | Added | `Edit lines`, `Add line`; modals [8] |

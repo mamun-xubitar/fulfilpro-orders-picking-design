@@ -1,5 +1,7 @@
 # Orders + Picking List: merged page, six layout concepts (round 3)
 
+> **Decision: Concept A (queue table with inline pack) is the chosen layout.** Concepts B–F are archived in `archive/` (artboards only; their renderers stay in `designs*.mjs`). `node build.mjs` now builds A only; `CONCEPTS=a,b,c,d,e,f node build.mjs` rebuilds all six into the top-level folder. Sections below that mention six concepts are kept as history.
+
 Design prototype for merging `app/(shell)/orders` and `app/(shell)/picking-list` into one page.
 Round 3 changes: the filter now follows the picking slip with a green printed icon (the old 24 h “late” rule is an optional extra), and every gap found against today's pages was closed. See **`PARITY.md`** for the old-vs-new checklist and **`dialogs.html`** for all dialogs, menus and popovers.
 
