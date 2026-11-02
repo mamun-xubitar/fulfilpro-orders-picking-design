@@ -33,9 +33,9 @@ export const rowsFor = (role) => (role === 'picker' ? ORDERS.filter((r) => !['sh
 /* ======================================================================================== */
 /* CONCEPT A · Queue table + inline pack                                                    */
 /* ======================================================================================== */
-const actsW = (cap) => (2 + (cap.slip ? 1 : 0) + (cap.labels ? 1 : 0) + (cap.invoice ? 1 : 0) + 1) * 24 + 4;
+const actsW = (cap) => (2 + (cap.slip ? 1 : 0) + (cap.labels ? 1 : 0) + (cap.invoice ? 1 : 0) + (cap.track ? 1 : 0) + 1) * 24 + 4;
 function colsA(cap) {
-  return `20px 116px 50px minmax(90px,1.1fr) ${cap.stockAdj ? '58px ' : ''}minmax(84px,1fr) ${P.trackW(cap)}px ${cap.ful ? '112px ' : ''}84px ${cap.deco ? 140 : 108}px 52px ${actsW(cap)}px`;
+  return `20px ${cap.track ? 108 : 116}px 50px minmax(90px,1.1fr) ${cap.stockAdj ? '58px ' : ''}minmax(84px,1fr) ${P.trackW(cap)}px ${cap.ful ? (cap.track ? '104px ' : '112px ') : ''}84px ${cap.deco ? (cap.track ? 132 : 140) : 108}px 52px ${actsW(cap)}px`;
 }
 /** Stock adjustment pill (admin): managed / total lines, green / amber / red, as today's column. */
 const stockAdjCell = (r) => {
@@ -54,6 +54,7 @@ function rowActsA(r, cap) {
   if (cap.labels) a.push(P.labelBtn(r));
   if (cap.invoice) a.push(P.invoiceBtn());
   a.push(P.msgBtn(r));
+  if (cap.track) a.push(r.trk ? X.trackingIcon(r, cap, true) : '<span style="width:24px;flex:none"></span>');
   a.push(`<button class="ib" title="Refresh order from Shopify">${ic('refresh', 'i')}</button>`);
   return a.join('');
 }
@@ -88,7 +89,8 @@ export function conceptA(role) {
   const take = role === 'picker' ? 6 : 7;
   const idx = rows.findIndex((r) => r.no === focus);
   // window the list so the open row sits near the top and the bottom is filled
-  const start = role === 'admin' ? 3 : Math.max(0, idx - 3), win = rows.slice(start, start + take);
+  const start = role === 'admin' ? 3 : Math.max(0, idx - 3), lead = role === 'admin' ? [byNo('2188')] : [];
+  const win = [...lead, ...rows.slice(start).filter((r) => !lead.includes(r))].slice(0, take);
   const body = win.map((r) => rowA(r, role, { open: r.no === focus, checked: chk.includes(r.no) }) + X.underRow(r, cap, P.rowTone(r, role)) + (r.no === focus ? expandedA(r, role) : '')).join('');
   const content = `
     ${P.approvals(role)}

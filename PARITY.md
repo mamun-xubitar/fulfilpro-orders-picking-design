@@ -53,7 +53,7 @@ has its own green state ("Label printed"). Confirm with the client.
 | Decoration chips `x/y Emb`, `x/y Print` with assignee | Added | A–F row / expanded order |
 | Stock Adjustment column + modal (Admin) | Restored as a column | `Stock adj.` column, green / amber / red `managed/total` pill (Concept A); the expanded order keeps the `Stock m/t` button; modal [4] |
 | Notes count + modal, admin messages count + modal | Covered / Added modal | note icon in the Notes column, message icon in the Actions column (as today); modal [12] |
-| Tracking icon states, register / pause / restart (Admin) | Added | tracking icon in the fulfil box of fulfilled orders; modal [10], states [13] |
+| Tracking icon states, register / pause / restart (Admin) | Added | tracking icon in the row Actions (Admin, orders with a tracking number), also in the order bar; modal [10], states [13] |
 | View details expand, Refresh order, Tax invoice, Label | Covered | row action icons (tax invoice and label for Admin/Staff); no longer repeated in the expanded customer box |
 | Expanded: customer name, full address (street, city, state, zip, country), shipping lines (Free/Paid, discount codes) | Added | customer box. Email and phone are order fields that **today's pages do not display**; shown here for Admin/Staff as a proposal, easy to remove |
 | Product table: Product, SKU, Emb, Print, QTY, Packed, Restock, Work, Full, Partial | Covered / Added | lines grid in Concept A: **SKU** column and **Work** `done/qty` pill (green / amber / grey) are columns again; Emb and Print share one **Deco** column (progress and Assign); Restock stays a chip under the name (columns tightened so Admin still fits beside the Packing and Fulfilment boxes) |
@@ -61,7 +61,7 @@ has its own green state ("Label printed"). Confirm with the client.
 | Decoration: toggle, Assign, Mark done, View decorations, Work badge | Added | Deco column `+ Assign`; modals [7] |
 | Attachments row (Files, Customer design, Photos, remarks) | Added | strip under the lines (Admin, decorated orders) |
 | Request Stock modal | Added | `Request stock` button with count; modal [3], cross-linked to PO status |
-| Confirm fulfilment: barcodes, carrier search, tracking number and URL, notify, Confirm & print | Added | fulfil box; modal [5] |
+| Confirm fulfilment: barcodes, carrier search, tracking number and URL, notify, Confirm & print | Added | opens from **Confirm fulfilment** / **Confirm & Print** as a modal, as today; not inline in the fulfil box; modal [5] |
 | Fulfilments view (several parcels, barcodes, lines) | Added | `Fulfilments (n)` button; view [6] |
 | Edit / cancel fulfilment: Admin direct, Staff request → pending → "Edit now" | Covered / Added states | fulfil box; [6] |
 | "Fulfilment locked" for canceled and closed | Added | fulfil box [13] |

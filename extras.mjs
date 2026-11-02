@@ -100,10 +100,10 @@ export function decoProg(r, cap) {
 }
 export const closedBadge = (r) => (r.closed ? `<span class="bdg" title="Order closed in Shopify">Closed</span>` : '');
 /** Tracking (17track) state icon, admin only. */
-export function trackingIcon(r, cap) {
+export function trackingIcon(r, cap, row = false) {
   if (!cap.track || !r.trk) return '';
   const st = r.trk.st === 'Delivered' ? 'reg' : r.req ? 'pause' : 'reg';
-  return `<button class="trkic ${st}" title="${st === 'pause' ? 'Tracking paused. Click to restart' : 'Tracking: ' + r.trk.st}">${ic('navTracking', 'i')}</button>`;
+  return `<button class="${row ? 'ib ' : ''}trkic ${st}" title="${st === 'pause' ? 'Restart tracking (paused)' : r.trk.st === 'Delivered' ? 'Tracking: Delivered' : 'Pause tracking (' + r.trk.st + ')'}">${ic('trackReg', 'i')}</button>`;
 }
 
 /** One strip of order-level extras: state chips on the left, role-gated actions on the right. */

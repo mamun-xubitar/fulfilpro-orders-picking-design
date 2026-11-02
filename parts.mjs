@@ -228,9 +228,6 @@ export function fulBox(r, cap, { confirm = true } = {}) {
   const ready = packedQty(r) >= totalQty(r);
   return `<div style="display:flex;flex-direction:column;gap:6px">
     <div class="row-b"><span class="bdg ${ready ? 'info' : 'warn'}">${ready ? 'Ready to fulfil' : 'Not fully packed'}</span><span class="muted tn" style="font-size:10px">${ready ? 'All lines packed' : packedQty(r) + '/' + totalQty(r) + ' packed'}</span></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px"><span class="inp" style="justify-content:space-between" title="Searchable carrier list">Australia Post ${ic('chevronDown', 'i10')}</span><span class="inp muted">Tracking no.</span></div>
-    <div style="display:grid;grid-template-columns:1fr auto;gap:5px;align-items:center"><span class="inp muted">${ic('scan', 'i10')}&nbsp;Barcodes</span><button class="lnk">+ Tracking URL</button></div>
-    <label class="ckl"><span class="ck on"></span>Send notification to customer</label>
     ${confirm ? `<div style="display:flex;gap:5px"><button class="btn pri" style="flex:1;height:26px">Confirm fulfilment</button><button class="btn ghost" style="flex:1;height:26px" title="Confirm fulfilment and print the shipping label">${ic('printer', 'i')}Confirm & Print</button></div>` : ''}
     ${confirm ? fulMsg(r, cap) : ''}
   </div>`;
