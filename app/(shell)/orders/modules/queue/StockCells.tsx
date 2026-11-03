@@ -41,12 +41,21 @@ export function PoCell({ p, order, item }: { p: OrdersPageBundle; order: OrderRo
     );
   }
   if (locked) return <span className="text-orders-border-strong">-</span>;
-  if (!inv) return <span className="rounded-full bg-orders-canvas px-1.5 text-[9.5px] font-bold text-orders-text-muted" title="This product is not in the hub catalogue yet">Not in hub</span>;
-  if (short <= 0) return <span className="text-orders-border-strong">-</span>;
-  if (!p.caps.createPo) return <span className="rounded-full bg-orders-danger-soft px-1.5 text-[9.5px] font-bold text-orders-danger-ink">No PO</span>;
+  if (inv && short <= 0) return <span className="text-orders-border-strong">-</span>;
+  if (!p.caps.createPo) {
+    return inv
+      ? <span className="rounded-full bg-orders-danger-soft px-1.5 text-[9.5px] font-bold text-orders-danger-ink">No PO</span>
+      : <span className="rounded-full bg-orders-canvas px-1.5 text-[9.5px] font-bold text-orders-text-muted" title="This product is not in the hub catalogue yet">Not in hub</span>;
+  }
+  const remaining = Math.max(0, item.qty - getFulfilledQty(order, item.id));
+  const quantity = inv ? short : remaining;
+  const creating = p.creatingPoKey === `${order.id}:${item.id}`;
+  const title = inv
+    ? `Create a purchase order for ${quantity} piece${quantity === 1 ? '' : 's'} in Inventory`
+    : 'Not in the hub yet: adds the product under this store, then opens the purchase order';
   return (
-    <button type="button" title={`Create a purchase order for ${short} piece${short === 1 ? '' : 's'} in Inventory`} onClick={() => p.openCreatePo(order, item, short)} className="flex h-5 items-center gap-0.5 rounded-md border border-orders-primary-ring bg-orders-primary-soft px-1.5 text-[10px] font-bold text-orders-primary-ink hover:brightness-95 cursor-pointer">
-      <Icon name="plus" className="h-2.5 w-2.5" />PO
+    <button type="button" disabled={Boolean(p.creatingPoKey)} title={title} onClick={() => void p.openCreatePo(order, item, quantity)} className="flex h-5 items-center gap-0.5 rounded-md border border-orders-primary-ring bg-orders-primary-soft px-1.5 text-[10px] font-bold text-orders-primary-ink hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer">
+      <Icon name={creating ? 'refresh' : 'plus'} className={`h-2.5 w-2.5 ${creating ? 'animate-spin' : ''}`} />PO
     </button>
   );
 }
