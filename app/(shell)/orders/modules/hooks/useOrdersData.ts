@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
-import type { ApiResponse, OrderRow, Pagination, StoreOption } from '../types';
+import type { ApiResponse, OrderRow, Pagination, PackingRecipient, StoreOption } from '../types';
 import { getApiErrorMessage } from '../utils';
 
 type UseOrdersDataArgs = {
@@ -15,6 +15,8 @@ export function useOrdersData({ queryString, search, setPagination, blockTestMod
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [stores, setStores] = useState<StoreOption[]>([]);
   const [crossDecorationVisibility, setCrossDecorationVisibility] = useState(false);
+  const [packingRecipients, setPackingRecipients] = useState<PackingRecipient[]>([]);
+  const [packingDefaultRecipientIds, setPackingDefaultRecipientIds] = useState<string[]>([]);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [expandAll, setExpandAll] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -35,6 +37,8 @@ export function useOrdersData({ queryString, search, setPagination, blockTestMod
           stores: StoreOption[];
           pagination: Pagination;
           crossDecorationVisibility: boolean;
+          packingRecipients?: PackingRecipient[];
+          packingDefaultRecipientUserIds?: string[];
         }>;
 
         if (!res.ok || !json.success) {
@@ -46,6 +50,8 @@ export function useOrdersData({ queryString, search, setPagination, blockTestMod
         setStores(json.data.stores);
         setPagination(json.data.pagination);
         setCrossDecorationVisibility(json.data.crossDecorationVisibility);
+        setPackingRecipients(json.data.packingRecipients ?? []);
+        setPackingDefaultRecipientIds(json.data.packingDefaultRecipientUserIds ?? []);
         const firstId = json.data.orders[0]?.id;
         if (expandAll) {
           setExpandedIds(new Set(json.data.orders.map((o) => o.id)));
@@ -123,6 +129,8 @@ export function useOrdersData({ queryString, search, setPagination, blockTestMod
     setOrders,
     stores,
     crossDecorationVisibility,
+    packingRecipients,
+    packingDefaultRecipientIds,
     loading,
     expandedIds,
     setExpandedIds,

@@ -30,7 +30,7 @@ export async function DELETE(
       }
     }
 
-    const result = await controller.cancelPacked(id, confirmationId, body, session?.user ?? null, request.nextUrl.origin);
+    const result = await controller.cancelPacked(id, confirmationId, body, session?.user ?? null, request.nextUrl.origin, session?.user?.role);
     return apiSuccess({ message: result.message, data: result.data });
   } catch (error) {
     return apiError({

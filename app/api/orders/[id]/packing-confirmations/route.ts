@@ -25,7 +25,7 @@ export async function POST(
       }
     }
 
-    const result = await controller.confirmPacked(id, body, session?.user ?? null, request.nextUrl.origin);
+    const result = await controller.confirmPacked(id, body, session?.user ?? null, request.nextUrl.origin, session?.user?.role);
     return apiSuccess({ message: result.message, data: result.data, status: 201 });
   } catch (error) {
     return apiError({

@@ -24,7 +24,7 @@ const PUBLIC_ROUTES = [
 
 const AUTH_ONLY_ROUTES = ['/'];
 const DASHBOARD_ROUTE = '/orders';
-const PICKER_DASHBOARD_ROUTE = '/picking-list';
+const PICKER_DASHBOARD_ROUTE = '/orders';
 const DECORATOR_DASHBOARD_ROUTE = '/decoration';
 const LOGIN_ROUTE = '/';
 const RESTRICTED_ROUTE = '/restricted';
@@ -67,10 +67,8 @@ const STAFF_RESTRICTED_API_ROUTES = ['/api/auth/.*'];
 const STAFF_EXPIRED_API_ROUTES = ['/api/auth/.*'];
 const TEST_USER_MUTATION_BLOCKED_API_ROUTES = ['/api/orders', '/api/orders/.*', '/api/back-in-stock', '/api/back-in-stock/.*', '/api/fulfillment-requests', '/api/fulfillment-requests/.*', '/api/tasks', '/api/tasks/.*', '/api/inventory/.*', '/api/customers', '/api/customers/.*', '/api/invoices', '/api/invoices/.*'];
 
-const PICKER_ALLOWED_PAGE_ROUTES = ['/picking-list', '/profile', '/tasks', '/messages'];
+const PICKER_ALLOWED_PAGE_ROUTES = ['/orders', '/profile', '/tasks', '/messages'];
 const PICKER_ALLOWED_API_ROUTES = [
-  '/api/picking-list',
-  '/api/picking-list/.*',
   '/api/orders/sync',
   '^/api/orders$',
   '^/api/orders/queue-counts$',

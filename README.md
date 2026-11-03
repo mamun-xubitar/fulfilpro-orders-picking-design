@@ -188,7 +188,7 @@ keeps 7 days of compressed logs, each up to 10 MB.
 ```
 app/
   (shell)/              Authenticated app shell — sidebar + header layout
-    orders/ decoration/ picking-list/ back-in-stock/ tasks/ messages/
+    orders/ decoration/ back-in-stock/ tasks/ messages/
     tracking/ stores/ inventory/ users/ settings/ profile/
       page.tsx          Thin server component
       modules/          Client orchestrator (index.tsx), page hooks, sub-components

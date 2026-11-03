@@ -52,7 +52,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
   const inactivityLogoutTriggeredRef = useRef(false);
   const blockedActionWarningAt = useRef(0);
   const blockedActionTimer = useRef<number | null>(null);
-  const isOrdersPath = pathname === "/orders" || pathname.startsWith("/orders/") || pathname === "/decoration" || pathname.startsWith("/decoration/") || pathname === "/picking-list" || pathname.startsWith("/picking-list/");
+  const isOrdersPath = pathname === "/orders" || pathname.startsWith("/orders/") || pathname === "/decoration" || pathname.startsWith("/decoration/");
   const userIsOrderPicker = isOrderPickerRole(session?.user?.role);
   const userIsDecorator = isDecoratorRole(session?.user?.role);
   const blockOrdersCopy = isOrdersPath && session?.user?.role !== "admin";
@@ -233,10 +233,10 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
 
   const navItems: NavItem[] = [
     {
-      id: "orders", label: "Orders", href: "/orders",
+      id: "orders", label: userIsOrderPicker ? "Pick & Pack" : "Orders", href: "/orders",
       icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>,
       adminOnly: false,
-      pickerHidden: true,
+      pickerHidden: false,
       adminDecoratorOnly: false,
     },
     {
@@ -259,13 +259,6 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
       adminOnly: false,
       pickerHidden: true,
       adminDecoratorOnly: true,
-    },
-    {
-      id: "picking-list", label: "Picking List", href: "/picking-list",
-      icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m-6 4h6m-6 4h4M7 3h10a2 2 0 012 2v14l-3-2-3 2-3-2-3 2V5a2 2 0 012-2z" />,
-      adminOnly: false,
-      pickerOnly: true,
-      adminDecoratorOnly: false,
     },
     {
       id: "back-in-stock", label: "Back In Stock", href: "/back-in-stock",
@@ -330,7 +323,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
     },
   ];
 
-  const pageTitles: Record<string, string> = { orders: "Orders", customers: "Customers", invoices: "Invoices", decoration: "Decoration", "picking-list": "Picking List", "back-in-stock": "Back In Stock", tasks: "Tasks", messages: "Messages", tracking: "Tracking", stores: "Stores", inventory: "Inventory", users: "Users", profile: "Profile", settings: "Settings" };
+  const pageTitles: Record<string, string> = { orders: userIsOrderPicker ? "Pick & Pack" : "Orders", customers: "Customers", invoices: "Invoices", decoration: "Decoration", "back-in-stock": "Back In Stock", tasks: "Tasks", messages: "Messages", tracking: "Tracking", stores: "Stores", inventory: "Inventory", users: "Users", profile: "Profile", settings: "Settings" };
   const activeId = pathname.split("/")[1] || "";
   const activeChildId = pathname.split("/")[2] || "";
   const activeChild = navItems.find((i) => i.id === activeId)?.children?.find((c) => c.id === activeChildId);

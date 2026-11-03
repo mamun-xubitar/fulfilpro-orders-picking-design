@@ -16,6 +16,8 @@ export type OrderItem = {
   qty: number;
   position?: number;
   packedQuantity?: number;
+  packedDate?: string | null;
+  fulfilledQuantity?: number;
   isEmbroidery?: boolean;
   isPrint?: boolean;
   assignments?: LineItemAssignment[];
@@ -180,7 +182,14 @@ export type OrderRow = {
   packedQuantity: number;
   totalQuantity: number;
   trackings: TrackingSummary[];
+  slipPrinted?: boolean;
+  slipLastPrintedAt?: string | null;
+  packingConfirmations?: PackingConfirmationRow[];
 };
+
+export type PackingLine = { lineItemId: string; quantity: number; full: boolean };
+export type PackingConfirmationRow = { id: string; confirmedAt: string; canceledAt: string | null; lines: PackingLine[] };
+export type PackingRecipient = { id: string; name: string; email: string; role: string };
 
 export type TrackingActionModalState = {
   order: OrderRow;
