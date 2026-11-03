@@ -58,6 +58,65 @@
 
   --inventory-shadow: 0 1px 2px rgba(40, 30, 90, 0.06), 0 1px 3px rgba(40, 30, 90, 0.08);
   --inventory-shadow-md: 0 8px 20px rgba(40, 30, 90, 0.14), 0 2px 6px rgba(40, 30, 90, 0.08);
+
+  /* Orders queue tokens (app/(shell)/orders) — the merged Orders + Picking List page. Same gray/blue
+   * hues as the rest of the shell, defined once here (like the inventory set) so the dense queue
+   * UI uses named utilities (bg-orders-primary-soft, text-orders-text-muted, …) instead of ad hoc
+   * shades. Declared on :root because the page's menus and modals render outside its wrapper. */
+  --orders-canvas: #f3f4f6;
+  --orders-surface: #ffffff;
+  --orders-surface-muted: #f9fafb;
+  --orders-border: #e5e7eb;
+  --orders-border-strong: #d1d5db;
+  --orders-divider: #f3f4f6;
+
+  --orders-text: #111827;
+  --orders-text-body: #374151;
+  --orders-text-muted: #4b5563;
+  --orders-text-subtle: #5b6472;
+
+  --orders-primary: #2563eb;
+  --orders-primary-hover: #1d4ed8;
+  --orders-primary-soft: #eff6ff;
+  --orders-primary-ring: #bfdbfe;
+  --orders-primary-ink: #1d4ed8;
+
+  --orders-success: #059669;
+  --orders-success-soft: #ecfdf5;
+  --orders-success-border: #a7f3d0;
+  --orders-success-ink: #047857;
+
+  --orders-warning: #d97706;
+  --orders-warning-soft: #fffbeb;
+  --orders-warning-border: #fde68a;
+  --orders-warning-ink: #92400e;
+
+  --orders-danger: #dc2626;
+  --orders-danger-soft: #fef2f2;
+  --orders-danger-border: #fecaca;
+  --orders-danger-ink: #b91c1c;
+
+  --orders-info: #0369a1;
+  --orders-info-soft: #f0f9ff;
+  --orders-info-border: #bae6fd;
+
+  --orders-emb: #6d28d9;
+  --orders-emb-soft: #f5f3ff;
+  --orders-emb-border: #ddd6fe;
+  --orders-prt: #0369a1;
+  --orders-prt-soft: #f0f9ff;
+  --orders-prt-border: #bae6fd;
+
+  /* Row tints by order status (same priority as the old Orders table). */
+  --orders-tone-restock: #fffbeb;
+  --orders-tone-partial: #fffbeb;
+  --orders-tone-fulfilled: #eff6ff;
+  --orders-tone-packed: #f0fdf4;
+  --orders-tone-canceled: #fef2f2;
+  --orders-tone-closed: #f3f4f6;
+
+  --orders-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --orders-shadow-md: 0 8px 22px rgba(15, 23, 42, 0.16);
 }
 
 @theme inline {
@@ -118,6 +177,53 @@
 
   --shadow-inventory: var(--inventory-shadow);
   --shadow-inventory-md: var(--inventory-shadow-md);
+
+  /* Orders queue tokens as Tailwind utilities (bg-orders-surface, border-orders-border, …). */
+  --color-orders-canvas: var(--orders-canvas);
+  --color-orders-surface: var(--orders-surface);
+  --color-orders-surface-muted: var(--orders-surface-muted);
+  --color-orders-border: var(--orders-border);
+  --color-orders-border-strong: var(--orders-border-strong);
+  --color-orders-divider: var(--orders-divider);
+  --color-orders-text: var(--orders-text);
+  --color-orders-text-body: var(--orders-text-body);
+  --color-orders-text-muted: var(--orders-text-muted);
+  --color-orders-text-subtle: var(--orders-text-subtle);
+  --color-orders-primary: var(--orders-primary);
+  --color-orders-primary-hover: var(--orders-primary-hover);
+  --color-orders-primary-soft: var(--orders-primary-soft);
+  --color-orders-primary-ring: var(--orders-primary-ring);
+  --color-orders-primary-ink: var(--orders-primary-ink);
+  --color-orders-success: var(--orders-success);
+  --color-orders-success-soft: var(--orders-success-soft);
+  --color-orders-success-border: var(--orders-success-border);
+  --color-orders-success-ink: var(--orders-success-ink);
+  --color-orders-warning: var(--orders-warning);
+  --color-orders-warning-soft: var(--orders-warning-soft);
+  --color-orders-warning-border: var(--orders-warning-border);
+  --color-orders-warning-ink: var(--orders-warning-ink);
+  --color-orders-danger: var(--orders-danger);
+  --color-orders-danger-soft: var(--orders-danger-soft);
+  --color-orders-danger-border: var(--orders-danger-border);
+  --color-orders-danger-ink: var(--orders-danger-ink);
+  --color-orders-info: var(--orders-info);
+  --color-orders-info-soft: var(--orders-info-soft);
+  --color-orders-info-border: var(--orders-info-border);
+  --color-orders-emb: var(--orders-emb);
+  --color-orders-emb-soft: var(--orders-emb-soft);
+  --color-orders-emb-border: var(--orders-emb-border);
+  --color-orders-prt: var(--orders-prt);
+  --color-orders-prt-soft: var(--orders-prt-soft);
+  --color-orders-prt-border: var(--orders-prt-border);
+  --color-orders-tone-restock: var(--orders-tone-restock);
+  --color-orders-tone-partial: var(--orders-tone-partial);
+  --color-orders-tone-fulfilled: var(--orders-tone-fulfilled);
+  --color-orders-tone-packed: var(--orders-tone-packed);
+  --color-orders-tone-canceled: var(--orders-tone-canceled);
+  --color-orders-tone-closed: var(--orders-tone-closed);
+
+  --shadow-orders: var(--orders-shadow);
+  --shadow-orders-md: var(--orders-shadow-md);
 }
 
 body {

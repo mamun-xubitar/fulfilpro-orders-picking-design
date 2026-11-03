@@ -1,5 +1,6 @@
 'use client';
 
+import { useZoom } from '@/components/ZoomContext';
 import { useOrdersPage } from './hooks/useOrdersPage';
 import PendingRequestsPanel from './PendingRequestsPanel';
 import OrdersPagination from './OrdersPagination';
@@ -18,9 +19,10 @@ import { formatStockStatus, getAvailableStockItemsForRow, getBackInStockEligible
 
 export default function OrdersPage() {
   const p = useOrdersPage();
+  const { zoomPercent } = useZoom();
 
   return (
-    <main className="flex-1 p-4 md:p-6">
+    <main className="flex-1 p-4 md:p-6" style={{ zoom: `${zoomPercent}%`, '--page-zoom': zoomPercent / 100 } as React.CSSProperties}>
       {p.userIsAdmin && (
         <PendingRequestsPanel
           pendingRequests={p.pendingRequests}

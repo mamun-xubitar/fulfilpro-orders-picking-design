@@ -68,6 +68,33 @@ colors:
   inventory-sec-activity: "#334155"
   inventory-sec-toolbar: "#4d7c0f"
   inventory-sec-subtabs: "#be185d"
+  # Orders queue skin — app/(shell)/orders only (CSS custom properties in app/globals.css). Same gray/blue hues as the shell, named so the dense queue UI doesn't use ad hoc shades.
+  orders-canvas: "#f3f4f6"
+  orders-surface: "#ffffff"
+  orders-surface-muted: "#f9fafb"
+  orders-border: "#e5e7eb"
+  orders-border-strong: "#d1d5db"
+  orders-text: "#111827"
+  orders-text-body: "#374151"
+  orders-text-muted: "#4b5563"
+  orders-text-subtle: "#5b6472"
+  orders-primary: "#2563eb"
+  orders-primary-hover: "#1d4ed8"
+  orders-primary-soft: "#eff6ff"
+  orders-primary-ring: "#bfdbfe"
+  orders-success: "#059669"
+  orders-success-soft: "#ecfdf5"
+  orders-warning: "#d97706"
+  orders-warning-soft: "#fffbeb"
+  orders-warning-ink: "#92400e"
+  orders-danger: "#dc2626"
+  orders-danger-soft: "#fef2f2"
+  orders-info: "#0369a1"
+  orders-info-soft: "#f0f9ff"
+  orders-emb: "#6d28d9"
+  orders-emb-soft: "#f5f3ff"
+  orders-prt: "#0369a1"
+  orders-prt-soft: "#f0f9ff"
 typography:
   page-title:
     fontFamily: "Arial, Helvetica, sans-serif"
@@ -305,7 +332,9 @@ alone.
 
 **The Skin Boundary Rule.** `inventory-*` tokens are only used under `app/(shell)/inventory`
 (plus the modals and portals it opens, which use the `compact` ModalShell). Shell routes use the
-Tailwind gray/blue utilities. Don't mix the two skins on one surface.
+Tailwind gray/blue utilities. Don't mix the two skins on one surface. `orders-*` tokens are the
+third set: gray/blue like the shell (so it adds no second action hue), used only under
+`app/(shell)/orders` and the modals it opens; the page is zoomable (50–150%) like Inventory.
 
 **The One-Zone-One-Hue Rule.** Each Inventory section hue is assigned to exactly one panel. Don't
 reuse a hue for a different panel, and don't use section hues for state.

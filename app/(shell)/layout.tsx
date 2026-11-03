@@ -406,7 +406,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
 
   return (
     <PageHeadingProvider>
-    <ZoomProvider>
+    <ZoomProvider scope={activeId === "orders" ? "orders" : "inventory"}>
     <div className={blockOrdersCopy ? "protected-orders-page" : undefined}>
       {blockOrdersCopy && blockedActionMessage && (
         <div
@@ -653,7 +653,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
           </div>
           <div className="flex items-center gap-3 relative">
 
-            {activeId === "inventory" && (
+            {(activeId === "inventory" || activeId === "orders") && (
               <>
                 <ZoomControl />
                 <span className="h-5 w-px bg-gray-200" aria-hidden="true" />

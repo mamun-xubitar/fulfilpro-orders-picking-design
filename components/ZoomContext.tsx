@@ -6,12 +6,13 @@ const MIN_ZOOM = 50;
 const MAX_ZOOM = 150;
 const STEP = 10;
 const DEFAULT_ZOOM = 100;
-const STORAGE_KEY = 'inventory-zoom-level';
+const DEFAULT_SCOPE = 'inventory';
 // Marks that the stored level is a deliberate user choice, not just a previously
 // auto-computed breakpoint default — without this, a value saved on one screen size
 // (e.g. 100% from before breakpoint defaults existed, or from a smaller monitor) would
 // keep overriding the breakpoint default forever, even on a much larger desktop.
-const MANUAL_KEY = 'inventory-zoom-manual';
+const levelKey = (scope: string) => `${scope}-zoom-level`;
+const manualKey = (scope: string) => `${scope}-zoom-manual`;
 
 function clamp(value: number) {
   return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value));
@@ -33,20 +34,20 @@ function currentDefault(): number {
   return defaultForWidth(window.innerWidth);
 }
 
-function readStored(): number {
+function readStored(scope: string): number {
   if (typeof window === 'undefined') return DEFAULT_ZOOM;
-  if (window.localStorage.getItem(MANUAL_KEY) !== 'true') return currentDefault();
-  const raw = window.localStorage.getItem(STORAGE_KEY);
+  if (window.localStorage.getItem(manualKey(scope)) !== 'true') return currentDefault();
+  const raw = window.localStorage.getItem(levelKey(scope));
   const parsed = raw ? Number(raw) : NaN;
   return Number.isFinite(parsed) ? clamp(parsed) : currentDefault();
 }
 
-function markManual() {
-  if (typeof window !== 'undefined') window.localStorage.setItem(MANUAL_KEY, 'true');
+function markManual(scope: string) {
+  if (typeof window !== 'undefined') window.localStorage.setItem(manualKey(scope), 'true');
 }
 
-function clearManual() {
-  if (typeof window !== 'undefined') window.localStorage.removeItem(MANUAL_KEY);
+function clearManual(scope: string) {
+  if (typeof window !== 'undefined') window.localStorage.removeItem(manualKey(scope));
 }
 
 type ZoomContextValue = {
@@ -60,18 +61,24 @@ type ZoomContextValue = {
 
 const ZoomContext = createContext<ZoomContextValue | null>(null);
 
-/** Page-scoped zoom level for the Inventory single-product view. Shared via context (rather than
- * page-local state) so the header's `ZoomControl` — mounted in the shell, outside the inventory
- * page's own component tree — can read/drive the same value. */
-export function ZoomProvider({ children }: { children: React.ReactNode }) {
-  const [zoomPercent, setZoomPercent] = useState<number>(readStored);
+/** Page-scoped zoom level (Inventory, Orders). Shared via context (rather than page-local state)
+ * so the header's `ZoomControl` — mounted in the shell, outside the page's own component tree —
+ * can read/drive the same value. `scope` names the localStorage keys, so each page remembers its
+ * own level; the default keeps Inventory's existing keys. */
+export function ZoomProvider({ children, scope = DEFAULT_SCOPE }: { children: React.ReactNode; scope?: string }) {
+  const [zoomPercent, setZoomPercent] = useState<number>(() => readStored(scope));
+  const [loadedScope, setLoadedScope] = useState(scope);
+  if (loadedScope !== scope) {
+    setLoadedScope(scope);
+    setZoomPercent(readStored(scope));
+  }
   // Tracks the viewport so Reset always returns to the right breakpoint default — the
   // live zoom itself never moves on resize, only the reset target does.
   const [defaultZoom, setDefaultZoom] = useState<number>(currentDefault);
 
   useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEY, String(zoomPercent));
-  }, [zoomPercent]);
+    window.localStorage.setItem(levelKey(scope), String(zoomPercent));
+  }, [zoomPercent, scope]);
 
   useEffect(() => {
     const onResize = () => setDefaultZoom(currentDefault());
@@ -84,40 +91,40 @@ export function ZoomProvider({ children }: { children: React.ReactNode }) {
       if (!(e.ctrlKey || e.metaKey)) return;
       if (e.key === '-' || e.key === '_') {
         e.preventDefault();
-        markManual();
+        markManual(scope);
         setZoomPercent((v) => clamp(v - STEP));
       } else if (e.key === '=' || e.key === '+') {
         e.preventDefault();
-        markManual();
+        markManual(scope);
         setZoomPercent((v) => clamp(v + STEP));
       } else if (e.key === '0') {
         e.preventDefault();
-        clearManual();
+        clearManual(scope);
         setZoomPercent(currentDefault());
       }
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, []);
+  }, [scope]);
 
   const value = useMemo(
     () => ({
       zoomPercent,
       defaultZoom,
       zoomIn: () => {
-        markManual();
+        markManual(scope);
         setZoomPercent((v) => clamp(v + STEP));
       },
       zoomOut: () => {
-        markManual();
+        markManual(scope);
         setZoomPercent((v) => clamp(v - STEP));
       },
       resetZoom: () => {
-        clearManual();
+        clearManual(scope);
         setZoomPercent(currentDefault());
       },
     }),
-    [zoomPercent, defaultZoom],
+    [zoomPercent, defaultZoom, scope],
   );
 
   return <ZoomContext.Provider value={value}>{children}</ZoomContext.Provider>;
