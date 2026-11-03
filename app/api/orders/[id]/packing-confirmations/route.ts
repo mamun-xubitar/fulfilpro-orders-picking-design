@@ -12,6 +12,9 @@ export async function POST(
 ) {
   const { id } = await params;
   const session = await auth();
+  if (session?.user?.role !== 'admin' && session?.user?.role !== 'order_picker') {
+    return apiError({ message: 'Forbidden', status: 403 });
+  }
   const body = await request.json() as unknown;
 
   try {

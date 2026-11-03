@@ -12,6 +12,9 @@ export async function DELETE(
 ) {
   const { id, confirmationId } = await params;
   const session = await auth();
+  if (session?.user?.role !== 'admin' && session?.user?.role !== 'order_picker') {
+    return apiError({ message: 'Forbidden', status: 403 });
+  }
   let body: unknown = {};
   try {
     body = await request.json();
