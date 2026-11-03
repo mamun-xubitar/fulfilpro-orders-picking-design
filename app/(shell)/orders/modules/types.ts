@@ -1,6 +1,21 @@
 import type { MessageAdmin } from '@/hooks/useOrderMessages';
 type AdminOption = MessageAdmin;
 
+export type LinePurchaseOrder = {
+  number: number;
+  status: 'REQUESTED' | 'PARTIALLY_RECEIVED' | 'RECEIVED' | 'CANCELLED';
+  ordered: number;
+  received: number;
+  deliveryDate: string | null;
+};
+export type LineInventory = {
+  supplierProductId: string;
+  variantId: string;
+  available: number;
+  onHand: number;
+  ownAllocated: number;
+  po: LinePurchaseOrder | null;
+};
 export type OrderItem = {
   id: string;
   productId: string | null;
@@ -18,6 +33,8 @@ export type OrderItem = {
   packedQuantity?: number;
   packedDate?: string | null;
   fulfilledQuantity?: number;
+  /** Hub stock and PO state behind the line (Admin, Staff); null when the product is not in the hub yet. */
+  inventory?: LineInventory | null;
   isEmbroidery?: boolean;
   isPrint?: boolean;
   assignments?: LineItemAssignment[];

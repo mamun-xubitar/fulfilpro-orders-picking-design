@@ -26,6 +26,7 @@ import { usePaymentsTab } from './usePaymentsTab';
 import { useBulkPoPayment } from './useBulkPoPayment';
 import { usePoPayment } from './usePoPayment';
 import { usePurchaseOrder } from './usePurchaseOrder';
+import { useInventoryDeepLink } from './useInventoryDeepLink';
 import { usePurchaseOrdersTab } from './usePurchaseOrdersTab';
 import { usePurchaseRecommendTab } from './usePurchaseRecommendTab';
 import { useStocktake } from './useStocktake';
@@ -129,6 +130,7 @@ export function useInventoryPage() {
     onDone: () => matrix.clearSelection(),
   });
   const po = usePurchaseOrder({ product, onSaved: onProductSaved });
+  useInventoryDeepLink({ product, openProduct: openProductInVariants, openCreatePo: (variantIds, quantity) => po.openCreate(variantIds, undefined, quantity) });
   // Bumped after a payment save so the PO list, the Payments list and the Suppliers tab's payment
   // counts all refetch.
   const [payNonce, setPayNonce] = useState(0);

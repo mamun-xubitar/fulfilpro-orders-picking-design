@@ -14,6 +14,7 @@ import { getOrderCapabilities } from "../capabilities";
 import { usePacking } from "./usePacking";
 import { useSlipPrinting } from "./useSlipPrinting";
 import { useQueueCounts } from "./useQueueCounts";
+import { useCreatePo } from "./useCreatePo";
 import { useOrdersFilters } from "./useOrdersFilters";
 import { useOrdersData } from "./useOrdersData";
 import { useSync } from "./useSync";
@@ -156,6 +157,7 @@ export function useOrdersPage() {
   });
 
   const slipPrinting = useSlipPrinting({ setOrders: data.setOrders, blockTestModeAction });
+  const createPo = useCreatePo();
 
   // Picker-to-admin messages: the Order Picker's message icon, and an Admin shortcut in the packing box.
   const pickerMessages = useSharedOrderMessages<OrderRow>({
@@ -276,6 +278,7 @@ export function useOrdersPage() {
     packingRecipients: data.packingRecipients,
     ...packing,
     ...slipPrinting,
+    openCreatePo: createPo.openCreatePo,
     pickerMessages,
     // name attributes / export
     selectedNameCount: nameAttrs.selectedNameCount,

@@ -8,6 +8,7 @@ import OrderItemActions from '../OrderItemActions';
 import { getRemainingToPack } from '../slipDocument';
 import { getItemColour, getOtherOptions, getShopifyAdminUrl, getSwatchColour, getThumbnailUrl } from './queueUtils';
 import { getLineColumns, lineGridTemplate } from './lineColumns';
+import { AvailCell, PoCell } from './StockCells';
 import { Icon } from './icons';
 
 type Props = { p: OrdersPageBundle; order: OrderRow; item: OrderItem; index: number; restockItems: OrderStockAdjustmentItem[]; cols: ReturnType<typeof getLineColumns> };
@@ -99,6 +100,8 @@ export default function ItemLine({ p, order, item, index, restockItems, cols }: 
     packed: <b className={`tabular-nums ${done ? 'text-orders-success-ink' : packed > 0 ? 'text-orders-warning-ink' : 'text-orders-text-subtle'}`}>{packed}/{item.qty}</b>,
     pdate: <span className="text-[10px] text-orders-text-muted tabular-nums">{item.packedDate ? new Date(item.packedDate).toLocaleString(undefined, { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '-'}</span>,
     ful: <b className={`tabular-nums ${fulfilled >= item.qty && item.qty > 0 ? 'text-orders-success-ink' : 'text-orders-text-subtle'}`}>{fulfilled}/{item.qty}</b>,
+    avail: <AvailCell order={order} item={item} />,
+    po: <PoCell p={p} order={order} item={item} />,
     work: (work?.works?.length ?? 0) > 0
       ? <button type="button" disabled={!caps.admin} title="View decoration work" onClick={() => p.openWorkDetails(order, item)} className={`rounded-full px-1.5 text-[9.5px] font-bold ${work?.fullyDone ? 'bg-orders-success-soft text-orders-success-ink' : (work?.doneQty ?? 0) > 0 ? 'bg-orders-warning-soft text-orders-warning-ink' : 'bg-orders-canvas text-orders-text-muted'} ${caps.admin ? 'cursor-pointer' : 'cursor-default'}`}>{work?.doneQty ?? 0}/{item.qty}</button>
       : <span className="text-orders-border-strong">-</span>,

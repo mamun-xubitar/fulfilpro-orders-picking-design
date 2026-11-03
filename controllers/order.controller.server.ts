@@ -9,10 +9,15 @@ import { getSettingsTimezone } from '@/lib/task-due-date.server';
 import { normalizeQueue } from '@/lib/order-queue.server';
 import { PickingListModel } from '@/models/picking-list.model.server';
 import { shapeOrderForRole } from '@/lib/order-row-shape.server';
-import { isOrderPickerRole } from '@/lib/roles';
+import { isOrderPickerRole, isStaffLikeRole } from '@/lib/roles';
+import { OrderLineInventoryModel } from '@/models/order-line-inventory.model.server';
 
 const model = new OrderModel();
 const pickingModel = new PickingListModel();
+const lineInventoryModel = new OrderLineInventoryModel();
+
+/** Hub stock and PO state per line is shown to Admin and Staff only. */
+const canSeeLineInventory = (role?: string) => role === 'admin' || isStaffLikeRole(role);
 const productModel = new ProductModel();
 
 type Period = 'all' | 'week' | 'month' | 'year';
@@ -106,7 +111,7 @@ export class OrderController {
 
     return {
       data: {
-        orders: result.orders.map((order) => shapeOrderForRole(order, viewerRole)),
+        orders: (canSeeLineInventory(viewerRole) ? await lineInventoryModel.attach(result.orders) : result.orders).map((order) => shapeOrderForRole(order, viewerRole)),
         filters: {
           search,
           searchField,
@@ -373,9 +378,10 @@ export class OrderController {
 
   async refreshOrder(orderId: string, viewerRole?: string) {
     const result = await model.refreshFromShopify(orderId, isOrderPickerRole(viewerRole) ? 'picker' : 'orders');
+    const [withInventory] = canSeeLineInventory(viewerRole) ? await lineInventoryModel.attach([result]) : [result];
 
     return {
-      data: shapeOrderForRole(result, viewerRole),
+      data: shapeOrderForRole(withInventory, viewerRole),
       message: 'Order refreshed',
     };
   }

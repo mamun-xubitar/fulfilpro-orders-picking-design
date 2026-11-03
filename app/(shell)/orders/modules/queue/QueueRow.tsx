@@ -3,7 +3,7 @@
 import type { OrderRow } from '../types';
 import type { OrdersPageBundle } from '../ordersPageContext';
 import { formatFulfillmentDate, formatStockStatus, getDecorationStatusBadges, getFulfillmentInfo, isOrderFullyFulfilled } from '../utils';
-import { getGridColumns, getRowTone, getThumbnailUrl } from './queueUtils';
+import { countShortLines, getGridColumns, getRowTone, getThumbnailUrl } from './queueUtils';
 import StageTrack from './StageTrack';
 import RowActions, { IconButton } from './RowActions';
 
@@ -98,6 +98,7 @@ export default function QueueRow({ p, order, isExpanded }: { p: OrdersPageBundle
           {(order.canceled || status === 'canceled') && <span className="rounded-full bg-orders-danger-soft px-1.5 text-[9.5px] font-bold text-orders-danger-ink">Canceled</span>}
           {order.closed && !order.canceled && !fulfilled && <span className="rounded-full bg-orders-canvas px-1.5 text-[9.5px] font-bold text-orders-text-muted">Closed</span>}
           {caps.requestStock && order.backInStockStatus && !fulfilled && <span className="rounded-full bg-orders-warning-soft px-1.5 text-[9.5px] font-bold text-orders-warning-ink">{formatStockStatus(order.backInStockStatus)}</span>}
+          {caps.stock && !fulfilled && countShortLines(order) > 0 && <span className="rounded-full bg-orders-warning-soft px-1.5 text-[9.5px] font-bold text-orders-warning-ink" title="Lines not covered by available hub stock">Short {countShortLines(order)}</span>}
           {caps.labels && order.labelPrintedAt && <span className="rounded-full bg-orders-emb-soft px-1.5 text-[9.5px] font-bold text-orders-emb">Label printed</span>}
           {caps.slip && order.slipPrinted && order.packingStatus !== 'packed' && <span className="rounded-full bg-orders-success-soft px-1.5 text-[9.5px] font-bold text-orders-success-ink">Slip printed</span>}
         </span>

@@ -1,6 +1,7 @@
 import { resolveSwatch } from '@/lib/inventory/colour';
 import type { OrderItem, OrderRow } from '../types';
-import { isOrderFullyFulfilled } from '../utils';
+import { getFulfilledQty, isOrderFullyFulfilled } from '../utils';
+import { getLineShortfall } from '../hooks/useCreatePo';
 import type { OrderCapabilities } from '../capabilities';
 
 const optionValue = (item: OrderItem, pattern: RegExp) => item.variantOptions?.find((o) => pattern.test(o.name))?.value?.trim() ?? '';
@@ -81,3 +82,12 @@ export function getGridColumns(caps: OrderCapabilities) {
   cols.push(caps.admin ? '196px' : caps.pack && !caps.fulfilment ? '124px' : '168px');
   return cols.join(' ');
 }
+
+/** Pieces of a line the hub cannot cover yet (0 when covered, locked, or the product is not in the hub). */
+export function getItemShortfall(order: OrderRow, item: OrderItem) {
+  if (!item.inventory || order.canceled || order.closed) return 0;
+  const remaining = Math.max(0, item.qty - getFulfilledQty(order, item.id));
+  return getLineShortfall(remaining, item.inventory);
+}
+
+export const countShortLines = (order: OrderRow) => order.items.filter((item) => getItemShortfall(order, item) > 0).length;
