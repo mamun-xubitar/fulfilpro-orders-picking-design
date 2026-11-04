@@ -252,7 +252,7 @@ decorated / packed / fulfilled / delivered* by itself. Chrome stays neutral so t
 carries the meaning.
 
 The system ships as **two skins** that share one shell (dark sidebar, white 60px header) and one
-font. The **Shell skin** covers every route except Inventory: Orders, Decoration, Picking List,
+font. The **Shell skin** covers every route except Inventory and Orders: Decoration,
 Back In Stock, Tasks, Messages, Tracking, Stores, Users, Settings, and Profile. It is built
 directly from Tailwind's default gray and blue palette, at comfortable 14px density with 8px
 rounded controls. The **Inventory skin** covers `app/(shell)/inventory` only. It is a namespaced
