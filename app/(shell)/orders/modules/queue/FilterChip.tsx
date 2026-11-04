@@ -30,7 +30,7 @@ export default function FilterChip({ label, value, active = false, open, onToggl
         <Icon name="chevronDown" className="h-[11px] w-[11px] text-[#9ca3af]" />
       </button>
       {open && (
-        <div role="menu" className={`absolute top-full z-30 mt-1 min-w-44 rounded-xl border border-orders-border bg-orders-surface py-1 shadow-orders-md ${align === 'right' ? 'right-0' : 'left-0'}`}>
+        <div role="menu" className={`absolute top-full z-30 mt-1 w-max min-w-44 rounded-xl border border-orders-border bg-orders-surface py-1 shadow-orders-md ${align === 'right' ? 'right-0' : 'left-0'}`}>
           {children}
         </div>
       )}

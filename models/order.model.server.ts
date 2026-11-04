@@ -910,6 +910,13 @@ export class OrderModel {
         lineItemId: line.lineItemId,
         quantity: line.quantity,
       })),
+    }).catch(async (error: unknown) => {
+      // Shopify has less left to fulfil than our copy of the order says: pull its fulfilments in so the page catches up.
+      if (error instanceof Error && error.message.startsWith('Selected quantity exceeds the remaining fulfillable quantity')) {
+        await this.refreshFromShopify(orderId).catch(() => undefined);
+        throw new Error('Part of this order is already fulfilled in Shopify. The order was re-synced from Shopify; refresh the row and try again.');
+      }
+      throw error;
     });
 
     const fulfillment = shopifyResult.fulfillments[0];
@@ -1288,7 +1295,7 @@ export class OrderModel {
     };
   }
 
-  async getOrderMessageCenter(orderId: string, type: OrderMessageTypeInput) {
+  async getOrderMessageCenter(orderId: string, type: OrderMessageTypeInput | 'all') {
     const [order, directMessageRecipients, fulfillmentRequestRecipients, messages] = await Promise.all([
       prisma.order.findUnique({
         where: { id: orderId },
@@ -1297,7 +1304,7 @@ export class OrderModel {
       resolvePickerRecipientOptions('direct_message'),
       resolvePickerRecipientOptions('fulfillment_request'),
       prisma.orderMessage.findMany({
-        where: { orderId, type },
+        where: type === 'all' ? { orderId } : { orderId, type },
         orderBy: { createdAt: 'desc' },
       }),
     ]);

@@ -32,13 +32,26 @@ export const FormError = ({ children }: { children: ReactNode }) => (
 
 export const Hint = ({ children }: { children: ReactNode }) => <div className="py-8 text-center text-[11px] text-orders-text-subtle">{children}</div>;
 
-/** Note | Message to admin toggle shown at the top of both dialogs (prototype `.seg2`). */
+/** Compose form on the left, history on the right (stacked on narrow screens); the history list scrolls on its own. */
+export function SplitPane({ form, count, history }: { form: ReactNode; count: number; history: ReactNode }) {
+  return (
+    <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
+      <div className="flex min-w-0 flex-col gap-2">{form}</div>
+      <div className="flex min-w-0 flex-col gap-1 md:border-l md:border-orders-divider md:pl-3">
+        <span className="text-[9.5px] font-bold uppercase tracking-[.4px] text-orders-text-subtle">History{count > 0 && ` (${count})`}</span>
+        <div className="thin-scroll flex max-h-64 flex-col gap-1 overflow-y-auto pr-0.5 md:max-h-[min(24rem,60dvh)]">{history}</div>
+      </div>
+    </div>
+  );
+}
+
+/** Note | Message toggle shown at the top of both dialogs (prototype `.seg2`). */
 export function SegSwitch({ active, onNote, onMessage }: { active: 'note' | 'message'; onNote: () => void; onMessage: () => void }) {
   const tab = (on: boolean) => `h-6 flex-1 rounded-md px-2 text-[11px] font-bold cursor-pointer ${on ? 'bg-orders-surface text-orders-text shadow-orders' : 'text-orders-text-muted hover:text-orders-text'}`;
   return (
     <div role="tablist" className="mb-2.5 flex gap-0.5 rounded-lg border border-orders-border bg-orders-divider p-0.5">
       <button type="button" role="tab" aria-selected={active === 'note'} onClick={onNote} className={tab(active === 'note')}>Note</button>
-      <button type="button" role="tab" aria-selected={active === 'message'} onClick={onMessage} className={tab(active === 'message')}>Message to admin</button>
+      <button type="button" role="tab" aria-selected={active === 'message'} onClick={onMessage} className={tab(active === 'message')}>Message</button>
     </div>
   );
 }

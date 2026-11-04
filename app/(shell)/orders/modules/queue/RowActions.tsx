@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, type MouseEvent } from 'react';
+import type { MouseEvent } from 'react';
 import type { OrderRow } from '../types';
 import type { OrdersPageBundle } from '../ordersPageContext';
 import { isOrderFullyFulfilled } from '../utils';
@@ -42,29 +42,10 @@ function trackingState(order: OrderRow) {
   return { disabled: false, label: `Pause tracking (${t.status ?? 'registered'})`, tone: 'text-orders-success-ink' };
 }
 
-/** Admin's message icon opens Admin messages or Picker messages (both exist today, on two separate pages). */
+/** Opens the Message tab of the "Notes and messages" dialog; the recipient is chosen inside it. */
 function MessagesButton({ p, order, disabled }: { p: OrdersPageBundle; order: OrderRow; disabled: boolean }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLSpanElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const close = (e: globalThis.MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener('mousedown', close);
-    return () => document.removeEventListener('mousedown', close);
-  }, [open]);
   if (p.caps.role === 'picker') return <IconButton icon="chat" label="Message to admin" count={order.messageCount} disabled={disabled} onClick={() => void p.pickerMessages.openMessageModal(order)} />;
-  if (!p.caps.admin) return <IconButton icon="chat" label="Message the admins" count={order.messageCount} disabled={disabled} onClick={() => void p.openMessageModal(order)} />;
-  return (
-    <span ref={ref} className="relative" onClick={(e) => e.stopPropagation()}>
-      <IconButton icon="chat" label="Messages" count={order.messageCount} onClick={() => setOpen((v) => !v)} />
-      {open && (
-        <span role="menu" className="absolute right-0 top-full z-30 mt-1 flex w-40 flex-col rounded-xl border border-orders-border bg-orders-surface py-1 text-[11px] shadow-orders-md">
-          <button type="button" role="menuitem" onClick={() => { setOpen(false); void p.openMessageModal(order); }} className="px-3 py-1.5 text-left text-orders-text-body hover:bg-orders-surface-muted cursor-pointer">Admin messages{order.messageCount > 0 ? ` (${order.messageCount})` : ''}</button>
-          <button type="button" role="menuitem" onClick={() => { setOpen(false); void p.pickerMessages.openMessageModal(order); }} className="px-3 py-1.5 text-left text-orders-text-body hover:bg-orders-surface-muted cursor-pointer">Picker messages</button>
-        </span>
-      )}
-    </span>
-  );
+  return <IconButton icon="chat" label={p.caps.admin ? 'Messages' : 'Message the admins'} count={order.messageCount} disabled={disabled} onClick={() => void p.openMessageModal(order)} />;
 }
 
 export default function RowActions({ p, order, isExpanded }: { p: OrdersPageBundle; order: OrderRow; isExpanded: boolean }) {

@@ -68,7 +68,7 @@ type OrderModalsProps = {
   trackingModal: TrackingActionModalState | null;
   closeTrackingModal: () => void;
   submitTrackingAction: () => Promise<void>;
-  /** Note | Message to admin toggle (the merged Orders page only). */
+  /** Note | Message toggle (the merged Orders page only). */
   onSwitchToMessages?: (order: OrderRow) => void;
   onSwitchToNotes?: (order: OrderRow) => void;
 };

@@ -116,6 +116,7 @@ export function useOrdersPage() {
   const messages = useOrderMessages({
     setOrders: data.setOrders,
     blockTestModeAction,
+    historyType: caps.admin ? "all" : undefined,
   });
 
   const notes = useOrderNotes({

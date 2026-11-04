@@ -11,7 +11,7 @@ import { dlgBtn, dlgInput, dlgTextarea, Field, FormError } from './dialogUi';
 export function EditFulfilmentDialog({ modal, setModal, onSubmit }: { modal: EditFulfillmentModalState; setModal: Dispatch<SetStateAction<EditFulfillmentModalState | null>>; onSubmit: () => Promise<void> }) {
   const patch = (next: Partial<EditFulfillmentModalState>) => setModal((p) => (p ? { ...p, ...next } : null));
   return (
-    <DialogShell title="Edit fulfilment" sub={`#${modal.order.number}`} width={460} busy={modal.saving} onClose={() => setModal(null)}
+    <DialogShell elevated title="Edit fulfilment" sub={`#${modal.order.number}`} width={460} busy={modal.saving} onClose={() => setModal(null)}
       footer={<>
         <button type="button" onClick={() => setModal(null)} disabled={modal.saving} className={dlgBtn.ghost}>Cancel</button>
         <button type="button" onClick={() => void onSubmit()} disabled={modal.saving} className={dlgBtn.pri}>{modal.saving ? 'Saving…' : 'Save changes'}</button>
@@ -36,7 +36,7 @@ export function EditFulfilmentDialog({ modal, setModal, onSubmit }: { modal: Edi
 /** Cancel a fulfilment (Admin, or Staff once approved). */
 export function CancelFulfilmentDialog({ modal, setModal, onSubmit }: { modal: CancelFulfillmentModalState; setModal: Dispatch<SetStateAction<CancelFulfillmentModalState | null>>; onSubmit: () => Promise<void> }) {
   return (
-    <DialogShell title="Cancel fulfilment" sub={`#${modal.order.number}`} width={400} busy={modal.saving} onClose={() => setModal(null)}
+    <DialogShell elevated title="Cancel fulfilment" sub={`#${modal.order.number}`} width={400} busy={modal.saving} onClose={() => setModal(null)}
       footer={<>
         <button type="button" onClick={() => setModal(null)} disabled={modal.saving} className={dlgBtn.ghost}>Go back</button>
         <button type="button" onClick={() => void onSubmit()} disabled={modal.saving} className="inline-flex h-7 items-center justify-center whitespace-nowrap rounded-lg border border-transparent bg-orders-danger px-[9px] text-[11px] font-bold text-white hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer">{modal.saving ? 'Cancelling…' : 'Yes, cancel fulfilment'}</button>
@@ -59,7 +59,7 @@ export function RequestPermissionDialog({ modal, setModal, onSubmit }: { modal: 
     return { ...prev, selectedAdminIds: prev.selectedAdminIds.includes(id) ? prev.selectedAdminIds.filter((x) => x !== id) : [...prev.selectedAdminIds, id] };
   });
   return (
-    <DialogShell title={`Request ${modal.requestType === 'edit' ? 'edit' : 'cancel'} permission`} sub={`#${modal.order.number}`} width={400} busy={modal.saving} onClose={() => setModal(null)}
+    <DialogShell elevated title={`Request ${modal.requestType === 'edit' ? 'edit' : 'cancel'} permission`} sub={`#${modal.order.number}`} width={400} busy={modal.saving} onClose={() => setModal(null)}
       footer={<>
         <button type="button" onClick={() => setModal(null)} disabled={modal.saving} className={dlgBtn.ghost}>Cancel</button>
         <button type="button" onClick={() => void onSubmit()} disabled={modal.saving || modal.loadingAdmins} className={dlgBtn.pri}>{modal.saving ? 'Submitting…' : 'Submit request'}</button>

@@ -25,27 +25,27 @@ export default function PeriodMenu({ p }: { p: OrdersPageBundle }) {
       ))}
       {period === 'custom' && (
         <div className="border-t border-orders-divider p-3" onMouseLeave={() => p.setHoverDate(null)}>
-          <div className="mb-2 flex items-center justify-between">
+          <div className="mb-3 flex items-center justify-between">
             <button type="button" aria-label="Previous month" onClick={() => shift(-1)} className="rounded p-1 text-orders-text-muted hover:bg-orders-surface-muted cursor-pointer"><Icon name="chevronDown" className="h-3.5 w-3.5 rotate-90" /></button>
-            <div className="flex gap-10 text-[11px] font-semibold text-orders-text-body select-none">
+            <div className="flex gap-10 text-xs font-semibold text-orders-text-body select-none">
               {[0, 1].map((offset) => { const d = new Date(calendarNav.year, calendarNav.month + offset, 1); return <span key={offset}>{MONTH_LABELS[d.getMonth()]} {d.getFullYear()}</span>; })}
             </div>
             <button type="button" aria-label="Next month" onClick={() => shift(1)} className="rounded p-1 text-orders-text-muted hover:bg-orders-surface-muted cursor-pointer"><Icon name="chevronDown" className="h-3.5 w-3.5 -rotate-90" /></button>
           </div>
-          <div className="flex gap-4">
+          <div className="flex gap-5">
             {[0, 1].map((offset) => {
               const d = new Date(calendarNav.year, calendarNav.month + offset, 1);
               return (
                 <div key={offset}>
-                  <div className="grid grid-cols-7">{DAY_LABELS.map((dl) => <div key={dl} className="flex h-5 w-7 items-center justify-center text-[10px] font-medium text-orders-text-subtle select-none">{dl}</div>)}</div>
+                  <div className="mb-1 grid grid-cols-7">{DAY_LABELS.map((dl) => <div key={dl} className="flex h-6 w-8 items-center justify-center text-xs font-medium text-orders-text-subtle select-none">{dl}</div>)}</div>
                   <div className="grid grid-cols-7">
                     {getMonthDays(d.getFullYear(), d.getMonth()).map((date, i) => {
-                      if (!date) return <div key={i} className="h-7 w-7" />;
+                      if (!date) return <div key={i} className="h-8 w-8" />;
                       const edge = date === dateFrom || (!!dateTo && date === dateTo);
                       const inRange = !!(rStart && rEnd && date > rStart && date < rEnd);
                       const tone = edge ? 'rounded-full bg-orders-primary font-semibold text-white' : inRange ? 'bg-orders-primary-soft text-orders-primary-ink' : date === today ? 'rounded-full font-bold text-orders-primary hover:bg-orders-surface-muted' : 'rounded-full text-orders-text-body hover:bg-orders-surface-muted';
                       return (
-                        <button key={date} type="button" className={`flex h-7 w-7 items-center justify-center text-[11px] cursor-pointer ${tone}`} onClick={() => p.handleCalendarDateClick(date)} onMouseEnter={() => !dateTo && p.setHoverDate(date)}>
+                        <button key={date} type="button" className={`flex h-8 w-8 items-center justify-center text-xs cursor-pointer ${tone}`} onClick={() => p.handleCalendarDateClick(date)} onMouseEnter={() => !dateTo && p.setHoverDate(date)}>
                           {new Date(`${date}T00:00:00`).getDate()}
                         </button>
                       );
@@ -57,8 +57,8 @@ export default function PeriodMenu({ p }: { p: OrdersPageBundle }) {
           </div>
           {(dateFrom || dateTo) && (
             <div className="mt-2 flex items-center justify-between border-t border-orders-divider pt-2">
-              <span className="text-[10px] text-orders-text-subtle">{dateFrom && dateTo ? `${fmtCalDate(dateFrom)} – ${fmtCalDate(dateTo)}` : `From ${fmtCalDate(dateFrom)}`}</span>
-              <button type="button" onClick={() => { p.setDateFrom(''); p.setDateTo(''); p.setPeriod('all'); }} className="text-[10px] text-orders-text-subtle hover:text-orders-danger cursor-pointer">Clear dates</button>
+              <span className="text-xs text-orders-text-subtle">{dateFrom && dateTo ? `${fmtCalDate(dateFrom)} – ${fmtCalDate(dateTo)}` : `From ${fmtCalDate(dateFrom)}`}</span>
+              <button type="button" onClick={() => { p.setDateFrom(''); p.setDateTo(''); p.setPeriod('all'); }} className="text-xs text-orders-text-subtle hover:text-orders-danger cursor-pointer">Clear dates</button>
             </div>
           )}
         </div>

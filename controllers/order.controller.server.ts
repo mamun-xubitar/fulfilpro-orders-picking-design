@@ -397,7 +397,7 @@ export class OrderController {
   }
 
   async getOrderMessageCenter(orderId: string, typeInput?: string | null) {
-    const type = parseOrderMessageType(typeInput, true);
+    const type = typeInput?.trim() === 'all' ? 'all' : parseOrderMessageType(typeInput, true);
     const result = await model.getOrderMessageCenter(orderId, type);
 
     return {
