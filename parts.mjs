@@ -1,15 +1,15 @@
 import { ic, tile } from './chrome.mjs';
 import * as X from './extras.mjs';
-import { restockState, RECIPIENTS, contactOf, confsOf, STORES, ORDERS, QUEUES, countOf, queueFor, stage, totalQty, packedQty, slipOver24, byNo, shopifyUrl, need, isShort, shortCount, PO_LABEL } from './data.mjs';
+import { packHistOf, restockState, RECIPIENTS, contactOf, confsOf, STORES, ORDERS, QUEUES, countOf, queueFor, stage, totalQty, packedQty, slipOver24, byNo, shopifyUrl, shipLineOf, need, isShort, shortCount, PO_LABEL } from './data.mjs';
 let ROLE = 'admin';
 export const setRole = (r) => { ROLE = r; };
 
 /** What each role can see / do. Mirrors today's pages exactly (proxy.ts + page code). */
 export const CAP = {
   // deco: 2 = manage (assign, toggle, mark done), 1 = read-only state. round 3 adds reqStock, stockAdj, names, lineEdit, attach.
-  admin:  { shopify: 1, stock: 1, poCreate: 1, store: 1, period: 1, sync: 1, ffilter: 1, slip: 1, pack: 1, ful: 1, cust: 1, labels: 1, req: 'direct', approvals: 1, deco: 2, bin: 0, track: 1, invoice: 1, reqStock: 1, stockAdj: 1, names: 1, lineEdit: 1, attach: 1 },
-  staff:  { shopify: 1, stock: 1, poCreate: 0, store: 1, period: 1, sync: 1, ffilter: 1, slip: 0, pack: 0, ful: 1, cust: 1, labels: 1, req: 'request', approvals: 0, deco: 1, bin: 0, track: 0, invoice: 1, reqStock: 1, stockAdj: 0, names: 1, lineEdit: 0, attach: 0 },
-  picker: { shopify: 0, stock: 0, poCreate: 0, store: 0, period: 0, sync: 0, ffilter: 0, slip: 1, pack: 1, ful: 0, cust: 0, labels: 0, req: null, approvals: 0, deco: 0, bin: 0, track: 0, invoice: 0, reqStock: 0, stockAdj: 0, names: 0, lineEdit: 0, attach: 0 },
+  admin:  { shopify: 1, stock: 1, poCreate: 1, store: 1, period: 1, sync: 1, ffilter: 1, slip: 1, pack: 1, ful: 1, cust: 1, contact: 1, labels: 1, req: 'direct', approvals: 1, deco: 2, bin: 0, track: 1, invoice: 1, reqStock: 1, stockAdj: 1, names: 1, lineEdit: 1, attach: 1, packDate: 0 },
+  staff:  { shopify: 1, stock: 1, poCreate: 0, store: 1, period: 1, sync: 1, ffilter: 1, slip: 0, pack: 0, ful: 1, cust: 1, contact: 0, labels: 1, req: 'request', approvals: 0, deco: 1, bin: 0, track: 0, invoice: 1, reqStock: 1, stockAdj: 0, names: 1, lineEdit: 0, attach: 0, packDate: 0, actions: 1 },
+  picker: { shopify: 0, stock: 0, poCreate: 0, store: 0, period: 0, sync: 0, ffilter: 0, slip: 1, pack: 1, ful: 0, cust: 0, contact: 0, labels: 0, req: null, approvals: 0, deco: 0, bin: 0, track: 0, invoice: 0, reqStock: 0, stockAdj: 0, names: 0, lineEdit: 0, attach: 0, packDate: 1 },
 };
 
 /** Row background by status. Same priority as today's table (back-in-stock, then status, then decoration), with canceled / closed first. */
@@ -94,20 +94,28 @@ export const sortHead =(t) => `<span class="srt">${t}${ic('sort', 'i10')}</span>
 /* ---------- toolbar: filters are chips, not dropdown stacks ---------- */
 export const chip = (k, v, on, ro) => `<button class="fchip${on ? ' on' : ''}${ro ? ' ro' : ''}"><span class="k">${k}</span><b>${v}</b>${ic('chevronDown', 'i12')}</button>`;
 export function searchBox(role) {
-  const ph = role === 'picker' ? 'Scan barcode or search order, customer, product…' : 'Search order, customer, SKU, address…  try  sku:TEE-NVY-L';
-  return `<div class="srch" title="Search by order number, customer, address, product or barcode">${ic('search', 'i')}<span class="fld">All fields${ic('chevronDown', 'i10')}</span><span class="ph">${ph}</span>${ic('scan', 'i')}<kbd>/</kbd></div>`;
+  // Staff and Picker keep the old field lists: Orders has no Barcode field, Picking List adds it.
+  const ph = role === 'picker' ? 'Scan barcode or search order, customer, product…' : role === 'staff' ? 'Search order, customer, address, product…' : 'Scan barcode or search order, customer, address, product…';
+  const tip = role === 'staff' ? 'Search by order number, customer name, customer address or product' : 'Search by order number, customer, address, product or barcode';
+  return `<div class="srch" title="${tip}">${ic('search', 'i')}<span class="fld">All fields${ic('chevronDown', 'i10')}</span><span class="ph">${ph}</span>${role === 'staff' ? '' : ic('scan', 'i')}<kbd>/</kbd></div>`;
+}
+/** Every role uses the filters of today's pages (OrdersToolbar, PickingListFilters). Admin sees both pages, so gets the union. */
+function oldFilters(role) {
+  if (role === 'admin') return chip('Status', 'All', 0) + chip('Packed', 'All', 0) + chip('Print', 'All', 0);
+  if (role === 'staff') return chip('Status', 'All', 0) + chip('Packed', 'All', 0);
+  if (role === 'picker') return chip('Packed', 'Not packed + Partial', 1) + chip('Print', 'All', 0) + `<button class="btn xs ghost" style="border-color:transparent;color:var(--pri-ink)">${ic('close', 'i10')}Clear filters</button>`;
+  return '';
 }
 export function toolbar(role, { extra = '', refreshWarn = false } = {}) {
   const c = CAP[role];
   return `<div class="row-tb">
     ${searchBox(role)}
-    ${c.store ? chip('Store', 'All 4', 0) : ''}
+    ${c.store ? chip('Store', 'All stores', 0) : ''}
     ${c.period ? chip('Period', 'All time', 0) : ''}
-    ${c.slip ? chip('Slip', 'Any', 0) : ''}
-    ${c.ffilter ? chip('Fulfilment', 'Any', 0) : ''}
+    ${oldFilters(role)}
     ${extra}
     <span class="sp"></span>
-    ${c.sync ? `<span class="muted" style="font-size:10px">${refreshWarn ? 'Synced 14:12 · 3 orders new or updated' : 'Synced 14:12'}</span><span class="split"><button class="btn ghost">${ic('refresh', 'i')}Sync</button><button class="btn ghost sd" title="Choose stores to sync">${ic('chevronDown', 'i12')}</button></span>` : ''}
+    ${c.sync ? `<span class="muted" style="font-size:10px;white-space:nowrap">${refreshWarn ? 'Synced 14:12 · 3 new' : 'Synced 14:12'}</span><span class="split"><button class="btn ghost">${ic('refresh', 'i')}Sync</button><button class="btn ghost sd" title="Choose stores to sync">${ic('chevronDown', 'i12')}</button></span>` : ''}
     <button class="btn ${refreshWarn ? 'warn' : 'ghost'}" title="${refreshWarn ? 'A sync finished: refresh to see the changes' : 'Reload the list'}">${ic('refresh', 'i')}Refresh</button>
   </div>`;
 }
@@ -127,7 +135,7 @@ export function approvals(role) {
 
 /* ---------- round 2: colour swatch, Shopify link, available qty, purchase order ---------- */
 export const swatch = (x) => `<span class="sw"><i style="background:${x.hex}"></i>${x.colour}</span>`;
-export const shopifyLink = (r, x) => `<a class="shl" title="Open in Shopify admin · ${STORES[r.store].domain}/admin/products/${x.productId}" href="${shopifyUrl(r, x)}">${ic('external', 'i10')}</a>`;
+export const shopifyLink = (r, x) => `<a class="shln" title="Open in Shopify admin · ${STORES[r.store].domain}/admin/products/${x.productId}" href="${shopifyUrl(r, x)}">${ic('external', 'i10')}</a>`;
 export const availCell = (r, x) => {
   const n = need(x), cls = r.canceled || r.ful === 'full' ? '' : x.avail < n ? 'bad' : x.avail === n ? 'low' : '';
   return `<span class="av-n tn ${cls}" title="Available = on hand − allocated (hub pool, shared by all stores)">${x.avail}</span>`;
@@ -149,25 +157,31 @@ export function shortBadge(r, cap) {
 }
 
 /* ---------- pack lines ---------- */
-export function lineCols(cap, dense = false, work = false, showWork = work) {
+export function lineCols(cap, dense = false, work = false, showWork = work, decoBoth = false) {
   const cols = [['item', 'minmax(0,1fr)']];
   if (!cap.stock) cols.push(['sku', '96px']);
   else if (work) cols.push(['sku', '62px']);
   if (cap.bin && !dense && !(work && cap.stock)) cols.push(['bin', '44px']);
-  if (cap.deco && !dense) cols.push(['deco', work && cap.stock ? '60px' : '68px']);
-  cols.push(['qty', work ? '22px' : '28px'], ['packed', work ? '38px' : '52px']);
-  if (cap.stock) cols.push(['avail', work ? '28px' : '40px'], ['po', work ? '98px' : '136px']);
+  if (cap.deco && !dense) cols.push(['deco', decoBoth ? '90px' : work && cap.stock ? '60px' : '68px']);
+  cols.push(['qty', work ? '22px' : '28px'], ['packed', decoBoth ? '38px' : work ? '38px' : '52px']);
+  if (cap.packDate) cols.push(['pdate', '96px']);
+  if (cap.stock) cols.push(['avail', work ? '28px' : '40px'], ['po', decoBoth ? '86px' : work ? '98px' : '136px']);
   if (showWork && cap.deco) cols.push(['work', '34px']);
-  if (cap.pack) cols.push(['full', work ? '28px' : '34px'], ['part', work ? '72px' : '96px']);
+  if (cap.pack) cols.push(['full', work ? '42px' : '48px'], ['part', decoBoth ? '66px' : work ? '72px' : '96px']);
   if (work && cap.lineEdit) cols.push(['act', '46px']);
   return cols;
 }
 const colsCss = (cols) => cols.map((c) => c[1]).join(' ');
 const xchips = (x, cap) => { const c = [X.nameChip(x, cap), cap.reqStock ? X.restockLine(x) : ''].filter(Boolean).join(''); return c ? `<span class="cell" style="gap:4px;margin-top:1px">${c}</span>` : ''; };
-export function lines(r, cap, { rowH = 36, sel = 1, skuSub = true, head: showHead = true, dense = false, workCol = false } = {}) {
+export function lines(r, cap, { rowH = 36, sel = 1, skuSub = true, head: showHead = true, dense = false, workCol = false, decoBoth = false } = {}) {
   const hasWork = workCol && r.items.some((x) => x.work);
-  const cols = lineCols(cap, dense, workCol, hasWork), css = colsCss(cols), lgap = workCol && cap.stock ? 4 : 8, N = { item: 'Item', sku: 'SKU', bin: 'Bin', deco: 'Deco', work: 'Work', act: 'Actions', qty: 'Qty', packed: 'Packed', avail: 'Avail', po: 'PO status', full: 'Full', part: 'Partial' };
-  const head = `<div class="lnh" style="--lcols:${css};--lgap:${lgap}px">${cols.map(([k]) => `<span style="${['qty', 'packed', 'full', 'avail', 'act'].includes(k) ? 'text-align:center' : ''}">${N[k]}</span>`).join('')}</div>`;
+  const cols = lineCols(cap, dense, workCol, hasWork, decoBoth), css = colsCss(cols), lgap = workCol && cap.stock ? 4 : 8, N = { pdate: 'Packed Date', item: 'Item', sku: 'SKU', bin: 'Bin', deco: 'Deco', work: 'Work', act: 'Actions', qty: 'Qty', packed: 'Packed', avail: 'Avail', po: 'PO status', full: 'Full', part: 'Partial' };
+  const fullN = r.items.filter((x, idx) => x.packed >= x.qty || (sel && idx === 0)).length;
+  const fullAll = r.items.length > 0 && fullN === r.items.length, fullMix = fullN > 0 && !fullAll;
+  const headCell = (k) => k === 'full'
+    ? `<span style="display:flex;align-items:center;justify-content:center;gap:3px">${N[k]}<span class="ck${fullAll ? ' on' : fullMix ? ' mix' : ''}" title="Mark every line Full"></span></span>`
+    : `<span style="${['qty', 'packed', 'avail', 'act'].includes(k) ? 'text-align:center' : ''}">${N[k]}</span>`;
+  const head = `<div class="lnh" style="--lcols:${css};--lgap:${lgap}px">${cols.map(([k]) => headCell(k)).join('')}</div>`;
   const rows = r.items.map((x, idx) => {
     const done = x.packed >= x.qty, part = x.packed > 0 && !done, fullOn = done || (sel && idx === 0);
     const cell = {
@@ -176,10 +190,11 @@ export function lines(r, cap, { rowH = 36, sel = 1, skuSub = true, head: showHea
       work: X.lineWork(x, cap),
       act: X.lineActions(r, x, r.ful === 'full' ? 'full' : r.ful === 'partial' && idx < r.items.length - 1 ? 'part' : '', cap),
       bin: `<span class="bin">${x.bin}</span>`,
-      deco: X.lineDeco(x, cap),
+      deco: X.lineDeco(x, cap, { both: decoBoth }),
       qty: `<b class="tn" style="text-align:center">${x.qty}</b>`,
       avail: `<span style="display:flex;justify-content:center">${cap.stock ? availCell(r, x) : ''}</span>`,
       po: cap.stock ? poCell(r, x, cap) : '',
+      pdate: `<span class="muted tn" style="font-size:10.5px">${x.packed > 0 ? packHistOf(r)[0].at : '-'}</span>`,
       packed: `<span class="pb" style="justify-content:center"><b class="tn" style="color:${done ? 'var(--e700)' : part ? 'var(--a800)' : 'var(--tx-s)'}">${x.packed}/${x.qty}</b></span>`,
       full: `<span style="display:flex;justify-content:center"><span class="ck${fullOn ? ' on' : ''}"></span></span>`,
       part: `<span class="step${fullOn ? ' dis' : ''}" style="justify-self:end"><button>−</button><span>${fullOn ? x.qty : idx === 1 && sel ? 2 : 0}</span><button>+</button></span>`,
@@ -193,12 +208,14 @@ export function lines(r, cap, { rowH = 36, sel = 1, skuSub = true, head: showHea
 export function packBox(r, cap, { big = false } = {}) {
   if (!cap.pack) return '';
   const allPacked = packedQty(r) >= totalQty(r);
-  const hist = packedQty(r) > 0 ? `<div class="hist"><span><b>Packed Wed 14:02</b> · ${packedQty(r)} items</span><button class="ib" title="Cancel confirmation (sends notification)">${ic('trash', 'i')}</button></div>` : `<div class="hist muted">No packing history.</div>`;
+  const entry = (e) => `<div class="hist"><span><b>Packed ${e.at}</b> · ${e.n} item${e.n === 1 && cap.packDate ? '' : 's'}</span><button class="ib" title="Cancel confirmation (sends notification)">${ic('trash', 'i')}</button></div>`;
+  // Picking List: every confirmation (up to 5) with its own cancel icon. Admin keeps the single latest entry.
+  const hist = packedQty(r) === 0 ? `<div class="hist muted">No packing history.</div>` : cap.packDate ? `<div style="display:flex;flex-direction:column;gap:4px">${packHistOf(r).slice(0, 5).map(entry).join('')}</div>` : entry(packHistOf(r)[0]);
   const h = big ? 38 : 28;
   return `<div style="display:flex;flex-direction:column;gap:6px">
-    ${allPacked ? `<button class="btn off" style="height:${h}px;width:100%">${ic('check', 'i')}All ${totalQty(r)} items packed</button>` : `<button class="btn pri" style="height:${h}px;font-size:${big ? 13 : 11}px;width:100%">${ic('check', 'i')}Confirm packed</button>`}
     <div style="display:flex;gap:5px">
-      <button class="btn ${r.slip != null ? 'printed' : 'soft'}" style="flex:1;height:${big ? 34 : 26}px" title="${slipTitle(r)}">${ic(r.slip != null ? 'check' : 'printer', 'i')}${r.slip != null ? 'Slip printed · Reprint' : 'Print picking slip'}</button>
+      ${allPacked ? `<button class="btn off" style="flex:1;height:${h}px">${ic('check', 'i')}All ${totalQty(r)} items packed</button>` : `<button class="btn pri" style="flex:1;height:${h}px;font-size:${big ? 13 : 11}px">${ic('check', 'i')}Confirm packed</button>`}
+      <button class="btn ${r.slip != null ? 'printed' : 'soft'}" style="flex:none;height:${h}px" title="${slipTitle(r)}">${ic(r.slip != null ? 'check' : 'printer', 'i')}${r.slip != null ? 'Reprint Slip' : 'Print Slip'}</button>
     </div>
     ${hist}
   </div>`;
@@ -208,8 +225,20 @@ const fulMsg = (r, cap) => {
   const cls = r.ful === 'full' ? 'off' : 'ghost';
   return `<div style="display:flex;gap:5px">${cap.labels ? `<button class="btn ${cls}" style="flex:1;height:26px" title="Print the 4×6 shipping label">${ic('printer', 'i')}Print Label</button>` : ''}<button class="btn ${cls}" style="flex:1;height:26px" title="Message the admins about this order">${ic('chat', 'i')}Message${r.msgs ? `<span style="background:var(--pri);color:#fff;border-radius:999px;font-size:9px;font-weight:700;padding:0 5px;line-height:14px;margin-left:2px">${r.msgs}</span>` : ''}</button></div>`;
 };
+/** Today's expanded "Actions" column (Staff): always shown, buttons disabled once fully fulfilled, canceled or closed. */
+export function actionsBox(r, cap) {
+  const locked = r.canceled || r.closed, done = r.ful === 'full', noConfirm = locked || done;
+  const h = 28, st = `flex:1;height:${h}px`;
+  const confirmLbl = (t) => (locked ? 'Fulfilment locked' : t);
+  const cls = done ? 'off' : 'ghost';
+  return `<div style="display:flex;flex-direction:column;gap:5px">
+    <div style="display:flex;gap:5px"><button class="btn ${noConfirm ? 'off' : 'pri'}" style="${st}"${noConfirm ? ' disabled' : ''}>${confirmLbl('Confirm Fulfilment')}</button><button class="btn ${noConfirm ? 'off' : 'sky'}" style="${st}"${noConfirm ? ' disabled' : ''} title="Confirm fulfilment and print the shipping label">${confirmLbl('Confirm & Print')}</button></div>
+    <div style="display:flex;gap:5px"><button class="btn ${cls}" style="${st}"${done ? ' disabled' : ''} title="Print the 4×6 shipping label">Print Label</button><button class="btn ${cls}" style="${st}"${done ? ' disabled' : ''} title="Message the admins about this order">Message${r.msgs ? `<span style="background:var(--pri);color:#fff;border-radius:999px;font-size:9px;font-weight:700;padding:0 5px;line-height:14px;margin-left:2px">${r.msgs}</span>` : ''}</button></div>
+  </div>`;
+}
 export function fulBox(r, cap, { confirm = true } = {}) {
   if (!cap.ful) return '';
+  if (cap.actions) confirm = false;
   const locked = r.canceled || r.closed;
   const lockNote = locked ? `<div class="lockb">${ic('lock', 'i')}<span><b class="strong">Fulfilment locked</b><br>${r.canceled ? 'Canceled' : 'Closed'} orders cannot be fulfilled.</span></div>` : '';
   if (locked && !r.ful) return lockNote;
@@ -222,7 +251,7 @@ export function fulBox(r, cap, { confirm = true } = {}) {
       <div class="row-b"><span class="cell" style="gap:4px"><span class="bdg ok">${r.ful === 'full' ? 'Fulfilled' : 'Partial'}</span>${cs.length > 1 ? `<span class="bdg">${cs.length} parcels</span>` : ''}</span><span class="muted tn" style="font-size:10px">${c.date}</span></div>
       <dl class="kv"><dt>Carrier</dt><dd>${c.carrier}</dd><dt>Tracking</dt><dd class="mono">${c.no} ${ic('external', 'i10')}</dd><dt>Status</dt><dd><span class="cell"><span class="bdg ${c.st === 'Delivered' ? 'ok' : 'info'}">${c.st}</span>${X.trackingIcon(r, cap)}</span></dd></dl>
       ${left ? `<span class="muted" style="font-size:10px">${left} line still to fulfil</span>` : ''}
-      <div style="display:flex;gap:5px;flex-wrap:wrap">${locked ? '' : editBtns}<button class="btn xs ghost" title="Confirmations, barcodes and shipped lines">${ic('clipboard', 'i12')}Fulfilments (${cs.length})</button></div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap">${locked ? '' : editBtns}</div>
     </div>`;
   }
   const ready = packedQty(r) >= totalQty(r);
@@ -232,10 +261,20 @@ export function fulBox(r, cap, { confirm = true } = {}) {
     ${confirm ? fulMsg(r, cap) : ''}
   </div>`;
 }
-export function custBox(r, cap) {
+/** Today's "Shipping" block (Orders page): title, Free / Paid pill, discount codes, then Price and Discounted. */
+export function shipBox(r, cap) {
   if (!cap.cust) return '';
+  const s = shipLineOf(r), free = s.final <= 0, $ = (n) => '$' + n.toFixed(2);
+  return `<div class="shipb"><div class="shh">Shipping</div>
+    <div class="shln"><div class="cell" style="flex-wrap:wrap;gap:5px"><b class="strong">${s.title}</b><span class="bdg ${free ? 'ok' : ''}">${free ? 'Free' : 'Paid'}</span>${s.codes.map((c) => `<span class="bdg warn mono" title="Discount code">${c}</span>`).join('')}</div>
+    <div class="muted tn" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:3px;font-size:10.5px"><span>Price: ${$(s.price)}</span><span>Discounted: ${$(s.final)}</span></div></div>
+    <div class="muted" style="font-size:10.5px">${STORES[r.store].name} · #${r.no}</div></div>`;
+}
+export function custBox(r, cap, { method = true } = {}) {
+  if (!cap.cust) return '';
+  const meth = method ? `<dt>Method</dt><dd><span class="cell" style="flex-wrap:wrap"><span class="bdg ${r.ship === 'Express' ? 'warn' : 'ok'}">${r.ship} · ${r.ship === 'Express' ? 'Paid $14' : 'Free'}</span>${(r.codes || []).map((c) => `<span class="bdg info" title="Discount code">${c}</span>`).join('')}</span></dd>` : '';
   return `<div style="display:flex;flex-direction:column;gap:6px">
-    <dl class="kv" style="grid-template-columns:58px 1fr"><dt>Customer</dt><dd><b class="strong">${r.customer}</b></dd><dt>Email</dt><dd style="overflow-wrap:anywhere;font-size:10.5px">${contactOf(r).email}</dd><dt>Phone</dt><dd class="tn">${contactOf(r).phone}</dd><dt>Ship to</dt><dd>${contactOf(r).lines.join('<br>')}</dd><dt>Method</dt><dd><span class="cell" style="flex-wrap:wrap"><span class="bdg ${r.ship === 'Express' ? 'warn' : 'ok'}">${r.ship} · ${r.ship === 'Express' ? 'Paid $14' : 'Free'}</span>${(r.codes || []).map((c) => `<span class="bdg info" title="Discount code">${c}</span>`).join('')}</span></dd></dl>
+    <dl class="kv" style="grid-template-columns:58px 1fr"><dt>Customer</dt><dd><b class="strong">${r.customer}</b></dd>${cap.contact ? `<dt>Email</dt><dd style="overflow-wrap:anywhere;font-size:10.5px">${contactOf(r).email}</dd><dt>Phone</dt><dd class="tn">${contactOf(r).phone}</dd>` : ''}<dt>Ship to</dt><dd>${contactOf(r).lines.join('<br>')}</dd>${meth}</dl>
     ${r.notes ? `<div class="note-a"><b>Order note</b> · Please hold until the team captain collects the box.</div>` : ''}
   </div>`;
 }
@@ -264,7 +303,10 @@ export function bulkBar(role, n = 3, compact = false, names = null) {
     ${c.names ? `<button class="btn ghost" title="Export name attributes as CSV or print">${ic('download', 'i')}${L.e}${cnt}${ic('chevronDown', 'i10')}</button>` : ''}
     <span class="sep"></span><button class="x ib" title="Clear selection">${ic('close', 'i')}</button></div>`;
 }
-export const pager = (n = 21, size = false) => `<div class="foot"><span>Showing <b class="tn strong">1–${Math.min(n, 20)}</b> of <b class="tn strong">${n}</b> ${size === 'products' ? 'products' : 'orders'}</span><div style="display:flex;align-items:center;gap:10px">${size ? `<span class="row-b" style="gap:5px"><span class="muted">Rows per page</span><span class="inp" style="height:20px;font-size:10.5px">20 ${ic('chevronDown', 'i10')}</span></span>` : ''}<div class="pager"><span>${ic('chevronLeft', 'i12')}</span><span class="on">1</span>${n > 20 ? '<span>2</span>' : ''}<span>${ic('chevronRight', 'i12')}</span></div></div></div>`;
+export const pager = (n = 21, size = true) => {
+  const sel = `<select class="pgsz" aria-label="Rows per page" onchange="this.closest('.foot').querySelector('[data-rng]').textContent='1–'+Math.min(${n},+this.value)">${[10, 20, 50, 100].map((v) => `<option${v === 20 ? ' selected' : ''}>${v}</option>`).join('')}</select>`;
+  return `<div class="foot"><span style="display:flex;align-items:center;gap:12px"><span>Showing <b class="tn strong" data-rng>1–${Math.min(n, 20)}</b> of <b class="tn strong">${n}</b> ${size === 'products' ? 'products' : 'orders'}</span><span class="row-b" style="gap:5px"><span class="muted">Rows per page</span>${sel}</span></span><div class="pager"><span>${ic('chevronLeft', 'i12')}</span><span class="on">1</span>${n > 20 ? '<span>2</span>' : ''}<span>${ic('chevronRight', 'i12')}</span></div></div>`;
+};
 /** Create-PO popover (admin only). Created as REQUESTED, prefilled with the shortfall. */
 export function poPopover(r, x, { left, top, caretTop = 60 }) {
   const short = Math.max(1, need(x) - x.avail);

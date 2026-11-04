@@ -1,7 +1,7 @@
 import { sidebar, header, ZOOM_JS } from './chrome.mjs';
 import * as P from './parts.mjs';
 import * as X from './extras.mjs';
-import { stockAdjOf, confsOf } from './data.mjs';
+import { stockAdjOf, confsOf, packHistOf } from './data.mjs';
 const { ic, tile, CAP, ORDERS, byNo, queueFor, totalQty, packedQty } = P;
 
 export const CSS2 = `
@@ -35,7 +35,7 @@ export const rowsFor = (role) => (role === 'picker' ? ORDERS.filter((r) => !['sh
 /* ======================================================================================== */
 const actsW = (cap) => (2 + (cap.slip ? 1 : 0) + (cap.labels ? 1 : 0) + (cap.invoice ? 1 : 0) + (cap.track ? 1 : 0) + 1) * 24 + 4;
 function colsA(cap) {
-  return `20px ${cap.track ? 108 : 116}px 50px minmax(90px,1.1fr) ${cap.stockAdj ? '58px ' : ''}minmax(84px,1fr) ${P.trackW(cap)}px ${cap.ful ? (cap.track ? '104px ' : '112px ') : ''}84px ${cap.deco ? (cap.track ? 132 : 140) : 108}px 52px ${actsW(cap)}px`;
+  return `20px 96px 50px 108px ${cap.stockAdj ? '58px ' : ''}minmax(80px,1fr) ${P.trackW(cap)}px ${cap.ful ? '104px ' : ''}84px 132px 52px ${actsW(cap)}px`;
 }
 /** Stock adjustment pill (admin): managed / total lines, green / amber / red, as today's column. */
 const stockAdjCell = (r) => {
@@ -54,13 +54,13 @@ function rowActsA(r, cap) {
   if (cap.labels) a.push(P.labelBtn(r));
   if (cap.invoice) a.push(P.invoiceBtn());
   a.push(P.msgBtn(r));
-  if (cap.track) a.push(r.trk ? X.trackingIcon(r, cap, true) : '<span style="width:24px;flex:none"></span>');
+  if (cap.track) a.push(X.trackingIcon(r, cap, true));
   a.push(`<button class="ib" title="Refresh order from Shopify">${ic('refresh', 'i')}</button>`);
   return a.join('');
 }
 function rowA(r, role, { open = false, checked = false }) {
   const cap = CAP[role], cx = r.canceled;
-  return `<div class="tr${open ? ' open' : ''}${checked ? ' sel' : ''}${cx ? ' cx' : ''} ${P.rowTone(r, role)}" style="--cols:${colsA(cap)};${role === 'picker' ? '--rh:40px' : ''}">
+  return `<div class="tr${open ? ' open' : ''}${checked ? ' sel' : ''}${cx ? ' cx' : ''} ${P.rowTone(r, role)}" style="--cols:${colsA(cap)}">
     <span class="ck${checked ? ' on' : ''}"></span>
     <span class="cell col"><span class="cell"><span class="ono${X.lbl(r, cap)}">#${r.no}</span>${X.miniChips(r, cap)}${cx ? '<span class="bdg">Canceled</span>' : ''}</span><span class="muted ell" style="font-size:10px">${r.placed}</span></span>
     <span class="cell">${P.storeChip(r.store)}</span>
@@ -70,35 +70,56 @@ function rowA(r, role, { open = false, checked = false }) {
     ${P.track(r, cap)}
     ${cap.ful ? fulCell(r) : ''}
     ${P.packBar(r)}
-    <span class="cell">${P.shortBadge(r, cap)}${X.decoProg(r, cap)}</span>
+    <span class="cell">${cap.packDate ? `<span class="muted tn" style="font-size:10.5px">${packedQty(r) > 0 ? packHistOf(r)[0].at : '-'}</span>` : `${P.shortBadge(r, cap)}${X.decoProg(r, cap)}`}</span>
     <span class="cell">${P.noteFlags(r)}</span>
     <span class="acts">${rowActsA(r, cap)}<button class="ib" title="${open ? 'Collapse' : 'View details'}">${ic(open ? 'chevUp' : 'chevronDown', 'i')}</button></span>
   </div>`;
 }
-function expandedA(r, role) {
-  const cap = CAP[role], boxes = [];
-  const lnH = role === 'picker' ? 42 : 34;
-  boxes.push(`<div class="bx" style="flex:1 1 0">${P.secHead('package', 'Order items', `<span class="muted tn">${totalQty(r)} pcs · ${packedQty(r)} packed</span>`)}${X.extrasBar(r, cap)}${P.lines(r, cap, { rowH: lnH, skuSub: false, workCol: true })}${cap.ful ? '' : (X.customerNote(r, cap) ? `<div class="in">${X.customerNote(r, cap)}</div>` : '')}</div>`);
-  if (cap.pack) boxes.push(`<div class="bx" style="width:${role === 'picker' ? 280 : 200}px;flex:none">${P.secHead('check', 'Packing & slip')}<div class="in">${P.packBox(r, cap, { big: role === 'picker' })}</div></div>`);
-  if (cap.ful) boxes.push(`<div class="bx" style="width:250px;flex:none">${P.secHead('truck', 'Fulfilment')}<div class="in">${P.fulBox(r, cap)}${X.customerNote(r, cap)}</div>${cap.cust ? `<div class="hr"></div>${P.secHead('mapPin', 'Customer & shipping')}<div class="in">${P.custBox(r, cap)}</div>` : ''}</div>`);
-  return `<div class="xp">${boxes.join('')}</div>`;
+export const CSS_A2 = `
+.xp.v2{align-items:flex-start}
+.dcb .dcr{display:flex;gap:3px;flex-wrap:nowrap}.dcb .bdg{cursor:pointer}.dcb .bdg.off{background:var(--g100,#f3f4f6);border-color:var(--bd);color:var(--g400)}.dcb span.bdg{cursor:default}
+.xp .col2{display:flex;flex-direction:column;gap:8px;min-width:0}
+.shipb{border:1px solid var(--b200);background:var(--b50);border-radius:8px;padding:6px 8px;display:flex;flex-direction:column;gap:5px}
+.shipb .shh{font-size:9.5px;font-weight:700;letter-spacing:.35px;text-transform:uppercase;color:var(--tx-s)}
+.shipb .shln{background:var(--surf);border:1px solid var(--b200);border-radius:7px;padding:5px 7px;font-size:11px}
+.btn.sky{background:#0284c7;color:#fff}.btn.sky:hover{background:#0369a1}
+.tscroll{position:absolute;inset:0;overflow:auto;padding-bottom:70px}
+`;
+/** Concept A2: same table, but the expanded panel is packed into columns that size to their content (items + notes, packing + fulfilment, customer + shipping). */
+function expandedA2(r, role) {
+  const cap = CAP[role], lnH = 34, note = X.customerNote(r, cap);
+  const items = `<div class="bx">${P.secHead('package', 'Order items', `<span class="muted tn">${totalQty(r)} pcs · ${packedQty(r)} packed</span>`)}${X.extrasBar(r, cap)}${P.lines(r, cap, { rowH: lnH, skuSub: false, workCol: true, decoBoth: true })}${X.fulHistory(r, cap)}</div>`;
+  const noteBox = note ? `<div class="bx"><div class="in">${note}</div></div>` : '';
+  const pack = cap.pack ? `<div class="bx">${P.secHead('check', 'Packing & slip')}<div class="in">${P.packBox(r, cap)}</div></div>` : '';
+  const actions = cap.actions ? `<div class="shh" style="margin:8px 0 4px;font-size:9.5px;font-weight:700;letter-spacing:.35px;text-transform:uppercase;color:var(--tx-s)">Actions</div>${P.actionsBox(r, cap)}` : '';
+  const ful = cap.ful ? `<div class="bx">${P.secHead('truck', 'Fulfilment')}<div class="in">${P.fulBox(r, cap)}${actions}</div></div>` : '';
+  const cust = cap.cust ? `<div class="bx">${P.secHead('mapPin', 'Customer & shipping')}<div class="in">${P.custBox(r, cap, { method: false })}${P.shipBox(r, cap)}</div></div>` : '';
+  const cols = [`<div class="col2" style="flex:1 1 0">${items}${noteBox}</div>`];
+  const mid = ful + pack;
+  if (mid) cols.push(`<div class="col2" style="width:246px;flex:none">${mid}</div>`);
+  if (cust) cols.push(`<div class="col2" style="width:224px;flex:none">${cust}</div>`);
+  return `<div class="xp v2">${cols.join('')}</div>`;
 }
-export function conceptA(role) {
+/** Every role opens a second order next to the focus one so two states can be compared (Staff: fulfilled #0702 vs unfulfilled #0718, Admin / Picker: different pack and slip states). */
+const OPEN_MORE = { admin: ['2188'], staff: ['0718'], picker: ['4821'] };
+export const conceptA2 = (role) => pageA(role, expandedA2);
+function pageA(role, expand) {
   P.setRole(role);
   const cap = CAP[role], rows = rowsFor(role), focus = FOCUS[role], chk = CHECKED[role];
   const take = role === 'picker' ? 6 : 7;
   const idx = rows.findIndex((r) => r.no === focus);
   // window the list so the open row sits near the top and the bottom is filled
   const start = role === 'admin' ? 3 : Math.max(0, idx - 3), lead = role === 'admin' ? [byNo('2188')] : [];
-  const win = [...lead, ...rows.slice(start).filter((r) => !lead.includes(r))].slice(0, take);
-  const body = win.map((r) => rowA(r, role, { open: r.no === focus, checked: chk.includes(r.no) }) + X.underRow(r, cap, P.rowTone(r, role)) + (r.no === focus ? expandedA(r, role) : '')).join('');
+  const win = role === 'staff' ? [focus, ...OPEN_MORE[role]].map(byNo) : [...lead, ...rows.slice(start).filter((r) => !lead.includes(r))].slice(0, take);
+  const isOpen = (r) => r.no === focus || (OPEN_MORE[role] ?? []).includes(r.no);
+  const body = win.map((r) => rowA(r, role, { open: isOpen(r), checked: chk.includes(r.no) }) + X.underRow(r, cap, P.rowTone(r, role)) + (isOpen(r) ? expand(r, role) : '')).join('');
   const content = `
     ${P.approvals(role)}
     ${P.toolbar(role, { refreshWarn: role === 'admin' })}
     <div class="qrow">${P.queueTabs(role, 'all')}<div class="r"><span class="muted" style="font-size:10.5px">Sort</span>${P.chip('', 'Newest first', 0)}${cap.labels ? `<button class="btn ghost">${ic('plus', 'i')}New invoice</button>` : ''}<button class="btn ghost">${ic('expand', 'i')}Expand all</button></div></div>
     <div class="card" style="flex:1">
-      <div class="thead" style="--cols:${colsA(cap)}"><span class="ck mix"></span><span>${P.sortHead('Order')}</span><span>Store</span><span>${P.sortHead('Customer')}</span>${cap.stockAdj ? '<span style="text-align:center" title="Stock adjustment">Stock adj.</span>' : ''}<span>Items</span>${P.trackHead(cap)}${cap.ful ? '<span>Fulfilment</span>' : ''}<span>Packed</span><span>Deco</span><span>Notes</span><span style="text-align:right">Actions</span></div>
-      <div class="tbody">${body}${P.bulkBar(role, 3, false, chk.reduce((a, n) => a + byNo(n).items.filter((x) => x.nameAttr).length, 0))}</div>
+      <div class="thead" style="--cols:${colsA(cap)}"><span class="ck mix"></span><span>${P.sortHead('Order')}</span><span>Store</span><span>${P.sortHead('Customer')}</span>${cap.stockAdj ? '<span style="text-align:center" title="Stock adjustment">Stock adj.</span>' : ''}<span>Items</span>${P.trackHead(cap)}${cap.ful ? '<span>Fulfilment</span>' : ''}<span>Packed</span><span>${cap.packDate ? 'Packed date' : 'Deco'}</span><span>Notes</span><span style="text-align:right">Actions</span></div>
+      <div class="tbody"><div class="tscroll thin">${body}</div>${P.bulkBar(role, 3, false, chk.reduce((a, n) => a + byNo(n).items.filter((x) => x.nameAttr).length, 0))}</div>
       ${P.pager(rows.length)}
     </div>`;
   return shell(role, content, { sub: 'Queue' });

@@ -74,7 +74,7 @@ button:focus-visible,.tab:focus-visible{outline:2px solid var(--pri);outline-off
 .ib.ro{cursor:default;width:20px;height:20px}
 .ib .ct{position:absolute;top:-2px;right:-3px;background:var(--pri);color:#fff;font-size:8px;font-weight:700;border-radius:999px;padding:0 3.5px;line-height:12px;font-style:normal}
 .ib .ct.red{background:var(--r600)}.ib .ct.amber{background:var(--a800)}
-.srch{display:flex;align-items:center;gap:6px;height:var(--ctl-h);flex:1;min-width:230px;max-width:430px;border:1px solid var(--bd-s);border-radius:var(--rad);background:var(--surf);padding:0 4px 0 8px;color:var(--tx-s)}
+.srch{display:flex;align-items:center;gap:6px;height:var(--ctl-h);flex:none;width:360px;border:1px solid var(--bd-s);border-radius:var(--rad);background:var(--surf);padding:0 4px 0 8px;color:var(--tx-s)}
 .srch:focus-within{border-color:var(--pri);box-shadow:0 0 0 2px var(--pri-ring)}
 .srch .fld{display:inline-flex;align-items:center;gap:3px;background:var(--pri-soft);color:var(--pri-ink);border:1px solid var(--pri-ring);border-radius:5px;font-size:10px;font-weight:700;padding:1px 3px 1px 6px;white-space:nowrap}
 .srch .ph{flex:1;color:var(--g500);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -158,6 +158,7 @@ button:focus-visible,.tab:focus-visible{outline:2px solid var(--pri);outline-off
 .foot{display:flex;align-items:center;justify-content:space-between;padding:0 10px;height:28px;border-top:1px solid var(--bd);background:var(--surf-m);flex:none;font-size:10.5px;color:var(--tx-s);border-radius:0 0 var(--rad-card) var(--rad-card)}
 .pager{display:flex;gap:2px}.pager span{min-width:20px;height:20px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--tx-m);border:1px solid transparent}
 .pager .on{background:var(--pri);color:#fff}
+.pgsz{height:20px;font:inherit;font-size:10.5px;font-weight:700;color:var(--tx-b);background:var(--surf);border:1px solid var(--bd-s);border-radius:5px;padding:0 2px;cursor:pointer}
 
 /* keep rows clear of the floating bulk bar */
 .tbody:has(.bulk),.sheet-body:has(.bulk){padding-bottom:70px}

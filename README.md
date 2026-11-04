@@ -1,11 +1,13 @@
 # Orders + Picking List: merged page, six layout concepts (round 3)
 
-> **Decision: Concept A (queue table with inline pack) is the chosen layout.** Concepts B–F are archived in `archive/` (artboards only; their renderers stay in `designs*.mjs`). `node build.mjs` now builds A only; `CONCEPTS=a,b,c,d,e,f node build.mjs` rebuilds all six into the top-level folder. Sections below that mention six concepts are kept as history.
+> **Decision: Concept A2 (queue table, expanded panel uses the space) is the chosen layout.** The original Concept A was removed; B–F are archived in `archive/` (artboards only; their renderers stay in `designs*.mjs`). `node build.mjs` builds A2 only; `CONCEPTS=a2,b,c,d,e,f node build.mjs` rebuilds it with B–F into the top-level folder. Sections below that mention A or six concepts are kept as history.
 
 Design prototype for merging `app/(shell)/orders` and `app/(shell)/picking-list` into one page.
 Round 3 changes: the filter now follows the picking slip with a green printed icon (the old 24 h “late” rule is an optional extra), and every gap found against today's pages was closed. See **`PARITY.md`** for the old-vs-new checklist and **`dialogs.html`** for all dialogs, menus and popovers.
 
 Round 4 (Concept A): the **decoration attachments strip** (Files / Customer design / Photo / Customer remarks, Admin) now sits under each row without expanding, the **Customer note** shows in the expanded order as today, and rows are **tinted by status** again (see PARITY.md).
+
+Round 5: the **Shipping block** from today's Orders page (title, Free / Paid, discount codes, Price, Discounted) is back in the expanded order, and **Concept A2** (now the only table concept) re-lays the expanded panel so no column stretches over blank space.
 
 Open **`index.html`**: it shows every concept, a role switcher (Admin / Staff / Picker) per concept, the role
 matrix and the questions for the client. The zoom control works on every artboard (50–150%, Ctrl +/−/0 while the
@@ -47,7 +49,7 @@ All concepts use the gray/blue shell colours (C was changed from the violet Inve
 |---|:-:|:-:|:-:|
 | Store, Period filters and Sync | ✓ | ✓ | — |
 | Fulfilment status, fulfilment column, tracking link | ✓ | ✓ | — |
-| Slip-printed filter, green printed icon, print picking slip (bin, remark) | ✓ | — | ✓ |
+| Print status filter, green printed icon, print picking slip (bin, remark) | ✓ | — | ✓ |
 | Packing: Full / Partial, Confirm packed, notify, cancel confirmation | ✓ | — | ✓ |
 | Customer details, labels, tax invoice, name export, new invoice | ✓ | ✓ | — |
 | Confirm fulfilment; edit / cancel fulfilment | ✓ / direct | ✓ / request and approval | — |
@@ -107,6 +109,7 @@ Inventory access today, so they get none of the stock, PO or Shopify items.
 | `dialogs.html` | round 3: every dialog, menu and popover of today's pages, shared by all concepts |
 | `PARITY.md` | round 3: old-system capability checklist (covered / added / changed) |
 | `extras.mjs`, `dialogs.mjs` | round 3 renderers: decoration, restock, name attributes, attachments, label state; the dialogs sheet |
+| `concept-a2-{admin,staff,picker}.html` | A2 artboards (built by default) |
 | `concept-{a..f}-{admin,staff,picker}.html / .png` | 18 artboards, 1280 × 800, PNGs at 2× |
 | `concept-d-admin-po.html / .png` | Create PO popover |
 | `data.mjs` | sample orders, stock, POs, restock, decoration and derived state |
@@ -120,3 +123,17 @@ node build.mjs
 ./shot.sh concept-d-admin.html out.png 1280 800 2
 node overflow.mjs concept-d-admin.html
 ```
+
+Round 6: the row **Actions** column always shows the tracking button for Admin; it is disabled (greyed, tooltip explains why) when there is no tracking number yet or the parcel is delivered. In **Packing & slip**, Confirm packed and Print Slip / Reprint Slip sit in one row.
+
+Round 7: the **Fulfilments >** button moved from the Fulfilment box to the **Order items** bar (Admin, Staff), like today's order header. It is disabled (tooltip "No fulfilments yet") until the order has a fulfilment confirmation, and opens the fulfilment history as a modal (one card per parcel; Admin edits directly, Staff requests). Click the button in the staff view to try it.
+
+Round 8 (Picker parity, Admin and Staff untouched): the item table gets a **Packed Date** column and the row's empty Deco column becomes **Packed date**; the packing box lists up to 5 confirmations, each cancellable; the customer-note box is gone for Picker, as today's Picking List never shows it to pickers.
+
+Round 9 (Staff only): the expanded order always shows today's **Actions** block (Confirm Fulfilment, Confirm & Print, Print Label, Message with count) inside the Fulfilment box, disabled once the order is fully fulfilled, canceled or closed. The Staff artboard now opens two orders, #0702 (fulfilled, buttons disabled) and #0718 (unfulfilled, buttons enabled), to show both states. Request Stock stays in the Order items bar. The tracking button in the row is unchanged.
+
+Round 10: the pager (select on the left, next to "Showing") now has a **Rows per page** select (10 / 20 / 50 / 100, default 20) on every role, as in today's shared Pagination component; changing it updates the "Showing 1–N" range.
+
+Round 11: every role (Admin, Staff, Picker) now opens **two orders** on its A2 artboard so two states can be compared (Admin #2188 fulfilled + #1184 unfulfilled, Staff #0702 + #0718, Picker #2204 slip printed + #4821 slip not printed). The order list scrolls inside its card (`.tscroll`); header, tabs, pager and the floating bulk bar stay fixed.
+
+Round 12 (filters, all three roles): the toolbar of **Admin, Staff** and **Order Picker** now carries the filters of today's pages; the Slip chip is gone. Admin (sees both pages): Store, Period, Status, Packed, Print, Sync, barcode search. Staff: Store, Period, Status (fulfilment), **Packed** (Not Packed, Partial Packed, Packed, Late Unpacked, Shipped Delayed); search has no Barcode field. Picker: **Packed** (opens on Not Packed + Partial Packed, as today) and **Print** (Slip Not Printed / Slip Printed), Clear filters, barcode search; no Store, Period or Sync. Queue tabs are kept next to the filters. Late Unpacked / Shipped Delayed are back in the Packed menu for every role. Menus: `dialogs.html` card 11.

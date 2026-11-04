@@ -87,8 +87,11 @@ const namesMenu = () => `<div style="display:flex;gap:14px;align-items:flex-star
  <div class="csv"><div class="csvh">name-attributes-2026-10-30.csv</div>${[['Order', 'Product title', 'Name'], ['#4809', 'Club Training Tee', 'GRACE L.'], ['#1190', 'Team Hoodie', 'PRIYA 12'], ['#0729', 'Team Hoodie', 'MARCUS 7']].map((r, i) => `<div class="csvr${i ? '' : ' h'}"><span>${r[0]}</span><span>${r[1]}</span><span>${r[2]}</span></div>`).join('')}</div></div>`;
 
 /* 10 ---- Filter menus */
-const slipMenu = () => `<div class="menu" style="position:static;width:236px"><div class="mh">Picking slip</div><span><i class="rd on"></i>Any</span><span><i class="rd"></i>Not printed <em>4</em></span><span><i class="rd"></i>Printed <em>7</em></span><div class="mh" style="margin-top:2px">More</div><span><span class="ck"></span>Printed over 24 h ago, not packed <em>2</em></span><div class="muted" style="font-size:9.5px;padding:3px 8px 4px;line-height:1.4">Optional. The old “late” rule, now an extra, with no red flag.</div></div>`;
 const statusMenu = () => `<div class="menu" style="position:static;width:200px"><div class="mh">Fulfilment status</div>${[['Unfulfilled', 1], ['Partial', 1], ['Fulfilled', 0], ['Closed', 0], ['Canceled', 0]].map(([n, on]) => `<span><span class="ck${on ? ' on' : ''}"></span>${n}</span>`).join('')}</div>`;
+const checkMenu = (title, allLabel, opts, w = 210) => `<div class="menu" style="position:static;width:${w}px"><div class="mh">${title}</div><span class="${opts.some((o) => o[1]) ? '' : 'on'}">${allLabel}</span>${opts.map(([n, on]) => `<span><span class="ck${on ? ' on' : ''}"></span>${n}</span>`).join('')}</div>`;
+const PACKED_OPTS = ['Not Packed', 'Partial Packed', 'Packed', 'Late Unpacked', 'Shipped Delayed'];
+const packedMenu = () => checkMenu('Packed status', 'All Packed Statuses', PACKED_OPTS.map((n, i) => [n, i < 2]));
+const printMenu = () => checkMenu('Print status', 'All Print Statuses', [['Slip Not Printed', 0], ['Slip Printed', 0]]);
 const storeMenu = () => `<div class="menu" style="position:static;width:200px"><div class="mh">Store</div>${[['All stores', 0], ['Harbour FC Shop', 1], ['Northside Netball', 1], ['Bayside Surf Club', 0], ['Westgate Rugby', 0]].map(([n, on]) => `<span><span class="ck${on ? ' on' : ''}"></span>${n}</span>`).join('')}</div>`;
 const syncMenu = () => `<div class="menu" style="position:static;width:200px"><div class="mh">Select stores to sync</div><span>All stores</span><span>Harbour FC Shop</span><span>Northside Netball</span><span>Bayside Surf Club</span><div class="mh" style="margin-top:2px;text-transform:none;letter-spacing:0;font-weight:400">Last synced 14:12 · 3 new or updated</div></div>`;
 function calendar() {
@@ -97,7 +100,7 @@ function calendar() {
   const cells = (start, n, sel0, sel1) => `<div class="cal">${days}${Array.from({ length: start }, () => '<span class="cd"></span>').join('')}${Array.from({ length: n }, (_, i) => { const v = i + 1; return d(v, sel0 && v === sel0 ? 'e' : sel1 && v === sel1 ? 'e' : sel0 && sel1 && v > sel0 && v < sel1 ? 'r' : ''); }).join('')}</div>`;
   return `<div class="menu" style="position:static;width:300px;padding:8px"><div class="row-b" style="margin-bottom:6px"><b>October 2026</b><span class="muted">Custom range</span></div>${cells(3, 31, 12, 30)}<div class="row-b" style="margin-top:8px"><button class="btn xs ghost" style="border-color:transparent;color:var(--pri-ink)">Clear dates</button><span class="muted tn">12 Oct – 30 Oct</span></div></div>`;
 }
-const filterRow = () => `<div class="menus"><div><div class="mt">Slip filter · admin, picker</div>${slipMenu()}</div><div><div class="mt">Status</div>${statusMenu()}</div><div><div class="mt">Store</div>${storeMenu()}</div><div><div class="mt">Sync split button</div>${syncMenu()}</div><div><div class="mt">Period: custom range</div>${calendar()}</div></div>`;
+const filterRow = () => `<div class="menus"><div><div class="mt">Packed status · all roles</div>${packedMenu()}</div><div><div class="mt">Print status · admin, picker</div>${printMenu()}</div><div><div class="mt">Fulfilment status · admin, staff</div>${statusMenu()}</div><div><div class="mt">Store</div>${storeMenu()}</div><div><div class="mt">Sync split button</div>${syncMenu()}</div><div><div class="mt">Period: custom range</div>${calendar()}</div></div>`;
 
 /* 11 ---- Tracking */
 const tracking = () => dlg('Tracking', `<div class="kv" style="grid-template-columns:64px 1fr"><dt>Parcel</dt><dd class="mono">ST9920451 · StarTrack</dd><dt>State</dt><dd><span class="bdg warn">Paused</span> after 3 days with no scan</dd></div><div class="row-b" style="margin-top:10px;justify-content:flex-start;gap:12px;font-size:10.5px"><span class="cell"><span class="trkic none">${ic('navTracking', 'i')}</span>Not registered</span><span class="cell"><span class="trkic reg">${ic('navTracking', 'i')}</span>Registered</span><span class="cell"><span class="trkic pause">${ic('navTracking', 'i')}</span>Paused</span></div>`, `<button class="btn ghost">Close</button><button class="btn pri">Restart tracking</button>`, { w: 400 });
@@ -125,9 +128,6 @@ body{background:#e9edf3}.sheet{width:1480px;margin:0 auto;padding:34px 0 60px}
 .meta code{font-family:ui-monospace,monospace;font-size:9.5px;color:#6b7280}.meta em{font-style:normal;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:999px;padding:0 6px;font-weight:700}
 .rl{font-style:normal;font-size:9.5px;font-weight:700;border-radius:999px;padding:1px 7px;border:1px solid}.rl.a{background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8}.rl.s{background:#f9fafb;border-color:#e5e7eb;color:#4b5563}.rl.p{background:#ecfdf5;border-color:#a7f3d0;color:#047857}
 .stage{padding:16px;background:#f3f4f6;display:flex;justify-content:center;align-items:flex-start;flex-wrap:wrap;gap:12px;min-height:60px}
-.dlg{background:#fff;border:1px solid var(--bd-s);border-radius:12px;box-shadow:0 14px 36px rgb(15 23 42/.2),0 2px 6px rgb(15 23 42/.1);max-width:100%;font-size:11.5px;color:var(--tx-b)}
-.dh{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding:10px 12px;border-bottom:1px solid var(--div)}.dh b{font-size:13px;color:var(--tx);display:block}.dh .muted{font-size:10.5px}
-.db{padding:10px 12px}.df{display:flex;justify-content:flex-end;gap:6px;padding:9px 12px;border-top:1px solid var(--bd);background:var(--surf-m);border-radius:0 0 12px 12px}
 .fr{display:flex;flex-direction:column;gap:3px}.fr label{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--tx-s)}
 .row-b{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .pl{border:1px solid var(--bd);border-radius:8px;padding:6px 8px;margin-bottom:6px;display:flex;flex-direction:column;gap:5px}.pl.rm{background:var(--surf-m);opacity:.7}.lr{display:flex;align-items:center;gap:6px}
@@ -139,7 +139,6 @@ body{background:#e9edf3}.sheet{width:1480px;margin:0 auto;padding:34px 0 60px}
 .rd{width:12px;height:12px;border-radius:50%;border:1.5px solid var(--g400);display:inline-block;flex:none}.rd.on{border:4px solid var(--pri)}
 .menus{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-start}.mt{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#6b7280;margin-bottom:4px}
 .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;text-align:center}.cd{height:24px;display:flex;align-items:center;justify-content:center;font-size:10.5px;border-radius:5px;font-variant-numeric:tabular-nums}.cd.h{font-size:9px;font-weight:700;color:var(--tx-s)}.cd.r{background:var(--pri-soft);color:var(--pri-ink);border-radius:0}.cd.e{background:var(--pri);color:#fff;font-weight:700}
-.fcard{border:1px solid var(--bd);border-radius:9px;padding:8px 10px;margin-bottom:8px;background:var(--surf-m)}
 .trio{display:flex;flex-wrap:wrap;gap:12px;justify-content:center}
 .csv{border:1px solid var(--bd-s);border-radius:8px;background:#fff;overflow:hidden;width:290px;font-size:10.5px}.csvh{background:var(--surf-m);padding:4px 8px;font-weight:700;border-bottom:1px solid var(--bd)}.csvr{display:grid;grid-template-columns:50px 1fr 80px;gap:6px;padding:3px 8px;border-bottom:1px solid var(--div)}.csvr.h{font-weight:700;color:var(--tx-s)}
 .toast{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--bd);border-left:4px solid var(--r600);border-radius:8px;padding:10px 12px;box-shadow:0 6px 18px rgb(15 23 42/.14);font-weight:700;color:var(--tx)}.toast i{width:8px;height:8px;border-radius:50%;background:var(--r600)}
@@ -156,7 +155,7 @@ const cards = [
   card(8, 'Line items: edit, add, remove', 'A', 'orders/modules/EditLineItemModal …', 'Added', lineEditSet(), { span: 2 }),
   card(9, 'Name attributes: select and export', 'AS', 'orders/modules/useNameAttributes.ts', 'Added: menu and CSV', namesMenu(), { span: 2 }),
   card(10, 'Tracking (17track)', 'A', 'orders/modules/OrderRowActions.tsx', 'Added', tracking()),
-  card(11, 'Filter menus', 'APS', 'OrdersToolbar, PickingListFilters', 'Slip filter is new; rest added', filterRow(), { span: 3 }),
+  card(11, 'Filter menus', 'APS', 'OrdersToolbar, PickingListFilters', 'All roles: today’s filters', filterRow(), { span: 3 }),
   card(12, 'Notes and messages', 'APS', 'components/NotesModal, MessagesModal', 'Added: type per role', notesMsg()),
   card(13, 'Order states: closed, canceled, tracking', 'AS', 'orders/modules/OrderActionsColumn.tsx', 'Added: Closed, lock states', states(), { span: 2 }),
   card(14, 'Test user and copy protection', 'S', 'proxy.ts · app/(shell)/layout.tsx', 'Requirement, not a screen', testMode()),

@@ -79,6 +79,12 @@ export const ZOOM_JS = `<script>
   document.addEventListener('mouseover',function(e){var a=e.target.closest&&e.target.closest('.art');if(a)cur=a});
   document.addEventListener('click',function(e){var t=e.target.closest('[data-vt]');if(t){var a2=t.closest('.art');a2.querySelectorAll('[data-vt]').forEach(function(x){x.classList.toggle('on',x===t)});a2.querySelectorAll('.view').forEach(function(v){v.style.display=v.dataset.view===t.dataset.vt?'flex':'none'});return;}
     var b=e.target.closest('[data-z]');if(!b)return;var a=b.closest('.art'),d=+b.dataset.z;set(a,d===0?100:val(a)+d);});
+  /* Fulfilments modal: the scrim sits in the order's items box; move it onto the artboard so it covers the whole screen */
+  function fhClose(){document.querySelectorAll('.fh-scrim.on').forEach(function(s){s.classList.remove('on')})}
+  document.addEventListener('click',function(e){var o=e.target.closest('[data-fh]');
+    if(o){if(o.disabled)return;var s=o._fhm||o.closest('.bx').querySelector('[data-fhm]');if(!s)return;o._fhm=s;o.closest('.art').appendChild(s);s.classList.add('on');return;}
+    if(e.target.closest('[data-fh-close]')||e.target.hasAttribute('data-fhm'))fhClose();});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape')fhClose();});
   document.addEventListener('keydown',function(e){if(!(e.ctrlKey||e.metaKey)||!cur)return;
     if(e.key==='-'||e.key==='_'){e.preventDefault();set(cur,val(cur)-10)}else if(e.key==='='||e.key==='+'){e.preventDefault();set(cur,val(cur)+10)}else if(e.key==='0'){e.preventDefault();set(cur,100)}});
 })();

@@ -164,13 +164,20 @@ export const RECIPIENTS = [
   { name: 'Customer service', email: 'service@example.com', role: 'Staff' },
   { name: 'Warehouse lead', email: 'warehouse@example.com', role: 'Staff' },
 ];
-/** Customer contact block (full address as in today's Customer Details; email and phone are order fields not shown today). Synthetic. */
+/** Customer contact block (full address as in today's Customer Details; email and phone are order fields not shown today; Admin only here). Synthetic. */
 const hsh = (s) => [...s].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 11);
 const STREETS = ['Harbour St', 'Elm Ave', 'Station Rd', 'Park Lane', 'Wattle Cres', 'King St'];
 export function contactOf(r) {
   const h = hsh(r.no + r.customer), [sub, st] = [r.addr.slice(0, r.addr.lastIndexOf(' ')), r.addr.slice(r.addr.lastIndexOf(' ') + 1)];
   const slug = r.customer.toLowerCase().normalize('NFD').replace(/[^a-z ]/g, '').trim().split(/\s+/);
   return { lines: [`${10 + (h % 190)} ${STREETS[h % STREETS.length]}`, `${sub} ${st} ${2000 + (h % 180)}`, 'Australia'], email: `${slug[0]}.${slug[slug.length - 1]}@example.com`, phone: `04${String(10 + (h % 89))} ${String(100 + (h % 899))} ${String(100 + ((h >> 3) % 899))}` };
+}
+
+/** Shipping line as today's Orders page shows it: title, price before discount, price after (a shipping code can zero it). Synthetic. */
+export function shipLineOf(r) {
+  const price = r.ship === 'Express' ? 14 : 10.69;
+  const codes = (r.codes || []).filter((c) => c === 'CLUB5');
+  return { title: r.ship, price, final: codes.length ? 0 : price, codes };
 }
 
 /* ---------- round 3: parity data (restock requests, decoration work, name attributes, confirmations) ---------- */
@@ -203,6 +210,7 @@ for (const r of ORDERS) for (const x of r.items) {
 }
 // Customer note = Order.note (the Shopify checkout note). Shown for every role, as on today's Orders and Picking List pages.
 const CUSTOMER_NOTE = {
+  '2188': 'Please deliver to the front desk and ask for Isla. Thanks!',
   '4821': 'Please pack the polo separately, it is a gift.',
   '4809': 'Deliver to the club house, not the home address. Gate code 4471.',
   '1184': 'Crest on left chest only. Match the club navy.',
@@ -221,6 +229,9 @@ for (const r of ORDERS) {
   if (CUSTOMER_NOTE[r.no]) r.note = CUSTOMER_NOTE[r.no];
   r.att = ATTACH[r.no] || { files: 0, design: 0, photos: 0, remark: '' };
 }
+// Packing confirmations (today: OrderPackingConfirmation, newest first; the Picking List shows up to 5). Orders not listed get one entry.
+const PACK_HIST = { '2204': [{ at: 'Thu 09:12', n: 2 }, { at: 'Wed 14:02', n: 1 }] };
+export const packHistOf = (r) => PACK_HIST[r.no] || (packedQty(r) > 0 ? [{ at: 'Wed 14:02', n: packedQty(r) }] : []);
 export const hasRestock = (r) => r.items.some((x) => x.restock);
 /** Order-level back-in-stock state: Need restock (pending) / Partially restocked / Restocked. */
 export function restockState(r) {
