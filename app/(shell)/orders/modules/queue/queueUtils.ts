@@ -3,6 +3,7 @@ import type { OrderItem, OrderRow } from '../types';
 import { getFulfilledQty, isOrderFullyFulfilled } from '../utils';
 import { getLineShortfall } from '../hooks/useCreatePo';
 import type { OrderCapabilities } from '../capabilities';
+import { getLineColumns, lineGap } from './lineColumns';
 
 const optionValue = (item: OrderItem, pattern: RegExp) => item.variantOptions?.find((o) => pattern.test(o.name))?.value?.trim() ?? '';
 
@@ -71,7 +72,7 @@ export function getRowTone(order: OrderRow, caps: OrderCapabilities) {
 export function getGridColumns(caps: OrderCapabilities) {
   const nodes = (caps.slip ? 1 : 0) + 1 + (caps.fulfilment ? 2 : 0);
   const icons = 3 + (caps.slip ? 1 : 0) + (caps.labels ? 1 : 0) + (caps.invoice ? 1 : 0) + (caps.admin ? 1 : 0);
-  return ['20px', '96px', '50px', '108px', caps.admin ? '58px' : '', 'minmax(80px,1fr)', `${nodes * 34 + 4}px`, caps.fulfilment ? '104px' : '', '84px', '132px', '52px', `${icons * 24 + 4}px`].filter(Boolean).join(' ');
+  return ['20px', '96px', '50px', '108px', caps.admin ? '66px' : '', 'minmax(80px,1fr)', `${nodes * 34 + 4}px`, caps.fulfilment ? '104px' : '', '84px', '132px', '52px', `${icons * 24 + 4}px`].filter(Boolean).join(' ');
 }
 
 /** "Today 09:42", "Yesterday 17:21" or "Wed 28 Oct": how the prototype shows when an order was placed. */
@@ -111,4 +112,19 @@ export function formatDateTimeShort(iso: string | undefined | null) {
   const d = new Date(iso);
   const date = d.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' }).replace(',', '');
   return `${date} · ${d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false })}`;
+}
+
+/** Smallest width a track can shrink to: "96px" -> 96, "minmax(80px,1fr)" -> 80. */
+const trackMin = (track: string) => Number.parseFloat(track.replace('minmax(', ''));
+
+/** Narrowest the queue table can be before it scrolls sideways: the main grid, or an opened order whose item
+ * table, fulfilment/packing card and customer card sit side by side. Rows, panels and the header all get this
+ * min-width, so their backgrounds reach the end of the scroll area. */
+export function getTableMinWidth(caps: OrderCapabilities) {
+  const main = getGridColumns(caps).split(' ');
+  const mainWidth = main.reduce((sum, t) => sum + trackMin(t), 0) + (main.length - 1) * 8 + 20;
+  const lines = getLineColumns(caps, true);
+  const lineWidth = lines.reduce((sum, c) => sum + trackMin(c.width), 0) + (lines.length - 1) * lineGap(caps) + 16;
+  const side = (caps.fulfilment || caps.pack ? 254 : 0) + (caps.customer ? 232 : 0);
+  return Math.max(mainWidth, lineWidth + side + 20);
 }

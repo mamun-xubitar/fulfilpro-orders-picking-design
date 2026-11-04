@@ -10,6 +10,10 @@ type UsePurchaseOrderArgs = {
   product: ProductRecord | null;
   /** Patches the product in place with the server's response — no full-catalogue refetch. */
   onSaved: (product: ProductRecord) => void;
+  /** Fires once a PO created through `saveAndSend` is saved (the Orders page patches its lines' PO state). */
+  onCreated?: (po: PurchaseOrderRecord) => void;
+  /** Set false where the supplier list is not needed until the form opens (default true). */
+  loadSuppliers?: boolean;
 };
 
 /** Seeded onto every new PO's Shipping Remark field. `{orderNumber}` is a literal token the
@@ -24,7 +28,7 @@ export function receiveLocationOptions(items: PurchaseOrderRecord['items']): { i
   return [...byId].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
 }
 
-export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
+export function usePurchaseOrder({ product, onSaved, onCreated, loadSuppliers = true }: UsePurchaseOrderArgs) {
   const [supplierOptions, setSupplierOptions] = useState<SupplierOption[]>([]);
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrderRecord[]>([]);
   const { request: requestList, loading: loadingList } = useRequest<{ purchaseOrders: PurchaseOrderRecord[] }>();
@@ -68,8 +72,8 @@ export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
   }, []);
 
   useEffect(() => {
-    refreshSuppliers();
-  }, [refreshSuppliers]);
+    if (loadSuppliers) refreshSuppliers();
+  }, [refreshSuppliers, loadSuppliers]);
 
   const loadPurchaseOrders = () => {
     if (!product) return;
@@ -187,6 +191,7 @@ export function usePurchaseOrder({ product, onSaved }: UsePurchaseOrderArgs) {
         setCreateOpen(false);
         loadPurchaseOrders();
         if (data.product) onSaved(data.product);
+        onCreated?.(po);
         // Raised for another product: refresh the tabs that show incoming stock and PO counts.
         if (createProduct) setReceivedNonce((n) => n + 1);
         setCreateProduct(null);

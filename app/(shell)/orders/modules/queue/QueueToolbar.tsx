@@ -34,7 +34,7 @@ function SearchBox({ p }: { p: OrdersPageBundle }) {
   }, []);
   const fields = p.caps.barcodeSearch ? [...SEARCH_FIELDS, { label: 'Barcode', value: 'barcode' }] : SEARCH_FIELDS;
   const fieldLabel = fields.find((f) => f.value === p.searchField)?.label ?? 'All fields';
-  const pick = (value: string) => { p.setSearchField(value); p.setSearchDropdownOpen(false); p.setPagination((prev) => ({ ...prev, page: 1 })); };
+  const pick = (value: string) => { p.setSearchField(value); p.setSearchDropdownOpen(false); if (p.searchInput.trim()) p.setPagination((prev) => ({ ...prev, page: 1 })); };
   return (
     <div className="flex h-7 w-[360px] flex-none items-center gap-1.5 rounded-lg border border-orders-border-strong bg-orders-surface pl-2 pr-1 text-orders-text-subtle focus-within:border-orders-primary focus-within:shadow-[0_0_0_2px_var(--orders-primary-ring)]">
       <Icon name="search" className="h-3.5 w-3.5" />

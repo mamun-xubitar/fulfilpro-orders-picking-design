@@ -3,13 +3,13 @@
 import type { OrderItem, OrderRow } from '../types';
 import type { OrdersPageBundle } from '../ordersPageContext';
 import Badge from './Badge';
+import { Icon } from './icons';
 
 const firstName = (name: string) => name.split(' ')[0];
 const kindOn = { emb: 'border-orders-emb-border bg-orders-emb-soft text-orders-emb', prt: 'border-orders-prt-border bg-orders-prt-soft text-orders-prt' };
 
-/** Deco column (prototype `lineDeco` with both toggles): an EMB and a PRT badge on every line (Admin toggles them,
- * Staff reads them) and the assignee chip below. Admin reaches Assign by clicking the chip, or the `+` that shows
- * on row hover. */
+/** Decoration column (prototype `lineDeco` with both toggles): an EMB and a PRT badge on every line, side by side
+ * and never wrapped (Admin toggles them, Staff reads them). Who does the work lives in the Decorator column. */
 export function DecoCell({ p, order, item }: { p: OrdersPageBundle; order: OrderRow; item: OrderItem }) {
   const done = item.decoration?.doneQty ?? 0;
   const admin = p.caps.admin;
@@ -17,47 +17,50 @@ export function DecoCell({ p, order, item }: { p: OrdersPageBundle; order: Order
     const text = on ? `${done}/${item.qty} ${short}` : short;
     if (admin) {
       return (
-        <button key={key} type="button" title={`Toggle ${name}`} onClick={() => p.toggleLineItemDecoration(order, item, key)} className={`inline-flex h-4 items-center rounded-full border px-1.5 text-[9.5px] font-bold cursor-pointer ${on ? kindOn[tone] : 'border-orders-border bg-orders-canvas text-orders-text-subtle hover:bg-orders-border'}`}>{text}</button>
+        <button key={key} type="button" title={`Toggle ${name}`} onClick={() => p.toggleLineItemDecoration(order, item, key)} className={`inline-flex h-4 items-center whitespace-nowrap rounded-full border px-1.5 text-[9.5px] font-bold cursor-pointer ${on ? kindOn[tone] : 'border-orders-border bg-orders-canvas text-orders-text-subtle hover:bg-orders-border'}`}>{text}</button>
       );
     }
     return on ? <Badge key={key} tone={tone} title={`${name}: ${done} of ${item.qty} decorated`}>{text}</Badge> : null;
   };
   const badges = [badge('isEmbroidery', 'EMB', item.isEmbroidery, 'embroidery', 'emb'), badge('isPrint', 'PRT', item.isPrint, 'print', 'prt')].filter(Boolean);
+  return <span className="flex flex-nowrap items-center gap-[3px] whitespace-nowrap">{badges.length > 0 ? badges : <span className="text-orders-text-subtle">-</span>}</span>;
+}
+
+const ICON_BTN = 'flex h-5 w-5 items-center justify-center rounded-md border border-orders-border text-orders-text-muted hover:bg-orders-divider hover:text-orders-text focus-visible:outline focus-visible:outline-2 focus-visible:outline-orders-primary disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer';
+
+/** Decorator column: who is assigned (chip, a `+` button to assign for Admin) and, below, Admin's two decoration actions as
+ * icon buttons: Mark decoration done and View decorations. Staff reads the assignee only. */
+export function DecoratorCell({ p, order, item }: { p: OrdersPageBundle; order: OrderRow; item: OrderItem }) {
+  const admin = p.caps.admin;
+  const decorated = Boolean(item.isEmbroidery || item.isPrint);
   const assignments = item.assignments ?? [];
+  const first = assignments[0];
+  if (!first && !admin) return <span className="text-orders-text-subtle">-</span>;
+  const remaining = item.decoration?.remaining ?? item.qty;
+  const hasWork = (item.decoration?.works?.length ?? 0) > 0;
+  const label = first ? `${firstName(first.assigneeName)}${first.dueDate ? ` · ${first.dueDate}` : ''}` : '';
+  const title = first ? `Assigned to ${first.assigneeName}${first.dueDate ? ` · due ${first.dueDate}` : ''}` : '';
   return (
-    <span className="flex flex-col items-start gap-0.5 leading-[1.1]">
-      <span className="flex gap-[3px]">{badges.length > 0 ? badges : <span className="text-orders-text-subtle">-</span>}</span>
-      {(assignments.length > 0 || admin) && (
-        <span className="flex items-center gap-0.5">
-          {assignments.slice(0, 1).map((a) => {
-            const label = `${firstName(a.assigneeName)}${a.dueDate ? ` · ${a.dueDate}` : ''}`;
-            return admin
-              ? <button key={a.id} type="button" title={`Assigned to ${a.assigneeName}${a.dueDate ? ` · due ${a.dueDate}` : ''}: click to change`} onClick={() => p.openAssignModal(order, item)} className="cursor-pointer"><Badge tone="info">{label}</Badge></button>
-              : <Badge key={a.id} tone="info" title={`Assigned to ${a.assigneeName}${a.dueDate ? ` · due ${a.dueDate}` : ''}`}>{label}</Badge>;
-          })}
-          {assignments.length > 1 && <span className="text-[9.5px] font-bold text-orders-text-subtle">+{assignments.length - 1}</span>}
-          {admin && (
-            <button type="button" title="Assign a decorator" aria-label="Assign a decorator" onClick={() => p.openAssignModal(order, item)} className="flex h-4 w-4 items-center justify-center rounded-full border border-orders-emb-border text-[11px] font-bold leading-none text-orders-emb opacity-0 transition-opacity hover:bg-orders-emb-soft focus:opacity-100 group-hover:opacity-100 cursor-pointer">+</button>
-          )}
+    <span className="flex min-w-0 flex-col items-start gap-0.5 py-0.5">
+      <span className="flex min-w-0 max-w-full items-center gap-1">
+        {first ? (
+          <span className="min-w-0 [&>span]:max-w-full [&>span]:truncate" title={title}><Badge tone="info">{label}</Badge></span>
+        ) : (
+          <span className="text-[10px] text-orders-text-subtle">Unassigned</span>
+        )}
+        {assignments.length > 1 && <span className="text-[9.5px] font-bold text-orders-text-subtle">+{assignments.length - 1}</span>}
+        {admin && (
+          <button type="button" title={first ? 'Change the decorator' : 'Assign a decorator'} aria-label={first ? 'Change the decorator' : 'Assign a decorator'} onClick={() => p.openAssignModal(order, item)} className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-orders-primary-ring text-orders-primary-ink hover:bg-orders-primary-soft focus-visible:outline focus-visible:outline-2 focus-visible:outline-orders-primary cursor-pointer">
+            <Icon name="plus" className="h-2.5 w-2.5" />
+          </button>
+        )}
+      </span>
+      {admin && decorated && (
+        <span className="flex items-center gap-1">
+          <button type="button" disabled={remaining <= 0} title="Mark decoration done" aria-label="Mark decoration done" onClick={() => p.openWorkModal(order, item)} className={ICON_BTN}><Icon name="check" className="h-3 w-3" /></button>
+          <button type="button" disabled={!hasWork} title="View decorations" aria-label="View decorations" onClick={() => p.openWorkDetails(order, item)} className={ICON_BTN}><Icon name="eye" className="h-3 w-3" /></button>
         </span>
       )}
     </span>
   );
-}
-
-/** Work column: decorated / total, green when finished, amber when started. Admin opens the decoration work list
- * (which also offers Mark done); a decorated line without work yet opens Mark done directly. */
-export function WorkCell({ p, order, item }: { p: OrdersPageBundle; order: OrderRow; item: OrderItem }) {
-  const works = item.decoration?.works?.length ?? 0;
-  const decorated = Boolean(item.isEmbroidery || item.isPrint);
-  const done = item.decoration?.doneQty ?? 0;
-  if (works === 0 && !(decorated && p.caps.admin)) return <span className="text-orders-text-subtle">-</span>;
-  if (works === 0) {
-    return <button type="button" title="Mark decoration done" onClick={() => p.openWorkModal(order, item)} className="h-4 rounded-full border border-orders-border px-1.5 text-[9.5px] font-bold text-orders-text-subtle hover:bg-orders-canvas cursor-pointer">-</button>;
-  }
-  const tone = item.decoration?.fullyDone ? 'ok' : done > 0 ? 'warn' : 'neutral';
-  const label = `${done}/${item.qty}`;
-  return p.caps.admin
-    ? <button type="button" title="View decoration work" onClick={() => p.openWorkDetails(order, item)} className="cursor-pointer"><Badge tone={tone}>{label}</Badge></button>
-    : <Badge tone={tone} title="Decoration work">{label}</Badge>;
 }

@@ -92,9 +92,9 @@ function DecoCell({ order, p }: { order: OrderRow; p: OrdersPageBundle }) {
       })
     : [];
   return (
-    <span className="flex items-center gap-[5px]">
-      {short > 0 && <Badge tone="warn" title={`${short} line${short > 1 ? 's' : ''} not covered by available stock`}>Short {short}</Badge>}
-      {prog.map((d) => <Badge key={d.key} tone={d.tone}>{d.label}</Badge>)}
+    <span className="flex min-w-0 flex-col justify-center gap-0.5 whitespace-nowrap">
+      {short > 0 && <span className="flex"><Badge tone="warn" title={`${short} line${short > 1 ? 's' : ''} not covered by available stock`}>Short {short}</Badge></span>}
+      {prog.length > 0 && <span className="flex items-center gap-[5px]">{prog.map((d) => <Badge key={d.key} tone={d.tone}>{d.label}</Badge>)}</span>}
     </span>
   );
 }

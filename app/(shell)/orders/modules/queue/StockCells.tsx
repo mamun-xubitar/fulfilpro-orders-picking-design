@@ -53,7 +53,7 @@ export function PoCell({ p, order, item }: { p: OrdersPageBundle; order: OrderRo
   const quantity = inv ? short : remaining;
   const creating = p.creatingPoKey === `${order.id}:${item.id}`;
   const title = inv
-    ? `Create a purchase order for ${quantity} piece${quantity === 1 ? '' : 's'} in Inventory`
+    ? `Create a purchase order for ${quantity} piece${quantity === 1 ? '' : 's'}`
     : 'Not in the hub yet: adds the product under this store, then opens the purchase order';
   return (
     <button type="button" disabled={Boolean(p.creatingPoKey)} title={title} onClick={() => void p.openCreatePo(order, item, quantity)} className="flex h-5 items-center gap-0.5 rounded-md border border-orders-primary-ring bg-orders-primary-soft px-1.5 text-[10px] font-bold text-orders-primary-ink hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer">

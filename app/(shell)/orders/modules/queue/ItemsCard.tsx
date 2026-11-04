@@ -26,16 +26,15 @@ export const CardBody = ({ children }: { children: ReactNode }) => <div classNam
 
 export default function ItemsCard({ p, order }: { p: OrdersPageBundle; order: OrderRow }) {
   const { caps } = p;
-  const worked = order.items.some((i) => (i.decoration?.works?.length ?? 0) > 0);
-  const decorated = order.items.some((i) => i.isEmbroidery || i.isPrint);
-  const cols = getLineColumns(caps, worked || (caps.admin && decorated));
+  const showDecorator = order.items.some((i) => i.isEmbroidery || i.isPrint || (i.assignments?.length ?? 0) > 0 || (i.decoration?.works?.length ?? 0) > 0);
+  const cols = getLineColumns(caps, showDecorator);
   const restockItems = (order.stockAdjustment?.items ?? []).filter((i) => i.action === 'restore');
   const allFull = order.items.length > 0 && order.items.every((item, i) => p.isLineFullChecked(order, item, i));
   return (
     <CardShell title="Order items" icon="cube" right={`${order.totalQuantity} pcs · ${order.packedQuantity} packed`}>
       <ExtrasBar p={p} order={order} />
       <div role="table" aria-label={`Items of order ${order.number}`}>
-        <div role="row" className="grid h-[22px] items-center border-b border-orders-border bg-orders-surface-muted px-2 text-[9px] font-bold uppercase tracking-[.4px] text-orders-text-subtle" style={{ gridTemplateColumns: lineGridTemplate(cols), columnGap: lineGap(caps) }}>
+        <div role="row" className="grid h-[22px] items-center whitespace-nowrap border-b border-orders-border bg-orders-surface-muted px-2 text-[9px] font-bold uppercase tracking-[.4px] text-orders-text-subtle" style={{ gridTemplateColumns: lineGridTemplate(cols), columnGap: lineGap(caps) }}>
           {cols.map((c) => (
             <span key={c.key} className={CENTERED_COLUMNS.includes(c.key) ? 'text-center' : c.key === 'full' ? 'flex items-center justify-center gap-[3px]' : ''}>
               {c.label}

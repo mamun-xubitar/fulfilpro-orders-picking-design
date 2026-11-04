@@ -80,7 +80,7 @@ export function useOrdersFilters({ userIsDecorator, userIsPicker = false, decora
     params.set('pageSize', String(pagination.pageSize));
     params.set('period', period === 'custom' ? 'all' : period);
     if (search) params.set('search', search);
-    if (searchField) params.set('searchField', searchField);
+    if (search && searchField) params.set('searchField', searchField);
     storeIds.forEach((id) => params.append('storeId', id));
     if (dateFrom) params.set('dateFrom', dateFrom);
     if (dateTo) params.set('dateTo', dateTo);

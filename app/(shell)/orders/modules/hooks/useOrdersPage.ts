@@ -157,7 +157,7 @@ export function useOrdersPage() {
   });
 
   const slipPrinting = useSlipPrinting({ setOrders: data.setOrders, blockTestModeAction });
-  const createPo = useCreatePo({ setOrders: data.setOrders, blockTestModeAction });
+  const createPo = useCreatePo({ canCreatePo: caps.createPo, setOrders: data.setOrders, blockTestModeAction });
 
   // Picker-to-admin messages: the Order Picker's message icon, and an Admin shortcut in the packing box.
   const pickerMessages = useSharedOrderMessages<OrderRow>({
@@ -280,6 +280,7 @@ export function useOrdersPage() {
     ...slipPrinting,
     openCreatePo: createPo.openCreatePo,
     creatingPoKey: createPo.creatingKey,
+    createPoForm: createPo.form,
     pickerMessages,
     // name attributes / export
     selectedNameCount: nameAttrs.selectedNameCount,

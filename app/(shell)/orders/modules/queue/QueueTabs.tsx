@@ -15,17 +15,17 @@ function tabsFor(role: 'admin' | 'staff' | 'picker'): Tab[] {
   return [{ key: 'all', label: 'All' }, { key: 'slip_not_printed', label: 'Slip not printed' }, { key: 'slip_printed', label: 'Slip printed' }, { key: 'packed', label: 'Packed' }, { key: 'shipped', label: 'Shipped' }, { key: 'issues', label: 'Issues' }];
 }
 
-const SORTS: ReadonlyArray<{ label: string; sort: 'number' | 'customer' | 'orderedAt' | null; dir: 'asc' | 'desc' }> = [
-  { label: 'Newest first', sort: null, dir: 'desc' },
-  { label: 'Oldest first', sort: 'orderedAt', dir: 'asc' },
-  { label: 'Order no. ↑', sort: 'number', dir: 'asc' },
-  { label: 'Order no. ↓', sort: 'number', dir: 'desc' },
-  { label: 'Customer A–Z', sort: 'customer', dir: 'asc' },
+type SortField = 'orderedAt' | 'number' | 'customer';
+
+const SORT_FIELDS: ReadonlyArray<{ label: string; value: SortField }> = [
+  { label: 'Date placed', value: 'orderedAt' },
+  { label: 'Order no.', value: 'number' },
+  { label: 'Customer', value: 'customer' },
 ];
 
 const GHOST = 'inline-flex h-7 items-center justify-center gap-1 whitespace-nowrap rounded-lg border border-orders-border-strong bg-orders-surface px-[9px] text-[11px] font-bold text-orders-text-body hover:bg-orders-surface-muted cursor-pointer';
 
-/** "Sort  Newest first ▾" as a chip menu. */
+/** "Date placed ↓" as a chip menu: sortable fields, a separator, then Ascending / Descending. Every pick applies at once. */
 function SortChip({ p }: { p: OrdersPageBundle }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -35,15 +35,20 @@ function SortChip({ p }: { p: OrdersPageBundle }) {
     document.addEventListener('mousedown', close);
     return () => document.removeEventListener('mousedown', close);
   }, [open]);
-  const current = Math.max(0, SORTS.findIndex((s) => s.sort === p.sort && (s.sort === null || s.dir === p.dir)));
+  const field = p.sort ?? 'orderedAt';
+  const current = SORT_FIELDS.find((f) => f.value === field) ?? SORT_FIELDS[0];
   return (
     <div ref={ref} className="relative">
       <button type="button" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((v) => !v)} className="inline-flex h-7 items-center gap-[5px] whitespace-nowrap rounded-lg border border-orders-border-strong bg-orders-surface pl-2 pr-[7px] text-[11px] hover:bg-orders-surface-muted cursor-pointer">
-        <b className="font-bold text-orders-text">{SORTS[current].label}</b><Icon name="chevronDown" className="h-[11px] w-[11px] text-[#9ca3af]" />
+        <b className="font-bold text-orders-text">{current.label}</b>
+        <Icon name={p.dir === 'asc' ? 'chevronUp' : 'chevronDown'} className="h-[11px] w-[11px] text-orders-primary" />
       </button>
       {open && (
         <div role="menu" className="absolute right-0 top-full z-30 mt-1 min-w-40 rounded-xl border border-orders-border bg-orders-surface py-1 shadow-orders-md">
-          {SORTS.map((s, i) => <MenuOption key={s.label} selected={i === current} onClick={() => { p.setSortBy(s.sort, s.dir); setOpen(false); }}>{s.label}</MenuOption>)}
+          {SORT_FIELDS.map((f) => <MenuOption key={f.value} selected={f.value === field} onClick={() => p.setSortBy(f.value, p.dir)}>{f.label}</MenuOption>)}
+          <div role="separator" className="my-1 border-t border-orders-divider" />
+          <MenuOption selected={p.dir === 'asc'} onClick={() => p.setSortBy(field, 'asc')}>Ascending</MenuOption>
+          <MenuOption selected={p.dir === 'desc'} onClick={() => p.setSortBy(field, 'desc')}>Descending</MenuOption>
         </div>
       )}
     </div>

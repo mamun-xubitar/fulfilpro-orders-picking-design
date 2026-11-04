@@ -15,6 +15,7 @@ import { formatStockStatus, getAvailableStockItemsForRow, getBackInStockEligible
 import PrintSlipModal from './queue/PrintSlipModal';
 import NotifyPackedModal from './queue/NotifyPackedModal';
 import FulfilmentsModal from './queue/FulfilmentsModal';
+import { CreatePoModal } from '@/app/(shell)/inventory/modules/PoModals';
 
 /** Every dialog the Orders page can open. Each one only mounts while its own state is set. */
 export default function PageModals({ p }: { p: OrdersPageBundle }) {
@@ -183,6 +184,7 @@ export default function PageModals({ p }: { p: OrdersPageBundle }) {
           }}
         />
       )}
+      {p.createPoForm.createOpen && <CreatePoModal po={p.createPoForm} variants={p.createPoForm.createProduct?.variants ?? []} />}
     </div>
   );
 }

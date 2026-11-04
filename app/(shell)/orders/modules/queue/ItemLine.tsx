@@ -8,7 +8,7 @@ import { getRemainingToPack } from '../slipDocument';
 import { getItemColour, getOtherOptions, getShopifyAdminUrl, getSwatchColour, getThumbnailUrl } from './queueUtils';
 import { lineGap, lineGridTemplate, type LineColumnDef } from './lineColumns';
 import { AvailCell, PoCell } from './StockCells';
-import { DecoCell, WorkCell } from './LineDeco';
+import { DecoCell, DecoratorCell } from './LineDeco';
 import Badge from './Badge';
 
 type Props = { p: OrdersPageBundle; order: OrderRow; item: OrderItem; index: number; restockItems: OrderStockAdjustmentItem[]; cols: LineColumnDef[] };
@@ -103,19 +103,19 @@ export default function ItemLine({ p, order, item, index, restockItems, cols }: 
   const restock = restockItems.find((r) => r.lineItemId === item.id);
   const cell: Record<string, React.ReactNode> = {
     item: <ItemCell p={p} order={order} item={item} restock={restock} />,
-    sku: <span className="truncate font-mono text-[10px] text-orders-text-muted" title={item.sku || undefined}>{item.sku || '-'}</span>,
+    sku: <span className="block truncate font-mono text-[10px] text-orders-text-muted" title={item.sku || undefined}>{item.sku || '-'}</span>,
     deco: <DecoCell p={p} order={order} item={item} />,
     qty: <b className="text-center tabular-nums">{item.qty}</b>,
     packed: <b className={`text-center tabular-nums ${done ? 'text-orders-success-ink' : part ? 'text-orders-warning-ink' : 'text-orders-text-subtle'}`}>{packed}/{item.qty}</b>,
     pdate: <span className="text-[10.5px] text-orders-text-subtle tabular-nums">{item.packedDate ? dayTime(item.packedDate) : '-'}</span>,
     avail: <AvailCell order={order} item={item} />,
     po: <PoCell p={p} order={order} item={item} />,
-    work: <WorkCell p={p} order={order} item={item} />,
+    decorator: <DecoratorCell p={p} order={order} item={item} />,
     full: <input type="checkbox" checked={isFull} disabled={selectable === 0} title={selectable === 0 ? 'Nothing left to select' : 'Select the whole remaining quantity'} onChange={() => p.toggleFull(order.id, index, selectable)} className="h-[13px] w-[13px] cursor-pointer rounded-[3px] border-orders-border-strong text-orders-primary disabled:cursor-not-allowed disabled:opacity-40" />,
     partial: <Stepper p={p} order={order} item={item} index={index} selectable={selectable} partial={partial} isFull={isFull} />,
     actions: <LineActions p={p} order={order} item={item} />,
   };
-  const centered = new Set(['qty', 'packed', 'avail', 'full', 'work', 'actions', 'pdate']);
+  const centered = new Set(['qty', 'packed', 'avail', 'full', 'actions', 'pdate']);
   return (
     <div role="row" className={`group grid min-h-[34px] items-center border-b border-orders-divider px-2 text-[11.5px] last:border-b-0 ${done ? 'bg-orders-line-done' : part ? 'bg-orders-warning-soft' : ''}`} style={{ gridTemplateColumns: lineGridTemplate(cols), columnGap: lineGap(caps) }}>
       {cols.map((c) => <span key={c.key} className={`min-w-0 ${centered.has(c.key) ? 'flex justify-center' : ''}`}>{cell[c.key]}</span>)}
