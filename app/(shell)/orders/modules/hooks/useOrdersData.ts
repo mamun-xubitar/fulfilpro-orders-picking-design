@@ -12,7 +12,7 @@ type UseOrdersDataArgs = {
 };
 
 export function useOrdersData({ queryString, search, setPagination, blockTestModeAction, setError }: UseOrdersDataArgs) {
-  const [orders, setOrders] = useState<OrderRow[]>([]);
+  const [orders, setOrdersRaw] = useState<OrderRow[]>([]);
   const [stores, setStores] = useState<StoreOption[]>([]);
   const [crossDecorationVisibility, setCrossDecorationVisibility] = useState(false);
   const [packingRecipients, setPackingRecipients] = useState<PackingRecipient[]>([]);
@@ -46,7 +46,7 @@ export function useOrdersData({ queryString, search, setPagination, blockTestMod
         }
         if (cancelled) return;
 
-        setOrders(json.data.orders);
+        setOrdersRaw(json.data.orders);
         setStores(json.data.stores);
         setPagination(json.data.pagination);
         setCrossDecorationVisibility(json.data.crossDecorationVisibility);
@@ -61,7 +61,7 @@ export function useOrdersData({ queryString, search, setPagination, blockTestMod
       } catch (err) {
         if (cancelled) return;
         setError(err instanceof Error ? err.message : 'Failed to load orders');
-        setOrders([]);
+        setOrdersRaw([]);
       } finally {
         if (!cancelled) {
           setLoading(false);
@@ -75,6 +75,21 @@ export function useOrdersData({ queryString, search, setPagination, blockTestMod
       cancelled = true;
     };
   }, [queryString, refreshToken, search]);
+
+  // Mutation responses replace a whole order row but do not carry the hub stock / PO state of its lines
+  // (it is only loaded with the list), so keep what the row already had.
+  const setOrders: React.Dispatch<React.SetStateAction<OrderRow[]>> = (action) => {
+    setOrdersRaw((prev) => {
+      const next = typeof action === 'function' ? action(prev) : action;
+      const before = new Map(prev.map((o) => [o.id, o]));
+      return next.map((order) => {
+        const old = before.get(order.id);
+        if (!old || old === order || !order.items.some((i) => i.inventory === undefined)) return order;
+        const inventory = new Map(old.items.map((i) => [i.id, i.inventory]));
+        return { ...order, items: order.items.map((i) => (i.inventory === undefined && inventory.has(i.id) ? { ...i, inventory: inventory.get(i.id) } : i)) };
+      });
+    });
+  };
 
   const bumpRefresh = () => setRefreshToken((prev) => prev + 1);
 
