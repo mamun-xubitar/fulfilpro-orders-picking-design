@@ -4,72 +4,40 @@ import type { OrderRow } from './types';
 import type { OrdersPageBundle } from './ordersPageContext';
 import { formatFulfillmentDate } from './utils';
 import FulfillmentConfActions from './FulfillmentConfActions';
+import Badge from './queue/Badge';
+import { Icon } from './queue/icons';
+import { formatDateTimeShort } from './queue/queueUtils';
 
-type FulfillmentDetailsViewProps = {
-  p: OrdersPageBundle;
-  order: OrderRow;
-};
+const DT = 'text-[9.5px] font-bold uppercase tracking-[.35px] text-orders-text-subtle';
 
-export default function FulfillmentDetailsView({ p, order }: FulfillmentDetailsViewProps) {
+/** One card per parcel of the order (prototype `fcard`): status and date, carrier, tracking, lines, barcodes, then
+ * Edit / Cancel (Admin) or Request edit / cancel (Staff). */
+export default function FulfillmentDetailsView({ p, order }: { p: OrdersPageBundle; order: OrderRow }) {
   return (
-    <div className="min-w-0">
-            <div className="space-y-3">
-        {order.fulfillmentItems.confirmations.map((conf, confIndex) => (
-          <div key={conf.id ?? confIndex} className="bg-orders-surface rounded-lg border border-orders-border p-3">
-            <div className="flex flex-wrap gap-x-4 gap-y-1 mb-2 text-xs text-orders-text-muted">
-              {conf.confirmedAt && (
-                <span><span className="font-medium text-orders-text-subtle">Confirmed:</span> {new Date(conf.confirmedAt).toLocaleString()}</span>
-              )}
-              {conf.fulfillmentDate && (
-                <span><span className="font-medium text-orders-text-subtle">Fulfilled:</span> {formatFulfillmentDate(conf.fulfillmentDate)}</span>
-              )}
-              {conf.shopifyFulfillmentStatus && (
-                <span><span className="font-medium text-orders-text-subtle">Status:</span> {conf.shopifyFulfillmentStatus}</span>
-              )}
-              {conf.trackingInfo?.company && (
-                <span><span className="font-medium text-orders-text-subtle">Carrier:</span> {conf.trackingInfo.company}</span>
-              )}
-              {conf.trackingInfo?.number && (
-                <span>
-                  <span className="font-medium text-orders-text-subtle">Tracking:</span>{' '}
-                  {conf.trackingInfo.url ? (
-                    <a href={conf.trackingInfo.url} target="_blank" rel="noopener noreferrer" className="text-orders-primary hover:underline">{conf.trackingInfo.number}</a>
-                  ) : conf.trackingInfo.number}
-                </span>
-              )}
+    <div className="flex flex-col gap-2">
+      {order.fulfillmentItems.confirmations.map((conf, index) => {
+        const trackingNumber = conf.trackingInfo?.number?.trim();
+        const tracking = order.trackings?.find((t) => t.trackingNumber === trackingNumber);
+        const when = conf.confirmedAt ? formatDateTimeShort(conf.confirmedAt) : conf.fulfillmentDate ? formatFulfillmentDate(conf.fulfillmentDate) : '';
+        return (
+          <div key={conf.id ?? index} className="rounded-[9px] border border-orders-border bg-orders-surface-muted px-2.5 py-2">
+            <div className="flex items-center justify-between gap-2">
+              <span className="flex items-center gap-1.5"><b className="text-orders-text">Parcel {index + 1}</b>{tracking?.status && <Badge tone={tracking.status === 'Delivered' ? 'ok' : 'info'}>{tracking.status}</Badge>}</span>
+              <span className="tabular-nums text-orders-text-subtle">{when}</span>
             </div>
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-orders-divider">
-                  <th className="text-left py-1 text-orders-text-subtle font-medium">Product</th>
-                  <th className="text-left py-1 text-orders-text-subtle font-medium">SKU</th>
-                  <th className="text-center py-1 text-orders-text-subtle font-medium">Qty</th>
-                </tr>
-              </thead>
-              <tbody>
-                {conf.lines.map((line) => {
-                  const lineItem = order.items.find((i) => i.id === line.lineItemId);
-                  return (
-                    <tr key={line.lineItemId} className="border-b border-orders-divider">
-                      <td className="py-1.5 pr-2 text-orders-text-body">{lineItem?.name ?? line.lineItemId}</td>
-                      <td className="py-1.5 pr-2 font-mono text-orders-text-subtle">{lineItem?.sku || '-'}</td>
-                      <td className="py-1.5 text-center text-orders-text-body">{line.quantity}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            {conf.barcodes && conf.barcodes.length > 0 && (
-              <div className="mt-2 text-xs text-orders-text-subtle">
-                <span className="font-medium">Barcodes:</span> {conf.barcodes.join(', ')}
-              </div>
-            )}
+            <dl className="mt-1 grid grid-cols-[78px_1fr] items-baseline gap-x-2 gap-y-[3px] text-[11px]">
+              {conf.trackingInfo?.company && (<><dt className={DT}>Carrier</dt><dd className="text-orders-text-body">{conf.trackingInfo.company}</dd></>)}
+              {trackingNumber && (<><dt className={DT}>Tracking</dt><dd className="font-mono text-[10.5px] text-orders-text-body">{conf.trackingInfo?.url ? <a href={conf.trackingInfo.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-orders-primary hover:underline">{trackingNumber}<Icon name="external" className="h-2.5 w-2.5" /></a> : trackingNumber}</dd></>)}
+              <dt className={DT}>Lines</dt>
+              <dd className="text-orders-text-body">{conf.lines.map((line) => <span key={line.lineItemId} className="block">{order.items.find((i) => i.id === line.lineItemId)?.name ?? line.lineItemId} × {line.quantity}</span>)}</dd>
+              {conf.barcodes && conf.barcodes.length > 0 && (<><dt className={DT}>Barcodes</dt><dd className="font-mono text-[10.5px] text-orders-text-body">{conf.barcodes.join(', ')}</dd></>)}
+            </dl>
             {(p.userIsAdmin || p.userIsStaff) && (
-              <FulfillmentConfActions p={p} order={order} conf={conf} confId={conf.id ?? String(confIndex)} />
+              <div className="mt-1.5 flex justify-end"><FulfillmentConfActions compact p={p} order={order} conf={conf} confId={conf.id ?? String(index)} /></div>
             )}
           </div>
-        ))}
-      </div>
+        );
+      })}
     </div>
   );
 }

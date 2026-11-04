@@ -10,7 +10,7 @@ import WorkDetailsModal from './WorkDetailsModal';
 import DeleteLineItemModal from './DeleteLineItemModal';
 import EditLineItemModal from './EditLineItemModal';
 import AddLineItemModal from './AddLineItemModal';
-import MessagesModal from '@/components/MessagesModal';
+import MessagesDialog from './dialogs/MessagesDialog';
 import { formatStockStatus, getAvailableStockItemsForRow, getBackInStockEligibleItems, hasStockItemAvailableToAdd } from './utils';
 import PrintSlipModal from './queue/PrintSlipModal';
 import NotifyPackedModal from './queue/NotifyPackedModal';
@@ -73,6 +73,15 @@ export default function PageModals({ p }: { p: OrdersPageBundle }) {
     trackingModal={p.trackingModal}
     closeTrackingModal={p.closeTrackingModal}
     submitTrackingAction={p.submitTrackingAction}
+    onSwitchToMessages={(order) => {
+      p.closeNoteModal();
+      if (p.caps.role === 'picker') void p.pickerMessages.openMessageModal(order);
+      else void p.openMessageModal(order);
+    }}
+    onSwitchToNotes={(order) => {
+      p.closeMessageModal();
+      void p.openNoteModal(order);
+    }}
   />
 
   {p.assignModal && (
@@ -161,7 +170,19 @@ export default function PageModals({ p }: { p: OrdersPageBundle }) {
       {p.fulfillmentViewOrderId && <FulfilmentsModal p={p} />}
       {p.printModal && <PrintSlipModal orders={p.printModal} setOrders={p.setPrintModal} onClose={() => p.setPrintModal(null)} onPrint={() => void p.printPickingSlips()} />}
       {p.notifyModal && <NotifyPackedModal state={p.notifyModal} setState={p.setNotifyModal} recipients={p.packingRecipients} onClose={() => p.setNotifyModal(null)} onSubmit={() => void p.submitNotifyAction()} />}
-      {p.pickerMessages.messageModal && <MessagesModal state={p.pickerMessages.messageModal} setState={p.pickerMessages.setMessageModal} onClose={p.pickerMessages.closeMessageModal} onSubmit={() => void p.pickerMessages.submitMessage()} />}
+      {p.pickerMessages.messageModal && (
+        <MessagesDialog
+          state={p.pickerMessages.messageModal}
+          setState={p.pickerMessages.setMessageModal}
+          onClose={p.pickerMessages.closeMessageModal}
+          onSubmit={p.pickerMessages.submitMessage}
+          onSwitchToNotes={() => {
+            const order = p.pickerMessages.messageModal!.order;
+            p.pickerMessages.closeMessageModal();
+            void p.openNoteModal(order);
+          }}
+        />
+      )}
     </div>
   );
 }

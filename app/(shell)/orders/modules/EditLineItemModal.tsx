@@ -1,7 +1,8 @@
 'use client';
 
-import { ModalShell, ModalActions } from '@/components/ModalShell';
 import type { EditLineItemModalState } from './types';
+import DialogShell from './dialogs/DialogShell';
+import { dlgBtn, dlgInput, Field } from './dialogs/dialogUi';
 
 type Props = {
   modal: EditLineItemModalState | null;
@@ -12,57 +13,41 @@ type Props = {
   onConfirm: () => void;
 };
 
+/** Edit a line item's quantity (and title on custom items) (Admin). */
 export default function EditLineItemModal({ modal, setQuantity, setTitle, setRestock, onClose, onConfirm }: Props) {
   if (!modal) return null;
   const { item, titleEditable, title, quantity, minQuantity, restockable, restock, saving, error } = modal;
-  const isDecreasing = quantity < item.qty;
-
+  const decreasing = quantity < item.qty;
   return (
-    <ModalShell
+    <DialogShell
       title="Edit line item"
+      width={300}
+      busy={saving}
       onClose={onClose}
-      footer={<ModalActions onCancel={onClose} onConfirm={onConfirm} confirmLabel={saving ? 'Saving...' : 'Save'} disabled={saving} />}
+      footer={<>
+        <button type="button" onClick={onClose} disabled={saving} className={dlgBtn.ghost}>Cancel</button>
+        <button type="button" onClick={onConfirm} disabled={saving} className={dlgBtn.pri}>{saving ? 'Saving…' : 'Save'}</button>
+      </>}
     >
-      <div className="space-y-4">
-        <div>
-          <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Title</label>
-          <input
-            type="text"
-            value={title}
-            readOnly={!titleEditable}
-            onChange={(e) => setTitle(e.target.value)}
-            className={`w-full rounded-lg border border-gray-300 px-3 py-2 text-sm ${!titleEditable ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : ''}`}
-          />
-          {!titleEditable && (
-            <p className="mt-1 text-xs text-gray-400">Title can only be changed on custom items</p>
-          )}
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Quantity</label>
-          <input
-            type="number"
-            min={minQuantity}
-            value={quantity}
-            onChange={(e) => setQuantity(Math.max(minQuantity, Number(e.target.value) || minQuantity))}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-          />
-          {minQuantity > 1 && (
-            <p className="mt-1 text-xs text-gray-400">{minQuantity} already fulfilled — quantity can&apos;t go lower</p>
-          )}
-        </div>
-        {restockable && isDecreasing && (
-          <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={restock}
-              onChange={(e) => setRestock(e.target.checked)}
-              className="rounded border-gray-300 text-blue-600 cursor-pointer"
-            />
-            Return removed items to inventory
+      <div className="flex flex-col gap-2">
+        <Field label="Title" hint={!titleEditable ? 'Store products keep their title' : undefined}>
+          <input type="text" value={title} readOnly={!titleEditable} onChange={(e) => setTitle(e.target.value)} className={`${dlgInput} ${!titleEditable ? 'cursor-not-allowed bg-orders-surface-muted text-orders-text-subtle' : ''}`} />
+        </Field>
+        <Field label="Quantity" hint={minQuantity > 1 ? `${minQuantity} already fulfilled, quantity can't go lower` : undefined}>
+          <span className="inline-flex h-6 w-fit items-center overflow-hidden rounded-[7px] border border-orders-border-strong bg-orders-surface">
+            <button type="button" aria-label="Decrease quantity" disabled={quantity <= minQuantity} onClick={() => setQuantity(Math.max(minQuantity, quantity - 1))} className="h-full w-[22px] text-[13px] font-bold text-orders-text-muted hover:bg-orders-divider disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer">−</button>
+            <input type="number" min={minQuantity} value={quantity} onChange={(e) => setQuantity(Math.max(minQuantity, Number(e.target.value) || minQuantity))} aria-label="Quantity" className="h-[22px] w-10 border-x border-orders-border bg-transparent text-center text-[11.5px] font-bold tabular-nums outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none" />
+            <button type="button" aria-label="Increase quantity" onClick={() => setQuantity(quantity + 1)} className="h-full w-[22px] text-[13px] font-bold text-orders-text-muted hover:bg-orders-divider cursor-pointer">+</button>
+          </span>
+        </Field>
+        {restockable && decreasing && (
+          <label className="flex cursor-pointer items-center gap-1.5 text-[10.5px] font-semibold text-orders-text-body">
+            <input type="checkbox" checked={restock} onChange={(e) => setRestock(e.target.checked)} className="h-[13px] w-[13px] cursor-pointer rounded-[3px] border-orders-border-strong text-orders-primary" />
+            Restock the {item.qty - quantity} removed piece{item.qty - quantity === 1 ? '' : 's'}
           </label>
         )}
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-[11px] text-orders-danger">{error}</p>}
       </div>
-    </ModalShell>
+    </DialogShell>
   );
 }

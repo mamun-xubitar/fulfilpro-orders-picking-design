@@ -1,14 +1,14 @@
 'use client';
 
 import { Fragment, type Dispatch, type SetStateAction } from 'react';
-import { ModalShell } from '@/components/ModalShell';
+import DialogShell from '../dialogs/DialogShell';
+import { dlgBtn } from '../dialogs/dialogUi';
 import { clampNumber, createLocationRemark, getRemainingToPack, getVariantText, type PrintItem, type PrintOrder } from '../slipDocument';
 import { Icon } from './icons';
 
 type SetOrders = Dispatch<SetStateAction<PrintOrder[] | null>>;
 
-const field = 'w-full rounded border border-orders-border-strong bg-orders-surface px-2 py-1 text-[11.5px] disabled:bg-orders-canvas';
-const label = 'mb-0.5 block text-[9.5px] font-bold uppercase text-orders-text-subtle';
+const field = 'w-full rounded-md border border-orders-border-strong bg-orders-surface px-2 text-[11px] outline-none placeholder:text-orders-text-subtle focus:border-orders-primary disabled:bg-orders-canvas';
 
 function patchItem(setOrders: SetOrders, orderId: string, itemId: string, patch: Partial<PrintItem>) {
   setOrders((prev) => (prev ? prev.map((o) => (o.id === orderId ? { ...o, printItems: o.printItems.map((item) => (item.id === itemId ? { ...item, ...patch } : item)) } : o)) : prev));
@@ -18,15 +18,15 @@ function LocationRemarks({ orderId, item, setOrders }: { orderId: string; item: 
   const update = (next: PrintItem['locationRemarks']) => patchItem(setOrders, orderId, item.id, { locationRemarks: next });
   const entries = item.locationRemarks;
   return (
-    <div className="mt-2 space-y-1.5">
+    <div className="space-y-1">
       {entries.map((entry, idx) => {
         const last = idx === entries.length - 1;
         const set = (patch: Partial<typeof entry>) => update(entries.map((e) => (e.id === entry.id ? { ...e, ...patch } : e)));
         return (
-          <div key={entry.id} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-end gap-2">
-            <label>{idx === 0 && <span className={label}>Location</span>}<input value={entry.location} disabled={item.removed} onChange={(e) => set({ location: e.target.value })} className={field} /></label>
-            <label>{idx === 0 && <span className={label}>Remark</span>}<input value={entry.remark} disabled={item.removed} onChange={(e) => set({ remark: e.target.value })} className={field} /></label>
-            <button type="button" disabled={item.removed || (!last && entries.length <= 1)} aria-label={last ? 'Add location remark' : 'Remove location remark'} onClick={() => update(last ? [...entries, createLocationRemark()] : entries.filter((e) => e.id !== entry.id))} className="flex h-7 w-7 items-center justify-center rounded border border-orders-border-strong text-orders-text-muted hover:bg-orders-primary-soft hover:text-orders-primary disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer">
+          <div key={entry.id} className="grid grid-cols-[minmax(0,.7fr)_minmax(0,1.3fr)_auto] items-center gap-1.5">
+            <input value={entry.location} disabled={item.removed} onChange={(e) => set({ location: e.target.value })} placeholder="Location" aria-label="Location" className={`${field} h-6`} />
+            <input value={entry.remark} disabled={item.removed} onChange={(e) => set({ remark: e.target.value })} placeholder="Remark (shown on the slip)" aria-label="Remark" className={`${field} h-6`} />
+            <button type="button" disabled={item.removed || (!last && entries.length <= 1)} aria-label={last ? 'Add location remark' : 'Remove location remark'} onClick={() => update(last ? [...entries, createLocationRemark()] : entries.filter((e) => e.id !== entry.id))} className="flex h-6 w-6 items-center justify-center rounded-md border border-orders-border-strong text-orders-text-muted hover:bg-orders-primary-soft hover:text-orders-primary disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer">
               <Icon name={last ? 'plus' : 'minus'} className="h-3.5 w-3.5" />
             </button>
           </div>
@@ -40,40 +40,41 @@ type Props = { orders: PrintOrder[]; setOrders: SetOrders; onClose: () => void; 
 
 export default function PrintSlipModal({ orders, setOrders, onClose, onPrint }: Props) {
   return (
-    <ModalShell
+    <DialogShell
       title="Print picking slip"
+      sub={`${orders.length} order${orders.length === 1 ? '' : 's'} · ${orders.reduce((n, o) => n + o.printItems.length, 0)} lines`}
+      width={560}
       onClose={onClose}
-      extraWide
-      footer={
-        <div className="flex items-center justify-end gap-2">
-          <span className="mr-auto text-[10.5px] text-orders-text-subtle">After printing, the slip icon turns green.</span>
-          <button type="button" onClick={onClose} className="rounded-lg border border-orders-border-strong bg-orders-surface px-3 py-1.5 text-[12px] font-semibold text-orders-text-body hover:bg-orders-surface-muted cursor-pointer">Cancel</button>
-          <button type="button" onClick={onPrint} className="flex items-center gap-1.5 rounded-lg bg-orders-primary px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-orders-primary-hover cursor-pointer"><Icon name="printer" className="h-3.5 w-3.5" />Print</button>
-        </div>
-      }
+      footer={<>
+        <span className="mr-auto self-center text-[10px] text-orders-text-subtle">After printing, the slip icon turns green</span>
+        <button type="button" onClick={onClose} className={dlgBtn.ghost}>Cancel</button>
+        <button type="button" onClick={onPrint} className={dlgBtn.pri}><Icon name="printer" className="h-3.5 w-3.5" />Print</button>
+      </>}
     >
-      <p className="-mt-2 mb-3 text-[11.5px] text-orders-text-muted">{orders.length} order{orders.length === 1 ? '' : 's'}</p>
-      <div className="space-y-4">
+      <div className="flex flex-col gap-2.5">
         {orders.map((order) => (
-          <section key={order.id} className="rounded-lg border border-orders-border">
-            <div className="flex flex-wrap justify-between gap-2 border-b border-orders-border bg-orders-surface-muted px-3 py-2">
-              <div><b className="text-[12.5px] text-orders-text">{order.storeName}</b><div className="text-[11px] text-orders-text-muted">Order {order.number}</div></div>
-              <div className="text-right text-[11px] text-orders-text-muted"><div>Print date: {new Date().toLocaleString()}</div><div>{order.customer}</div></div>
+          <section key={order.id} className="rounded-[9px] border border-orders-border">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-orders-divider bg-orders-surface-muted px-2.5 py-1.5">
+              <span className="flex items-center gap-1.5"><b className="text-orders-text">#{order.number}</b><span className="text-orders-text-subtle">{order.storeName}</span></span>
+              <span className="text-[10.5px] text-orders-text-subtle">{order.customer} · print date {new Date().toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}</span>
             </div>
-            <div className="p-3">
+            <div className="px-2.5">
               {order.printItems.map((item, idx) => (
                 <Fragment key={`${order.id}-print-${item.id}-${idx}`}>
-                  <div className={`grid grid-cols-[minmax(0,34%)_minmax(0,1fr)] gap-4 border-b border-orders-divider py-3 ${item.removed ? 'opacity-40' : ''}`}>
-                    <div><div className="text-[12.5px] font-semibold text-orders-text">{item.title || item.name}</div><div className="mt-1 text-[11px] text-orders-text-muted"><b className="uppercase">SKU:</b> <span className="font-mono">{item.sku || '-'}</span></div></div>
-                    <div>
-                      <div className="grid grid-cols-[minmax(0,1fr)_5rem_2rem] items-end gap-3">
-                        <div className="min-w-0"><span className={label}>Variant</span><div className="truncate text-[11.5px] text-orders-text-body">{getVariantText(item) || '-'}</div></div>
-                        <label><span className={label}>Qty</span><input type="number" min={1} max={getRemainingToPack(item)} value={item.printQuantity} disabled={item.removed} onChange={(e) => patchItem(setOrders, order.id, item.id, { printQuantity: clampNumber(e.target.value, getRemainingToPack(item), 1) })} className={`${field} text-center`} /></label>
-                        <button type="button" onClick={() => patchItem(setOrders, order.id, item.id, { removed: !item.removed })} aria-label={item.removed ? 'Restore item' : 'Remove item'} title={item.removed ? 'Restore item' : 'Remove item from the slip'} className={`flex h-7 w-7 items-center justify-center rounded border cursor-pointer ${item.removed ? 'border-orders-primary-ring bg-orders-primary-soft text-orders-primary' : 'border-orders-border-strong text-orders-text-muted hover:bg-orders-danger-soft hover:text-orders-danger'}`}><Icon name={item.removed ? 'refresh' : 'close'} className="h-3.5 w-3.5" /></button>
-                      </div>
-                      <LocationRemarks orderId={order.id} item={item} setOrders={setOrders} />
-                      <label className="mt-2 block"><span className={label}>Note</span><textarea value={item.printNote} rows={2} disabled={item.removed} onChange={(e) => patchItem(setOrders, order.id, item.id, { printNote: e.target.value })} className={`${field} resize-none`} /></label>
+                  <div className={`flex flex-col gap-1.5 border-b border-orders-divider py-2 last:border-b-0 ${item.removed ? 'opacity-40' : ''}`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="min-w-0"><b className="block truncate text-orders-text">{item.title || item.name}</b><span className="block truncate text-[10px] text-orders-text-subtle">{getVariantText(item) || '-'}{item.sku ? ` · ${item.sku}` : ''}</span></span>
+                      <span className="flex shrink-0 items-center gap-1.5">
+                        <span className="inline-flex h-6 items-center overflow-hidden rounded-[7px] border border-orders-border-strong bg-orders-surface">
+                          <button type="button" aria-label="Decrease quantity" disabled={item.removed || item.printQuantity <= 1} onClick={() => patchItem(setOrders, order.id, item.id, { printQuantity: Math.max(1, item.printQuantity - 1) })} className="h-full w-[22px] text-[13px] font-bold text-orders-text-muted hover:bg-orders-divider disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer">−</button>
+                          <input type="number" min={1} max={getRemainingToPack(item)} value={item.printQuantity} disabled={item.removed} aria-label="Quantity on the slip" onChange={(e) => patchItem(setOrders, order.id, item.id, { printQuantity: clampNumber(e.target.value, getRemainingToPack(item), 1) })} className="h-[22px] w-9 border-x border-orders-border bg-transparent text-center text-[11.5px] font-bold tabular-nums outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none" />
+                          <button type="button" aria-label="Increase quantity" disabled={item.removed || item.printQuantity >= getRemainingToPack(item)} onClick={() => patchItem(setOrders, order.id, item.id, { printQuantity: Math.min(getRemainingToPack(item), item.printQuantity + 1) })} className="h-full w-[22px] text-[13px] font-bold text-orders-text-muted hover:bg-orders-divider disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer">+</button>
+                        </span>
+                        <button type="button" onClick={() => patchItem(setOrders, order.id, item.id, { removed: !item.removed })} className={`${dlgBtn.xs} ${item.removed ? 'border-orders-primary-ring bg-orders-primary-soft text-orders-primary-ink' : 'border-orders-border-strong bg-orders-surface text-orders-text-body hover:bg-orders-surface-muted'}`}>{item.removed ? 'Restore' : 'Remove'}</button>
+                      </span>
                     </div>
+                    <LocationRemarks orderId={order.id} item={item} setOrders={setOrders} />
+                    <input value={item.printNote} disabled={item.removed} onChange={(e) => patchItem(setOrders, order.id, item.id, { printNote: e.target.value })} placeholder="Note printed under this line (optional)" aria-label="Note" className={`${field} h-6`} />
                   </div>
                 </Fragment>
               ))}
@@ -81,6 +82,6 @@ export default function PrintSlipModal({ orders, setOrders, onClose, onPrint }: 
           </section>
         ))}
       </div>
-    </ModalShell>
+    </DialogShell>
   );
 }
