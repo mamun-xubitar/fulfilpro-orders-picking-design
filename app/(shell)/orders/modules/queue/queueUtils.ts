@@ -69,17 +69,15 @@ export function getRowTone(order: OrderRow, caps: OrderCapabilities) {
 
 /** Grid columns of the queue table; the same template is used by the header and every row. */
 export function getGridColumns(caps: OrderCapabilities) {
-  const cols = ['28px', '92px'];
-  if (caps.store) cols.push('64px');
-  cols.push('minmax(120px,1fr)');
-  if (caps.admin) cols.push('58px');
-  cols.push('96px');
-  cols.push(`${(caps.slip ? 1 : 0) * 34 + 34 + (caps.fulfilment ? 68 : 0) + 8}px`);
-  if (caps.fulfilment) cols.push('150px');
-  cols.push('96px');
-  if (caps.decoration || caps.packedDate) cols.push('88px');
-  cols.push('52px');
-  cols.push(caps.admin ? '196px' : caps.pack && !caps.fulfilment ? '124px' : '168px');
+  const cols = ['24px', '84px', '58px', 'minmax(104px,1fr)'];
+  if (caps.admin) cols.push('50px');
+  cols.push('88px');
+  cols.push(`${(caps.slip ? 1 : 0) * 34 + 34 + (caps.fulfilment ? 68 : 0)}px`);
+  if (caps.fulfilment) cols.push('132px');
+  cols.push('88px');
+  if (caps.decoration || caps.packedDate) cols.push(caps.packedDate ? '84px' : '92px');
+  cols.push('44px');
+  cols.push(caps.admin ? '190px' : caps.pack && !caps.fulfilment ? '112px' : '150px');
   return cols.join(' ');
 }
 
@@ -91,3 +89,14 @@ export function getItemShortfall(order: OrderRow, item: OrderItem) {
 }
 
 export const countShortLines = (order: OrderRow) => order.items.filter((item) => getItemShortfall(order, item) > 0).length;
+
+const STORE_HUES = ['#4f46e5', '#0891b2', '#c026d3', '#475569', '#0d9488', '#b45309'];
+
+/** Short store code for the chip ("Harbour FC Shop" -> "HFS") and a stable dot colour per store. */
+export function getStoreChip(name: string) {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  const code = (words.length > 1 ? words.map((w) => w[0]).join('') : name.trim()).replace(/[^a-z0-9]/gi, '').slice(0, 3).toUpperCase() || '?';
+  let hash = 0;
+  for (const ch of name) hash = (hash * 31 + ch.charCodeAt(0)) % 997;
+  return { code, hue: STORE_HUES[hash % STORE_HUES.length] };
+}

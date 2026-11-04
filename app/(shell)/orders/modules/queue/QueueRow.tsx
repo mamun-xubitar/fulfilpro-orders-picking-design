@@ -3,7 +3,8 @@
 import type { OrderRow } from '../types';
 import type { OrdersPageBundle } from '../ordersPageContext';
 import { formatFulfillmentDate, formatStockStatus, getDecorationStatusBadges, getFulfillmentInfo, isOrderFullyFulfilled } from '../utils';
-import { countShortLines, getGridColumns, getRowTone, getThumbnailUrl } from './queueUtils';
+import { countShortLines, getGridColumns, getRowTone, getStoreChip, getThumbnailUrl } from './queueUtils';
+import Badge from './Badge';
 import StageTrack from './StageTrack';
 import RowActions, { IconButton } from './RowActions';
 
@@ -63,14 +64,29 @@ function PackedCell({ order }: { order: OrderRow }) {
   );
 }
 
+function StoreChip({ name }: { name: string }) {
+  const { code, hue } = getStoreChip(name);
+  return (
+    <span title={name} className="inline-flex h-4 w-fit items-center gap-1 rounded-[5px] border border-orders-border bg-orders-surface-muted px-1.5 text-[9.5px] font-bold text-orders-text-muted">
+      <i className="h-1.5 w-1.5 rounded-full" style={{ background: hue }} />{code}
+    </span>
+  );
+}
+
 function DecoCell({ order, p }: { order: OrderRow; p: OrdersPageBundle }) {
   if (p.caps.packedDate) {
     const last = (order.packingConfirmations ?? []).find((c) => !c.canceledAt);
     return <span className="text-[10.5px] text-orders-text-muted tabular-nums">{last ? dateTime(last.confirmedAt) : '-'}</span>;
   }
   const badges = getDecorationStatusBadges(order);
-  if (badges.length === 0) return <span className="text-orders-border-strong">-</span>;
-  return <span className="flex flex-col items-start gap-0.5">{badges.map((b) => <span key={b.label} className={`rounded-full px-1.5 text-[10px] font-bold ${b.label.includes('Emb') ? 'bg-orders-emb-soft text-orders-emb' : 'bg-orders-prt-soft text-orders-prt'}`}>{b.label}</span>)}</span>;
+  const short = p.caps.stock && !isOrderFullyFulfilled(order) ? countShortLines(order) : 0;
+  if (badges.length === 0 && short === 0) return <span className="text-orders-border-strong">-</span>;
+  return (
+    <span className="flex flex-wrap items-center gap-0.5">
+      {short > 0 && <Badge tone="warn" title="Lines not covered by available hub stock">Short {short}</Badge>}
+      {badges.map((b) => <Badge key={b.label} tone={b.label.includes('Emb') ? 'emb' : 'prt'}>{b.label}</Badge>)}
+    </span>
+  );
 }
 
 export default function QueueRow({ p, order, isExpanded }: { p: OrdersPageBundle; order: OrderRow; isExpanded: boolean }) {
@@ -81,7 +97,7 @@ export default function QueueRow({ p, order, isExpanded }: { p: OrdersPageBundle
     <div
       role="row"
       onClick={() => p.toggleExpanded(order.id)}
-      className={`grid cursor-pointer items-center gap-x-2 border-b border-orders-border px-2 py-1.5 text-[11.5px] transition-colors ${isExpanded ? 'border-l-4 border-l-orders-primary' : 'border-l-4 border-l-transparent'} ${getRowTone(order, caps)}`}
+      className={`grid cursor-pointer items-center gap-x-1.5 border-b border-orders-border px-2.5 py-1.5 text-[11.5px] transition-colors ${isExpanded ? 'relative z-[1] ring-[1.5px] ring-inset ring-orders-primary' : ''} ${p.selectedLabelIds.has(order.id) && getRowTone(order, caps).includes('bg-orders-surface ') ? 'bg-orders-primary-soft' : getRowTone(order, caps)}`}
       style={{ gridTemplateColumns: getGridColumns(caps) }}
     >
       <span onClick={(e) => e.stopPropagation()}>
@@ -91,16 +107,15 @@ export default function QueueRow({ p, order, isExpanded }: { p: OrdersPageBundle
         <b className={`font-mono text-[12px] ${order.labelPrintedAt && caps.labels ? 'text-orders-success-ink' : 'text-orders-text'}`}>#{order.number}</b>
         <span className="text-[10px] text-orders-text-subtle">{order.orderedAt ? dateTime(order.orderedAt) : ''}</span>
       </span>
-      {caps.store && <span className="truncate rounded bg-orders-canvas px-1.5 py-0.5 text-[10px] font-semibold text-orders-text-body" title={order.storeName}>{order.storeName}</span>}
+      <StoreChip name={order.storeName} />
       <span className="flex min-w-0 flex-col leading-tight">
         <b className="truncate text-[12px] font-semibold text-orders-text">{order.customer}</b>
         <span className="flex flex-wrap items-center gap-1">
-          {(order.canceled || status === 'canceled') && <span className="rounded-full bg-orders-danger-soft px-1.5 text-[9.5px] font-bold text-orders-danger-ink">Canceled</span>}
-          {order.closed && !order.canceled && !fulfilled && <span className="rounded-full bg-orders-canvas px-1.5 text-[9.5px] font-bold text-orders-text-muted">Closed</span>}
-          {caps.requestStock && order.backInStockStatus && !fulfilled && <span className="rounded-full bg-orders-warning-soft px-1.5 text-[9.5px] font-bold text-orders-warning-ink">{formatStockStatus(order.backInStockStatus)}</span>}
-          {caps.stock && !fulfilled && countShortLines(order) > 0 && <span className="rounded-full bg-orders-warning-soft px-1.5 text-[9.5px] font-bold text-orders-warning-ink" title="Lines not covered by available hub stock">Short {countShortLines(order)}</span>}
-          {caps.labels && order.labelPrintedAt && <span className="rounded-full bg-orders-emb-soft px-1.5 text-[9.5px] font-bold text-orders-emb">Label printed</span>}
-          {caps.slip && order.slipPrinted && order.packingStatus !== 'packed' && <span className="rounded-full bg-orders-success-soft px-1.5 text-[9.5px] font-bold text-orders-success-ink">Slip printed</span>}
+          {(order.canceled || status === 'canceled') && <Badge tone="bad">Canceled</Badge>}
+          {order.closed && !order.canceled && !fulfilled && <Badge>Closed</Badge>}
+          {caps.requestStock && order.backInStockStatus && !fulfilled && <Badge tone="warn">{formatStockStatus(order.backInStockStatus)}</Badge>}
+          {caps.labels && order.labelPrintedAt && <Badge tone="emb">Label printed</Badge>}
+          {caps.slip && order.slipPrinted && order.packingStatus !== 'packed' && <Badge tone="ok">Slip printed</Badge>}
         </span>
       </span>
       {caps.admin && <span onClick={(e) => e.stopPropagation()}><StockAdjButton p={p} order={order} /></span>}

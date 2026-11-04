@@ -14,11 +14,6 @@ export default function CustomerCard({ order }: { order: OrderRow }) {
           <dt className="text-[9.5px] font-bold uppercase text-orders-text-subtle">Customer</dt><dd className="font-semibold text-orders-text">{order.customer}</dd>
           {address.length > 0 && (<><dt className="text-[9.5px] font-bold uppercase text-orders-text-subtle">Ship to</dt><dd className="text-orders-text-body">{address.map((l) => <span key={l} className="block">{l}</span>)}</dd></>)}
         </dl>
-        {order.note && (
-          <div className="allow-copy rounded-lg border border-orders-warning-border bg-orders-warning-soft px-2 py-1.5 text-orders-warning-ink">
-            <b>Customer note</b><p className="mt-0.5 whitespace-pre-wrap break-words">{order.note}</p>
-          </div>
-        )}
         {order.shippingLines?.length > 0 && (
           <div className="flex flex-col gap-1 rounded-lg border border-orders-primary-ring bg-orders-primary-soft p-2">
             <span className="text-[9.5px] font-bold uppercase text-orders-text-subtle">Shipping</span>

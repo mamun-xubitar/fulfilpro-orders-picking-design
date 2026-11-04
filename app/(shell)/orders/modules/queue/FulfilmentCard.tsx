@@ -3,7 +3,9 @@
 import type { OrderRow } from '../types';
 import type { OrdersPageBundle } from '../ordersPageContext';
 import { getFulfillmentInfo, isOrderFullyFulfilled, isOrderFulfillmentLocked, formatFulfillmentDate } from '../utils';
+import FulfillmentConfActions from '../FulfillmentConfActions';
 import { CardShell } from './ItemsCard';
+import Badge from './Badge';
 import { Icon } from './icons';
 
 const base = 'flex h-7 flex-1 items-center justify-center gap-1 rounded-lg border px-2 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed cursor-pointer';
@@ -49,11 +51,11 @@ export default function FulfilmentCard({ p, order }: { p: OrdersPageBundle; orde
           <div className="flex items-start gap-1.5 rounded-lg border border-orders-border bg-orders-canvas p-2 text-[10.5px] text-orders-text-muted"><Icon name="lock" className="mt-0.5 h-3 w-3" /><span><b className="text-orders-text">Fulfilment locked</b><br />{order.canceled ? 'Canceled' : 'Closed'} orders cannot be fulfilled.</span></div>
         )}
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className={`rounded-full px-2 py-0.5 text-[10.5px] font-bold ${fulfilled ? 'bg-orders-success-soft text-orders-success-ink' : order.fulfillmentItems.confirmations.length > 0 ? 'bg-orders-warning-soft text-orders-warning-ink' : ready ? 'bg-orders-primary-soft text-orders-primary-ink' : 'bg-orders-warning-soft text-orders-warning-ink'}`}>
+          <Badge tone={fulfilled ? 'ok' : order.fulfillmentItems.confirmations.length > 0 ? 'warn' : ready ? 'info' : 'warn'}>
             {fulfilled ? 'Fulfilled' : order.fulfillmentItems.confirmations.length > 0 ? 'Partially fulfilled' : ready ? 'Ready to fulfil' : 'Not fully packed'}
-          </span>
-          {order.fulfillmentItems.confirmations.length > 1 && <span className="rounded-full bg-orders-canvas px-2 py-0.5 text-[10.5px] font-semibold text-orders-text-muted">{order.fulfillmentItems.confirmations.length} parcels</span>}
-          {tracking?.status && <span className={`rounded-full px-2 py-0.5 text-[10.5px] font-semibold ${tracking.status === 'Delivered' ? 'bg-orders-success-soft text-orders-success-ink' : 'bg-orders-info-soft text-orders-info'}`}>{tracking.status}</span>}
+          </Badge>
+          {order.fulfillmentItems.confirmations.length > 1 && <Badge>{order.fulfillmentItems.confirmations.length} parcels</Badge>}
+          {tracking?.status && <Badge tone={tracking.status === 'Delivered' ? 'ok' : 'info'}>{tracking.status}</Badge>}
         </div>
         {info && (
           <dl className="grid grid-cols-[58px_1fr] gap-x-2 gap-y-0.5 text-[11px]">
@@ -61,6 +63,10 @@ export default function FulfilmentCard({ p, order }: { p: OrdersPageBundle; orde
             {info.trackingNumber && (<><dt className="text-[9.5px] font-bold uppercase text-orders-text-subtle">Tracking</dt><dd className="font-mono text-orders-text">{info.trackingUrl ? <a href={info.trackingUrl} target="_blank" rel="noopener noreferrer" className="text-orders-primary hover:underline">{info.trackingNumber}</a> : info.trackingNumber}</dd></>)}
           </dl>
         )}
+        {last && !locked && (p.caps.admin || p.userIsStaff) && (
+          <FulfillmentConfActions p={p} order={order} conf={last} confId={last.id ?? String(order.fulfillmentItems.confirmations.length - 1)} />
+        )}
+        <span className="text-[9.5px] font-bold uppercase tracking-wide text-orders-text-subtle">Actions</span>
         <ActionButtons p={p} order={order} />
       </div>
     </CardShell>

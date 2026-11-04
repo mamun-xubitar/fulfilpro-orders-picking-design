@@ -22,10 +22,10 @@ function Header({ p }: { p: OrdersPageBundle }) {
   const { caps } = p;
   const some = p.selectedLabelIds.size > 0;
   return (
-    <div role="row" className="sticky top-0 z-10 grid items-center gap-x-2 border-b border-orders-border bg-orders-surface-muted px-2 py-1.5 pl-3 text-[9.5px] font-bold tracking-wide text-orders-text-subtle" style={{ gridTemplateColumns: getGridColumns(caps) }}>
+    <div role="row" className="sticky top-0 z-10 grid items-center gap-x-1.5 border-b border-orders-border bg-orders-surface-muted px-2.5 py-1.5 text-[9.5px] font-bold tracking-wide text-orders-text-subtle" style={{ gridTemplateColumns: getGridColumns(caps) }}>
       <input type="checkbox" checked={p.allLabelsOnPageSelected} ref={(el) => { if (el) el.indeterminate = some && !p.allLabelsOnPageSelected; }} onChange={p.toggleSelectAllLabelsOnPage} disabled={p.loading || p.orders.length === 0} aria-label="Select all orders on this page" className="h-3.5 w-3.5 rounded border-orders-border-strong text-orders-primary cursor-pointer" />
       <SortHead p={p} label="Order" sortKey="number" />
-      {caps.store && <span>STORE</span>}
+      <span>STORE</span>
       <SortHead p={p} label="Customer" sortKey="customer" />
       {caps.admin && <span title="Stock adjustment">STOCK ADJ.</span>}
       <span>ITEMS</span>

@@ -10,6 +10,7 @@ import { getItemColour, getOtherOptions, getShopifyAdminUrl, getSwatchColour, ge
 import { getLineColumns, lineGridTemplate } from './lineColumns';
 import { AvailCell, PoCell } from './StockCells';
 import { Icon } from './icons';
+import Badge from './Badge';
 
 type Props = { p: OrdersPageBundle; order: OrderRow; item: OrderItem; index: number; restockItems: OrderStockAdjustmentItem[]; cols: ReturnType<typeof getLineColumns> };
 
@@ -34,7 +35,6 @@ function ProductCell({ p, order, item }: { p: OrdersPageBundle; order: OrderRow;
         <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 text-[10px] text-orders-text-muted">
           {colour && <span className="inline-flex items-center gap-1"><i className="h-2.5 w-2.5 rounded-full border border-black/15" style={{ background: getSwatchColour(colour) }} />{colour}</span>}
           {getOtherOptions(item) && <span>· {getOtherOptions(item)}</span>}
-          {item.sku && <span className="font-mono text-orders-text-subtle">· {item.sku}</span>}
         </span>
         {nameAttr && (
           <label className="mt-0.5 inline-flex items-center gap-1 text-[10px] text-orders-primary-ink cursor-pointer">
@@ -73,11 +73,11 @@ function DecoCell({ p, order, item }: { p: OrdersPageBundle; order: OrderRow; it
   const make = (key: 'isEmbroidery' | 'isPrint', on: boolean | undefined, label: string, onCls: string) => {
     const text = on ? `${done}/${item.qty} ${label}` : label;
     if (p.caps.admin) {
-      return <button type="button" title={`Toggle ${label === 'Emb' ? 'embroidery' : 'print'}`} onClick={() => p.toggleLineItemDecoration(order, item, key)} className={`rounded-full px-1.5 text-[9.5px] font-bold cursor-pointer ${on ? onCls : 'bg-orders-canvas text-orders-text-subtle hover:bg-orders-border'}`}>{text}</button>;
+      return <button type="button" title={`Toggle ${label === 'Emb' ? 'embroidery' : 'print'}`} onClick={() => p.toggleLineItemDecoration(order, item, key)} className={`h-4 rounded-full border px-1.5 text-[9.5px] font-bold cursor-pointer ${on ? onCls : 'border-orders-border bg-orders-canvas text-orders-text-subtle hover:bg-orders-border'}`}>{text}</button>;
     }
-    return on ? <span className={`rounded-full px-1.5 text-[9.5px] font-bold ${onCls}`}>{text}</span> : null;
+    return on ? <Badge tone={key === 'isEmbroidery' ? 'emb' : 'prt'}>{text}</Badge> : null;
   };
-  return <span className="flex flex-col items-start gap-0.5">{make('isEmbroidery', item.isEmbroidery, 'Emb', 'bg-orders-emb-soft text-orders-emb')}{make('isPrint', item.isPrint, 'Print', 'bg-orders-prt-soft text-orders-prt')}</span>;
+  return <span className="flex flex-col items-start gap-0.5">{make('isEmbroidery', item.isEmbroidery, 'Emb', 'border-orders-emb-border bg-orders-emb-soft text-orders-emb')}{make('isPrint', item.isPrint, 'Print', 'border-orders-prt-border bg-orders-prt-soft text-orders-prt')}</span>;
 }
 
 export default function ItemLine({ p, order, item, index, restockItems, cols }: Props) {
@@ -95,6 +95,7 @@ export default function ItemLine({ p, order, item, index, restockItems, cols }: 
   const work = item.decoration;
   const cell: Record<string, React.ReactNode> = {
     item: <ProductCell p={p} order={order} item={item} />,
+    sku: <span className="truncate font-mono text-[10px] text-orders-text-muted" title={item.sku || undefined}>{item.sku || '-'}</span>,
     deco: <DecoCell p={p} order={order} item={item} />,
     qty: <b className="tabular-nums">{item.qty}</b>,
     packed: <b className={`tabular-nums ${done ? 'text-orders-success-ink' : packed > 0 ? 'text-orders-warning-ink' : 'text-orders-text-subtle'}`}>{packed}/{item.qty}</b>,
@@ -106,13 +107,19 @@ export default function ItemLine({ p, order, item, index, restockItems, cols }: 
       ? <button type="button" disabled={!caps.admin} title="View decoration work" onClick={() => p.openWorkDetails(order, item)} className={`rounded-full px-1.5 text-[9.5px] font-bold ${work?.fullyDone ? 'bg-orders-success-soft text-orders-success-ink' : (work?.doneQty ?? 0) > 0 ? 'bg-orders-warning-soft text-orders-warning-ink' : 'bg-orders-canvas text-orders-text-muted'} ${caps.admin ? 'cursor-pointer' : 'cursor-default'}`}>{work?.doneQty ?? 0}/{item.qty}</button>
       : <span className="text-orders-border-strong">-</span>,
     full: <input type="checkbox" checked={isFull} disabled={selectable === 0} title={selectable === 0 ? 'Nothing left to select' : 'Select the whole remaining quantity'} onChange={() => p.toggleFull(order.id, index, selectable)} className="h-3.5 w-3.5 rounded border-orders-border-strong text-orders-primary disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer" />,
-    partial: <input type="number" min={0} max={selectable} value={partial} disabled={isFull || selectable === 0} aria-label={`Partial quantity for ${item.name}`} onChange={(e) => p.validPartial(order.id, index, selectable, e.target.value)} className="h-6 w-14 rounded border border-orders-primary-ring bg-orders-surface px-1 text-center text-[11px] disabled:cursor-not-allowed disabled:bg-orders-canvas disabled:text-orders-text-subtle" />,
+    partial: (
+      <span className={`inline-flex h-6 items-center overflow-hidden rounded-[7px] border border-orders-border-strong bg-orders-surface ${isFull || selectable === 0 ? 'opacity-50' : ''}`}>
+        <button type="button" aria-label={`Decrease partial quantity for ${item.name}`} disabled={isFull || selectable === 0 || partial <= 0} onClick={() => p.validPartial(order.id, index, selectable, String(partial - 1))} className="h-full w-5 text-[13px] font-bold text-orders-text-muted hover:bg-orders-divider disabled:cursor-not-allowed cursor-pointer">−</button>
+        <input type="number" min={0} max={selectable} value={partial} disabled={isFull || selectable === 0} aria-label={`Partial quantity for ${item.name}`} onChange={(e) => p.validPartial(order.id, index, selectable, e.target.value)} className="h-full w-7 border-x border-orders-border bg-transparent text-center text-[11px] font-bold tabular-nums outline-none [appearance:textfield] disabled:cursor-not-allowed [&::-webkit-inner-spin-button]:appearance-none" />
+        <button type="button" aria-label={`Increase partial quantity for ${item.name}`} disabled={isFull || selectable === 0 || partial >= selectable} onClick={() => p.validPartial(order.id, index, selectable, String(partial + 1))} className="h-full w-5 text-[13px] font-bold text-orders-text-muted hover:bg-orders-divider disabled:cursor-not-allowed cursor-pointer">+</button>
+      </span>
+    ),
     actions: caps.admin ? <OrderItemActions p={p} order={order} item={item} /> : null,
   };
   return (
     <div role="row" className={`grid items-center gap-x-2 border-b border-orders-divider px-2 py-1.5 text-[11px] ${done ? 'bg-orders-tone-packed' : packed > 0 ? 'bg-orders-warning-soft' : ''}`} style={{ gridTemplateColumns: lineGridTemplate(cols) }}>
-      {cols.map((c) => <span key={c.key} className={c.key === 'item' ? 'min-w-0' : 'flex justify-center'}>{cell[c.key]}</span>)}
-      {restock && <span className="col-span-full -mt-0.5 ml-10"><span className={`rounded-full px-1.5 text-[9.5px] font-bold ${restock.managed ? 'bg-orders-success-soft text-orders-success-ink' : 'bg-orders-warning-soft text-orders-warning-ink'}`}>Restock {restock.managed ? restock.quantity : 0}/{restock.quantity}</span></span>}
+      {cols.map((c) => <span key={c.key} className={c.key === 'item' || c.key === 'sku' ? 'min-w-0' : 'flex justify-center'}>{cell[c.key]}</span>)}
+      {restock && <span className="col-span-full -mt-0.5 ml-10"><Badge tone={restock.managed ? 'ok' : 'warn'}>Restock {restock.managed ? restock.quantity : 0}/{restock.quantity}</Badge></span>}
     </div>
   );
 }

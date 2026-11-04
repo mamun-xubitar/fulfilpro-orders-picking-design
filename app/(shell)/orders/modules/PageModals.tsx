@@ -14,6 +14,7 @@ import MessagesModal from '@/components/MessagesModal';
 import { formatStockStatus, getAvailableStockItemsForRow, getBackInStockEligibleItems, hasStockItemAvailableToAdd } from './utils';
 import PrintSlipModal from './queue/PrintSlipModal';
 import NotifyPackedModal from './queue/NotifyPackedModal';
+import FulfilmentsModal from './queue/FulfilmentsModal';
 
 /** Every dialog the Orders page can open. Each one only mounts while its own state is set. */
 export default function PageModals({ p }: { p: OrdersPageBundle }) {
@@ -152,6 +153,7 @@ export default function PageModals({ p }: { p: OrdersPageBundle }) {
       onClose={p.closeInvoiceModal}
     />
   )}
+      {p.fulfillmentViewOrderId && <FulfilmentsModal p={p} />}
       {p.printModal && <PrintSlipModal orders={p.printModal} setOrders={p.setPrintModal} onClose={() => p.setPrintModal(null)} onPrint={() => void p.printPickingSlips()} />}
       {p.notifyModal && <NotifyPackedModal state={p.notifyModal} setState={p.setNotifyModal} recipients={p.packingRecipients} onClose={() => p.setNotifyModal(null)} onSubmit={() => void p.submitNotifyAction()} />}
       {p.pickerMessages.messageModal && <MessagesModal state={p.pickerMessages.messageModal} setState={p.pickerMessages.setMessageModal} onClose={p.pickerMessages.closeMessageModal} onSubmit={() => void p.pickerMessages.submitMessage()} />}

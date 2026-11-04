@@ -3,6 +3,7 @@
 import type { OrdersPageBundle } from '../ordersPageContext';
 import type { OrderQueueKey } from '../hooks/useOrdersFilters';
 import { Icon } from './icons';
+import NamesMenu from './NamesMenu';
 
 type Tab = { key: OrderQueueKey; label: string };
 
@@ -26,11 +27,11 @@ export default function QueueTabs({ p }: { p: OrdersPageBundle }) {
   const sortValue = SORTS.findIndex((s) => s.sort === p.sort && (s.sort === null || s.dir === p.dir));
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <div role="tablist" aria-label="Order queues" className="flex flex-wrap items-center gap-0.5 rounded-xl border border-orders-border bg-orders-surface p-0.5 shadow-orders">
+      <div role="tablist" aria-label="Order queues" className="flex flex-wrap items-center gap-0.5 rounded-[10px] border border-orders-border bg-orders-divider p-0.5">
         {tabs.map((t) => {
           const on = p.queue === t.key;
           return (
-            <button key={t.key} type="button" role="tab" aria-selected={on} onClick={() => p.setQueue(t.key)} className={`flex h-7 items-center gap-1.5 rounded-lg px-2.5 text-[11px] font-semibold cursor-pointer ${on ? 'bg-orders-primary-soft text-orders-primary-ink' : 'text-orders-text-muted hover:bg-orders-surface-muted'}`}>
+            <button key={t.key} type="button" role="tab" aria-selected={on} onClick={() => p.setQueue(t.key)} className={`flex h-[26px] items-center gap-1.5 rounded-lg px-2.5 text-[11.5px] font-bold cursor-pointer ${on ? 'bg-orders-surface text-orders-text shadow-orders' : 'text-orders-text-muted hover:text-orders-text'}`}>
               {t.label}
               <span className={`rounded-full px-1.5 text-[10px] font-bold tabular-nums ${on ? 'bg-orders-primary text-white' : 'bg-orders-canvas text-orders-text-muted'}`}>{p.queueCounts[t.key]}</span>
             </button>
@@ -48,6 +49,7 @@ export default function QueueTabs({ p }: { p: OrdersPageBundle }) {
           {SORTS.map((s, i) => <option key={s.label} value={i}>{s.label}</option>)}
         </select>
       </label>
+      {p.caps.names && <NamesMenu p={p} />}
       {p.canCreateInvoice && (
         <button type="button" onClick={p.openNewInvoice} className="flex h-8 items-center gap-1.5 rounded-lg border border-orders-border-strong bg-orders-surface px-2.5 text-[11px] font-semibold text-orders-text-body shadow-orders hover:bg-orders-surface-muted cursor-pointer"><Icon name="plus" className="h-3.5 w-3.5" />New invoice</button>
       )}
