@@ -23,11 +23,11 @@ export default function FilterChip({ label, value, active = false, open, onToggl
         onClick={onToggle}
         aria-haspopup="menu"
         aria-expanded={open}
-        className={`flex h-8 items-center gap-1.5 whitespace-nowrap rounded-lg border px-2.5 text-[11px] shadow-orders transition-colors cursor-pointer ${active ? 'border-orders-primary-ring bg-orders-primary-soft text-orders-primary-ink' : 'border-orders-border-strong bg-orders-surface text-orders-text-muted hover:bg-orders-surface-muted'}`}
+        className={`inline-flex h-7 items-center gap-[5px] whitespace-nowrap rounded-lg border pl-2 pr-[7px] text-[11px] cursor-pointer ${active ? 'border-orders-primary-ring bg-orders-primary-soft' : 'border-orders-border-strong bg-orders-surface text-orders-text-body hover:bg-orders-surface-muted'}`}
       >
-        <span className="text-orders-text-subtle">{label}</span>
-        <b className="font-semibold text-orders-text">{value}</b>
-        <Icon name="chevronDown" className="h-3 w-3 text-orders-text-subtle" />
+        {label && <span className="font-normal text-orders-text-muted">{label}</span>}
+        <b className={`font-bold ${active ? 'text-orders-primary-ink' : 'text-orders-text'}`}>{value}</b>
+        <Icon name="chevronDown" className="h-[11px] w-[11px] text-[#9ca3af]" />
       </button>
       {open && (
         <div role="menu" className={`absolute top-full z-30 mt-1 min-w-44 rounded-xl border border-orders-border bg-orders-surface py-1 shadow-orders-md ${align === 'right' ? 'right-0' : 'left-0'}`}>

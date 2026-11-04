@@ -626,7 +626,7 @@ export default function ShellLayout({ children }: { children: React.ReactNode })
       {/* Main content */}
       <div
         id="main-content"
-        className={`flex flex-col min-h-screen ${activeId === "inventory" ? "xl:h-screen" : ""}`}
+        className={`flex flex-col min-h-screen ${activeId === "inventory" || activeId === "orders" ? "xl:h-screen" : ""}`}
         style={{ marginLeft: sidebarWidth }}
       >
         {/* Header */}

@@ -1,9 +1,10 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
 import type { OrdersPageBundle } from '../ordersPageContext';
 import type { OrderQueueKey } from '../hooks/useOrdersFilters';
 import { Icon } from './icons';
-import NamesMenu from './NamesMenu';
+import { MenuOption } from './FilterChip';
 
 type Tab = { key: OrderQueueKey; label: string };
 
@@ -22,38 +23,54 @@ const SORTS: ReadonlyArray<{ label: string; sort: 'number' | 'customer' | 'order
   { label: 'Customer A–Z', sort: 'customer', dir: 'asc' },
 ];
 
+const GHOST = 'inline-flex h-7 items-center justify-center gap-1 whitespace-nowrap rounded-lg border border-orders-border-strong bg-orders-surface px-[9px] text-[11px] font-bold text-orders-text-body hover:bg-orders-surface-muted cursor-pointer';
+
+/** "Sort  Newest first ▾" as a chip menu. */
+function SortChip({ p }: { p: OrdersPageBundle }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [open]);
+  const current = Math.max(0, SORTS.findIndex((s) => s.sort === p.sort && (s.sort === null || s.dir === p.dir)));
+  return (
+    <div ref={ref} className="relative">
+      <button type="button" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((v) => !v)} className="inline-flex h-7 items-center gap-[5px] whitespace-nowrap rounded-lg border border-orders-border-strong bg-orders-surface pl-2 pr-[7px] text-[11px] hover:bg-orders-surface-muted cursor-pointer">
+        <b className="font-bold text-orders-text">{SORTS[current].label}</b><Icon name="chevronDown" className="h-[11px] w-[11px] text-[#9ca3af]" />
+      </button>
+      {open && (
+        <div role="menu" className="absolute right-0 top-full z-30 mt-1 min-w-40 rounded-xl border border-orders-border bg-orders-surface py-1 shadow-orders-md">
+          {SORTS.map((s, i) => <MenuOption key={s.label} selected={i === current} onClick={() => { p.setSortBy(s.sort, s.dir); setOpen(false); }}>{s.label}</MenuOption>)}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function QueueTabs({ p }: { p: OrdersPageBundle }) {
   const tabs = tabsFor(p.caps.role);
-  const sortValue = SORTS.findIndex((s) => s.sort === p.sort && (s.sort === null || s.dir === p.dir));
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <div role="tablist" aria-label="Order queues" className="flex flex-wrap items-center gap-0.5 rounded-[10px] border border-orders-border bg-orders-divider p-0.5">
+    <div className="flex items-center justify-between gap-2">
+      <div role="tablist" aria-label="Order queues" className="flex flex-none gap-0.5 rounded-[10px] border border-orders-border bg-orders-divider p-0.5">
         {tabs.map((t) => {
           const on = p.queue === t.key;
           return (
-            <button key={t.key} type="button" role="tab" aria-selected={on} onClick={() => p.setQueue(t.key)} className={`flex h-[26px] items-center gap-1.5 rounded-lg px-2.5 text-[11.5px] font-bold cursor-pointer ${on ? 'bg-orders-surface text-orders-text shadow-orders' : 'text-orders-text-muted hover:text-orders-text'}`}>
+            <button key={t.key} type="button" role="tab" aria-selected={on} onClick={() => p.setQueue(t.key)} className={`flex h-[26px] items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 text-[11.5px] font-bold cursor-pointer ${on ? 'bg-orders-surface text-orders-text shadow-orders' : 'text-orders-text-muted hover:text-orders-text'}`}>
               {t.label}
-              <span className={`rounded-full px-1.5 text-[10px] font-bold tabular-nums ${on ? 'bg-orders-primary text-white' : 'bg-orders-canvas text-orders-text-muted'}`}>{p.queueCounts[t.key]}</span>
+              <span className={`min-w-[18px] rounded-full px-[5px] py-px text-center text-[10px] tabular-nums ${on ? 'bg-orders-primary text-white' : 'bg-orders-border text-orders-text-body'}`}>{p.queueCounts[t.key]}</span>
             </button>
           );
         })}
       </div>
-      <span className="flex-1" />
-      <label className="flex items-center gap-1.5 text-[11px] text-orders-text-subtle">
-        Sort
-        <select
-          value={sortValue < 0 ? 0 : sortValue}
-          onChange={(e) => { const next = SORTS[Number(e.target.value)]; p.setSortBy(next.sort, next.dir); }}
-          className="h-8 rounded-lg border border-orders-border-strong bg-orders-surface px-2 text-[11px] font-semibold text-orders-text outline-none focus:border-orders-primary"
-        >
-          {SORTS.map((s, i) => <option key={s.label} value={i}>{s.label}</option>)}
-        </select>
-      </label>
-      {p.caps.names && <NamesMenu p={p} />}
-      {p.canCreateInvoice && (
-        <button type="button" onClick={p.openNewInvoice} className="flex h-8 items-center gap-1.5 rounded-lg border border-orders-border-strong bg-orders-surface px-2.5 text-[11px] font-semibold text-orders-text-body shadow-orders hover:bg-orders-surface-muted cursor-pointer"><Icon name="plus" className="h-3.5 w-3.5" />New invoice</button>
-      )}
-      <button type="button" onClick={p.handleToggleExpandAll} aria-pressed={p.expandAll} className="flex h-8 items-center gap-1.5 rounded-lg border border-orders-border-strong bg-orders-surface px-2.5 text-[11px] font-semibold text-orders-text-body shadow-orders hover:bg-orders-surface-muted cursor-pointer"><Icon name="expand" className="h-3.5 w-3.5" />{p.expandAll ? 'Collapse all' : 'Expand all'}</button>
+      <div className="flex items-center gap-1.5">
+        <span className="text-[10.5px] text-orders-text-subtle">Sort</span>
+        <SortChip p={p} />
+        {p.canCreateInvoice && <button type="button" onClick={p.openNewInvoice} className={GHOST}><Icon name="plus" className="h-3.5 w-3.5" />New invoice</button>}
+        <button type="button" onClick={p.handleToggleExpandAll} aria-pressed={p.expandAll} className={GHOST}><Icon name="expand" className="h-3.5 w-3.5" />{p.expandAll ? 'Collapse all' : 'Expand all'}</button>
+      </div>
     </div>
   );
 }

@@ -2,52 +2,64 @@
 
 import type { OrderRow } from '../types';
 import type { OrdersPageBundle } from '../ordersPageContext';
-import { formatFulfillmentDate, formatStockStatus, getDecorationStatusBadges, getFulfillmentInfo, isOrderFullyFulfilled } from '../utils';
-import { countShortLines, getGridColumns, getRowTone, getStoreChip, getThumbnailUrl } from './queueUtils';
+import { formatFulfillmentDate, formatStockStatus, getFulfillmentInfo, isOrderFullyFulfilled } from '../utils';
+import { countShortLines, formatPlaced, getGridColumns, getRowTone, getStoreChip, getThumbnailUrl } from './queueUtils';
 import Badge from './Badge';
+import { Icon } from './icons';
 import StageTrack from './StageTrack';
-import RowActions, { IconButton } from './RowActions';
+import RowActions from './RowActions';
 
-const dateTime = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleString(undefined, { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '');
+const MINI = 'inline-flex h-4 items-center rounded-full border px-[3px]';
 
-function Thumbs({ order }: { order: OrderRow }) {
-  const shown = order.items.slice(0, 3);
+function StoreChip({ name }: { name: string }) {
+  const { code, hue } = getStoreChip(name);
   return (
-    <span className="flex items-center gap-1.5">
-      <span className="flex -space-x-1.5">
-        {shown.map((item, i) => (
-          item.imageUrl
-            // eslint-disable-next-line @next/next/no-img-element
-            ? <img key={`${item.id}-${i}`} src={getThumbnailUrl(item.imageUrl)} alt="" loading="lazy" className="h-6 w-6 rounded border border-orders-surface bg-orders-canvas object-cover ring-1 ring-orders-border" />
-            : <span key={`${item.id}-${i}`} className="flex h-6 w-6 items-center justify-center rounded border border-orders-surface bg-orders-canvas text-[9px] font-bold text-orders-text-subtle ring-1 ring-orders-border">{item.name.slice(0, 1).toUpperCase()}</span>
-        ))}
-      </span>
-      <span className="whitespace-nowrap text-[11px] text-orders-text-muted tabular-nums">{order.itemsCount} pcs</span>
+    <span title={name} className="inline-flex h-4 w-fit items-center gap-1 whitespace-nowrap rounded-[5px] border border-orders-border bg-orders-surface-muted px-[5px] text-[9.5px] font-bold text-orders-text-muted">
+      <i className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: hue }} />{code}
     </span>
   );
 }
 
-function StockAdjButton({ p, order }: { p: OrdersPageBundle; order: OrderRow }) {
-  const sa = order.stockAdjustment;
-  if (!sa) return <span className="text-orders-border-strong">-</span>;
-  const tone = sa.status === 'managed' ? 'bg-orders-success-soft text-orders-success-ink' : sa.status === 'partial' ? 'bg-orders-warning-soft text-orders-warning-ink' : 'bg-orders-danger-soft text-orders-danger-ink';
+function Thumbs({ order }: { order: OrderRow }) {
+  const more = order.items.length - 3;
   return (
-    <button type="button" aria-label={`Manage stock adjustment for order ${order.number}`} onClick={(e) => { e.stopPropagation(); void p.openStockAdjustmentModal(order); }} className={`rounded-full px-2 py-0.5 text-[10.5px] font-bold tabular-nums cursor-pointer hover:opacity-80 ${tone}`}>
-      {sa.managedCount}/{sa.totalCount}
-    </button>
+    <span className="flex min-w-0 items-center gap-[5px] whitespace-nowrap">
+      <span className="inline-flex">
+        {order.items.slice(0, 3).map((item, i) => (
+          item.imageUrl
+            // eslint-disable-next-line @next/next/no-img-element
+            ? <img key={`${item.id}-${i}`} src={getThumbnailUrl(item.imageUrl)} alt="" loading="lazy" className={`h-[22px] w-[22px] rounded-md border-[1.5px] border-orders-surface bg-orders-canvas object-cover ring-1 ring-orders-border ${i ? '-ml-1.5' : ''}`} />
+            : <span key={`${item.id}-${i}`} className={`flex h-[22px] w-[22px] items-center justify-center rounded-md border-[1.5px] border-orders-surface bg-orders-canvas text-[9px] font-bold text-orders-text-subtle ring-1 ring-orders-border ${i ? '-ml-1.5' : ''}`}>{item.name.slice(0, 1).toUpperCase()}</span>
+        ))}
+      </span>
+      {more > 0 && <span className="text-[11.5px] tabular-nums text-orders-text-subtle">+{more}</span>}
+      <span className="text-[10.5px] tabular-nums text-orders-text-subtle">{order.itemsCount} pcs</span>
+    </span>
+  );
+}
+
+function StockAdjCell({ p, order }: { p: OrdersPageBundle; order: OrderRow }) {
+  const sa = order.stockAdjustment;
+  if (!sa) return <span className="text-center text-orders-text-subtle">-</span>;
+  return (
+    <span className="flex justify-center">
+      <button type="button" title={`Stock adjustment: ${sa.managedCount} of ${sa.totalCount} lines managed`} aria-label={`Manage stock adjustment for order ${order.number}`} onClick={(e) => { e.stopPropagation(); void p.openStockAdjustmentModal(order); }} className="cursor-pointer">
+        <Badge tone={sa.status === 'managed' ? 'ok' : sa.status === 'partial' ? 'warn' : 'bad'}>{sa.managedCount}/{sa.totalCount}</Badge>
+      </button>
+    </span>
   );
 }
 
 function FulfilmentCell({ order }: { order: OrderRow }) {
   const info = getFulfillmentInfo(order);
-  if (info.length === 0) return <span className="text-orders-border-strong">-</span>;
   const first = info[0];
+  if (!first) return <span className="text-orders-text-subtle">-</span>;
   return (
-    <span className="flex min-w-0 flex-col leading-tight">
-      <span className="truncate text-[11px] font-semibold text-orders-text">{first.date ? formatFulfillmentDate(first.date) : ''}{info.length > 1 && <b className="ml-1 text-orders-primary">+{info.length - 1}</b>}</span>
-      <span className="truncate text-[10.5px] text-orders-text-muted">
+    <span className="flex min-w-0 flex-col items-start justify-center gap-px">
+      <span className="max-w-full truncate text-[10.5px] font-bold text-orders-text">{first.date ? formatFulfillmentDate(first.date) : ''}{info.length > 1 && <span className="ml-1 font-normal text-orders-text-subtle">+{info.length - 1}</span>}</span>
+      <span className="max-w-full truncate text-[10px] text-orders-text-subtle">
         {first.carrier}{first.carrier && first.trackingNumber ? ' · ' : ''}
-        {first.trackingUrl ? <a href={first.trackingUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-orders-primary hover:underline">{first.trackingNumber}</a> : first.trackingNumber}
+        {first.trackingUrl ? <a href={first.trackingUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-orders-primary hover:underline">{first.trackingNumber}</a> : <span className="text-orders-primary">{first.trackingNumber}</span>}
       </span>
     </span>
   );
@@ -55,20 +67,11 @@ function FulfilmentCell({ order }: { order: OrderRow }) {
 
 function PackedCell({ order }: { order: OrderRow }) {
   const pct = order.totalQuantity > 0 ? Math.round((order.packedQuantity / order.totalQuantity) * 100) : 0;
-  const bar = order.packingStatus === 'packed' ? 'bg-orders-success' : order.packingStatus === 'partially_packed' ? 'bg-orders-warning' : 'bg-orders-border-strong';
+  const bar = order.packedQuantity >= order.totalQuantity && order.totalQuantity > 0 ? 'bg-orders-primary' : order.packedQuantity > 0 ? 'bg-orders-warning' : 'bg-orders-primary';
   return (
     <span className="flex items-center gap-1.5">
-      <b className="text-[11.5px] tabular-nums text-orders-text">{order.packedQuantity}/{order.totalQuantity}</b>
-      <span className="h-1.5 w-12 overflow-hidden rounded-full bg-orders-canvas"><i className={`block h-full ${bar}`} style={{ width: `${pct}%` }} /></span>
-    </span>
-  );
-}
-
-function StoreChip({ name }: { name: string }) {
-  const { code, hue } = getStoreChip(name);
-  return (
-    <span title={name} className="inline-flex h-4 w-fit items-center gap-1 rounded-[5px] border border-orders-border bg-orders-surface-muted px-1.5 text-[9.5px] font-bold text-orders-text-muted">
-      <i className="h-1.5 w-1.5 rounded-full" style={{ background: hue }} />{code}
+      <b className="tabular-nums">{order.packedQuantity}/{order.totalQuantity}</b>
+      <span className="h-1 w-[38px] overflow-hidden rounded-sm bg-orders-border"><i className={`block h-full ${bar}`} style={{ width: `${pct}%` }} /></span>
     </span>
   );
 }
@@ -76,56 +79,75 @@ function StoreChip({ name }: { name: string }) {
 function DecoCell({ order, p }: { order: OrderRow; p: OrdersPageBundle }) {
   if (p.caps.packedDate) {
     const last = (order.packingConfirmations ?? []).find((c) => !c.canceledAt);
-    return <span className="text-[10.5px] text-orders-text-muted tabular-nums">{last ? dateTime(last.confirmedAt) : '-'}</span>;
+    return <span className="text-[10.5px] tabular-nums text-orders-text-subtle">{last ? new Date(last.confirmedAt).toLocaleString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false }) : '-'}</span>;
   }
-  const badges = getDecorationStatusBadges(order);
   const short = p.caps.stock && !isOrderFullyFulfilled(order) ? countShortLines(order) : 0;
-  if (badges.length === 0 && short === 0) return <span className="text-orders-border-strong">-</span>;
+  const prog = p.caps.decoration
+    ? (['isEmbroidery', 'isPrint'] as const).flatMap((key) => {
+        const lines = order.items.filter((i) => i[key]);
+        if (lines.length === 0) return [];
+        const total = lines.reduce((s, i) => s + i.qty, 0);
+        const done = lines.reduce((s, i) => s + (i.decoration?.doneQty ?? 0), 0);
+        return [{ key, label: `${done}/${total} ${key === 'isEmbroidery' ? 'EMB' : 'PRT'}`, tone: key === 'isEmbroidery' ? ('emb' as const) : ('prt' as const) }];
+      })
+    : [];
   return (
-    <span className="flex flex-wrap items-center gap-0.5">
-      {short > 0 && <Badge tone="warn" title="Lines not covered by available hub stock">Short {short}</Badge>}
-      {badges.map((b) => <Badge key={b.label} tone={b.label.includes('Emb') ? 'emb' : 'prt'}>{b.label}</Badge>)}
+    <span className="flex items-center gap-[5px]">
+      {short > 0 && <Badge tone="warn" title={`${short} line${short > 1 ? 's' : ''} not covered by available stock`}>Short {short}</Badge>}
+      {prog.map((d) => <Badge key={d.key} tone={d.tone}>{d.label}</Badge>)}
     </span>
   );
 }
 
 export default function QueueRow({ p, order, isExpanded }: { p: OrdersPageBundle; order: OrderRow; isExpanded: boolean }) {
   const { caps } = p;
-  const status = order.status.toLowerCase();
   const fulfilled = isOrderFullyFulfilled(order);
+  const canceled = order.canceled;
+  const selected = p.selectedLabelIds.has(order.id);
+  const tone = getRowTone(order, caps);
+  const plain = tone.includes('bg-orders-surface ');
+  const bg = isExpanded && plain ? 'bg-orders-surface' : selected && plain ? 'bg-orders-primary-soft' : tone;
   return (
     <div
       role="row"
       onClick={() => p.toggleExpanded(order.id)}
-      className={`grid cursor-pointer items-center gap-x-1.5 border-b border-orders-border px-2.5 py-1.5 text-[11.5px] transition-colors ${isExpanded ? 'relative z-[1] ring-[1.5px] ring-inset ring-orders-primary' : ''} ${p.selectedLabelIds.has(order.id) && getRowTone(order, caps).includes('bg-orders-surface ') ? 'bg-orders-primary-soft' : getRowTone(order, caps)}`}
+      className={`grid h-9 cursor-pointer items-center gap-x-2 border-b border-orders-divider px-2.5 text-[11.5px] ${canceled ? 'text-orders-text-subtle' : 'text-orders-text-body'} ${isExpanded ? 'relative shadow-[inset_0_0_0_1.5px_var(--orders-primary)]' : ''} ${bg}`}
       style={{ gridTemplateColumns: getGridColumns(caps) }}
     >
-      <span onClick={(e) => e.stopPropagation()}>
-        <input type="checkbox" checked={p.selectedLabelIds.has(order.id)} onChange={() => p.toggleLabelSelected(order.id)} aria-label={`Select order ${order.number}`} className="h-3.5 w-3.5 rounded border-orders-border-strong text-orders-primary cursor-pointer" />
+      <span onClick={(e) => e.stopPropagation()} className="flex">
+        <input type="checkbox" checked={selected} onChange={() => p.toggleLabelSelected(order.id)} aria-label={`Select order ${order.number}`} className="h-[13px] w-[13px] cursor-pointer rounded-[3px] border-orders-border-strong text-orders-primary" />
       </span>
-      <span className="flex flex-col leading-tight">
-        <b className={`font-mono text-[12px] ${order.labelPrintedAt && caps.labels ? 'text-orders-success-ink' : 'text-orders-text'}`}>#{order.number}</b>
-        <span className="text-[10px] text-orders-text-subtle">{order.orderedAt ? dateTime(order.orderedAt) : ''}</span>
+      <span className="flex min-w-0 flex-col items-start justify-center gap-px">
+        <span className="flex min-w-0 items-center gap-[5px] whitespace-nowrap">
+          <b className={`tabular-nums ${canceled ? 'text-orders-text-subtle line-through' : caps.labels && order.labelPrintedAt ? 'text-orders-success-ink' : 'text-orders-text'}`}>#{order.number}</b>
+          {caps.labels && order.labelPrintedAt && <span title="Shipping label printed" className={`${MINI} border-orders-success-border bg-orders-success-soft text-orders-success-ink`}><Icon name="tag" className="h-2.5 w-2.5" /></span>}
+          {caps.requestStock && order.backInStockStatus && !fulfilled && <span title={`${formatStockStatus(order.backInStockStatus)}: back-in-stock request`} className={`${MINI} ${order.backInStockStatus === 'back_in_stock' ? 'border-orders-success-border bg-orders-success-soft text-orders-success-ink' : 'border-orders-warning-border bg-orders-warning-soft text-orders-warning-ink'}`}><Icon name="cube" className="h-2.5 w-2.5" /></span>}
+          {order.closed && !canceled && <Badge title="Order closed in Shopify">Closed</Badge>}
+          {canceled && <Badge>Canceled</Badge>}
+        </span>
+        <span className="max-w-full truncate text-[10px] text-orders-text-subtle">{formatPlaced(order.orderedAt)}</span>
       </span>
       <StoreChip name={order.storeName} />
-      <span className="flex min-w-0 flex-col leading-tight">
-        <b className="truncate text-[12px] font-semibold text-orders-text">{order.customer}</b>
-        <span className="flex flex-wrap items-center gap-1">
-          {(order.canceled || status === 'canceled') && <Badge tone="bad">Canceled</Badge>}
-          {order.closed && !order.canceled && !fulfilled && <Badge>Closed</Badge>}
-          {caps.requestStock && order.backInStockStatus && !fulfilled && <Badge tone="warn">{formatStockStatus(order.backInStockStatus)}</Badge>}
-          {caps.labels && order.labelPrintedAt && <Badge tone="emb">Label printed</Badge>}
-          {caps.slip && order.slipPrinted && order.packingStatus !== 'packed' && <Badge tone="ok">Slip printed</Badge>}
-        </span>
-      </span>
-      {caps.admin && <span onClick={(e) => e.stopPropagation()}><StockAdjButton p={p} order={order} /></span>}
+      <b className="truncate text-[11.5px] font-bold text-orders-text">{order.customer}</b>
+      {caps.admin && <StockAdjCell p={p} order={order} />}
       <Thumbs order={order} />
       <StageTrack order={order} caps={caps} />
       {caps.fulfilment && <FulfilmentCell order={order} />}
       <PackedCell order={order} />
-      {(caps.decoration || caps.packedDate) && <DecoCell order={order} p={p} />}
-      <span onClick={(e) => e.stopPropagation()}><IconButton icon="note" label="Order notes" count={order.noteCount} onClick={() => void p.openNoteModal(order)} /></span>
+      <DecoCell order={order} p={p} />
+      <span className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+        <NoteButton p={p} order={order} />
+      </span>
       <span onClick={(e) => e.stopPropagation()}><RowActions p={p} order={order} isExpanded={isExpanded} /></span>
     </div>
+  );
+}
+
+function NoteButton({ p, order }: { p: OrdersPageBundle; order: OrderRow }) {
+  return (
+    <button type="button" title="Order notes" aria-label="Order notes" onClick={() => void p.openNoteModal(order)} className="relative flex h-5 w-5 items-center justify-center rounded text-orders-text-subtle hover:bg-orders-divider hover:text-orders-text cursor-pointer">
+      <Icon name="note" className="h-3.5 w-3.5" />
+      {order.noteCount > 0 && <i className="absolute -right-[3px] -top-0.5 rounded-full bg-orders-primary px-[3.5px] text-[8px] font-bold not-italic leading-3 text-white">{order.noteCount > 99 ? '99+' : order.noteCount}</i>}
+    </button>
   );
 }

@@ -107,6 +107,11 @@ export default function PageModals({ p }: { p: OrdersPageBundle }) {
       closeWorkDetails={p.closeWorkDetails}
       userIsAdmin={p.userIsAdmin}
       deleteWorkRecord={p.deleteWorkRecord}
+      onMarkDone={() => {
+        const { order, item } = p.workDetails!;
+        p.closeWorkDetails();
+        p.openWorkModal(order, item);
+      }}
     />
   )}
 

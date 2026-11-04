@@ -5,9 +5,10 @@ import type { OrdersPageBundle } from '../ordersPageContext';
 import { getFulfilledQty } from '../utils';
 import { getItemShortfall } from './queueUtils';
 import { Icon } from './icons';
+import Badge from './Badge';
 
 const PO_LABEL = { REQUESTED: 'Requested', PARTIALLY_RECEIVED: 'Part received', RECEIVED: 'Received', CANCELLED: 'Cancelled' } as const;
-const PO_TONE = { REQUESTED: 'bg-orders-info-soft text-orders-info', PARTIALLY_RECEIVED: 'bg-orders-warning-soft text-orders-warning-ink', RECEIVED: 'bg-orders-success-soft text-orders-success-ink', CANCELLED: 'bg-orders-canvas text-orders-text-muted' } as const;
+const PO_TONE = { REQUESTED: 'info', PARTIALLY_RECEIVED: 'warn', RECEIVED: 'ok', CANCELLED: 'neutral' } as const;
 
 const etaOf = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : null);
 
@@ -32,11 +33,12 @@ export function PoCell({ p, order, item }: { p: OrdersPageBundle; order: OrderRo
   const locked = order.canceled || order.closed || getFulfilledQty(order, item.id) >= item.qty;
   const po = inv?.po;
   if (po) {
-    const sub = po.status === 'RECEIVED' ? `${po.received}/${po.ordered} in` : [`${po.received}/${po.ordered} in`, etaOf(po.deliveryDate) && `ETA ${etaOf(po.deliveryDate)}`].filter(Boolean).join(' · ');
+    const eta = etaOf(po.deliveryDate);
+    const sub = po.status === 'RECEIVED' ? `${po.received}/${po.ordered} in` : po.status === 'PARTIALLY_RECEIVED' ? `${po.received}/${po.ordered} in${eta ? ` · ETA ${eta}` : ''}` : `${po.ordered} on PO${eta ? ` · ETA ${eta}` : ''}`;
     return (
       <span className="flex flex-col items-start leading-tight" title={`Purchase order #${po.number} · ${PO_LABEL[po.status]}`}>
-        <span className={`rounded-full px-1.5 text-[9.5px] font-bold ${PO_TONE[po.status]}`}>#{po.number} {PO_LABEL[po.status]}</span>
-        <span className="text-[10px] text-orders-text-muted">{sub}</span>
+        <Badge tone={PO_TONE[po.status]}>#{po.number} {PO_LABEL[po.status]}</Badge>
+        <span className="text-[10.5px] text-orders-text-subtle">{sub}</span>
       </span>
     );
   }
@@ -44,8 +46,8 @@ export function PoCell({ p, order, item }: { p: OrdersPageBundle; order: OrderRo
   if (inv && short <= 0) return <span className="text-orders-border-strong">-</span>;
   if (!p.caps.createPo) {
     return inv
-      ? <span className="rounded-full bg-orders-danger-soft px-1.5 text-[9.5px] font-bold text-orders-danger-ink">No PO</span>
-      : <span className="rounded-full bg-orders-canvas px-1.5 text-[9.5px] font-bold text-orders-text-muted" title="This product is not in the hub catalogue yet">Not in hub</span>;
+      ? <Badge tone="bad">No PO</Badge>
+      : <Badge title="This product is not in the hub catalogue yet">Not in hub</Badge>;
   }
   const remaining = Math.max(0, item.qty - getFulfilledQty(order, item.id));
   const quantity = inv ? short : remaining;

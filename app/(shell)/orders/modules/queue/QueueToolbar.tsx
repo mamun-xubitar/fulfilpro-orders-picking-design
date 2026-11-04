@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import type { OrdersPageBundle } from '../ordersPageContext';
 import { FULFILLMENT_STATUSES, PACKING_STATUSES, SEARCH_FIELDS } from '../constants';
 import { Icon } from './icons';
@@ -19,50 +20,65 @@ const summarize = (values: string[], options: ReadonlyArray<{ label: string; val
 
 function SearchBox({ p }: { p: OrdersPageBundle }) {
   const { searchDropdownRef } = p;
+  const inputRef = useRef<HTMLInputElement>(null);
+  // "/" jumps to the search box, as the hint in it says.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey || target?.closest('input, textarea, select, [contenteditable]')) return;
+      e.preventDefault();
+      inputRef.current?.focus();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
   const fields = p.caps.barcodeSearch ? [...SEARCH_FIELDS, { label: 'Barcode', value: 'barcode' }] : SEARCH_FIELDS;
   const fieldLabel = fields.find((f) => f.value === p.searchField)?.label ?? 'All fields';
+  const pick = (value: string) => { p.setSearchField(value); p.setSearchDropdownOpen(false); p.setPagination((prev) => ({ ...prev, page: 1 })); };
   return (
-    <div className="flex h-8 min-w-[260px] flex-1 items-center gap-1.5 rounded-lg border border-orders-border-strong bg-orders-surface px-2 shadow-orders focus-within:border-orders-primary focus-within:ring-2 focus-within:ring-orders-primary-ring sm:max-w-md">
-      <Icon name="search" className="h-3.5 w-3.5 text-orders-text-subtle" />
+    <div className="flex h-7 w-[360px] flex-none items-center gap-1.5 rounded-lg border border-orders-border-strong bg-orders-surface pl-2 pr-1 text-orders-text-subtle focus-within:border-orders-primary focus-within:shadow-[0_0_0_2px_var(--orders-primary-ring)]">
+      <Icon name="search" className="h-3.5 w-3.5" />
       <div className="relative" ref={searchDropdownRef}>
-        <button type="button" onClick={() => p.setSearchDropdownOpen((prev) => !prev)} aria-haspopup="menu" aria-expanded={p.searchDropdownOpen} className="flex items-center gap-1 rounded bg-orders-primary-soft px-1.5 py-0.5 text-[10.5px] font-semibold text-orders-primary-ink cursor-pointer">
+        <button type="button" onClick={() => p.setSearchDropdownOpen((prev) => !prev)} aria-haspopup="menu" aria-expanded={p.searchDropdownOpen} className="inline-flex items-center gap-[3px] whitespace-nowrap rounded-[5px] border border-orders-primary-ring bg-orders-primary-soft py-px pl-1.5 pr-[3px] text-[10px] font-bold text-orders-primary-ink cursor-pointer">
           {fieldLabel}<Icon name="chevronDown" className="h-2.5 w-2.5" />
         </button>
         {p.searchDropdownOpen && (
           <div role="menu" className="absolute left-0 top-full z-30 mt-1 min-w-40 rounded-xl border border-orders-border bg-orders-surface py-1 shadow-orders-md">
-            <MenuOption selected={p.searchField === ''} onClick={() => { p.setSearchField(''); p.setSearchDropdownOpen(false); p.setPagination((prev) => ({ ...prev, page: 1 })); }}>All fields</MenuOption>
-            {fields.map((f) => (
-              <MenuOption key={f.value} selected={p.searchField === f.value} onClick={() => { p.setSearchField(f.value); p.setSearchDropdownOpen(false); p.setPagination((prev) => ({ ...prev, page: 1 })); }}>{f.label}</MenuOption>
-            ))}
+            <MenuOption selected={p.searchField === ''} onClick={() => pick('')}>All fields</MenuOption>
+            {fields.map((f) => <MenuOption key={f.value} selected={p.searchField === f.value} onClick={() => pick(f.value)}>{f.label}</MenuOption>)}
           </div>
         )}
       </div>
       <input
+        ref={inputRef}
         value={p.searchInput}
         onChange={(e) => p.setSearchInput(e.target.value)}
-        placeholder={p.caps.barcodeSearch ? 'Scan barcode or search order, customer, product…' : 'Search order, customer, address, product…'}
+        onKeyDown={(e) => { if (e.key === 'Escape') p.setSearchInput(''); }}
+        placeholder={p.caps.role === 'picker' ? 'Scan barcode or search order, customer, product…' : p.caps.barcodeSearch ? 'Scan barcode or search order, customer, address, product…' : 'Search order, customer, address, product…'}
         aria-label="Search orders"
         className="min-w-0 flex-1 bg-transparent text-[11.5px] text-orders-text outline-none placeholder:text-orders-text-subtle"
       />
-      {p.searchInput && (
-        <button type="button" aria-label="Clear search" onClick={() => p.setSearchInput('')} className="text-orders-text-subtle hover:text-orders-text cursor-pointer"><Icon name="close" className="h-3 w-3" /></button>
-      )}
+      {p.caps.barcodeSearch && <Icon name="scan" className="h-3.5 w-3.5" />}
+      <kbd className="rounded border border-b-2 border-orders-border bg-orders-surface-muted px-1 font-sans text-[9.5px] font-bold text-orders-text-subtle">/</kbd>
     </div>
   );
 }
+
+/** "Last synced: Nov 2, 2026, 4:04 PM" -> "Synced 4:04 PM" (the prototype's one-liner). */
+const shortSync = (message: string) => (message.startsWith('Last synced:') ? `Synced ${message.split(',').pop()?.trim() ?? ''}` : message);
 
 function SyncControls({ p }: { p: OrdersPageBundle }) {
   const { syncStoreDropdownRef } = p;
   const busy = p.syncing || p.loading || p.syncActive;
   return (
     <>
-      <span className="hidden whitespace-nowrap text-[10px] text-orders-text-subtle xl:inline">{p.syncMessage}</span>
+      <span className="whitespace-nowrap text-[10px] text-orders-text-subtle" title={p.syncMessage}>{shortSync(p.syncMessage)}</span>
       <div className="relative flex" ref={syncStoreDropdownRef}>
-        <button type="button" onClick={p.handleSync} disabled={busy} className="flex h-8 items-center gap-1.5 rounded-l-lg border border-r-0 border-orders-border-strong bg-orders-surface px-2.5 text-[11px] font-semibold text-orders-text-body shadow-orders hover:bg-orders-surface-muted disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer">
+        <button type="button" onClick={p.handleSync} disabled={busy} className="inline-flex h-7 items-center gap-1 rounded-l-lg border border-r-0 border-orders-border-strong bg-orders-surface px-[9px] text-[11px] font-bold text-orders-text-body hover:bg-orders-surface-muted disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer">
           <Icon name="refresh" className={`h-3.5 w-3.5 ${p.syncing || p.syncActive ? 'animate-spin' : ''}`} />
           {p.syncActive ? 'Syncing…' : p.syncing ? 'Queueing…' : 'Sync'}
         </button>
-        <button type="button" aria-label="Choose stores to sync" onClick={() => p.setSyncStoreDropdownOpen((prev) => !prev)} disabled={busy} className="flex h-8 items-center rounded-r-lg border border-orders-border-strong bg-orders-surface px-1.5 text-orders-text-body shadow-orders hover:bg-orders-surface-muted disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer">
+        <button type="button" aria-label="Choose stores to sync" onClick={() => p.setSyncStoreDropdownOpen((prev) => !prev)} disabled={busy} className="inline-flex h-7 items-center rounded-r-lg border border-l-0 border-orders-border-strong bg-orders-surface px-[5px] text-orders-text-body hover:bg-orders-surface-muted disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer">
           <Icon name="chevronDown" className="h-3 w-3" />
         </button>
         {p.syncStoreDropdownOpen && (
@@ -109,13 +125,13 @@ export default function QueueToolbar({ p }: { p: OrdersPageBundle }) {
         </FilterChip>
       )}
       {p.hasActiveFilters && (
-        <button type="button" onClick={p.handleClearFilters} className="flex h-8 items-center gap-1 rounded-lg px-2 text-[11px] text-orders-text-subtle hover:bg-orders-danger-soft hover:text-orders-danger cursor-pointer">
+        <button type="button" onClick={p.handleClearFilters} className="inline-flex h-7 items-center gap-1 rounded-lg px-2 text-[11px] font-bold text-orders-primary-ink hover:bg-orders-primary-soft cursor-pointer">
           <Icon name="close" className="h-3 w-3" />Clear filters
         </button>
       )}
       <span className="flex-1" />
       {caps.sync && <SyncControls p={p} />}
-      <button type="button" onClick={p.handleRefresh} disabled={p.syncing} title={p.syncRefreshNeeded ? 'A sync finished: refresh to see the changes' : 'Reload the list'} className={`flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[11px] font-semibold shadow-orders disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer ${p.syncRefreshNeeded ? 'border-orders-warning-border bg-orders-warning-soft text-orders-warning-ink hover:brightness-95' : 'border-orders-border-strong bg-orders-surface text-orders-text-body hover:bg-orders-surface-muted'}`}>
+      <button type="button" onClick={p.handleRefresh} disabled={p.syncing} title={p.syncRefreshNeeded ? 'A sync finished: refresh to see the changes' : 'Reload the list'} className={`inline-flex h-7 items-center gap-1 rounded-lg border px-[9px] text-[11px] font-bold disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer ${p.syncRefreshNeeded ? 'border-orders-warning-border bg-orders-warning-soft text-orders-warning-ink' : 'border-orders-border-strong bg-orders-surface text-orders-text-body hover:bg-orders-surface-muted'}`}>
         <Icon name="refresh" className="h-3.5 w-3.5" />Refresh
       </button>
     </div>

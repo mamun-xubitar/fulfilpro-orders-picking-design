@@ -2,6 +2,7 @@
 
 import type { Dispatch, RefObject, SetStateAction } from 'react';
 import { SHOPIFY_TRACKING_CARRIERS } from './constants';
+import { getFulfilledQty } from './utils';
 import type {
   BackInStockItem,
   CancelFulfillmentModalState,
@@ -735,10 +736,22 @@ export default function OrderModals({
             <ul className="mt-2 space-y-1 text-sm text-orders-text-body">
               {pendingFulfillment.lines.map((line) => {
                 const item = pendingFulfillment.order.items.find((orderItem) => orderItem.id === line.lineItemId);
+                const max = item ? Math.max(0, item.qty - getFulfilledQty(pendingFulfillment.order, item.id)) : line.quantity;
+                const setQty = (quantity: number) => setPendingFulfillment((prev) => (
+                  prev ? { ...prev, lines: prev.lines.map((l) => (l.lineItemId === line.lineItemId ? { ...l, quantity, full: quantity === max } : l)) } : prev
+                ));
                 return (
-                  <li key={line.lineItemId} className="flex justify-between gap-3">
+                  <li key={line.lineItemId} className="flex items-center justify-between gap-3">
                     <span className="truncate">{item?.name ?? line.lineItemId}</span>
-                    <span className="font-medium">x{line.quantity}</span>
+                    {pendingFulfillment.editable ? (
+                      <span className="inline-flex h-6 items-center overflow-hidden rounded-[7px] border border-orders-border-strong bg-orders-surface">
+                        <button type="button" aria-label="Decrease quantity" disabled={line.quantity <= 0} onClick={() => setQty(line.quantity - 1)} className="h-full w-[22px] text-[13px] font-bold text-orders-text-muted hover:bg-orders-divider disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer">−</button>
+                        <span className="min-w-8 border-x border-orders-border text-center text-xs font-bold tabular-nums leading-[22px]">{line.quantity}<span className="font-normal text-orders-text-subtle">/{max}</span></span>
+                        <button type="button" aria-label="Increase quantity" disabled={line.quantity >= max} onClick={() => setQty(line.quantity + 1)} className="h-full w-[22px] text-[13px] font-bold text-orders-text-muted hover:bg-orders-divider disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer">+</button>
+                      </span>
+                    ) : (
+                      <span className="font-medium">x{line.quantity}</span>
+                    )}
                   </li>
                 );
               })}

@@ -11,7 +11,7 @@ export default function PeriodMenu({ p }: { p: OrdersPageBundle }) {
   const { period, dateFrom, dateTo, hoverDate, calendarNav, periodDropdownRef } = p;
   const label = period === 'custom'
     ? dateFrom && dateTo ? `${fmtCalDate(dateFrom)} – ${fmtCalDate(dateTo)}` : dateFrom ? `From ${fmtCalDate(dateFrom)}` : 'Custom'
-    : PERIODS.find((item) => item.value === period)?.label ?? 'All Time';
+    : period === 'all' ? 'All time' : PERIODS.find((item) => item.value === period)?.label ?? 'All time';
   const shift = (delta: number) => p.setCalendarNav((prev) => { const d = new Date(prev.year, prev.month + delta, 1); return { year: d.getFullYear(), month: d.getMonth() }; });
   const today = new Date().toISOString().split('T')[0];
   const effTo = !dateTo && hoverDate ? hoverDate : dateTo;

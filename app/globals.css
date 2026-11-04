@@ -109,11 +109,12 @@
 
   /* Row tints by order status (same priority as the old Orders table). */
   --orders-tone-restock: #fffbeb;
-  --orders-tone-partial: #fffbeb;
-  --orders-tone-fulfilled: #eff6ff;
-  --orders-tone-packed: #f0fdf4;
-  --orders-tone-canceled: #fef2f2;
+  --orders-tone-partial: #fef3c7;
+  --orders-tone-fulfilled: #dbeafe;
+  --orders-tone-packed: #dcfce7;
+  --orders-tone-canceled: #fee2e2;
   --orders-tone-closed: #f3f4f6;
+  --orders-line-done: #f0fdf4;
 
   --orders-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
   --orders-shadow-md: 0 8px 22px rgba(15, 23, 42, 0.16);
@@ -221,6 +222,7 @@
   --color-orders-tone-packed: var(--orders-tone-packed);
   --color-orders-tone-canceled: var(--orders-tone-canceled);
   --color-orders-tone-closed: var(--orders-tone-closed);
+  --color-orders-line-done: var(--orders-line-done);
 
   --shadow-orders: var(--orders-shadow);
   --shadow-orders-md: var(--orders-shadow-md);

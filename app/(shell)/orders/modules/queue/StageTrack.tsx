@@ -5,12 +5,13 @@ import { Icon } from './icons';
 
 const GREEN_KEYS: StageNode['key'][] = ['slip', 'ful', 'trk'];
 
-/** Stage nodes (slip, pack, fulfil, track) joined by a line; each role only sees its own stages. */
+/** Column heading of the stage track: one 34px label per node (prototype `trackHead`). */
 export function StageTrackHead({ caps }: { caps: OrderCapabilities }) {
   const labels = [caps.slip && 'Slip', 'Pack', caps.fulfilment && 'Fulfil', caps.fulfilment && 'Track'].filter(Boolean) as string[];
-  return <span className="flex">{labels.map((l) => <span key={l} className="w-[34px] overflow-visible whitespace-nowrap text-center">{l}</span>)}</span>;
+  return <span className="flex text-[9px] font-bold uppercase tracking-normal text-orders-text-subtle">{labels.map((l) => <span key={l} className="w-[34px] overflow-visible whitespace-nowrap">{l}</span>)}</span>;
 }
 
+/** Stage nodes (slip, pack, fulfil, track) joined by a line: 15px nodes, 19px links (prototype `.nd` / `.cn`). */
 export default function StageTrack({ order, caps }: { order: OrderRow; caps: OrderCapabilities }) {
   const nodes = getStageNodes(order, caps);
   return (
@@ -18,13 +19,15 @@ export default function StageTrack({ order, caps }: { order: OrderRow; caps: Ord
       {nodes.map((n, i) => {
         const green = GREEN_KEYS.includes(n.key);
         const done = n.state === 'done';
-        const fill = done ? (green ? 'border-orders-success bg-orders-success text-white' : 'border-orders-primary bg-orders-primary text-white') : n.state === 'part' ? 'border-orders-warning bg-orders-warning-soft text-orders-warning' : 'border-orders-text-subtle/50 bg-orders-surface text-transparent';
-        const link = done ? (green ? 'bg-orders-success' : 'bg-orders-primary') : 'bg-orders-text-subtle/40';
+        const fill = done
+          ? green ? 'border-orders-success bg-orders-success' : 'border-orders-primary bg-orders-primary'
+          : n.state === 'part' ? 'border-orders-warning bg-[linear-gradient(90deg,var(--orders-warning)_50%,#fff_50%)]' : 'border-orders-border-strong bg-white';
+        const link = done ? (green ? 'bg-orders-success' : 'bg-orders-primary') : 'bg-orders-border';
         return (
           <span key={n.key} className="flex items-center">
-            {i > 0 && <span className={`h-0.5 w-3 ${link}`} />}
-            <span title={n.label} className={`flex h-[18px] w-[18px] items-center justify-center rounded-full border-2 ${fill}`}>
-              {done ? <Icon name="check" className="h-2.5 w-2.5" /> : n.state === 'part' ? <span className="h-1.5 w-1.5 rounded-full bg-orders-warning" /> : null}
+            {i > 0 && <span className={`h-0.5 w-[19px] flex-none ${link}`} />}
+            <span title={n.label} className={`flex h-[15px] w-[15px] flex-none items-center justify-center rounded-full border-2 text-white ${fill}`}>
+              {done && <Icon name="check" className="h-2 w-2 [stroke-width:3.4]" />}
             </span>
           </span>
         );

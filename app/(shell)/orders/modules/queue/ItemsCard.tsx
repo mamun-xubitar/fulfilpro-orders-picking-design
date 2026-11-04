@@ -1,74 +1,45 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import type { OrderRow } from '../types';
 import type { OrdersPageBundle } from '../ordersPageContext';
-import { isOrderFulfillmentLocked, orderNameEntries } from '../utils';
+import ExtrasBar from './ExtrasBar';
 import ItemLine from './ItemLine';
-import { getLineColumns, lineGridTemplate } from './lineColumns';
-import { Icon } from './icons';
-import Badge from './Badge';
+import { CENTERED_COLUMNS, getLineColumns, lineGap, lineGridTemplate } from './lineColumns';
+import { Icon, type IconName } from './icons';
 
-const toolBtn = 'flex h-6 items-center gap-1 rounded-md border px-2 text-[10.5px] font-semibold disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer';
-
-export function CardShell({ title, icon, right, children }: { title: string; icon: 'cube' | 'tracking' | 'user' | 'printer'; right?: React.ReactNode; children: React.ReactNode }) {
+/** One card of the expanded order (prototype `.bx`): 9px radius, no shadow, 26px section header. */
+export function CardShell({ title, icon, right, children }: { title: string; icon: IconName; right?: ReactNode; children: ReactNode }) {
   return (
-    <section className="min-w-0 rounded-xl border border-orders-border bg-orders-surface shadow-orders">
-      <header className="flex items-center justify-between gap-2 border-b border-orders-divider px-3 py-1.5">
-        <h4 className="flex items-center gap-1.5 text-[10.5px] font-bold uppercase tracking-wide text-orders-text-muted"><Icon name={icon} className="h-3 w-3" />{title}</h4>
-        {right && <span className="text-[10.5px] text-orders-text-muted">{right}</span>}
+    <section className="flex min-w-0 flex-col rounded-[9px] border border-orders-border bg-orders-surface">
+      <header className="flex h-[26px] shrink-0 items-center justify-between gap-1.5 border-b border-orders-divider px-[9px]">
+        <h4 className="flex items-center gap-[5px] text-[9.5px] font-bold uppercase tracking-[.5px] text-orders-text-subtle"><Icon name={icon} className="h-[11px] w-[11px]" />{title}</h4>
+        {right && <span className="tabular-nums text-orders-text-subtle">{right}</span>}
       </header>
       {children}
     </section>
   );
 }
 
+/** Body padding used by the side cards (prototype `.in`). */
+export const CardBody = ({ children }: { children: ReactNode }) => <div className="flex flex-col gap-1.5 p-2">{children}</div>;
+
 export default function ItemsCard({ p, order }: { p: OrdersPageBundle; order: OrderRow }) {
   const { caps } = p;
-  const locked = isOrderFulfillmentLocked(order);
-  const hasWork = order.items.some((i) => (i.decoration?.works?.length ?? 0) > 0);
-  const cols = getLineColumns(caps, hasWork);
+  const worked = order.items.some((i) => (i.decoration?.works?.length ?? 0) > 0);
+  const decorated = order.items.some((i) => i.isEmbroidery || i.isPrint);
+  const cols = getLineColumns(caps, worked || (caps.admin && decorated));
   const restockItems = (order.stockAdjustment?.items ?? []).filter((i) => i.action === 'restore');
   const allFull = order.items.length > 0 && order.items.every((item, i) => p.isLineFullChecked(order, item, i));
-  const namesAll = orderNameEntries(order).length > 0;
-  const parcels = order.fulfillmentItems.confirmations.length;
-  const sa = order.stockAdjustment;
-  const hasTracking = order.fulfillmentItems.confirmations.some((c) => c.trackingInfo?.number?.trim());
-
   return (
     <CardShell title="Order items" icon="cube" right={`${order.totalQuantity} pcs · ${order.packedQuantity} packed`}>
-      <div className="flex flex-wrap items-center gap-1.5 border-b border-orders-divider px-3 py-1.5">
-        {caps.labels && order.labelPrintedAt && <Badge tone="emb"><Icon name="tag" className="h-2.5 w-2.5" />Label printed</Badge>}
-        {namesAll && (
-          <label className="flex items-center gap-1 text-[10.5px] text-orders-text-muted cursor-pointer"><input type="checkbox" checked={p.isOrderAllNamesChecked(order)} onChange={() => p.toggleOrderNames(order)} className="h-3 w-3 rounded border-orders-border-strong text-orders-primary cursor-pointer" />Select names</label>
-        )}
-        <span className="flex-1" />
-        {caps.requestStock && (
-          <button type="button" onClick={() => void p.openStockModal(order)} className={`${toolBtn} border-orders-border-strong bg-orders-surface text-orders-text-body hover:bg-orders-surface-muted`}>
-            <Icon name="cube" className="h-3 w-3" />Request stock{order.stockRequestCount > 0 && <b className="rounded-full bg-orders-warning px-1 text-[9px] text-white">{order.stockRequestCount}</b>}
-          </button>
-        )}
-        {caps.fulfilment && (
-          <button type="button" disabled={parcels === 0} title={parcels > 0 ? 'View fulfilments' : 'No fulfilments yet'} onClick={() => p.setFulfillmentViewOrderId(order.id)} className={`${toolBtn} border-orders-primary-ring bg-orders-surface text-orders-primary-ink hover:bg-orders-primary-soft`}>
-            Fulfilments{parcels > 0 && ` (${parcels})`}<Icon name="chevronRight" className="h-3 w-3" />
-          </button>
-        )}
-        {caps.admin && sa && (
-          <button type="button" title="Manage stock adjustment" onClick={() => void p.openStockAdjustmentModal(order)} className={`${toolBtn} border-orders-border-strong bg-orders-surface text-orders-text-body hover:bg-orders-surface-muted`}>Stock {sa.managedCount}/{sa.totalCount}</button>
-        )}
-        {caps.admin && (
-          <button type="button" disabled={locked} title={locked ? 'Order is closed or canceled' : 'Add a line item'} onClick={() => p.openAddLineItemModal(order, order.items[order.items.length - 1]?.id ?? null)} className={`${toolBtn} border-orders-border-strong bg-orders-surface text-orders-text-body hover:bg-orders-surface-muted`}>
-            <Icon name="plus" className="h-3 w-3" />Add line
-          </button>
-        )}
-        {caps.admin && (
-          <button type="button" disabled={!hasTracking} title={hasTracking ? 'Tracking' : 'No tracking number yet'} aria-label="Tracking" onClick={() => p.openTrackingModal(order)} className={`${toolBtn} border-orders-border-strong bg-orders-surface text-orders-text-body hover:bg-orders-surface-muted`}><Icon name="tracking" className="h-3 w-3" /></button>
-        )}
-      </div>
+      <ExtrasBar p={p} order={order} />
       <div role="table" aria-label={`Items of order ${order.number}`}>
-        <div role="row" className="grid items-center gap-x-2 border-b border-orders-border bg-orders-surface-muted px-2 py-1 text-[9px] font-bold uppercase tracking-wide text-orders-text-subtle" style={{ gridTemplateColumns: lineGridTemplate(cols) }}>
+        <div role="row" className="grid h-[22px] items-center border-b border-orders-border bg-orders-surface-muted px-2 text-[9px] font-bold uppercase tracking-[.4px] text-orders-text-subtle" style={{ gridTemplateColumns: lineGridTemplate(cols), columnGap: lineGap(caps) }}>
           {cols.map((c) => (
-            <span key={c.key} className={c.key === 'item' || c.key === 'sku' ? '' : 'flex justify-center'}>
-              {c.key === 'full' ? <label className="flex items-center gap-1 cursor-pointer">{c.label}<input type="checkbox" checked={allFull} onChange={() => p.toggleAllFull(order)} aria-label="Mark every line Full" className="h-3 w-3 rounded border-orders-border-strong text-orders-primary cursor-pointer" /></label> : c.label}
+            <span key={c.key} className={CENTERED_COLUMNS.includes(c.key) ? 'text-center' : c.key === 'full' ? 'flex items-center justify-center gap-[3px]' : ''}>
+              {c.label}
+              {c.key === 'full' && <input type="checkbox" checked={allFull} onChange={() => p.toggleAllFull(order)} aria-label="Mark every line Full" title="Mark every line Full" className="h-[13px] w-[13px] cursor-pointer rounded-[3px] border-orders-border-strong text-orders-primary" />}
             </span>
           ))}
         </div>

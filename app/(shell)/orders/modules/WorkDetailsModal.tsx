@@ -8,6 +8,8 @@ type WorkDetailsModalProps = {
   closeWorkDetails: () => void;
   userIsAdmin: boolean;
   deleteWorkRecord: (order: OrderRow, item: OrderItem, workId: string) => void;
+  /** Admin: record more decoration work for this line. */
+  onMarkDone?: () => void;
 };
 
 export default function WorkDetailsModal({
@@ -15,6 +17,7 @@ export default function WorkDetailsModal({
   closeWorkDetails,
   userIsAdmin,
   deleteWorkRecord,
+  onMarkDone,
 }: WorkDetailsModalProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={closeWorkDetails}>
@@ -75,6 +78,11 @@ export default function WorkDetailsModal({
             ))
           )}
         </div>
+        {userIsAdmin && onMarkDone && (
+          <div className="flex justify-end border-t border-orders-border bg-orders-surface-muted px-5 py-3">
+            <button type="button" onClick={onMarkDone} className="rounded-lg bg-orders-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-orders-primary-hover cursor-pointer">Mark decoration done</button>
+          </div>
+        )}
       </div>
     </div>
   );

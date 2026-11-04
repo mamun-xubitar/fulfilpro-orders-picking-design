@@ -67,18 +67,22 @@ export function getRowTone(order: OrderRow, caps: OrderCapabilities) {
   return 'bg-orders-surface hover:bg-orders-surface-muted';
 }
 
-/** Grid columns of the queue table; the same template is used by the header and every row. */
+/** Grid columns of the queue table (prototype `colsA`); the same template is used by the header and every row. */
 export function getGridColumns(caps: OrderCapabilities) {
-  const cols = ['24px', '84px', '58px', 'minmax(104px,1fr)'];
-  if (caps.admin) cols.push('50px');
-  cols.push('88px');
-  cols.push(`${(caps.slip ? 1 : 0) * 34 + 34 + (caps.fulfilment ? 68 : 0)}px`);
-  if (caps.fulfilment) cols.push('132px');
-  cols.push('88px');
-  if (caps.decoration || caps.packedDate) cols.push(caps.packedDate ? '84px' : '92px');
-  cols.push('44px');
-  cols.push(caps.admin ? '190px' : caps.pack && !caps.fulfilment ? '112px' : '150px');
-  return cols.join(' ');
+  const nodes = (caps.slip ? 1 : 0) + 1 + (caps.fulfilment ? 2 : 0);
+  const icons = 3 + (caps.slip ? 1 : 0) + (caps.labels ? 1 : 0) + (caps.invoice ? 1 : 0) + (caps.admin ? 1 : 0);
+  return ['20px', '96px', '50px', '108px', caps.admin ? '58px' : '', 'minmax(80px,1fr)', `${nodes * 34 + 4}px`, caps.fulfilment ? '104px' : '', '84px', '132px', '52px', `${icons * 24 + 4}px`].filter(Boolean).join(' ');
+}
+
+/** "Today 09:42", "Yesterday 17:21" or "Wed 28 Oct": how the prototype shows when an order was placed. */
+export function formatPlaced(iso: string | undefined) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const time = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false });
+  const days = Math.round((new Date().setHours(0, 0, 0, 0) - new Date(d).setHours(0, 0, 0, 0)) / 86_400_000);
+  if (days === 0) return `Today ${time}`;
+  if (days === 1) return `Yesterday ${time}`;
+  return d.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' }).replace(',', '');
 }
 
 /** Pieces of a line the hub cannot cover yet (0 when covered, locked, or the product is not in the hub). */
@@ -99,4 +103,12 @@ export function getStoreChip(name: string) {
   let hash = 0;
   for (const ch of name) hash = (hash * 31 + ch.charCodeAt(0)) % 997;
   return { code, hue: STORE_HUES[hash % STORE_HUES.length] };
+}
+
+/** "Tue 27 Oct · 09:05": date and time of a confirmation, as the prototype's Fulfilment card shows it. */
+export function formatDateTimeShort(iso: string | undefined | null) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const date = d.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' }).replace(',', '');
+  return `${date} · ${d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false })}`;
 }
