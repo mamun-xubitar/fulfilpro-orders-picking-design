@@ -1,5 +1,6 @@
 'use client';
 
+import { useZoom } from '@/components/ZoomContext';
 import type { OrdersPageBundle } from './ordersPageContext';
 import OrderModals from './OrderModals';
 import InvoiceModal from '@/components/invoices/InvoiceModal';
@@ -16,8 +17,10 @@ import NotifyPackedModal from './queue/NotifyPackedModal';
 
 /** Every dialog the Orders page can open. Each one only mounts while its own state is set. */
 export default function PageModals({ p }: { p: OrdersPageBundle }) {
+  // The page is zoomed (50-150%); dialogs keep their normal size, so cancel the page zoom here.
+  const { zoomPercent } = useZoom();
   return (
-    <>
+    <div style={{ zoom: 100 / zoomPercent, '--page-zoom': 1 } as React.CSSProperties}>
   <OrderModals
     stockModal={p.stockModal}
     setStockModal={p.setStockModal}
@@ -152,6 +155,6 @@ export default function PageModals({ p }: { p: OrdersPageBundle }) {
       {p.printModal && <PrintSlipModal orders={p.printModal} setOrders={p.setPrintModal} onClose={() => p.setPrintModal(null)} onPrint={() => void p.printPickingSlips()} />}
       {p.notifyModal && <NotifyPackedModal state={p.notifyModal} setState={p.setNotifyModal} recipients={p.packingRecipients} onClose={() => p.setNotifyModal(null)} onSubmit={() => void p.submitNotifyAction()} />}
       {p.pickerMessages.messageModal && <MessagesModal state={p.pickerMessages.messageModal} setState={p.pickerMessages.setMessageModal} onClose={p.pickerMessages.closeMessageModal} onSubmit={() => void p.pickerMessages.submitMessage()} />}
-    </>
+    </div>
   );
 }
