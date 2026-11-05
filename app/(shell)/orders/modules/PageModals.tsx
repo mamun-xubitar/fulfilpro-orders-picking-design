@@ -11,7 +11,7 @@ import DeleteLineItemModal from './DeleteLineItemModal';
 import EditLineItemModal from './EditLineItemModal';
 import AddLineItemModal from './AddLineItemModal';
 import MessagesDialog from './dialogs/MessagesDialog';
-import { formatStockStatus, getAvailableStockItemsForRow, getBackInStockEligibleItems, hasStockItemAvailableToAdd } from './utils';
+import { formatStockStatus, getAvailableStockItemsForRow, getBackInStockEligibleItems, hasStockItemAvailableToAdd, isMessageDisabled } from './utils';
 import PrintSlipModal from './queue/PrintSlipModal';
 import NotifyPackedModal from './queue/NotifyPackedModal';
 import FulfilmentsModal from './queue/FulfilmentsModal';
@@ -21,6 +21,10 @@ import { CreatePoModal } from '@/app/(shell)/inventory/modules/PoModals';
 export default function PageModals({ p }: { p: OrdersPageBundle }) {
   // The page is zoomed (50-150%); dialogs keep their normal size, so cancel the page zoom here.
   const { zoomPercent } = useZoom();
+  const messageSendDisabled = (orderId?: string) => {
+    const order = p.orders.find((o) => o.id === orderId);
+    return Boolean(order && isMessageDisabled(order, p.caps.role));
+  };
   return (
     <div style={{ zoom: 100 / zoomPercent, '--page-zoom': 1 } as React.CSSProperties}>
   <OrderModals
@@ -83,6 +87,7 @@ export default function PageModals({ p }: { p: OrdersPageBundle }) {
       p.closeMessageModal();
       void p.openNoteModal(order);
     }}
+    messageSendDisabled={messageSendDisabled(p.messageModal?.order.id)}
   />
 
   {p.assignModal && (
@@ -177,6 +182,7 @@ export default function PageModals({ p }: { p: OrdersPageBundle }) {
           setState={p.pickerMessages.setMessageModal}
           onClose={p.pickerMessages.closeMessageModal}
           onSubmit={p.pickerMessages.submitMessage}
+          sendDisabled={messageSendDisabled(p.pickerMessages.messageModal.order.id)}
           onSwitchToNotes={() => {
             const order = p.pickerMessages.messageModal!.order;
             p.pickerMessages.closeMessageModal();

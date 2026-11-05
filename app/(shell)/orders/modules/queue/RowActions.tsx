@@ -3,7 +3,7 @@
 import type { MouseEvent } from 'react';
 import type { OrderRow } from '../types';
 import type { OrdersPageBundle } from '../ordersPageContext';
-import { isOrderFullyFulfilled } from '../utils';
+import { isMessageDisabled, isOrderFullyFulfilled } from '../utils';
 import { Icon, type IconName } from './icons';
 
 type IconButtonProps = {
@@ -55,7 +55,7 @@ export default function RowActions({ p, order, isExpanded }: { p: OrdersPageBund
   const refreshing = Boolean(p.refreshingOrderIds[order.id]);
   const slipPrinted = caps.slip && order.slipPrinted;
   const slipLabel = allPacked ? 'Everything is packed' : slipPrinted ? 'Picking slip printed: print again' : 'Print picking slip';
-  const messageDisabled = caps.role === 'picker' ? allPacked : !caps.admin && fulfilled;
+  const messageDisabled = isMessageDisabled(order, caps.role);
   const trk = trackingState(order);
   return (
     <span className="flex items-center justify-end">

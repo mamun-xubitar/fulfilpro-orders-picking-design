@@ -222,6 +222,12 @@ export function isOrderFullyFulfilled(order: OrderRow) {
   return totalQuantity > 0 && fulfilledQuantity >= totalQuantity;
 }
 
+/** Messaging an order's admins is closed once a picker's order is fully packed, or a staff order is fulfilled. Admin can always message. */
+export function isMessageDisabled(order: OrderRow, role: string) {
+  if (role === 'picker') return order.totalQuantity > 0 && order.packedQuantity >= order.totalQuantity;
+  return role !== 'admin' && isOrderFullyFulfilled(order);
+}
+
 export function parseBarcodes(value: string) {
   return value.split(/\s+/).map((barcode) => barcode.trim()).filter(Boolean);
 }

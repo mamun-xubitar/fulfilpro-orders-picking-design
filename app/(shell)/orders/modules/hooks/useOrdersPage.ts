@@ -88,6 +88,7 @@ export function useOrdersPage() {
     setOrders: data.setOrders,
     blockTestModeAction,
     userIsAdmin,
+    bumpCounts: data.bumpCounts,
   });
 
   const decorWork = useDecorationWork({
@@ -147,7 +148,7 @@ export function useOrdersPage() {
 
   const manualInvoice = useManualInvoice({ enabled: userIsAdmin || userIsStaff });
 
-  const queueCounts = useQueueCounts({ queryString: filters.queryString, refreshToken: data.refreshToken });
+  const queueCounts = useQueueCounts({ queryString: filters.queryString, refreshToken: data.refreshToken + data.countsToken });
 
   const packing = usePacking({
     setOrders: data.setOrders,

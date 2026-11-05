@@ -22,6 +22,7 @@ export function useOrdersData({ queryString, search, setPagination, blockTestMod
   const [loading, setLoading] = useState(false);
   const [refreshRotation, setRefreshRotation] = useState(0);
   const [refreshToken, setRefreshToken] = useState(0);
+  const [countsToken, setCountsToken] = useState(0);
   const [refreshingOrderIds, setRefreshingOrderIds] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
@@ -78,7 +79,11 @@ export function useOrdersData({ queryString, search, setPagination, blockTestMod
 
   // Mutation responses replace a whole order row but do not carry the hub stock / PO state of its lines
   // (it is only loaded with the list), so keep what the row already had.
+  const bumpCounts = () => setCountsToken((prev) => prev + 1);
+
+  // Every local row change can move an order between queue tabs, so it also refetches the tab counts.
   const setOrders: React.Dispatch<React.SetStateAction<OrderRow[]>> = (action) => {
+    bumpCounts();
     setOrdersRaw((prev) => {
       const next = typeof action === 'function' ? action(prev) : action;
       const before = new Map(prev.map((o) => [o.id, o]));
@@ -152,6 +157,8 @@ export function useOrdersData({ queryString, search, setPagination, blockTestMod
     expandAll,
     setExpandAll,
     refreshToken,
+    countsToken,
+    bumpCounts,
     bumpRefresh,
     refreshRotation,
     setRefreshRotation,

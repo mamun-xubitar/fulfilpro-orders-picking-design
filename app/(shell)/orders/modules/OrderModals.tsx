@@ -71,6 +71,7 @@ type OrderModalsProps = {
   /** Note | Message toggle (the merged Orders page only). */
   onSwitchToMessages?: (order: OrderRow) => void;
   onSwitchToNotes?: (order: OrderRow) => void;
+  messageSendDisabled?: boolean;
 };
 
 import StockAdjustmentDialog from './dialogs/StockAdjustmentDialog';
@@ -133,6 +134,7 @@ export default function OrderModals({
   submitTrackingAction,
   onSwitchToMessages,
   onSwitchToNotes,
+  messageSendDisabled,
 }: OrderModalsProps) {
   return (
     <>
@@ -152,7 +154,7 @@ export default function OrderModals({
           formatStatus={formatStockStatus}
         />
       )}
-      {messageModal && <MessagesDialog state={messageModal} setState={setMessageModal} onClose={closeMessageModal} onSubmit={submitAdminMessage} onSwitchToNotes={onSwitchToNotes ? () => onSwitchToNotes(messageModal.order) : undefined} />}
+      {messageModal && <MessagesDialog state={messageModal} setState={setMessageModal} onClose={closeMessageModal} onSubmit={submitAdminMessage} onSwitchToNotes={onSwitchToNotes ? () => onSwitchToNotes(messageModal.order) : undefined} sendDisabled={messageSendDisabled} />}
       {noteModal && <NotesDialog modal={noteModal} setModal={setNoteModal} onClose={closeNoteModal} onCancelEdit={cancelEditNote} onSubmit={submitOrderNote} onStartEdit={startEditNote} onDelete={deleteOrderNote} onSwitchToMessages={onSwitchToMessages ? () => onSwitchToMessages(noteModal.order) : undefined} />}
       {pendingFulfillment && (
         <FulfilConfirmDialog

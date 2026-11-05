@@ -16,9 +16,10 @@ type UseFulfillmentRequestsArgs = {
   setOrders: React.Dispatch<React.SetStateAction<OrderRow[]>>;
   blockTestModeAction: () => boolean;
   userIsAdmin: boolean;
+  bumpCounts?: () => void;
 };
 
-export function useFulfillmentRequests({ setOrders, blockTestModeAction, userIsAdmin }: UseFulfillmentRequestsArgs) {
+export function useFulfillmentRequests({ setOrders, blockTestModeAction, userIsAdmin, bumpCounts }: UseFulfillmentRequestsArgs) {
   const [orderFulfillmentRequests, setOrderFulfillmentRequests] = useState<Record<string, FulfillmentEditRequestRow[]>>({});
   const [pendingRequests, setPendingRequests] = useState<FulfillmentEditRequestRow[]>([]);
   const [pendingRequestsPanelOpen, setPendingRequestsPanelOpen] = useState(false);
@@ -173,6 +174,7 @@ export function useFulfillmentRequests({ setOrders, blockTestModeAction, userIsA
       const json = (await res.json()) as ApiResponse<FulfillmentEditRequestRow>;
       if (!res.ok || !json.success) throw new Error(getApiErrorMessage(json, 'Failed to submit request'));
       setOrderFulfillmentRequests((prev) => ({ ...prev, [order.id]: [...(prev[order.id] ?? []), json.data] }));
+      bumpCounts?.();
       toast.success('Permission request submitted. Admin has been notified.');
       setRequestPermModal(null);
     } catch (err) {
@@ -190,6 +192,7 @@ export function useFulfillmentRequests({ setOrders, blockTestModeAction, userIsA
       const json = (await res.json()) as ApiResponse<FulfillmentEditRequestRow>;
       if (!res.ok || !json.success) throw new Error(getApiErrorMessage(json, 'Failed to approve'));
       setPendingRequests((prev) => prev.filter((r) => r.id !== requestId));
+      bumpCounts?.();
       toast.success('Request approved. Staff can now perform the action.');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to approve request');
@@ -206,6 +209,7 @@ export function useFulfillmentRequests({ setOrders, blockTestModeAction, userIsA
       const json = (await res.json()) as ApiResponse<FulfillmentEditRequestRow>;
       if (!res.ok || !json.success) throw new Error(getApiErrorMessage(json, 'Failed to reject'));
       setPendingRequests((prev) => prev.filter((r) => r.id !== requestId));
+      bumpCounts?.();
       toast.info('Request rejected.');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to reject request');

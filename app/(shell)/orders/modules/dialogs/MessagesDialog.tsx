@@ -12,11 +12,13 @@ type Props<O extends OrderRef> = {
   onSubmit: () => void | Promise<void>;
   /** Shows the Note | Message toggle; switching closes this dialog and opens the notes one. */
   onSwitchToNotes?: () => void;
+  /** The order's Message action is disabled, so sending is too. */
+  sendDisabled?: boolean;
   title?: string;
 };
 
 /** Direct message to an admin (Admin / Staff: "orders" messages, Order Picker: "picker" messages). */
-export default function MessagesDialog<O extends OrderRef>({ state, setState, onClose, onSubmit, onSwitchToNotes, title = 'Notes and messages' }: Props<O>) {
+export default function MessagesDialog<O extends OrderRef>({ state, setState, onClose, onSubmit, onSwitchToNotes, sendDisabled = false, title = 'Notes and messages' }: Props<O>) {
   return (
     <DialogShell
       title={title}
@@ -26,7 +28,7 @@ export default function MessagesDialog<O extends OrderRef>({ state, setState, on
       onClose={onClose}
       footer={<>
         <button type="button" onClick={onClose} disabled={state.sending} className={dlgBtn.ghost}>Close</button>
-        <button type="button" onClick={() => void onSubmit()} disabled={state.sending || state.loading || state.admins.length === 0} className={dlgBtn.pri}>{state.sending ? 'Sending…' : 'Send'}</button>
+        <button type="button" onClick={() => void onSubmit()} disabled={sendDisabled || state.sending || state.loading || state.admins.length === 0} title={sendDisabled ? 'Messages are disabled for this order' : undefined} className={dlgBtn.pri}>{state.sending ? 'Sending…' : 'Send'}</button>
       </>}
     >
       {onSwitchToNotes && <SegSwitch active="message" onNote={onSwitchToNotes} onMessage={() => undefined} />}

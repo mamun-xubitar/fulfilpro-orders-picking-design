@@ -7,7 +7,9 @@ const EMPTY: QueueCounts = { all: 0, open: 0, slip_not_printed: 0, slip_printed:
 // The tab counts ignore paging, sorting, the queue tab and the Packed / Print filters.
 const IGNORED_PARAMS = ['page', 'pageSize', 'sort', 'dir', 'queue', 'packingStatus', 'printStatus'];
 
-/** Live sizes of the queue tabs, refetched whenever the base filters or a refresh change. */
+const POLL_MS = 15000;
+
+/** Live sizes of the queue tabs, refetched on filter / refresh changes and polled while the page is visible. */
 export function useQueueCounts({ queryString, refreshToken }: { queryString: string; refreshToken: number }) {
   const [counts, setCounts] = useState<QueueCounts>(EMPTY);
   const params = new URLSearchParams(queryString);
@@ -16,14 +18,24 @@ export function useQueueCounts({ queryString, refreshToken }: { queryString: str
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`/api/orders/queue-counts?${baseQuery}`)
-      .then((res) => res.json() as Promise<ApiResponse<{ counts: QueueCounts }>>)
-      .then((json) => {
-        if (!cancelled && json.success) setCounts(json.data.counts);
-      })
-      .catch(() => {});
+    const load = () => {
+      fetch(`/api/orders/queue-counts?${baseQuery}`)
+        .then((res) => res.json() as Promise<ApiResponse<{ counts: QueueCounts }>>)
+        .then((json) => {
+          if (!cancelled && json.success) setCounts(json.data.counts);
+        })
+        .catch(() => {});
+    };
+    const poll = () => {
+      if (document.visibilityState === 'visible') load();
+    };
+    load();
+    const timer = window.setInterval(poll, POLL_MS);
+    document.addEventListener('visibilitychange', poll);
     return () => {
       cancelled = true;
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', poll);
     };
   }, [baseQuery, refreshToken]);
 
