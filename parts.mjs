@@ -8,7 +8,7 @@ export const setRole = (r) => { ROLE = r; };
 export const CAP = {
   // deco: 2 = manage (assign, toggle, mark done), 1 = read-only state. round 3 adds reqStock, stockAdj, names, lineEdit, attach.
   admin:  { shopify: 1, stock: 1, poCreate: 1, store: 1, period: 1, sync: 1, ffilter: 1, slip: 1, pack: 1, ful: 1, cust: 1, contact: 1, labels: 1, req: 'direct', approvals: 1, deco: 2, bin: 0, track: 1, invoice: 1, reqStock: 1, stockAdj: 1, names: 1, lineEdit: 1, attach: 1, packDate: 0 },
-  staff:  { shopify: 1, stock: 1, poCreate: 0, store: 1, period: 1, sync: 1, ffilter: 1, slip: 0, pack: 0, ful: 1, cust: 1, contact: 0, labels: 1, req: 'request', approvals: 0, deco: 1, bin: 0, track: 0, invoice: 1, reqStock: 1, stockAdj: 0, names: 1, lineEdit: 0, attach: 0, packDate: 0, actions: 1 },
+  staff:  { slipStatus: 1, shopify: 1, stock: 1, poCreate: 0, store: 1, period: 1, sync: 1, ffilter: 1, slip: 0, pack: 0, ful: 1, cust: 1, contact: 0, labels: 1, req: 'request', approvals: 0, deco: 1, bin: 0, track: 0, invoice: 1, reqStock: 1, stockAdj: 0, names: 1, lineEdit: 0, attach: 0, packDate: 0, actions: 1 },
   picker: { shopify: 0, stock: 0, poCreate: 0, store: 0, period: 0, sync: 0, ffilter: 0, slip: 1, pack: 1, ful: 0, cust: 0, contact: 0, labels: 0, req: null, approvals: 0, deco: 0, bin: 0, track: 0, invoice: 0, reqStock: 0, stockAdj: 0, names: 0, lineEdit: 0, attach: 0, packDate: 1 },
 };
 
@@ -38,7 +38,7 @@ export const slipDot = (r) => (r.slip != null ? `<span class="ib printed ro" tit
 
 /* ---------- stage track: nodes are role-shaped (staff never sees the slip, picker never sees fulfilment) ---------- */
 export function stageNodes(cap) {
-  return [cap.slip && ['slip', 'Slip'], ['packed', 'Pack'], cap.ful && ['ful', 'Fulfil'], cap.ful && ['trk', 'Track']].filter(Boolean);
+  return [(cap.slip || cap.slipStatus) && ['slip', 'Slip'], ['packed', 'Pack'], cap.ful && ['ful', 'Fulfil'], cap.ful && ['trk', 'Track']].filter(Boolean);
 }
 export function track(r, cap, lg = false) {
   const s = stage(r), nodes = stageNodes(cap);
@@ -86,7 +86,9 @@ export const noteFlags = (r) => {
   return `<span class="cell" style="gap:2px"><span class="ib" title="Order notes" style="width:20px">${ic('document', 'i')}${ct(r.notes)}</span>${r.req ? `<span class="ib" title="Fulfilment edit request awaiting approval" style="width:20px">${ic('userLock', 'i')}<i class="ct amber">1</i></span>` : ''}</span>`;
 };
 /** Actions column: message icon (always shown so a first message can be sent). Opens the Messages modal. */
-export const msgBtn = (r) => `<button class="ib" title="Messages">${ic('chat', 'i')}${r.msgs ? `<i class="ct">${r.msgs}</i>` : ''}</button>`;
+/** The order's Message action is closed once a picker's order is fully packed or a staff order is fulfilled (Admin never). */
+export const msgOff = (r) => (ROLE === 'picker' ? totalQty(r) > 0 && packedQty(r) >= totalQty(r) : ROLE !== 'admin' && r.ful === 'full');
+export const msgBtn = (r) => `<button class="ib${msgOff(r) ? ' off' : ''}"${msgOff(r) ? ' disabled style="opacity:.4;cursor:not-allowed"' : ''} title="${msgOff(r) ? 'Messages are closed for this order' : 'Messages'}">${ic('chat', 'i')}${r.msgs ? `<i class="ct">${r.msgs}</i>` : ''}</button>`;
 /** Actions column: tax invoice icon. */
 export const invoiceBtn = () => `<button class="ib" title="Print tax invoice">${ic('document', 'i')}</button>`;
 export const sortHead =(t) => `<span class="srt">${t}${ic('sort', 'i10')}</span>`;
@@ -127,13 +129,13 @@ export function queueTabs(role, active) {
 export const activeChips = (role) =>
   `<span class="rmv">Unfulfilled ${ic('close', 'i10')}</span>${CAP[role].period ? `<span class="rmv">This month ${ic('close', 'i10')}</span>` : ''}<button class="btn xs ghost" style="border-color:transparent;color:var(--pri-ink)">Clear all</button>`;
 
-export function approvals(role) {
+/** Collapsible amber section (implemented page): count pill + chevron; open it to approve or reject each request. `open` draws the expanded state. */
+export function approvals(role, { open = false } = {}) {
   if (!CAP[role].approvals) return '';
-  return `<div class="appr">${ic('userLock', 'i')}<b>1 fulfilment request awaiting approval</b><span class="by">Staff · Edit fulfilment on #0702 · “Wrong carrier, parcel not yet scanned”</span><span class="sp"></span><button class="btn xs ghost">View order</button><button class="btn xs pri">Approve</button><button class="btn xs dngr">Reject</button></div>`;
+  const req = `<div class="apr-b"><div><p><b>Staff</b> — Edit fulfilment <span class="muted" style="font-size:10.5px;margin-left:8px"><b class="strong">Order #0702</b> • 30/10/2026, 11:42:08</span></p><p class="apr-r">“Wrong carrier, parcel not yet scanned”</p></div><span class="cell" style="gap:6px"><button class="btn xs ghost">View order</button><button class="btn xs pri">Approve</button><button class="btn xs dngr">Reject</button></span></div>`;
+  return `<div class="appr2"><button class="apr-h" aria-expanded="${open}">${ic('userLock', 'i')}<i class="apr-n">1</i><b>Fulfilment request awaiting approval</b>${ic('chevronDown', 'i')}</button>${open ? req : ''}</div>`;
 }
 
-
-/* ---------- round 2: colour swatch, Shopify link, available qty, purchase order ---------- */
 export const swatch = (x) => `<span class="sw"><i style="background:${x.hex}"></i>${x.colour}</span>`;
 export const shopifyLink = (r, x) => `<a class="shln" title="Open in Shopify admin · ${STORES[r.store].domain}/admin/products/${x.productId}" href="${shopifyUrl(r, x)}">${ic('external', 'i10')}</a>`;
 export const availCell = (r, x) => {
@@ -158,24 +160,36 @@ export function shortBadge(r, cap) {
 
 /* ---------- pack lines ---------- */
 export function lineCols(cap, dense = false, work = false, showWork = work, decoBoth = false) {
+  if (decoBoth) {
+    // A2 = the implemented Orders page: Decoration (EMB / PRT) and Decorator (assignee + Mark done / View) are two columns
+    const c = [['item', 'minmax(120px,1.4fr)'], ['sku', cap.stock ? 'minmax(64px,.5fr)' : '96px']];
+    if (cap.deco) c.push(['deco', '104px']);
+    c.push(['qty', cap.ful ? '38px' : '22px'], ['packed', '38px']);
+    if (cap.packDate) c.push(['pdate', '96px']);
+    if (cap.stock) c.push(['avail', '28px'], ['po', '86px']);
+    if (cap.deco && showWork) c.push(['decorator', '132px']);
+    if (cap.pack || cap.ful) c.push(['full', '42px'], ['part', '66px']);
+    if (cap.lineEdit) c.push(['act', '46px']);
+    return c;
+  }
   const cols = [['item', 'minmax(0,1fr)']];
   if (!cap.stock) cols.push(['sku', '96px']);
   else if (work) cols.push(['sku', '62px']);
   if (cap.bin && !dense && !(work && cap.stock)) cols.push(['bin', '44px']);
-  if (cap.deco && !dense) cols.push(['deco', decoBoth ? '90px' : work && cap.stock ? '60px' : '68px']);
-  cols.push(['qty', work ? '22px' : '28px'], ['packed', decoBoth ? '38px' : work ? '38px' : '52px']);
+  if (cap.deco && !dense) cols.push(['deco', work && cap.stock ? '60px' : '68px']);
+  cols.push(['qty', work ? '22px' : '28px'], ['packed', work ? '38px' : '52px']);
   if (cap.packDate) cols.push(['pdate', '96px']);
-  if (cap.stock) cols.push(['avail', work ? '28px' : '40px'], ['po', decoBoth ? '86px' : work ? '98px' : '136px']);
+  if (cap.stock) cols.push(['avail', work ? '28px' : '40px'], ['po', work ? '98px' : '136px']);
   if (showWork && cap.deco) cols.push(['work', '34px']);
-  if (cap.pack) cols.push(['full', work ? '42px' : '48px'], ['part', decoBoth ? '66px' : work ? '72px' : '96px']);
+  if (cap.pack) cols.push(['full', work ? '42px' : '48px'], ['part', work ? '72px' : '96px']);
   if (work && cap.lineEdit) cols.push(['act', '46px']);
   return cols;
 }
 const colsCss = (cols) => cols.map((c) => c[1]).join(' ');
 const xchips = (x, cap) => { const c = [X.nameChip(x, cap), cap.reqStock ? X.restockLine(x) : ''].filter(Boolean).join(''); return c ? `<span class="cell" style="gap:4px;margin-top:1px">${c}</span>` : ''; };
 export function lines(r, cap, { rowH = 36, sel = 1, skuSub = true, head: showHead = true, dense = false, workCol = false, decoBoth = false } = {}) {
-  const hasWork = workCol && r.items.some((x) => x.work);
-  const cols = lineCols(cap, dense, workCol, hasWork, decoBoth), css = colsCss(cols), lgap = workCol && cap.stock ? 4 : 8, N = { pdate: 'Packed Date', item: 'Item', sku: 'SKU', bin: 'Bin', deco: 'Deco', work: 'Work', act: 'Actions', qty: 'Qty', packed: 'Packed', avail: 'Avail', po: 'PO status', full: 'Full', part: 'Partial' };
+  const hasWork = decoBoth ? r.items.some((x) => x.deco || x.work) : workCol && r.items.some((x) => x.work);
+  const cols = lineCols(cap, dense, workCol, hasWork, decoBoth), css = colsCss(cols), lgap = workCol && cap.stock ? 4 : 8, N = { pdate: 'Packed Date', item: 'Item', sku: 'SKU', bin: 'Bin', deco: decoBoth ? 'Decoration' : 'Deco', decorator: 'Decorator', work: 'Work', act: 'Actions', qty: 'Qty', packed: 'Packed', avail: 'Avail', po: 'PO status', full: 'Full', part: 'Partial' };
   const fullN = r.items.filter((x, idx) => x.packed >= x.qty || (sel && idx === 0)).length;
   const fullAll = r.items.length > 0 && fullN === r.items.length, fullMix = fullN > 0 && !fullAll;
   const headCell = (k) => k === 'full'
@@ -184,14 +198,18 @@ export function lines(r, cap, { rowH = 36, sel = 1, skuSub = true, head: showHea
   const head = `<div class="lnh" style="--lcols:${css};--lgap:${lgap}px">${cols.map(([k]) => headCell(k)).join('')}</div>`;
   const rows = r.items.map((x, idx) => {
     const done = x.packed >= x.qty, part = x.packed > 0 && !done, fullOn = done || (sel && idx === 0);
+    // fulfilled quantity of the line (fully fulfilled order, or a partial one that left the last line open)
+    const fulQty = r.ful === 'full' || (r.ful === 'partial' && idx < r.items.length - 1) ? x.qty : 0;
+    const picked = decoBoth && cap.ful && fulQty < x.qty && fullOn;
     const cell = {
       item: `<span class="cell">${tile(x.kind, x.hex, rowH > 40 ? 32 : 26)}<span class="cell col" style="min-width:0" title="${x.sku}"><span class="cell" style="gap:4px;max-width:100%"><b class="strong ell" style="font-size:11.5px">${x.name}</b>${cap.shopify ? shopifyLink(r, x) : ''}</span><span class="muted ell" style="font-size:10px;display:flex;align-items:center;gap:4px">${swatch(x)}<span>· ${x.size}</span>${cap.stock && skuSub ? `<span class="mono">· ${x.sku}</span>` : ''}${dense && cap.bin ? `<span class="bin">${x.bin}</span>` : ''}</span>${xchips(x, cap)}</span></span>`,
       sku: cap.stock ? `<span class="cell col" style="gap:2px;align-items:flex-start;min-width:0"><span class="mono muted ell" style="font-size:10px;max-width:100%">${x.sku || '-'}</span></span>` : `<span class="mono muted">${x.sku}</span>`,
       work: X.lineWork(x, cap),
+      decorator: X.lineDecorator(x, cap),
       act: X.lineActions(r, x, r.ful === 'full' ? 'full' : r.ful === 'partial' && idx < r.items.length - 1 ? 'part' : '', cap),
       bin: `<span class="bin">${x.bin}</span>`,
       deco: X.lineDeco(x, cap, { both: decoBoth }),
-      qty: `<b class="tn" style="text-align:center">${x.qty}</b>`,
+      qty: decoBoth && cap.ful ? `<b class="tn" style="text-align:center" title="${fulQty} of ${x.qty} fulfilled">${fulQty}/${x.qty}</b>` : `<b class="tn" style="text-align:center">${x.qty}</b>`,
       avail: `<span style="display:flex;justify-content:center">${cap.stock ? availCell(r, x) : ''}</span>`,
       po: cap.stock ? poCell(r, x, cap) : '',
       pdate: `<span class="muted tn" style="font-size:10.5px">${x.packed > 0 ? packHistOf(r)[0].at : '-'}</span>`,
@@ -199,9 +217,13 @@ export function lines(r, cap, { rowH = 36, sel = 1, skuSub = true, head: showHea
       full: `<span style="display:flex;justify-content:center"><span class="ck${fullOn ? ' on' : ''}"></span></span>`,
       part: `<span class="step${fullOn ? ' dis' : ''}" style="justify-self:end"><button>−</button><span>${fullOn ? x.qty : idx === 1 && sel ? 2 : 0}</span><button>+</button></span>`,
     };
-    return `<div class="ln${done ? ' done' : part ? ' part' : ''}" style="--lcols:${css};--lh:${rowH}px;--lgap:${lgap}px">${cols.map(([k]) => cell[k] || '<span></span>').join('')}</div>`;
+    return `<div class="ln${picked ? ' pick' : done ? ' done' : part ? ' part' : ''}" style="--lcols:${css};--lh:${rowH}px;--lgap:${lgap}px">${cols.map(([k]) => cell[k] || '<span></span>').join('')}</div>`;
   });
-  return (showHead ? head : '') + rows.join('');
+  const body = (showHead ? head : '') + rows.join('');
+  if (!decoBoth) return body;
+  // Implemented page: the item table keeps its column minimums and scrolls sideways when the three boxes do not fit.
+  const min = cols.reduce((n, c) => n + (parseFloat(c[1].replace('minmax(', '')) || 0), 0) + (cols.length - 1) * lgap + 16;
+  return `<div class="lscroll thin"><div style="min-width:${Math.ceil(min)}px">${body}</div></div>`;
 }
 
 /* ---------- role-gated side boxes (shared by A expanded row, B inspector, C detail zone) ---------- */
@@ -209,8 +231,8 @@ export function packBox(r, cap, { big = false } = {}) {
   if (!cap.pack) return '';
   const allPacked = packedQty(r) >= totalQty(r);
   const entry = (e) => `<div class="hist"><span><b>Packed ${e.at}</b> · ${e.n} item${e.n === 1 && cap.packDate ? '' : 's'}</span><button class="ib" title="Cancel confirmation (sends notification)">${ic('trash', 'i')}</button></div>`;
-  // Picking List: every confirmation (up to 5) with its own cancel icon. Admin keeps the single latest entry.
-  const hist = packedQty(r) === 0 ? `<div class="hist muted">No packing history.</div>` : cap.packDate ? `<div style="display:flex;flex-direction:column;gap:4px">${packHistOf(r).slice(0, 5).map(entry).join('')}</div>` : entry(packHistOf(r)[0]);
+  // Implemented page: every (non-canceled) confirmation, each with its own cancel icon, in a short scroll list (all roles).
+  const hist = packedQty(r) === 0 ? `<div class="hist muted">No packing history.</div>` : `<div style="display:flex;flex-direction:column;gap:4px;max-height:68px;overflow-y:auto">${packHistOf(r).map(entry).join('')}</div>`;
   const h = big ? 38 : 28;
   return `<div style="display:flex;flex-direction:column;gap:6px">
     <div style="display:flex;gap:5px">
@@ -242,24 +264,12 @@ export function fulBox(r, cap, { confirm = true } = {}) {
   const locked = r.canceled || r.closed;
   const lockNote = locked ? `<div class="lockb">${ic('lock', 'i')}<span><b class="strong">Fulfilment locked</b><br>${r.canceled ? 'Canceled' : 'Closed'} orders cannot be fulfilled.</span></div>` : '';
   if (locked && !r.ful) return lockNote;
-  const editBtns = cap.req === 'direct'
-    ? `<button class="btn xs ghost">${ic('pencil', 'i12')}Edit</button><button class="btn xs dngr">Cancel</button>`
-    : r.req ? `<span class="bdg warn">${ic('clock', 'i10')}Edit request pending</span>` : `<button class="btn xs ghost">${ic('userLock', 'i12')}Request edit</button><button class="btn xs dngr">Request cancel</button>`;
-  if (r.ful) {
-    const cs = confsOf(r), c = cs[cs.length - 1], left = r.ful === 'partial' ? r.items.length - 1 : 0;
-    return `<div style="display:flex;flex-direction:column;gap:6px">${lockNote}
-      <div class="row-b"><span class="cell" style="gap:4px"><span class="bdg ok">${r.ful === 'full' ? 'Fulfilled' : 'Partial'}</span>${cs.length > 1 ? `<span class="bdg">${cs.length} parcels</span>` : ''}</span><span class="muted tn" style="font-size:10px">${c.date}</span></div>
-      <dl class="kv"><dt>Carrier</dt><dd>${c.carrier}</dd><dt>Tracking</dt><dd class="mono">${c.no} ${ic('external', 'i10')}</dd><dt>Status</dt><dd><span class="cell"><span class="bdg ${c.st === 'Delivered' ? 'ok' : 'info'}">${c.st}</span>${X.trackingIcon(r, cap)}</span></dd></dl>
-      ${left ? `<span class="muted" style="font-size:10px">${left} line still to fulfil</span>` : ''}
-      <div style="display:flex;gap:5px;flex-wrap:wrap">${locked ? '' : editBtns}</div>
-    </div>`;
-  }
-  const ready = packedQty(r) >= totalQty(r);
-  return `<div style="display:flex;flex-direction:column;gap:6px">
-    <div class="row-b"><span class="bdg ${ready ? 'info' : 'warn'}">${ready ? 'Ready to fulfil' : 'Not fully packed'}</span><span class="muted tn" style="font-size:10px">${ready ? 'All lines packed' : packedQty(r) + '/' + totalQty(r) + ' packed'}</span></div>
-    ${confirm ? `<div style="display:flex;gap:5px"><button class="btn pri" style="flex:1;height:26px">Confirm fulfilment</button><button class="btn ghost" style="flex:1;height:26px" title="Confirm fulfilment and print the shipping label">${ic('printer', 'i')}Confirm & Print</button></div>` : ''}
-    ${confirm ? fulMsg(r, cap) : ''}
-  </div>`;
+  const cs = confsOf(r), fulfilled = r.ful === 'full', ready = packedQty(r) >= totalQty(r);
+  const left = r.ful === 'partial' ? r.items.length - 1 : 0;
+  const head = locked && !cs.length ? '' : `<div class="row-b"><span class="bdg ${fulfilled ? 'ok' : cs.length ? 'warn' : ready ? 'info' : 'warn'}">${fulfilled ? 'Fulfilled' : cs.length ? 'Partial' : ready ? 'Ready to fulfil' : 'Not fully packed'}</span><span class="muted tn" style="font-size:10px">${fulfilled ? '' : cs.length ? `${left} line${left === 1 ? '' : 's'} still to fulfil` : ready ? 'All lines packed' : packedQty(r) + '/' + totalQty(r) + ' packed'}</span></div>`;
+  // Admin: Confirm buttons stay (disabled once fulfilled). Carrier, tracking and Edit / Cancel moved into the Fulfilments modal.
+  const adminBtns = !locked && cap.req === 'direct' ? `<div style="display:flex;gap:5px"><button class="btn ${fulfilled ? 'off' : 'pri'}" style="flex:1;height:26px"${fulfilled ? ' disabled title="Already fully fulfilled"' : ''}>Confirm fulfilment</button><button class="btn ${fulfilled ? 'off' : 'ghost'}" style="flex:1;height:26px"${fulfilled ? ' disabled' : ''} title="${fulfilled ? 'Already fully fulfilled' : 'Confirm fulfilment and print the shipping label'}">${ic('printer', 'i')}Confirm & Print</button></div>${fulMsg(r, cap)}` : '';
+  return `<div style="display:flex;flex-direction:column;gap:6px">${lockNote}${head}${confirm ? adminBtns : ''}</div>`;
 }
 /** Today's "Shipping" block (Orders page): title, Free / Paid pill, discount codes, then Price and Discounted. */
 export function shipBox(r, cap) {

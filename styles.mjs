@@ -172,11 +172,17 @@ button:focus-visible,.tab:focus-visible{outline:2px solid var(--pri);outline-off
 .appr{display:flex;align-items:center;gap:8px;background:var(--a50);border:1px solid var(--a200);color:var(--a800);border-radius:var(--rad);padding:0 6px 0 9px;height:30px;font-size:11px;flex:none}
 .appr b{font-weight:700}.appr .sp{flex:1}
 .appr .by{color:#b45309}
+.appr2{background:var(--a50);border:1px solid var(--a200);border-radius:var(--rad);overflow:hidden;flex:none;font-size:11px}
+.apr-h{display:flex;align-items:center;gap:8px;width:100%;height:30px;padding:0 9px;color:var(--a800);text-align:left}.apr-h b{flex:1;font-weight:700}.apr-h:hover{filter:brightness(.97)}
+.apr-n{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:var(--a600,#d97706);color:#fff;font-size:10px;font-weight:700;font-style:normal}
+.apr-b{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:6px 9px;background:var(--surf);border-top:1px solid var(--a200)}
+.apr-r{margin-top:2px;font-style:italic;color:var(--tx-b);font-size:10.5px}
 
 /* ---------- pack lines ---------- */
 .ln{display:grid;grid-template-columns:var(--lcols);gap:var(--lgap,8px);align-items:center;padding:0 8px;min-height:var(--lh,36px);border-bottom:1px solid var(--div);font-size:11.5px}
 .ln:last-child{border-bottom:0}
-.ln.done{background:#f0fdf4}.ln.part{background:#fffbeb}
+.ln.done{background:#f0fdf4}.ln.part{background:#fffbeb}.lscroll{overflow-x:auto;overflow-y:hidden}
+.ln.pick{background:var(--pri-soft)}
 .lnh{display:grid;grid-template-columns:var(--lcols);gap:var(--lgap,8px);padding:0 8px;height:22px;align-items:center;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--tx-s);border-bottom:1px solid var(--bd);background:var(--surf-m)}
 .bin{display:inline-flex;align-items:center;gap:3px;font:700 10px ui-monospace,Menlo,monospace;color:var(--tx-b);background:var(--div);border-radius:4px;padding:1px 5px}
 .kv{display:grid;grid-template-columns:78px 1fr;gap:3px 8px;font-size:11px;align-items:baseline}

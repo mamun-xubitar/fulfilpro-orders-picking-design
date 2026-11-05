@@ -35,7 +35,7 @@ export const rowsFor = (role) => (role === 'picker' ? ORDERS.filter((r) => !['sh
 /* ======================================================================================== */
 const actsW = (cap) => (2 + (cap.slip ? 1 : 0) + (cap.labels ? 1 : 0) + (cap.invoice ? 1 : 0) + (cap.track ? 1 : 0) + 1) * 24 + 4;
 function colsA(cap) {
-  return `20px 96px 50px 108px ${cap.stockAdj ? '58px ' : ''}minmax(80px,1fr) ${P.trackW(cap)}px ${cap.ful ? '104px ' : ''}84px 132px 52px ${actsW(cap)}px`;
+  return `20px 96px 50px 108px ${cap.stockAdj ? '66px ' : ''}minmax(80px,1fr) ${P.trackW(cap)}px ${cap.ful ? '104px ' : ''}84px 132px 52px ${actsW(cap)}px`;
 }
 /** Stock adjustment pill (admin): managed / total lines, green / amber / red, as today's column. */
 const stockAdjCell = (r) => {
@@ -70,7 +70,7 @@ function rowA(r, role, { open = false, checked = false }) {
     ${P.track(r, cap)}
     ${cap.ful ? fulCell(r) : ''}
     ${P.packBar(r)}
-    <span class="cell">${cap.packDate ? `<span class="muted tn" style="font-size:10.5px">${packedQty(r) > 0 ? packHistOf(r)[0].at : '-'}</span>` : `${P.shortBadge(r, cap)}${X.decoProg(r, cap)}`}</span>
+    <span class="cell">${cap.packDate ? `<span class="muted tn" style="font-size:10.5px">${packedQty(r) > 0 ? packHistOf(r)[0].at : '-'}</span>` : `<span class="cell col" style="align-items:flex-start;gap:2px">${P.shortBadge(r, cap)}${X.decoProg(r, cap) ? `<span class="cell" style="gap:5px">${X.decoProg(r, cap)}</span>` : ''}</span>`}</span>
     <span class="cell">${P.noteFlags(r)}</span>
     <span class="acts">${rowActsA(r, cap)}<button class="ib" title="${open ? 'Collapse' : 'View details'}">${ic(open ? 'chevUp' : 'chevronDown', 'i')}</button></span>
   </div>`;
@@ -116,9 +116,9 @@ function pageA(role, expand) {
   const content = `
     ${P.approvals(role)}
     ${P.toolbar(role, { refreshWarn: role === 'admin' })}
-    <div class="qrow">${P.queueTabs(role, 'all')}<div class="r"><span class="muted" style="font-size:10.5px">Sort</span>${P.chip('', 'Newest first', 0)}${cap.labels ? `<button class="btn ghost">${ic('plus', 'i')}New invoice</button>` : ''}<button class="btn ghost">${ic('expand', 'i')}Expand all</button></div></div>
+    <div class="qrow">${P.queueTabs(role, 'all')}<div class="r"><span class="muted" style="font-size:10.5px">Sort</span><button class="fchip" title="Sort by"><b>Date placed</b><span style="display:inline-flex;color:var(--pri)">${ic('chevronDown', 'i12')}</span></button>${cap.labels ? `<button class="btn ghost">${ic('plus', 'i')}New invoice</button>` : ''}<button class="btn ghost">${ic('expand', 'i')}Expand all</button></div></div>
     <div class="card" style="flex:1">
-      <div class="thead" style="--cols:${colsA(cap)}"><span class="ck mix"></span><span>${P.sortHead('Order')}</span><span>Store</span><span>${P.sortHead('Customer')}</span>${cap.stockAdj ? '<span style="text-align:center" title="Stock adjustment">Stock adj.</span>' : ''}<span>Items</span>${P.trackHead(cap)}${cap.ful ? '<span>Fulfilment</span>' : ''}<span>Packed</span><span>${cap.packDate ? 'Packed date' : 'Deco'}</span><span>Notes</span><span style="text-align:right">Actions</span></div>
+      <div class="thead" style="--cols:${colsA(cap)}"><span class="ck mix"></span><span>${P.sortHead('Order')}</span><span>Store</span><span>${P.sortHead('Customer')}</span>${cap.stockAdj ? '<span style="text-align:center" title="Stock adjustment">Stock adj.</span>' : ''}<span>Items</span>${P.trackHead(cap)}${cap.ful ? '<span>Fulfilment</span>' : ''}<span>Packed</span><span>${cap.packDate ? 'Packed date' : 'Decoration'}</span><span>Notes</span><span style="text-align:right">Actions</span></div>
       <div class="tbody"><div class="tscroll thin">${body}</div>${P.bulkBar(role, 3, false, chk.reduce((a, n) => a + byNo(n).items.filter((x) => x.nameAttr).length, 0))}</div>
       ${P.pager(rows.length)}
     </div>`;

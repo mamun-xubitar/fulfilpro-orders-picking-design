@@ -22,6 +22,8 @@ export const CSS_X = `
 .nm-a .ck{width:10px;height:10px;border-width:1.3px}
 .rs-c{display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:700;color:var(--a800);background:var(--a50);border:1px solid var(--a200);border-radius:4px;padding:0 4px;height:15px;white-space:nowrap}
 .rs-c.ok{color:var(--e700);background:var(--e50);border-color:var(--e200)}
+.dpl{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;flex:none;border-radius:50%;border:1px solid var(--pri-ring);color:var(--pri-ink)}.dpl:hover{background:var(--pri-soft)}
+.dtb{display:inline-flex;align-items:center;height:16px;padding:0 6px;border-radius:999px;border:1px solid var(--bd);font-size:9.5px;font-weight:700;color:var(--tx-m);white-space:nowrap}.dtb:hover{background:var(--div);color:var(--tx)}.dtb:disabled{opacity:.4;cursor:not-allowed}
 .dcl{display:flex;flex-direction:column;gap:2px;align-items:flex-start;line-height:1.1}
 .dcl .w{font-size:9.5px;color:var(--tx-s);white-space:nowrap}.dcl .w.w-u{color:var(--a800);font-weight:700}.dcl .w.w-d{color:var(--e700);font-weight:700}
 .xbar{display:flex;align-items:center;gap:6px;flex-wrap:nowrap;min-height:30px;padding:3px 8px;border-bottom:1px solid var(--div);background:var(--surf)}
@@ -78,7 +80,7 @@ export function lineDeco(x, cap, { both = false } = {}) {
       ? `<${admin ? 'button' : 'span'} class="bdg ${cls}" title="${admin ? 'Toggle ' + name : name + ': ' + done + ' of ' + x.qty + ' decorated'}">${done}/${x.qty} ${k}</${admin ? 'button' : 'span'}>`
       : admin ? `<button class="bdg off" title="Toggle ${name}">${k}</button>` : '';
     const badges = kind('EMB', 'emb', 'embroidery') + kind('PRT', 'prt', 'print');
-    return `<span class="dcl dcb"><span class="dcr">${badges || '<span class="muted">-</span>'}</span>${assigned ? `<span class="bdg info" title="Assigned to ${w.who} · due ${w.due}">${w.who.split(' ')[0]} · ${w.due}</span>` : ''}</span>`;
+    return `<span class="dcl dcb"><span class="dcr">${badges || '<span class="muted">-</span>'}</span></span>`;
   }
   if (!x.deco) return '';
   const w = x.work || { state: 'unassigned', done: 0 };
@@ -86,6 +88,18 @@ export function lineDeco(x, cap, { both = false } = {}) {
   if (w.state === 'unassigned') return `<span class="dcl">${kind}${cap.deco === 2 ? `<button class="btn xs soft" style="height:16px;padding:0 5px">${ic('plus', 'i10')}Assign</button>` : '<span class="w w-u">Unassigned</span>'}</span>`;
   const cls = w.state === 'done' ? 'w-d' : '';
   return `<span class="dcl">${kind}<span class="w ${cls}" title="${w.who} · due ${w.due}">${w.state === 'done' ? '✓ Done' : `${w.done}/${x.qty}`} · ${w.who.split(' ')[0]}</span></span>`;
+}
+/** Decorator column (implemented page): assignee chip or "Unassigned", `+` to assign (Admin), and under it Mark done / View text buttons (Admin, decorated lines). Staff reads the assignee only. */
+export function lineDecorator(x, cap) {
+  const w = x.work || { state: 'unassigned', done: 0 }, assigned = w.state !== 'unassigned', admin = cap.deco === 2;
+  if (!assigned && !admin) return `<span class="muted">-</span>`;
+  const decorated = Boolean(x.deco), hasWork = assigned && (w.state === 'done' || w.done > 0);
+  const remaining = w.state === 'done' ? 0 : x.qty - (w.done || 0);
+  const chip = assigned ? `<span class="bdg info ell" style="max-width:100%" title="Assigned to ${w.who} · due ${w.due}">${w.who.split(' ')[0]} · ${w.due}</span>` : `<span class="muted" style="font-size:10px">Unassigned</span>`;
+  const plus = admin ? `<button class="dpl" title="${assigned ? 'Change the decorator' : 'Assign a decorator'}" aria-label="${assigned ? 'Change the decorator' : 'Assign a decorator'}">${ic('plus', 'i10')}</button>` : '';
+  const tb = (t, title, off) => `<button class="dtb"${off ? ' disabled' : ''} title="${title}">${t}</button>`;
+  const acts = admin && decorated ? `<span class="cell" style="gap:4px">${tb('Mark done', 'Mark decoration done', remaining <= 0)}${tb('View', 'View decorations', !hasWork)}</span>` : '';
+  return `<span class="cell col" style="align-items:flex-start;gap:2px;padding:2px 0;min-width:0"><span class="cell" style="gap:4px;min-width:0;max-width:100%">${chip}${plus}</span>${acts}</span>`;
 }
 /** Work column (as today's Work badge): done / qty, green when finished, amber when started, grey otherwise. Admin opens View decorations. */
 export function lineWork(x, cap) {

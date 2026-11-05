@@ -97,10 +97,11 @@ const syncMenu = () => `<div class="menu" style="position:static;width:200px"><d
 function calendar() {
   const d = (n, cls = '') => `<span class="cd ${cls}">${n}</span>`;
   const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((x) => `<span class="cd h">${x}</span>`).join('');
-  const cells = (start, n, sel0, sel1) => `<div class="cal">${days}${Array.from({ length: start }, () => '<span class="cd"></span>').join('')}${Array.from({ length: n }, (_, i) => { const v = i + 1; return d(v, sel0 && v === sel0 ? 'e' : sel1 && v === sel1 ? 'e' : sel0 && sel1 && v > sel0 && v < sel1 ? 'r' : ''); }).join('')}</div>`;
-  return `<div class="menu" style="position:static;width:300px;padding:8px"><div class="row-b" style="margin-bottom:6px"><b>October 2026</b><span class="muted">Custom range</span></div>${cells(3, 31, 12, 30)}<div class="row-b" style="margin-top:8px"><button class="btn xs ghost" style="border-color:transparent;color:var(--pri-ink)">Clear dates</button><span class="muted tn">12 Oct – 30 Oct</span></div></div>`;
+  const cells = (start, n, sel0, sel1) => `<div class="cal lg">${days}${Array.from({ length: start }, () => '<span class="cd"></span>').join('')}${Array.from({ length: n }, (_, i) => { const v = i + 1; return d(v, sel0 && v === sel0 ? 'e' : sel1 && v === sel1 ? 'e' : sel0 && sel1 && v > sel0 && v < sel1 ? 'r' : ''); }).join('')}</div>`;
+  return `<div class="menu" style="position:static;width:max-content;padding:12px"><div class="row-b" style="margin-bottom:10px;font-size:12px"><span class="muted">‹</span><b>October 2026</b><b>November 2026</b><span class="muted">›</span></div><div style="display:flex;gap:20px">${cells(3, 31, 12, 30)}${cells(6, 30, 0, 0)}</div><div class="row-b" style="margin-top:8px;font-size:12px"><button class="btn xs ghost" style="border-color:transparent;color:var(--pri-ink);font-size:12px">Clear dates</button><span class="muted tn">12 Oct – 30 Oct</span></div></div>`;
 }
-const filterRow = () => `<div class="menus"><div><div class="mt">Packed status · all roles</div>${packedMenu()}</div><div><div class="mt">Print status · admin, picker</div>${printMenu()}</div><div><div class="mt">Fulfilment status · admin, staff</div>${statusMenu()}</div><div><div class="mt">Store</div>${storeMenu()}</div><div><div class="mt">Sync split button</div>${syncMenu()}</div><div><div class="mt">Period: custom range</div>${calendar()}</div></div>`;
+const sortMenu = () => `<div class="menu" style="position:static;width:170px">${[['Date placed', 1], ['Order no.', 0], ['Customer', 0]].map(([n, on]) => `<span class="${on ? 'on' : ''}">${n}</span>`).join('')}<div style="border-top:1px solid var(--div);margin:4px 0"></div><span class="on">Descending</span><span>Ascending</span></div>`;
+const filterRow = () => `<div class="menus"><div><div class="mt">Packed status · all roles</div>${packedMenu()}</div><div><div class="mt">Print status · admin, picker</div>${printMenu()}</div><div><div class="mt">Fulfilment status · admin, staff</div>${statusMenu()}</div><div><div class="mt">Store</div>${storeMenu()}</div><div><div class="mt">Sync split button</div>${syncMenu()}</div><div><div class="mt">Sort: field, then direction</div>${sortMenu()}</div><div><div class="mt">Period: custom range</div>${calendar()}</div></div>`;
 
 /* 11 ---- Tracking */
 const tracking = () => dlg('Tracking', `<div class="kv" style="grid-template-columns:64px 1fr"><dt>Parcel</dt><dd class="mono">ST9920451 · StarTrack</dd><dt>State</dt><dd><span class="bdg warn">Paused</span> after 3 days with no scan</dd></div><div class="row-b" style="margin-top:10px;justify-content:flex-start;gap:12px;font-size:10.5px"><span class="cell"><span class="trkic none">${ic('navTracking', 'i')}</span>Not registered</span><span class="cell"><span class="trkic reg">${ic('navTracking', 'i')}</span>Registered</span><span class="cell"><span class="trkic pause">${ic('navTracking', 'i')}</span>Paused</span></div>`, `<button class="btn ghost">Close</button><button class="btn pri">Restart tracking</button>`, { w: 400 });
@@ -109,7 +110,16 @@ const tracking = () => dlg('Tracking', `<div class="kv" style="grid-template-col
 const testMode = () => `<div style="display:flex;flex-direction:column;gap:10px;width:380px"><div class="toast"><i></i>This action is not allowed in test mode.</div><div class="muted" style="line-height:1.5;font-size:10.5px"><b>Test user</b> sees the Staff page. Every change (fulfil, notes, labels, requests) is blocked and answered with this message.<br><br><b>Copy protection</b> stays on the merged page for every role except Admin: text selection and copy are blocked on order, customer and product surfaces. Surfaces that must stay copyable (the order note) keep the <code>allow-copy</code> class.</div></div>`;
 
 /* 13 ---- Notes + messages modal */
-const notesMsg = () => dlg('Notes and messages', `<div class="seg2" style="margin-bottom:8px"><button class="on">Note</button><button>Message to admin</button></div><div class="fr"><label>Message</label><span class="inp" style="height:46px;align-items:flex-start;padding-top:6px;color:var(--g500);white-space:normal">Write a note for the team…</span></div><div class="fr" style="margin-top:8px"><label>History</label><div class="msg"><span class="av">S</span><div><b>Staff</b> <span class="muted">· Order note · Wed 15:10</span><br>Captain collects Saturday.<span style="margin-left:6px"><button class="lnk">Edit</button> <button class="lnk" style="color:var(--r700)">Delete</button></span></div></div><div class="msg"><span class="av p">P</span><div><b>Picker</b> <span class="muted">· To admin · Thu 08:42</span><br>Bin A-04 is short by 1.</div></div></div>`, `<button class="btn ghost">Close</button><button class="btn pri">${ic('chat', 'i')}Send</button>`, { w: 420, sub: 'Pickers send “picker” messages, others “orders” messages' });
+const hmsg = (av, who, meta, text, extra = '') => `<div class="msg"><span class="av${av === 'P' ? ' p' : ''}">${av}</span><div><b>${who}</b> <span class="muted">· ${meta}</span><br>${text}${extra}</div></div>`;
+/** Implemented dialogs: compose on the left, scrollable "History (n)" on the right; Send is disabled once the order's Message action is closed. */
+const twoPane = (title, tab, form, count, history, { sendOff = false } = {}) => dlg(title, `<div class="seg2" style="margin-bottom:8px"><button${tab === 'note' ? ' class="on"' : ''}>Note</button><button${tab === 'msg' ? ' class="on"' : ''}>Message</button></div>
+  <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:12px"><div style="display:flex;flex-direction:column;gap:8px;min-width:0">${form}</div><div style="display:flex;flex-direction:column;gap:4px;min-width:0;border-left:1px solid var(--div);padding-left:12px"><span class="shh2">History${count ? ` (${count})` : ''}</span><div class="thin" style="display:flex;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto">${history}</div></div></div>`,
+  `<button class="btn ghost">Close</button><button class="btn ${sendOff ? 'off' : 'pri'}"${sendOff ? ' disabled title="Messages are disabled for this order"' : ''}>${ic('chat', 'i')}Send</button>`, { w: 720, sub: '#2204 · Tom Whitaker' });
+const textBox = (label, ph) => `<div class="fr"><label>${label}</label><span class="inp" style="height:124px;align-items:flex-start;padding-top:6px;color:var(--g500);white-space:normal">${ph}</span></div>`;
+const notesMsg = () => `<div style="display:flex;flex-direction:column;gap:14px;align-items:center">
+  ${twoPane('Notes and messages', 'note', textBox('Note', 'Write a note for the team…'), 2, hmsg('S', 'Staff', 'Wed 15:10', 'Captain collects Saturday.', '<span style="margin-left:6px"><button class="lnk">Edit</button> <button class="lnk" style="color:var(--r700)">Delete</button></span>') + hmsg('A', 'Admin', 'Wed 16:02', 'Hold until the kit bag is back in stock.'))}
+  ${twoPane('Notes and messages', 'msg', `<div class="fr"><label>Recipient</label><span class="inp" style="height:28px;justify-content:space-between">Dana Hart - dana@example.com${ic('chevronDown', 'i10')}</span></div>${textBox('Message', 'Write a message for the selected recipient')}`, 1, hmsg('P', 'Dana Hart', 'Thu 08:42', 'Bin A-04 is short by 1.'), { sendOff: true })}
+  <div class="muted" style="font-size:10.5px;max-width:700px;line-height:1.5">Send is disabled (second dialog) once messaging is closed for the order: <b>Picker</b> when the order is fully packed, <b>Staff</b> when it is fully fulfilled. Admin can always message. The row Message icon is a single button for every role; the recipient is chosen inside the dialog.</div></div>`;
 
 /* 14 ---- closed / canceled orders and fulfilment lock (admin view, same boxes the concepts use) */
 function states() {
@@ -117,6 +127,16 @@ function states() {
   P.setRole('admin');
   return `<div class="trio">${box('Closed, fulfilled', byNo('1142'), P.CAP.admin)}${box('Canceled, not fulfilled', byNo('1163'), P.CAP.admin)}${box('Fulfilled, 2 parcels', byNo('2188'), P.CAP.admin)}</div>`;
 }
+/* 15 ---- Pending fulfilment requests (Admin) */
+const approvalsCard = () => `<div style="display:flex;flex-direction:column;gap:12px;width:100%"><div><div class="mt">Collapsed (default)</div>${P.approvals('admin')}</div><div><div class="mt">Expanded</div>${P.approvals('admin', { open: true })}</div></div>`;
+
+/* 16 ---- Create PO from "+ PO" (Inventory's modal) */
+const poModal = () => dlg('Create purchase order', `${fld('Supplier', 'Westgate Apparel Co.' + ic('chevronDown', 'i10'))}
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px">${fld('Reference number', '<span class="muted">Supplier or internal reference</span>')}${fld('Delivery date', ic('calendar', 'i10') + '&nbsp;6 Nov 2026')}</div>
+  <div style="margin-top:6px">${fld('PO Remark', '<span class="muted">Optional notes</span>')}</div><div style="margin-top:6px">${fld('Shipping Remark', '<span class="muted">NF.{ORDERNUMBER}, color: , size: , quantity: , made in china.</span>')}</div>
+  <div class="fr" style="margin-top:8px"><label>Items</label><div class="hist" style="gap:8px"><span class="cell">${tile('tee', '#38bdf8', 24)}<span class="cell col"><b>Club Training Tee</b><span class="muted" style="font-size:9.5px">Sky · L · TEE-SKY-L</span></span></span><span class="step" style="height:24px"><button>−</button><span>3</span><button>+</button></span></div></div>`,
+  `<button class="btn ghost" style="flex:1">Cancel</button><button class="btn pri" style="flex:1">Save and send</button>`, { w: 480 });
+
 const DCSS = `
 body{background:#e9edf3}.sheet{width:1480px;margin:0 auto;padding:34px 0 60px}
 .hd1{padding:0 40px 18px}.hd1 h1{font-size:24px;letter-spacing:-.3px}.hd1 p{font-size:13px;color:#4b5563;margin-top:7px;line-height:1.55;max-width:1100px}
@@ -139,6 +159,7 @@ body{background:#e9edf3}.sheet{width:1480px;margin:0 auto;padding:34px 0 60px}
 .rd{width:12px;height:12px;border-radius:50%;border:1.5px solid var(--g400);display:inline-block;flex:none}.rd.on{border:4px solid var(--pri)}
 .menus{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-start}.mt{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#6b7280;margin-bottom:4px}
 .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;text-align:center}.cd{height:24px;display:flex;align-items:center;justify-content:center;font-size:10.5px;border-radius:5px;font-variant-numeric:tabular-nums}.cd.h{font-size:9px;font-weight:700;color:var(--tx-s)}.cd.r{background:var(--pri-soft);color:var(--pri-ink);border-radius:0}.cd.e{background:var(--pri);color:#fff;font-weight:700}
+.shh2{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--tx-s)}.cal.lg .cd{height:32px;width:32px;font-size:12px}.cal.lg .cd.h{font-size:11px}.cal.lg{grid-template-columns:repeat(7,32px)}
 .trio{display:flex;flex-wrap:wrap;gap:12px;justify-content:center}
 .csv{border:1px solid var(--bd-s);border-radius:8px;background:#fff;overflow:hidden;width:290px;font-size:10.5px}.csvh{background:var(--surf-m);padding:4px 8px;font-weight:700;border-bottom:1px solid var(--bd)}.csvr{display:grid;grid-template-columns:50px 1fr 80px;gap:6px;padding:3px 8px;border-bottom:1px solid var(--div)}.csvr.h{font-weight:700;color:var(--tx-s)}
 .toast{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--bd);border-left:4px solid var(--r600);border-radius:8px;padding:10px 12px;box-shadow:0 6px 18px rgb(15 23 42/.14);font-weight:700;color:var(--tx)}.toast i{width:8px;height:8px;border-radius:50%;background:var(--r600)}
@@ -156,9 +177,11 @@ const cards = [
   card(9, 'Name attributes: select and export', 'AS', 'orders/modules/useNameAttributes.ts', 'Added: menu and CSV', namesMenu(), { span: 2 }),
   card(10, 'Tracking (17track)', 'A', 'orders/modules/OrderRowActions.tsx', 'Added', tracking()),
   card(11, 'Filter menus', 'APS', 'OrdersToolbar, PickingListFilters', 'All roles: today’s filters', filterRow(), { span: 3 }),
-  card(12, 'Notes and messages', 'APS', 'components/NotesModal, MessagesModal', 'Added: type per role', notesMsg()),
+  card(12, 'Notes and messages', 'APS', 'orders/modules/dialogs/NotesDialog, MessagesDialog', 'Changed: two panes, “Message” tab, Send locks', notesMsg(), { span: 2 }),
   card(13, 'Order states: closed, canceled, tracking', 'AS', 'orders/modules/OrderActionsColumn.tsx', 'Added: Closed, lock states', states(), { span: 2 }),
   card(14, 'Test user and copy protection', 'S', 'proxy.ts · app/(shell)/layout.tsx', 'Requirement, not a screen', testMode()),
+  card(15, 'Pending fulfilment requests', 'A', 'orders/modules/queue/ApprovalsStrip.tsx', 'Changed: one collapsible section', approvalsCard(), { span: 2 }),
+  card(16, 'Create purchase order (+ PO)', 'A', 'inventory/modules/PoModals.tsx · CreatePoModal', 'Changed: Inventory’s modal, prefilled with the shortfall', poModal()),
 ].join('');
 
 export function buildDialogs() {

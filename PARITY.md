@@ -19,7 +19,7 @@ Legend: **Covered** = was already in the prototype. **Added** = missing in round
 | Packing filter options Late Unpacked / Shipped Delayed: slip printed over 24 h ago and not packed (or packed, not shipped). Slip Printed / Not Printed was a second, separate filter. | **Slip filter is the primary pivot** (Admin, Picker): Any · Not printed · Printed. Queue tabs are *Slip not printed · Slip printed · Packed* (+ Shipped, Issues for Admin). |
 | Print slip icon turned green but was a small detail | Green icon with a tick after printing: on the row, in the pack box ("Slip printed · Reprint"), in the stage track and in Products view. Not printed stays neutral. |
 | Red Late / Unshipped badges, Late tab, Late KPI | Removed. The old rule survives only as an optional line in the Slip menu: "Printed over 24 h ago, not packed" ([11]). |
-| Staff | Unchanged: Staff cannot see slips (today `/api/picking-list` is Admin and Picker only). |
+| Staff | Staff see the **Slip** dot on the stage track (read-only, from `slipPrinted`); they still cannot print slips or filter by them (`/api/picking-list` and `/api/orders/slip-prints` are Admin and Picker only). |
 | **Round 12 (all roles)** | Every toolbar now uses **today's filters**, not the Slip chip: Admin = Store, Period, Status, Packed, Print, Sync; Staff = Store, Period, Status, **Packed**; Picker = **Packed** (opens on Not Packed + Partial Packed), **Print** (Slip Not Printed / Slip Printed), Clear filters. Packed has all five options again, including Late Unpacked and Shipped Delayed. Queue tabs stay. Menus in `dialogs.html` [11]. |
 
 Open: the brief says "Print packing slip". The app has **Print picking slip** (Picking List, `OrderPickingSlipPrint`) and
@@ -63,7 +63,7 @@ has its own green state ("Label printed"). Confirm with the client.
 | Attachments row (Files, Customer design, Photos, remarks) | Added | strip under the lines (Admin, decorated orders) |
 | Request Stock modal | Added | `Request stock` button with count; modal [3], cross-linked to PO status |
 | Confirm fulfilment: barcodes, carrier search, tracking number and URL, notify, Confirm & print | Added | opens from **Confirm fulfilment** / **Confirm & Print** as a modal, as today; not inline in the fulfil box; modal [5] |
-| Expanded **Actions** block: Confirm Fulfilment, Confirm & Print (sky), Print Label, Message (count) | Added (round 9, Staff) | Always shown in the Fulfilment box for Staff, disabled once fully fulfilled (all four), canceled or closed ("Fulfilment locked"), as today's `OrderActionsColumn`. `actionsBox()` in `parts.mjs`; Admin keeps the inline buttons for unfulfilled orders |
+| Expanded **Actions** block: Confirm Fulfilment, Confirm & Print (sky), Print Label, Message (count) | Added (round 9, Staff) | Always shown in the Fulfilment box for Staff, disabled once fully fulfilled (all four), canceled or closed ("Fulfilment locked"), as today's `OrderActionsColumn`. Staff pick the lines with the **Full / Partial** columns (as today) and Confirm fulfils the selection; Qty reads `fulfilled/ordered`. `actionsBox()` in `parts.mjs`; Admin keeps the inline buttons for unfulfilled orders |
 | Fulfilments view (several parcels, barcodes, lines) | Added | `Fulfilments >` button in the **Order items** bar (Admin, Staff), next to Request stock, as in today's order header; disabled until the order has a fulfilment confirmation; opens the history as a modal [6] |
 | Edit / cancel fulfilment: Admin direct, Staff request → pending → "Edit now" | Covered / Added states | fulfil box; [6] |
 | "Fulfilment locked" for canceled and closed | Added | fulfil box [13] |
@@ -106,3 +106,22 @@ Orders components there is unchanged.
 
 The request-and-approval flows (`FulfillmentEditRequest`, `DecorationEditRequest`) are kept for Staff; nothing in
 the prototype replaces them with a direct edit.
+
+## Round 13: synced to the implemented app
+
+Source of truth: `app/(shell)/orders/modules` as of commit `15cd13d`. Statuses: **Changed** = the shipped page differs from the earlier prototype and the prototype now follows it.
+
+| Capability | Status | Where |
+|---|---|---|
+| Decoration column (EMB / PRT only) and Decorator column (assignee, `+`, Mark done, View) replace Deco / Work | Changed | item table (`lineDecorator()` in `extras.mjs`, `lineCols()` in `parts.mjs`) |
+| Qty shows fulfilled / ordered (Admin, Staff); Staff see Full / Partial; picked lines tinted | Changed | item table |
+| Queue header "Decoration"; Short N stacked above decoration progress | Changed | `designs.mjs` |
+| Sort chip: field + Ascending / Descending | Changed | queue header; menu in dialogs.html [11] |
+| Slip dot on the stage track for Staff (read-only) | Changed | `CAP.staff.slipStatus` |
+| Pending-request approvals as one collapsible section | Changed | `approvals()`; dialogs.html [15] |
+| Fulfilment box: status row, always-on Confirm buttons for Admin, no inline carrier / tracking / edit | Changed | `fulBox()` |
+| Packing history: all confirmations, scrollable, every role | Changed | `packBox()` |
+| Notes and messages: two panes, "Message" tab, Send locked when messaging is closed; one Message icon | Changed | `msgOff()`; dialogs.html [12] |
+| Create PO uses Inventory's modal | Changed | dialogs.html [16] |
+| Filter menus fit content; larger two-month calendar | Changed | dialogs.html [11] |
+| Item table and queue scroll sideways below their computed minimum width | Note | not drawable at 1280 px |
