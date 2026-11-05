@@ -29,7 +29,7 @@ export default function StepBasics({ p, basics: form }: StepBasicsProps) {
         label="Item no."
         required
         value={form.form.itemNo}
-        onChange={form.set('itemNo')}
+        onChange={form.setItemNo}
         placeholder="09419"
         error={p.createErrors.itemNo ?? (form.itemNoAvailability.taken ? 'A product with this item number already exists' : undefined)}
         adornment={
@@ -44,7 +44,7 @@ export default function StepBasics({ p, basics: form }: StepBasicsProps) {
           ) : undefined
         }
       />
-      <TextField label="Product name" required value={form.form.name} onChange={form.setName} placeholder="FLEX KINDY WIDE BRIM HAT" error={p.createErrors.name} />
+      <TextField label="Product name" required value={form.form.name} onChange={form.set('name')} placeholder="FLEX KINDY WIDE BRIM HAT" error={p.createErrors.name} />
       <div>
         <label className="mb-[2px] block text-[10px] font-bold uppercase leading-none tracking-[0.4px] text-inventory-text-muted">
           Handle <span className="text-inventory-danger">*</span>

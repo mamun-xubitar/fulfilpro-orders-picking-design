@@ -18,7 +18,7 @@ export default function ProductIdentityFields({ details: d, itemNoAvailability }
       <TextField
         label="Item no."
         value={d.form.itemNo}
-        onChange={d.set('itemNo')}
+        onChange={d.setItemNo}
         error={d.errors?.itemNo ?? (itemNoAvailability.taken ? 'A product with this item number already exists' : undefined)}
       />
       <div className="min-w-0">

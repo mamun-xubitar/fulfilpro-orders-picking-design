@@ -9,12 +9,10 @@ const when = (iso: string) => new Date(iso).toLocaleString(undefined, { weekday:
 
 /** Packing & slip (prototype `packBox`): Confirm packed + Print Slip in one row, then the packing history. */
 export default function PackingCard({ p, order }: { p: OrdersPageBundle; order: OrderRow }) {
-  const { caps } = p;
   const total = order.totalQuantity;
   const allPacked = total > 0 && order.packedQuantity >= total;
   const blocked = order.canceled || order.closed;
   const history = (order.packingConfirmations ?? []).filter((c) => !c.canceledAt);
-  const shown = caps.packedDate ? history.slice(0, 5) : history.slice(0, 1);
   const printed = Boolean(order.slipPrinted);
   const confirmOff = allPacked || blocked;
   const confirmTip = blocked ? `${order.canceled ? 'Canceled' : 'Closed'} orders cannot be packed` : allPacked ? 'Everything is packed' : '';
@@ -29,11 +27,11 @@ export default function PackingCard({ p, order }: { p: OrdersPageBundle; order: 
             <Icon name={printed ? 'check' : 'printer'} className="h-3.5 w-3.5" />{printed ? 'Reprint Slip' : 'Print Slip'}
           </button>
         </div>
-        {shown.length === 0 ? (
+        {history.length === 0 ? (
           <div className="rounded-[7px] border border-orders-border bg-orders-surface-muted px-2 py-[3px] text-[10.5px] text-orders-text-subtle">No packing history.</div>
         ) : (
-          <div className="flex flex-col gap-1">
-            {shown.map((c) => {
+          <div className="flex max-h-[68px] flex-col gap-1 overflow-y-auto">
+            {history.map((c) => {
               const items = c.lines.reduce((sum, l) => sum + l.quantity, 0);
               return (
                 <div key={c.id} className="flex items-center justify-between gap-1.5 rounded-[7px] border border-orders-border bg-orders-surface-muted py-[3px] pl-2 pr-1 text-[10.5px] text-orders-text-body">

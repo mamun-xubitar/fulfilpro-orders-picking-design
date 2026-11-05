@@ -57,7 +57,7 @@ export function useCreatePo({ canCreatePo, setOrders, blockTestModeAction }: Use
         ({ supplierProductId, variantId } = json.data);
         const inventory: LineInventory = { supplierProductId, variantId, available: 0, onHand: 0, ownAllocated: 0, po: null };
         setOrders((prev) => prev.map((o) => (o.id === order.id ? { ...o, items: o.items.map((i) => (i.id === item.id ? { ...i, inventory } : i)) } : o)));
-        if (json.data.created) toast.success(`"${item.name}" was added to the hub under ${order.storeName}.`);
+        if (json.data.created) toast.success(json.message);
       }
       await openForm(supplierProductId, variantId, quantity);
     } catch (err) {

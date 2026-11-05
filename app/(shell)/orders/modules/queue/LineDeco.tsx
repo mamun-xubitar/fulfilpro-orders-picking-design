@@ -26,7 +26,7 @@ export function DecoCell({ p, order, item }: { p: OrdersPageBundle; order: Order
   return <span className="flex flex-nowrap items-center gap-[3px] whitespace-nowrap">{badges.length > 0 ? badges : <span className="text-orders-text-subtle">-</span>}</span>;
 }
 
-const ICON_BTN = 'flex h-5 w-5 items-center justify-center rounded-md border border-orders-border text-orders-text-muted hover:bg-orders-divider hover:text-orders-text focus-visible:outline focus-visible:outline-2 focus-visible:outline-orders-primary disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer';
+const TEXT_BTN = 'inline-flex h-4 items-center whitespace-nowrap rounded-full border border-orders-border px-1.5 text-[9.5px] font-bold text-orders-text-muted hover:bg-orders-divider hover:text-orders-text focus-visible:outline focus-visible:outline-2 focus-visible:outline-orders-primary disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer';
 
 /** Decorator column: who is assigned (chip, a `+` button to assign for Admin) and, below, Admin's two decoration actions as
  * icon buttons: Mark decoration done and View decorations. Staff reads the assignee only. */
@@ -57,8 +57,8 @@ export function DecoratorCell({ p, order, item }: { p: OrdersPageBundle; order: 
       </span>
       {admin && decorated && (
         <span className="flex items-center gap-1">
-          <button type="button" disabled={remaining <= 0} title="Mark decoration done" aria-label="Mark decoration done" onClick={() => p.openWorkModal(order, item)} className={ICON_BTN}><Icon name="check" className="h-3 w-3" /></button>
-          <button type="button" disabled={!hasWork} title="View decorations" aria-label="View decorations" onClick={() => p.openWorkDetails(order, item)} className={ICON_BTN}><Icon name="eye" className="h-3 w-3" /></button>
+          <button type="button" disabled={remaining <= 0} title="Mark decoration done" aria-label="Mark decoration done" onClick={() => p.openWorkModal(order, item)} className={TEXT_BTN}>Mark done</button>
+          <button type="button" disabled={!hasWork} title="View decorations" aria-label="View decorations" onClick={() => p.openWorkDetails(order, item)} className={TEXT_BTN}>View</button>
         </span>
       )}
     </span>

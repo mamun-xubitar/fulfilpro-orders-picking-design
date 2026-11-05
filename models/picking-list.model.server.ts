@@ -296,12 +296,17 @@ async function sendPackingEmail(params: {
   const actor = params.actor?.name || params.actor?.email || 'Order picker';
   const url = params.originUrl ? `${params.originUrl}/orders?search=${encodeURIComponent(params.order.number)}` : '';
   const note = params.message ? `\n\nMessage:\n${params.message}` : '';
-  await sendAppMail({
-    to: params.recipients.map((recipient) => recipient.email),
-    subject: `Order ${params.order.number} packing ${params.type}`,
-    text: `${actor} ${verb} items for order ${params.order.number} (${params.order.cusName}).\n\n${lines}${note}${url ? `\n\n${url}` : ''}`,
-    html: `<p><strong>${escapeHtml(actor)}</strong> ${escapeHtml(verb)} items for order <strong>${escapeHtml(params.order.number)}</strong> (${escapeHtml(params.order.cusName)}).</p><pre>${escapeHtml(lines)}</pre>${params.message ? `<p><strong>Message:</strong><br>${escapeHtml(params.message).replace(/\n/g, '<br>')}</p>` : ''}${url ? `<p><a href="${escapeHtml(url)}">Open order</a></p>` : ''}`,
-  });
+  try {
+    await sendAppMail({
+      to: params.recipients.map((recipient) => recipient.email),
+      subject: `Order ${params.order.number} packing ${params.type}`,
+      text: `${actor} ${verb} items for order ${params.order.number} (${params.order.cusName}).\n\n${lines}${note}${url ? `\n\n${url}` : ''}`,
+      html: `<p><strong>${escapeHtml(actor)}</strong> ${escapeHtml(verb)} items for order <strong>${escapeHtml(params.order.number)}</strong> (${escapeHtml(params.order.cusName)}).</p><pre>${escapeHtml(lines)}</pre>${params.message ? `<p><strong>Message:</strong><br>${escapeHtml(params.message).replace(/\n/g, '<br>')}</p>` : ''}${url ? `<p><a href="${escapeHtml(url)}">Open order</a></p>` : ''}`,
+    });
+  } catch (error) {
+    // The packing change is already saved: a broken mail connection must not report it as failed.
+    console.error('Failed to send packing email:', error);
+  }
 
   await Promise.all(params.recipients.map((r) =>
     createNotification({

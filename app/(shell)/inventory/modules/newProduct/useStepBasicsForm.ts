@@ -18,22 +18,22 @@ export function useStepBasicsForm(p: InventoryPage, onCreated: (id: string) => v
     brand: '',
     handle: '',
   });
-  // Locked (the default): the handle field is disabled and re-derives from the product name on
+  // Locked (the default): the handle field is disabled and re-derives from the Item no. on
   // every keystroke. Unlocking hands control to the user; re-locking re-derives immediately.
   const [handleLocked, setHandleLocked] = useState(true);
 
-  const set = (field: 'itemNo' | 'brand') => (e: React.ChangeEvent<HTMLInputElement>) =>
+  const set = (field: 'name' | 'brand') => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
-  const setName = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const name = e.target.value;
-    setForm((prev) => ({ ...prev, name, ...(handleLocked ? { handle: slugifyHandle(name) } : {}) }));
+  const setItemNo = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const itemNo = e.target.value;
+    setForm((prev) => ({ ...prev, itemNo, ...(handleLocked ? { handle: slugifyHandle(itemNo) } : {}) }));
   };
   const setHandle = (e: React.ChangeEvent<HTMLInputElement>) => setForm((prev) => ({ ...prev, handle: e.target.value }));
   const setSupplierIds = (supplierIds: string[]) => setForm((prev) => ({ ...prev, supplierIds }));
   const toggleHandleLock = () => {
     setHandleLocked((prev) => {
       const next = !prev;
-      if (next) setForm((f) => ({ ...f, handle: slugifyHandle(f.name) }));
+      if (next) setForm((f) => ({ ...f, handle: slugifyHandle(f.itemNo) }));
       return next;
     });
   };
@@ -49,5 +49,5 @@ export function useStepBasicsForm(p: InventoryPage, onCreated: (id: string) => v
 
   const submit = () => p.createProduct(form, onCreated);
 
-  return { form, set, setName, setHandle, setSupplierIds, handleLocked, toggleHandleLock, itemNoAvailability, disabled, submit };
+  return { form, set, setItemNo, setHandle, setSupplierIds, handleLocked, toggleHandleLock, itemNoAvailability, disabled, submit };
 }

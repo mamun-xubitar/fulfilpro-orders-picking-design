@@ -121,6 +121,7 @@ export function useFulfillmentRequests({ setOrders, blockTestModeAction, userIsA
       });
       toast.success('Fulfillment cancelled.');
       setCancelFulModal(null);
+      if (json.data.fulfillmentItems.confirmations.length === 0) setFulfillmentViewOrderId(null);
     } catch (err) {
       setCancelFulModal((prev) => prev ? { ...prev, saving: false, error: err instanceof Error ? err.message : 'Failed to cancel' } : null);
     }

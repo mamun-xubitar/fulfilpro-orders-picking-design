@@ -88,7 +88,7 @@ export function useProductDetails({ product, onSaved, defaultHandleLocked = fals
   // Draft is tagged with the product it belongs to, so changing product discards it without an
   // effect having to reset anything.
   const [draft, setDraft] = useState<{ productId: string; form: ProductDetailsForm } | null>(null);
-  // Mirrors the New Product modal: locked re-derives the handle from the product name on every
+  // Mirrors the New Product modal: locked re-derives the handle from the Item no. on every
   // keystroke (the default only inside the New Product wizard); unlocked hands control to the
   // admin (the default for existing products). Tagged with the product it
   // belongs to (same pattern as `draft`) so an unlock made on one product doesn't carry over to
@@ -116,15 +116,17 @@ export function useProductDetails({ product, onSaved, defaultHandleLocked = fals
     write({ ...form, [field]: e.target.value });
   };
 
-  const setName = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const name = e.target.value;
-    write({ ...form, name, ...(handleLocked ? { handle: slugifyHandle(name) } : {}) });
+  const setName = (e: React.ChangeEvent<HTMLInputElement>) => write({ ...form, name: e.target.value });
+
+  const setItemNo = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const itemNo = e.target.value;
+    write({ ...form, itemNo, ...(handleLocked ? { handle: slugifyHandle(itemNo) } : {}) });
   };
 
   const toggleHandleLock = () => {
     if (!product) return;
     const next = !handleLocked;
-    if (next) write({ ...form, handle: slugifyHandle(form.name) });
+    if (next) write({ ...form, handle: slugifyHandle(form.itemNo) });
     setStoredHandleLocked({ productId: product.id, locked: next });
   };
 
@@ -205,6 +207,7 @@ export function useProductDetails({ product, onSaved, defaultHandleLocked = fals
     productId: product?.id ?? null,
     set,
     setName,
+    setItemNo,
     handleLocked,
     toggleHandleLock,
     setCategory,
