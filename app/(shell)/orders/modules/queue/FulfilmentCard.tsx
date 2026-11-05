@@ -26,20 +26,22 @@ function LabelMessage({ p, order, off }: { p: OrdersPageBundle; order: OrderRow;
   );
 }
 
-/** Today's expanded "Actions" block (Staff): always shown, disabled once fulfilled, canceled or closed. */
+/** The old expanded "Actions" block (Staff): always shown, fulfils the ticked / partial lines, disabled once fulfilled, canceled or closed. */
 function ActionsBox({ p, order }: { p: OrdersPageBundle; order: OrderRow }) {
   const done = isOrderFullyFulfilled(order);
   const locked = isOrderFulfillmentLocked(order);
-  const off = locked || done || Boolean(p.fulSaving[order.id]);
-  const tip = locked ? 'Closed or canceled orders cannot be fulfilled' : done ? 'Already fully fulfilled' : '';
+  const noLines = p.getFulfillmentLines(order).length === 0;
+  const off = locked || done || noLines || Boolean(p.fulSaving[order.id]);
+  const tip = locked ? 'Closed or canceled orders cannot be fulfilled' : done ? 'Already fully fulfilled' : noLines ? 'Tick Full or enter a partial quantity first' : '';
   const text = (t: string) => (locked ? 'Fulfilment locked' : p.fulSaving[order.id] ? 'Confirming…' : t);
   return (
     <div className="flex flex-col gap-[5px]">
       <div className="flex gap-[5px]">
-        <button type="button" disabled={off} title={tip} onClick={() => p.openFulfillmentConfirmation(order, { allRemaining: true })} className={`${BTN} h-7 ${off ? OFF : 'border-transparent bg-orders-primary text-white hover:bg-orders-primary-hover'}`}>{text('Confirm Fulfilment')}</button>
-        <button type="button" disabled={off} title={tip || 'Confirm fulfilment and print the shipping label'} onClick={() => { p.openFulfillmentConfirmation(order, { allRemaining: true }); void p.printPackingSlipLabel(order); }} className={`${BTN} h-7 ${off ? OFF : 'border-transparent bg-[#0284c7] text-white hover:bg-[#0369a1]'}`}>{text('Confirm & Print')}</button>
+        <button type="button" disabled={off} title={tip} onClick={() => p.openFulfillmentConfirmation(order)} className={`${BTN} h-7 ${off ? OFF : 'border-transparent bg-orders-primary text-white hover:bg-orders-primary-hover'}`}>{text('Confirm Fulfilment')}</button>
+        <button type="button" disabled={off} title={tip || 'Confirm fulfilment and print the shipping label'} onClick={() => { p.openFulfillmentConfirmation(order); void p.printPackingSlipLabel(order); }} className={`${BTN} h-7 ${off ? OFF : 'border-transparent bg-[#0284c7] text-white hover:bg-[#0369a1]'}`}>{text('Confirm & Print')}</button>
       </div>
       <LabelMessage p={p} order={order} off={done} />
+      {p.fulMessages[order.id] && <span className="text-center text-[10.5px] font-semibold text-orders-success-ink">{p.fulMessages[order.id]}</span>}
     </div>
   );
 }

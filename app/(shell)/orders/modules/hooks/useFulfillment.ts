@@ -126,8 +126,7 @@ export function useFulfillment({ setOrders, blockTestModeAction }: UseFulfillmen
     }, 3000);
   };
 
-  /** `allRemaining`: Staff have no Full / Partial columns, so every unfulfilled line is proposed and the dialog lets them lower the quantities. */
-  const openFulfillmentConfirmation = (order: OrderRow, options?: { allRemaining?: boolean }) => {
+  const openFulfillmentConfirmation = (order: OrderRow) => {
     if (blockTestModeAction()) return;
 
     if (isOrderFulfillmentLocked(order)) {
@@ -135,12 +134,7 @@ export function useFulfillment({ setOrders, blockTestModeAction }: UseFulfillmen
       return;
     }
 
-    const lines = options?.allRemaining
-      ? order.items.flatMap((item) => {
-          const remaining = Math.max(0, item.qty - getFulfilledQty(order, item.id));
-          return remaining > 0 ? [{ lineItemId: item.id, quantity: remaining, full: true }] : [];
-        })
-      : getFulfillmentLines(order);
+    const lines = getFulfillmentLines(order);
 
     if (lines.length === 0) {
       toast.error('Increase a quantity or check Full for an item with remaining stock.');
@@ -150,7 +144,6 @@ export function useFulfillment({ setOrders, blockTestModeAction }: UseFulfillmen
     setPendingFulfillment({
       order,
       lines,
-      editable: Boolean(options?.allRemaining),
       notifyCustomer: true,
       barcodeInput: '',
       trackingNumber: '',

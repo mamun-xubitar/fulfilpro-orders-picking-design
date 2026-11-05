@@ -363,8 +363,6 @@ export type FulfillmentConfirmation = {
 export type PendingFulfillmentModalState = {
   order: OrderRow;
   lines: FulfillmentLine[];
-  /** Staff pick quantities in the dialog itself (no Full / Partial columns on their page). */
-  editable?: boolean;
   notifyCustomer: boolean;
   barcodeInput: string;
   trackingNumber: string;

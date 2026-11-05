@@ -101,11 +101,12 @@ export default function ItemLine({ p, order, item, index, restockItems, cols }: 
   const done = item.qty > 0 && packed >= item.qty;
   const part = packed > 0 && !done;
   const restock = restockItems.find((r) => r.lineItemId === item.id);
+  const picked = caps.fulfilment && selectable > 0 && (isFull || partial > 0);
   const cell: Record<string, React.ReactNode> = {
     item: <ItemCell p={p} order={order} item={item} restock={restock} />,
     sku: <span className="block truncate font-mono text-[10px] text-orders-text-muted" title={item.sku || undefined}>{item.sku || '-'}</span>,
     deco: <DecoCell p={p} order={order} item={item} />,
-    qty: <b className="text-center tabular-nums">{item.qty}</b>,
+    qty: <b className="text-center tabular-nums" title={caps.fulfilment ? `${fulfilled} of ${item.qty} fulfilled` : undefined}>{caps.fulfilment ? `${fulfilled}/${item.qty}` : item.qty}</b>,
     packed: <b className={`text-center tabular-nums ${done ? 'text-orders-success-ink' : part ? 'text-orders-warning-ink' : 'text-orders-text-subtle'}`}>{packed}/{item.qty}</b>,
     pdate: <span className="text-[10.5px] text-orders-text-subtle tabular-nums">{item.packedDate ? dayTime(item.packedDate) : '-'}</span>,
     avail: <AvailCell order={order} item={item} />,
@@ -117,7 +118,7 @@ export default function ItemLine({ p, order, item, index, restockItems, cols }: 
   };
   const centered = new Set(['qty', 'packed', 'avail', 'full', 'actions', 'pdate']);
   return (
-    <div role="row" className={`group grid min-h-[34px] items-center border-b border-orders-divider px-2 text-[11.5px] last:border-b-0 ${done ? 'bg-orders-line-done' : part ? 'bg-orders-warning-soft' : ''}`} style={{ gridTemplateColumns: lineGridTemplate(cols), columnGap: lineGap(caps) }}>
+    <div role="row" className={`group grid min-h-[34px] items-center border-b border-orders-divider px-2 text-[11.5px] last:border-b-0 ${picked ? 'bg-orders-primary-soft' : done ? 'bg-orders-line-done' : part ? 'bg-orders-warning-soft' : ''}`} style={{ gridTemplateColumns: lineGridTemplate(cols), columnGap: lineGap(caps) }}>
       {cols.map((c) => <span key={c.key} className={`min-w-0 ${centered.has(c.key) ? 'flex justify-center' : ''}`}>{cell[c.key]}</span>)}
     </div>
   );

@@ -42,7 +42,7 @@ export type StageNode = { key: 'slip' | 'pack' | 'ful' | 'trk'; label: string; s
 /** Stage track nodes for a row; each role only sees the stages it works with. */
 export function getStageNodes(order: OrderRow, caps: OrderCapabilities): StageNode[] {
   const nodes: StageNode[] = [];
-  if (caps.slip) nodes.push({ key: 'slip', label: 'Slip', state: order.slipPrinted ? 'done' : 'none' });
+  if (caps.slipStatus) nodes.push({ key: 'slip', label: 'Slip', state: order.slipPrinted ? 'done' : 'none' });
   nodes.push({ key: 'pack', label: 'Pack', state: order.packingStatus === 'packed' ? 'done' : order.packingStatus === 'partially_packed' ? 'part' : 'none' });
   if (caps.fulfilment) {
     const fulfilled = isOrderFullyFulfilled(order);
@@ -70,7 +70,7 @@ export function getRowTone(order: OrderRow, caps: OrderCapabilities) {
 
 /** Grid columns of the queue table (prototype `colsA`); the same template is used by the header and every row. */
 export function getGridColumns(caps: OrderCapabilities) {
-  const nodes = (caps.slip ? 1 : 0) + 1 + (caps.fulfilment ? 2 : 0);
+  const nodes = (caps.slipStatus ? 1 : 0) + 1 + (caps.fulfilment ? 2 : 0);
   const icons = 3 + (caps.slip ? 1 : 0) + (caps.labels ? 1 : 0) + (caps.invoice ? 1 : 0) + (caps.admin ? 1 : 0);
   return ['20px', '96px', '50px', '108px', caps.admin ? '66px' : '', 'minmax(80px,1fr)', `${nodes * 34 + 4}px`, caps.fulfilment ? '104px' : '', '84px', '132px', '52px', `${icons * 24 + 4}px`].filter(Boolean).join(' ');
 }

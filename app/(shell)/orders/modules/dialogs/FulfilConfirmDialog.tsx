@@ -2,7 +2,6 @@
 
 import type { Dispatch, RefObject, SetStateAction } from 'react';
 import type { PendingFulfillmentModalState } from '../types';
-import { getFulfilledQty } from '../utils';
 import { Icon } from '../queue/icons';
 import DialogShell from './DialogShell';
 import { dlgBtn, dlgInput, Field } from './dialogUi';
@@ -21,7 +20,7 @@ type Props = {
   trackingInputRef: RefObject<HTMLInputElement | null>;
 };
 
-/** Confirm fulfilment: lines, barcodes, carrier and tracking, customer notification. Staff can lower the quantities here. */
+/** Confirm fulfilment: lines, barcodes, carrier and tracking, customer notification. */
 export default function FulfilConfirmDialog({ modal, setModal, saving, onClose, onConfirm, carrierOpen, setCarrierOpen, carrierSearch, setCarrierSearch, carriers, trackingInputRef }: Props) {
   const patch = (next: Partial<PendingFulfillmentModalState>) => setModal((prev) => (prev ? { ...prev, ...next } : prev));
   return (
@@ -42,18 +41,10 @@ export default function FulfilConfirmDialog({ modal, setModal, saving, onClose, 
           <div className="flex flex-col gap-0.5 rounded-[7px] border border-orders-border bg-orders-surface-muted p-1.5">
             {modal.lines.map((line) => {
               const item = modal.order.items.find((i) => i.id === line.lineItemId);
-              const max = item ? Math.max(0, item.qty - getFulfilledQty(modal.order, item.id)) : line.quantity;
-              const setQty = (quantity: number) => setModal((prev) => (prev ? { ...prev, lines: prev.lines.map((l) => (l.lineItemId === line.lineItemId ? { ...l, quantity, full: quantity === max } : l)) } : prev));
               return (
                 <div key={line.lineItemId} className="flex items-center justify-between gap-3">
                   <span className="truncate">{item?.name ?? line.lineItemId}</span>
-                  {modal.editable ? (
-                    <span className="inline-flex h-6 items-center overflow-hidden rounded-[7px] border border-orders-border-strong bg-orders-surface">
-                      <button type="button" aria-label="Decrease quantity" disabled={line.quantity <= 0} onClick={() => setQty(line.quantity - 1)} className="h-full w-[22px] text-[13px] font-bold text-orders-text-muted hover:bg-orders-divider disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer">−</button>
-                      <span className="min-w-9 border-x border-orders-border text-center text-[11.5px] font-bold tabular-nums leading-[22px]">{line.quantity}<span className="font-normal text-orders-text-subtle">/{max}</span></span>
-                      <button type="button" aria-label="Increase quantity" disabled={line.quantity >= max} onClick={() => setQty(line.quantity + 1)} className="h-full w-[22px] text-[13px] font-bold text-orders-text-muted hover:bg-orders-divider disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer">+</button>
-                    </span>
-                  ) : <b className="tabular-nums">× {line.quantity}</b>}
+                  <b className="tabular-nums">× {line.quantity}</b>
                 </div>
               );
             })}

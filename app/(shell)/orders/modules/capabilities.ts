@@ -9,10 +9,12 @@ export type OrderCapabilities = {
   store: boolean;
   period: boolean;
   sync: boolean;
-  /** Fulfilment status filter, fulfilment column, tracking link, Confirm fulfilment. */
+  /** Fulfilment status filter, fulfilment column, tracking link, Full / Partial line selection, Confirm fulfilment. */
   fulfilment: boolean;
   /** Print status filter, green slip icon, print picking slip. */
   slip: boolean;
+  /** Slip dot on the stage track: everyone sees whether the slip was printed, only `slip` roles can print. */
+  slipStatus: boolean;
   /** Packing: Full / Partial, Confirm packed, cancel packed, packing history. */
   pack: boolean;
   /** Customer name block, address, shipping, labels, tax invoice, name export. */
@@ -39,11 +41,11 @@ export type OrderCapabilities = {
 
 export function getOrderCapabilities(role: string | null | undefined): OrderCapabilities {
   if (isOrderPickerRole(role)) {
-    return { role: 'picker', store: false, period: false, sync: false, fulfilment: false, slip: true, pack: true, customer: false, labels: false, invoice: false, names: false, admin: false, requestStock: false, stock: false, createPo: false, decoration: false, packedDate: true, barcodeSearch: true, directFulfilmentEdit: false };
+    return { role: 'picker', store: false, period: false, sync: false, fulfilment: false, slip: true, slipStatus: true, pack: true, customer: false, labels: false, invoice: false, names: false, admin: false, requestStock: false, stock: false, createPo: false, decoration: false, packedDate: true, barcodeSearch: true, directFulfilmentEdit: false };
   }
   if (role === 'admin') {
-    return { role: 'admin', store: true, period: true, sync: true, fulfilment: true, slip: true, pack: true, customer: true, labels: true, invoice: true, names: true, admin: true, requestStock: true, stock: true, createPo: true, decoration: true, packedDate: false, barcodeSearch: true, directFulfilmentEdit: true };
+    return { role: 'admin', store: true, period: true, sync: true, fulfilment: true, slip: true, slipStatus: true, pack: true, customer: true, labels: true, invoice: true, names: true, admin: true, requestStock: true, stock: true, createPo: true, decoration: true, packedDate: false, barcodeSearch: true, directFulfilmentEdit: true };
   }
   // Staff and the read-only test user.
-  return { role: 'staff', store: true, period: true, sync: true, fulfilment: true, slip: false, pack: false, customer: true, labels: true, invoice: true, names: true, admin: false, requestStock: true, stock: true, createPo: false, decoration: true, packedDate: false, barcodeSearch: false, directFulfilmentEdit: false };
+  return { role: 'staff', store: true, period: true, sync: true, fulfilment: true, slip: false, slipStatus: true, pack: false, customer: true, labels: true, invoice: true, names: true, admin: false, requestStock: true, stock: true, createPo: false, decoration: true, packedDate: false, barcodeSearch: false, directFulfilmentEdit: false };
 }

@@ -7,7 +7,7 @@ const GREEN_KEYS: StageNode['key'][] = ['slip', 'ful', 'trk'];
 
 /** Column heading of the stage track: one 34px label per node (prototype `trackHead`). */
 export function StageTrackHead({ caps }: { caps: OrderCapabilities }) {
-  const labels = [caps.slip && 'Slip', 'Pack', caps.fulfilment && 'Fulfil', caps.fulfilment && 'Track'].filter(Boolean) as string[];
+  const labels = [caps.slipStatus && 'Slip', 'Pack', caps.fulfilment && 'Fulfil', caps.fulfilment && 'Track'].filter(Boolean) as string[];
   return <span className="flex text-[9px] font-bold uppercase tracking-normal text-orders-text-subtle">{labels.map((l) => <span key={l} className="w-[34px] overflow-visible whitespace-nowrap">{l}</span>)}</span>;
 }
 
