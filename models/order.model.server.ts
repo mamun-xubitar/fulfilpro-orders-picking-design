@@ -30,7 +30,8 @@ import {
 } from '@/models/decoration.model.server';
 import { TrackingModel, type TrackingSummary } from '@/models/tracking.model.server';
 import type { PaymentSummary } from '@/lib/tax-invoice.server';
-import { matchesPackingFilter } from '@/lib/late-label-filter.server';
+import { matchesPackingFilter } from '@/lib/late-slip-filter.server';
+import { buildPrintStatusSql, buildPrintStatusWhere, intersectStatuses, normalizePrintStatuses, normalizeQueue, pickerScopeSql, pickerScopeWhere, resolveQueue, type OrderQueue } from '@/lib/order-queue.server';
 import { Prisma } from '@prisma/client';
 type OrderMessageTypeInput = 'orders' | 'picker';
 
@@ -402,6 +403,11 @@ export class OrderModel {
     dateTo?: string;
     fulfillmentStatuses?: string[];
     packingStatuses?: string[];
+    printStatuses?: string[];
+    /** Queue tab of the merged Orders page; ANDed with the other filters. */
+    queue?: OrderQueue;
+    /** Order-picker view: hides fulfilled / pre-cutoff orders and counts picker-type messages. */
+    pickerScope?: boolean;
     viewerId?: string;
     viewerRole?: string;
     decorationView?: boolean;
@@ -411,10 +417,16 @@ export class OrderModel {
     sort?: 'number' | 'customer' | 'orderedAt';
     dir?: 'asc' | 'desc';
   }) {
-    const { search, searchField, storeIds = [], period = 'all', dateFrom, dateTo, fulfillmentStatuses = [], packingStatuses = [], viewerId, viewerRole, decorationView, crossDecorationVisibility, page, pageSize, sort, dir = 'desc' } = params;
+    const { search, searchField, storeIds = [], period = 'all', dateFrom, dateTo, fulfillmentStatuses = [], viewerId, viewerRole, decorationView, crossDecorationVisibility, page, pageSize, sort, dir = 'desc', pickerScope = false } = params;
     const viewer = { id: viewerId, role: viewerRole };
     const viewerIsDecorator = isDecoratorRole(viewerRole);
     const tokens = (search?.trim() ?? '').split(/\s+/).filter(Boolean);
+    const preset = await resolveQueue(normalizeQueue(params.queue));
+    const printStatuses = intersectStatuses(normalizePrintStatuses(params.printStatuses ?? []), preset.print);
+    const packingStatuses = intersectStatuses(params.packingStatuses ?? [], preset.packing);
+    const extraSql = [...(pickerScope ? pickerScopeSql() : []), ...preset.sql];
+    const printSql = buildPrintStatusSql(printStatuses);
+    if (printSql) extraSql.push(printSql);
     const filterByPacking = packingStatuses.length > 0;
     let orderedAtFrom: Date | undefined;
     let orderedAtTo: Date | undefined;
@@ -473,6 +485,9 @@ export class OrderModel {
       });
     }
 
+    if (pickerScope) andConditions.push(...pickerScopeWhere());
+    andConditions.push(...preset.prisma, ...buildPrintStatusWhere(printStatuses));
+
     if (andConditions.length > 0) {
       where.AND = andConditions;
     }
@@ -507,6 +522,7 @@ export class OrderModel {
       stockAdjustment: true,
       decorationAttachment: true,
       packingConfirmations: { select: { id: true, lines: true, confirmedAt: true, canceledAt: true }, orderBy: { confirmedAt: 'desc' as const } },
+      pickingSlipPrints: { select: { printedAt: true }, orderBy: { printedAt: 'desc' as const }, take: 1 },
     } satisfies Prisma.OrderInclude;
 
     const loadOrderRows = async (ids: string[]) => {
@@ -520,7 +536,7 @@ export class OrderModel {
       const idOrder = new Map(ids.map((id, index) => [id, index]));
       rows.sort((a, b) => (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0));
 
-      const messageCounts = await getOrderMessageCounts(rows.map((row) => row.id), 'orders');
+      const messageCounts = await getOrderMessageCounts(rows.map((row) => row.id), pickerScope ? 'picker' : 'orders');
       const decorationsByOrder = await getDecorationsByOrder(rows.map((row) => row.id));
       const assignmentsByOrder = await getAssignmentsByOrder(rows.map((row) => row.id));
       const summariesByOrder = await getDecorationSummariesByOrder(rows.map((row) => row.id), viewer);
@@ -538,6 +554,7 @@ export class OrderModel {
         orderedAtFrom,
         orderedAtTo,
         fulfillmentStatuses,
+        extraSql,
         viewerId,
         viewerRole,
         decorationView,
@@ -573,7 +590,7 @@ export class OrderModel {
       }),
     ]);
 
-    const messageCounts = await getOrderMessageCounts(rows.map((row) => row.id), 'orders');
+    const messageCounts = await getOrderMessageCounts(rows.map((row) => row.id), pickerScope ? 'picker' : 'orders');
     const decorationsByOrder = await getDecorationsByOrder(rows.map((row) => row.id));
     const assignmentsByOrder = await getAssignmentsByOrder(rows.map((row) => row.id));
     const summariesByOrder = await getDecorationSummariesByOrder(rows.map((row) => row.id), viewer);
@@ -617,6 +634,99 @@ export class OrderModel {
     return { attributes, count: attributes.length };
   }
 
+  /** Tab counts for the merged Orders page. One scan over the orders matching the base filters
+   * (store, period, status, search); the queue, Packed and Print filters are ignored so every tab
+   * shows its own size. */
+  async countQueues(params: {
+    search?: string;
+    searchField?: string;
+    storeIds?: string[];
+    period?: 'all' | 'week' | 'month' | 'year';
+    dateFrom?: string;
+    dateTo?: string;
+    fulfillmentStatuses?: string[];
+    pickerScope?: boolean;
+  }) {
+    const { search, searchField, storeIds = [], period = 'all', dateFrom, dateTo, fulfillmentStatuses = [], pickerScope = false } = params;
+    const tokens = (search?.trim() ?? '').split(/\s+/).filter(Boolean);
+    const where: Prisma.OrderWhereInput = {
+      store: { is: { status: 'connected', ...(storeIds.length > 0 ? { id: { in: storeIds } } : {}) } },
+    };
+    let orderedAtFrom: Date | undefined;
+    let orderedAtTo: Date | undefined;
+    if (dateFrom || dateTo) {
+      orderedAtFrom = dateFrom ? new Date(`${dateFrom}T00:00:00.000Z`) : undefined;
+      orderedAtTo = dateTo ? new Date(`${dateTo}T23:59:59.999Z`) : undefined;
+      where.orderedAt = { ...(orderedAtFrom ? { gte: orderedAtFrom } : {}), ...(orderedAtTo ? { lte: orderedAtTo } : {}) };
+    } else {
+      const periodDate = getPeriodStartDate(period);
+      if (periodDate) {
+        orderedAtFrom = periodDate;
+        where.orderedAt = { gte: periodDate };
+      }
+    }
+    const andConditions: Prisma.OrderWhereInput[] = [];
+    const statusConditions = fulfillmentStatuses.length > 0 ? buildFulfillmentStatusConditions(fulfillmentStatuses) : [];
+    if (statusConditions.length > 0) andConditions.push({ OR: statusConditions });
+    if (pickerScope) andConditions.push(...pickerScopeWhere());
+    if (andConditions.length > 0) where.AND = andConditions;
+
+    let scanWhere = where;
+    if (tokens.length > 0) {
+      const page = await getRankedOrderSearchPage({
+        tokens,
+        searchField,
+        storeIds,
+        orderedAtFrom,
+        orderedAtTo,
+        fulfillmentStatuses,
+        extraSql: pickerScope ? pickerScopeSql() : [],
+        page: 1,
+        pageSize: 10000,
+        dir: 'desc',
+      });
+      scanWhere = { id: { in: page.ids } };
+    }
+
+    const [candidates, confirmations, slipPrints, pending] = await Promise.all([
+      prisma.order.findMany({ where: scanWhere, select: { id: true, lineItems: true, canceled: true, closed: true, fulfillmentStatus: true } }),
+      prisma.orderPackingConfirmation.findMany({ where: { canceledAt: null, order: { is: scanWhere } }, select: { orderId: true, lines: true } }),
+      prisma.orderPickingSlipPrint.groupBy({ by: ['orderId'], where: { order: { is: scanWhere } }, _count: { _all: true } }),
+      prisma.fulfillmentEditRequest.findMany({ where: { status: 'pending' }, select: { orderId: true } }),
+    ]);
+
+    const confirmationsByOrder = new Map<string, Array<{ lines: Prisma.JsonValue }>>();
+    for (const confirmation of confirmations) {
+      const list = confirmationsByOrder.get(confirmation.orderId) ?? [];
+      list.push(confirmation);
+      confirmationsByOrder.set(confirmation.orderId, list);
+    }
+    const printed = new Set(slipPrints.map((row) => row.orderId));
+    const pendingIds = new Set(pending.map((row) => row.orderId));
+
+    const counts = { all: 0, open: 0, slip_not_printed: 0, slip_printed: 0, not_packed: 0, partial: 0, packed: 0, shipped: 0, issues: 0 };
+    for (const row of candidates) {
+      const status = (row.fulfillmentStatus ?? '').toLowerCase();
+      const fulfilled = !row.canceled && (row.closed ? ['fulfilled', 'shipped', 'partially_fulfilled'] : ['fulfilled', 'shipped']).includes(status);
+      const isOpen = !row.canceled && !row.closed && !fulfilled;
+      const total = toLineItems(row.lineItems).reduce((sum, item) => sum + Math.max(0, item.qty), 0);
+      const packed = [...computePackedByLine(confirmationsByOrder.get(row.id) ?? []).values()].reduce((sum, qty) => sum + qty, 0);
+      const packing = getPackingStatus(packed, total);
+      counts.all += 1;
+      counts.open += 1;
+      if (isOpen) {
+        if (printed.has(row.id)) counts.slip_printed += 1;
+        else counts.slip_not_printed += 1;
+        if (packing === 'not_packed') counts.not_packed += 1;
+        else if (packing === 'partially_packed') counts.partial += 1;
+        else counts.packed += 1;
+      }
+      if (fulfilled) counts.shipped += 1;
+      if (row.canceled || (row.closed && !fulfilled) || pendingIds.has(row.id)) counts.issues += 1;
+    }
+    return counts;
+  }
+
   async getConnectedStoreOptions(allowedStoreIds?: string[] | null) {
     const where: Prisma.StoreWhereInput = { status: 'connected' };
     if (allowedStoreIds !== null && allowedStoreIds !== undefined) {
@@ -640,7 +750,7 @@ export class OrderModel {
     }));
   }
 
-  async refreshFromShopify(orderId: string) {
+  async refreshFromShopify(orderId: string, messageType: OrderMessageTypeInput = 'orders') {
     const order = await prisma.order.findUnique({
       where: { id: orderId },
       include: {
@@ -692,10 +802,10 @@ export class OrderModel {
       storeId: order.store.id,
     });
 
-    return this.getOrderRow(orderId);
+    return this.getOrderRow(orderId, messageType);
   }
 
-  async getOrderRow(orderId: string) {
+  async getOrderRow(orderId: string, messageType: OrderMessageTypeInput = 'orders') {
     const row = await prisma.order.findUnique({
       where: { id: orderId },
       include: {
@@ -726,6 +836,7 @@ export class OrderModel {
           },
         },
         packingConfirmations: { select: { id: true, lines: true, confirmedAt: true, canceledAt: true }, orderBy: { confirmedAt: 'desc' as const } },
+        pickingSlipPrints: { select: { printedAt: true }, orderBy: { printedAt: 'desc' as const }, take: 1 },
         decorationAttachment: true,
       },
     });
@@ -735,7 +846,7 @@ export class OrderModel {
     }
 
     const messageCount = await prisma.orderMessage.count({
-      where: { orderId: row.id, type: 'orders' },
+      where: { orderId: row.id, type: messageType },
     });
 
     const decorationsByOrder = await getDecorationsByOrder([row.id]);
@@ -799,6 +910,13 @@ export class OrderModel {
         lineItemId: line.lineItemId,
         quantity: line.quantity,
       })),
+    }).catch(async (error: unknown) => {
+      // Shopify has less left to fulfil than our copy of the order says: pull its fulfilments in so the page catches up.
+      if (error instanceof Error && error.message.startsWith('Selected quantity exceeds the remaining fulfillable quantity')) {
+        await this.refreshFromShopify(orderId).catch(() => undefined);
+        throw new Error('Part of this order is already fulfilled in Shopify. The order was re-synced from Shopify; refresh the row and try again.');
+      }
+      throw error;
     });
 
     const fulfillment = shopifyResult.fulfillments[0];
@@ -1177,7 +1295,7 @@ export class OrderModel {
     };
   }
 
-  async getOrderMessageCenter(orderId: string, type: OrderMessageTypeInput) {
+  async getOrderMessageCenter(orderId: string, type: OrderMessageTypeInput | 'all') {
     const [order, directMessageRecipients, fulfillmentRequestRecipients, messages] = await Promise.all([
       prisma.order.findUnique({
         where: { id: orderId },
@@ -1186,7 +1304,7 @@ export class OrderModel {
       resolvePickerRecipientOptions('direct_message'),
       resolvePickerRecipientOptions('fulfillment_request'),
       prisma.orderMessage.findMany({
-        where: { orderId, type },
+        where: type === 'all' ? { orderId } : { orderId, type },
         orderBy: { createdAt: 'desc' },
       }),
     ]);
@@ -1736,6 +1854,7 @@ function toOrderRow(row: {
     updatedAt: Date;
   } | null;
   packingConfirmations?: Array<{ id: string; lines: Prisma.JsonValue; confirmedAt: Date; canceledAt: Date | null }>;
+  pickingSlipPrints?: Array<{ printedAt: Date }>;
   decorationAttachment?: {
     files: Prisma.JsonValue;
     customerDesign: Prisma.JsonValue;
@@ -1756,6 +1875,7 @@ function toOrderRow(row: {
   const totalQuantity = lineItems.reduce((sum, item) => sum + Math.max(0, item.qty), 0);
   const packedQuantity = [...packedByLine.values()].reduce((sum, qty) => sum + qty, 0);
   const packingStatus = getPackingStatus(packedQuantity, totalQuantity);
+  const fulfilledQtyByLine = getFulfilledQuantityByLineItem(fulfillmentItems.confirmations);
 
   return {
     id: row.id,
@@ -1784,6 +1904,8 @@ function toOrderRow(row: {
       return {
         ...item,
         packedQuantity: packedByLine.get(item.id) ?? 0,
+        packedDate: getLinePackedDate(activePackingConfirmations, item.id),
+        fulfilledQuantity: fulfilledQtyByLine.get(item.id) ?? 0,
         isEmbroidery: decorations?.get(item.id)?.isEmbroidery ?? false,
         isPrint: decorations?.get(item.id)?.isPrint ?? false,
         assignments: assignments?.get(item.id) ?? [],
@@ -1803,7 +1925,33 @@ function toOrderRow(row: {
     packedQuantity,
     totalQuantity,
     trackings: trackings ?? [],
+    slipPrinted: (row.pickingSlipPrints?.length ?? 0) > 0,
+    slipLastPrintedAt: toSafeISOString(row.pickingSlipPrints?.[0]?.printedAt ?? null),
+    packingConfirmations: packingConfirmations.map((c) => ({
+      id: c.id,
+      confirmedAt: c.confirmedAt.toISOString(),
+      canceledAt: toSafeISOString(c.canceledAt),
+      lines: normalizePackingConfirmationLines(c.lines),
+    })),
   };
+}
+
+function normalizePackingConfirmationLines(value: Prisma.JsonValue) {
+  if (!Array.isArray(value)) return [] as Array<{ lineItemId: string; quantity: number; full: boolean }>;
+  const lines: Array<{ lineItemId: string; quantity: number; full: boolean }> = [];
+  for (const line of value) {
+    if (!line || typeof line !== 'object') continue;
+    const obj = line as Record<string, unknown>;
+    const lineItemId = typeof obj.lineItemId === 'string' ? obj.lineItemId : '';
+    const quantity = typeof obj.quantity === 'number' ? obj.quantity : Number(obj.quantity ?? 0);
+    if (lineItemId && quantity > 0) lines.push({ lineItemId, quantity, full: Boolean(obj.full) });
+  }
+  return lines;
+}
+
+function getLinePackedDate(confirmations: Array<{ lines: Prisma.JsonValue; confirmedAt: Date }>, lineItemId: string) {
+  const match = confirmations.find((c) => normalizePackingConfirmationLines(c.lines).some((line) => line.lineItemId === lineItemId));
+  return match ? match.confirmedAt.toISOString() : null;
 }
 
 function toPaymentSummary(value: Prisma.JsonValue | null): PaymentSummary | null {
@@ -1947,15 +2095,20 @@ function getPackingStatus(packedQuantity: number, totalQuantity: number): 'packe
 // columns only: including relations here would bind one parameter per order in the follow-up
 // queries and exceed Postgres' 32,767 bind-parameter limit on large stores.
 async function getPackingFilteredOrderIds(where: Prisma.OrderWhereInput, orderBy: Prisma.OrderOrderByWithRelationInput | undefined, packingStatuses: string[]) {
-  const [candidates, confirmations] = await Promise.all([
+  const [candidates, confirmations, slipPrints] = await Promise.all([
     prisma.order.findMany({
       where,
       orderBy,
-      select: { id: true, lineItems: true, labelPrintedAt: true, canceled: true, closed: true, fulfillmentStatus: true },
+      select: { id: true, lineItems: true, canceled: true, closed: true, fulfillmentStatus: true },
     }),
     prisma.orderPackingConfirmation.findMany({
       where: { canceledAt: null, order: { is: where } },
       select: { orderId: true, lines: true },
+    }),
+    prisma.orderPickingSlipPrint.groupBy({
+      by: ['orderId'],
+      where: { order: { is: where } },
+      _min: { printedAt: true },
     }),
   ]);
 
@@ -1965,6 +2118,7 @@ async function getPackingFilteredOrderIds(where: Prisma.OrderWhereInput, orderBy
     list.push(confirmation);
     confirmationsByOrder.set(confirmation.orderId, list);
   }
+  const firstSlipPrintByOrder = new Map(slipPrints.map((print) => [print.orderId, print._min.printedAt]));
 
   const packingSet = new Set(packingStatuses);
   return candidates
@@ -1972,7 +2126,7 @@ async function getPackingFilteredOrderIds(where: Prisma.OrderWhereInput, orderBy
       const totalQuantity = toLineItems(row.lineItems).reduce((sum, item) => sum + Math.max(0, item.qty), 0);
       const packedQuantity = [...computePackedByLine(confirmationsByOrder.get(row.id) ?? []).values()].reduce((sum, qty) => sum + qty, 0);
       return matchesPackingFilter(packingSet, {
-        labelPrintedAt: row.labelPrintedAt,
+        slipPrintedAt: firstSlipPrintByOrder.get(row.id) ?? null,
         canceled: row.canceled,
         closed: row.closed,
         fulfillmentStatus: getDisplayStatus(row),
@@ -2713,6 +2867,7 @@ async function getRankedOrderSearchPage(params: {
   orderedAtFrom?: Date;
   orderedAtTo?: Date;
   fulfillmentStatuses: string[];
+  extraSql?: Prisma.Sql[];
   viewerId?: string;
   viewerRole?: string;
   decorationView?: boolean;
@@ -2770,6 +2925,7 @@ function buildRankedOrderSearchWhereSql(params: {
   orderedAtFrom?: Date;
   orderedAtTo?: Date;
   fulfillmentStatuses: string[];
+  extraSql?: Prisma.Sql[];
   viewerId?: string;
   viewerRole?: string;
   decorationView?: boolean;
@@ -2793,6 +2949,8 @@ function buildRankedOrderSearchWhereSql(params: {
   if (fulfillmentStatusSql) {
     whereParts.push(fulfillmentStatusSql);
   }
+
+  whereParts.push(...(params.extraSql ?? []));
 
   const viewerIsDecorator = isDecoratorRole(params.viewerRole);
 
@@ -2848,6 +3006,8 @@ function buildFieldConditionsForToken(token: string, searchField?: string): Pris
       ];
     case 'lineItem':
       return [ilikeContains(Prisma.sql`o."lineItems"::text`, token)];
+    case 'barcode':
+      return [ilikeContains(Prisma.sql`o."boarcode"`, token)];
     default:
       return [
         ilikeContains(Prisma.sql`o."number"::text`, token),

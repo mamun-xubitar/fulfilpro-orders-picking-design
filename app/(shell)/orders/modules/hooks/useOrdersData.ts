@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
-import type { ApiResponse, OrderRow, Pagination, StoreOption } from '../types';
+import type { ApiResponse, OrderRow, Pagination, PackingRecipient, StoreOption } from '../types';
 import { getApiErrorMessage } from '../utils';
 
 type UseOrdersDataArgs = {
@@ -12,14 +12,17 @@ type UseOrdersDataArgs = {
 };
 
 export function useOrdersData({ queryString, search, setPagination, blockTestModeAction, setError }: UseOrdersDataArgs) {
-  const [orders, setOrders] = useState<OrderRow[]>([]);
+  const [orders, setOrdersRaw] = useState<OrderRow[]>([]);
   const [stores, setStores] = useState<StoreOption[]>([]);
   const [crossDecorationVisibility, setCrossDecorationVisibility] = useState(false);
+  const [packingRecipients, setPackingRecipients] = useState<PackingRecipient[]>([]);
+  const [packingDefaultRecipientIds, setPackingDefaultRecipientIds] = useState<string[]>([]);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [expandAll, setExpandAll] = useState(false);
   const [loading, setLoading] = useState(false);
   const [refreshRotation, setRefreshRotation] = useState(0);
   const [refreshToken, setRefreshToken] = useState(0);
+  const [countsToken, setCountsToken] = useState(0);
   const [refreshingOrderIds, setRefreshingOrderIds] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
@@ -35,6 +38,8 @@ export function useOrdersData({ queryString, search, setPagination, blockTestMod
           stores: StoreOption[];
           pagination: Pagination;
           crossDecorationVisibility: boolean;
+          packingRecipients?: PackingRecipient[];
+          packingDefaultRecipientUserIds?: string[];
         }>;
 
         if (!res.ok || !json.success) {
@@ -42,10 +47,12 @@ export function useOrdersData({ queryString, search, setPagination, blockTestMod
         }
         if (cancelled) return;
 
-        setOrders(json.data.orders);
+        setOrdersRaw(json.data.orders);
         setStores(json.data.stores);
         setPagination(json.data.pagination);
         setCrossDecorationVisibility(json.data.crossDecorationVisibility);
+        setPackingRecipients(json.data.packingRecipients ?? []);
+        setPackingDefaultRecipientIds(json.data.packingDefaultRecipientUserIds ?? []);
         const firstId = json.data.orders[0]?.id;
         if (expandAll) {
           setExpandedIds(new Set(json.data.orders.map((o) => o.id)));
@@ -55,7 +62,7 @@ export function useOrdersData({ queryString, search, setPagination, blockTestMod
       } catch (err) {
         if (cancelled) return;
         setError(err instanceof Error ? err.message : 'Failed to load orders');
-        setOrders([]);
+        setOrdersRaw([]);
       } finally {
         if (!cancelled) {
           setLoading(false);
@@ -69,6 +76,25 @@ export function useOrdersData({ queryString, search, setPagination, blockTestMod
       cancelled = true;
     };
   }, [queryString, refreshToken, search]);
+
+  // Mutation responses replace a whole order row but do not carry the hub stock / PO state of its lines
+  // (it is only loaded with the list), so keep what the row already had.
+  const bumpCounts = () => setCountsToken((prev) => prev + 1);
+
+  // Every local row change can move an order between queue tabs, so it also refetches the tab counts.
+  const setOrders: React.Dispatch<React.SetStateAction<OrderRow[]>> = (action) => {
+    bumpCounts();
+    setOrdersRaw((prev) => {
+      const next = typeof action === 'function' ? action(prev) : action;
+      const before = new Map(prev.map((o) => [o.id, o]));
+      return next.map((order) => {
+        const old = before.get(order.id);
+        if (!old || old === order || !order.items.some((i) => i.inventory === undefined)) return order;
+        const inventory = new Map(old.items.map((i) => [i.id, i.inventory]));
+        return { ...order, items: order.items.map((i) => (i.inventory === undefined && inventory.has(i.id) ? { ...i, inventory: inventory.get(i.id) } : i)) };
+      });
+    });
+  };
 
   const bumpRefresh = () => setRefreshToken((prev) => prev + 1);
 
@@ -123,12 +149,16 @@ export function useOrdersData({ queryString, search, setPagination, blockTestMod
     setOrders,
     stores,
     crossDecorationVisibility,
+    packingRecipients,
+    packingDefaultRecipientIds,
     loading,
     expandedIds,
     setExpandedIds,
     expandAll,
     setExpandAll,
     refreshToken,
+    countsToken,
+    bumpCounts,
     bumpRefresh,
     refreshRotation,
     setRefreshRotation,

@@ -12,9 +12,11 @@ import { getApiErrorMessage } from '../utils';
 type UseOrderMessagesArgs = {
   setOrders: React.Dispatch<React.SetStateAction<OrderRow[]>>;
   blockTestModeAction: () => boolean;
+  /** 'all' also lists picker messages; the row's message count only tracks 'orders' messages, so it is left alone then. */
+  historyType?: 'all';
 };
 
-export function useOrderMessages({ setOrders, blockTestModeAction }: UseOrderMessagesArgs) {
+export function useOrderMessages({ setOrders, blockTestModeAction, historyType }: UseOrderMessagesArgs) {
   const [messageModal, setMessageModal] = useState<MessageModalState | null>(null);
 
   const openMessageModal = async (order: OrderRow) => {
@@ -30,7 +32,7 @@ export function useOrderMessages({ setOrders, blockTestModeAction }: UseOrderMes
     });
 
     try {
-      const res = await fetch(`/api/orders/${encodeURIComponent(order.id)}/messages`);
+      const res = await fetch(`/api/orders/${encodeURIComponent(order.id)}/messages${historyType ? `?type=${historyType}` : ''}`);
       const json = (await res.json()) as ApiResponse<{
         admins: AdminOption[];
         defaultAdminIds: string[];
@@ -55,9 +57,11 @@ export function useOrderMessages({ setOrders, blockTestModeAction }: UseOrderMes
           loading: false,
         };
       });
-      setOrders((prev) => prev.map((item) => (
-        item.id === order.id ? { ...item, messageCount: json.data.messages.length } : item
-      )));
+      if (!historyType) {
+        setOrders((prev) => prev.map((item) => (
+          item.id === order.id ? { ...item, messageCount: json.data.messages.length } : item
+        )));
+      }
     } catch (err) {
       setMessageModal((prev) => (
         prev && prev.order.id === order.id

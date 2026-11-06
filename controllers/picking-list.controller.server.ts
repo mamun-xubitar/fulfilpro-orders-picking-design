@@ -1,7 +1,16 @@
 import { PickingListModel } from '@/models/picking-list.model.server';
+import { OrderModel } from '@/models/order.model.server';
+import { shapeOrderForRole } from '@/lib/order-row-shape.server';
+import { isOrderPickerRole } from '@/lib/roles';
 
 const model = new PickingListModel();
-const SEARCH_FIELD_VALUES = new Set(['number', 'customer', 'address', 'lineItem', 'barcode']);
+const orderModel = new OrderModel();
+
+/** The merged Orders page shows the updated order in its own row shape. */
+async function loadOrderRow(orderId: string, viewerRole?: string) {
+  const row = await orderModel.getOrderRow(orderId, isOrderPickerRole(viewerRole) ? 'picker' : 'orders');
+  return { order: shapeOrderForRole(row, viewerRole) };
+}
 
 type Actor = {
   id?: string | null;
@@ -10,103 +19,9 @@ type Actor = {
 } | null;
 
 export class PickingListController {
-  async list(searchParams: URLSearchParams, allowedStoreIds?: string[] | null) {
-    const page = normalizePositiveInt(searchParams.get('page'), 1);
-    const pageSize = clamp(normalizePositiveInt(searchParams.get('pageSize'), 20), 5, 100);
-    const search = searchParams.get('search')?.trim() ?? '';
-    const searchFieldRaw = searchParams.get('searchField')?.trim() ?? '';
-    const searchField = SEARCH_FIELD_VALUES.has(searchFieldRaw) ? searchFieldRaw : undefined;
-    let storeIds = searchParams.getAll('storeId').map((value) => value.trim()).filter(Boolean);
-    const period = normalizePeriod(searchParams.get('period'));
-    const dateFrom = searchParams.get('dateFrom')?.trim() ?? '';
-    const dateTo = searchParams.get('dateTo')?.trim() ?? '';
-    const packedStatuses = searchParams.getAll('packedStatus').map((value) => value.trim()).filter(Boolean);
-    const printStatuses = searchParams.getAll('printStatus').map((value) => value.trim()).filter(Boolean);
-
-    if (allowedStoreIds !== null && allowedStoreIds !== undefined) {
-      if (allowedStoreIds.length === 0) {
-        const recipientOptions = await model.listRecipientOptions();
-        return {
-          data: {
-            orders: [],
-            filters: {
-              search,
-              searchField: searchField ?? '',
-              storeIds,
-              period,
-              dateFrom,
-              dateTo,
-              packedStatuses,
-              printStatuses,
-            },
-            stores: [],
-            packingRecipients: recipientOptions.packingRecipients,
-            packingDefaultRecipientUserIds: recipientOptions.packingDefaultRecipientUserIds,
-            messageRecipients: recipientOptions.messageRecipients,
-            messageDefaultRecipientUserIds: recipientOptions.messageDefaultRecipientUserIds,
-            pagination: {
-              page,
-              pageSize,
-              total: 0,
-              totalPages: 1,
-              hasPrev: false,
-              hasNext: false,
-            },
-          },
-        };
-      }
-      storeIds = storeIds.length > 0 ? storeIds.filter((id) => allowedStoreIds.includes(id)) : allowedStoreIds;
-    }
-
-    const result = await model.list({
-      search,
-      searchField,
-      storeIds,
-      period,
-      dateFrom: dateFrom || undefined,
-      dateTo: dateTo || undefined,
-      packedStatuses,
-      printStatuses,
-      page,
-      pageSize,
-      allowedStoreIds,
-    });
-    const recipientOptions = await model.listRecipientOptions();
-    const totalPages = Math.max(1, Math.ceil(result.total / pageSize));
-
-    return {
-      data: {
-        orders: result.orders,
-        filters: {
-          search,
-          searchField: searchField ?? '',
-          storeIds,
-          period,
-          dateFrom,
-          dateTo,
-          packedStatuses,
-          printStatuses,
-        },
-        stores: result.stores,
-        packingRecipients: recipientOptions.packingRecipients,
-        packingDefaultRecipientUserIds: recipientOptions.packingDefaultRecipientUserIds,
-        messageRecipients: recipientOptions.messageRecipients,
-        messageDefaultRecipientUserIds: recipientOptions.messageDefaultRecipientUserIds,
-        pagination: {
-          page,
-          pageSize,
-          total: result.total,
-          totalPages,
-          hasPrev: page > 1,
-          hasNext: page < totalPages,
-        },
-      },
-    };
-  }
-
-  async confirmPacked(orderId: string, body: unknown, actor: Actor, originUrl?: string) {
+  async confirmPacked(orderId: string, body: unknown, actor: Actor, originUrl?: string, viewerRole?: string) {
     const parsed = parsePackingBody(body);
-    const result = await model.confirmPacked({
+    await model.confirmPacked({
       orderId,
       lines: parsed.lines,
       notifyUserIds: parsed.notifyUserIds,
@@ -114,12 +29,12 @@ export class PickingListController {
       actor,
       originUrl,
     });
-    return { data: result, message: 'Packed quantities confirmed' };
+    return { data: await loadOrderRow(orderId, viewerRole), message: 'Packed quantities confirmed' };
   }
 
-  async cancelPacked(orderId: string, confirmationId: string, body: unknown, actor: Actor, originUrl?: string) {
+  async cancelPacked(orderId: string, confirmationId: string, body: unknown, actor: Actor, originUrl?: string, viewerRole?: string) {
     const parsed = parseNotifyBody(body);
-    const result = await model.cancelPacked({
+    await model.cancelPacked({
       orderId,
       confirmationId,
       notifyUserIds: parsed.notifyUserIds,
@@ -127,18 +42,13 @@ export class PickingListController {
       actor,
       originUrl,
     });
-    return { data: result, message: 'Packed confirmation canceled' };
+    return { data: await loadOrderRow(orderId, viewerRole), message: 'Packed confirmation canceled' };
   }
 
   async recordPrints(body: unknown, actor: Actor) {
     const orders = parsePrintBody(body);
     const result = await model.recordPrints({ orders, actor });
     return { data: result, message: 'Picking slip print recorded' };
-  }
-
-  async refreshOrder(orderId: string) {
-    const result = await model.refreshFromShopify(orderId);
-    return { data: result, message: 'Order refreshed' };
   }
 }
 
@@ -183,17 +93,4 @@ function parsePrintBody(body: unknown) {
     if (!orderId) throw new Error('orderId is required');
     return { orderId, items };
   });
-}
-
-function normalizePeriod(value: string | null): 'all' | 'week' | 'month' | 'year' {
-  return value === 'week' || value === 'month' || value === 'year' ? value : 'all';
-}
-
-function normalizePositiveInt(value: string | null, fallback: number) {
-  const parsed = Number.parseInt(value ?? '', 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
 }

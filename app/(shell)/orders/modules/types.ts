@@ -1,6 +1,21 @@
 import type { MessageAdmin } from '@/hooks/useOrderMessages';
 type AdminOption = MessageAdmin;
 
+export type LinePurchaseOrder = {
+  number: number;
+  status: 'REQUESTED' | 'PARTIALLY_RECEIVED' | 'RECEIVED' | 'CANCELLED';
+  ordered: number;
+  received: number;
+  deliveryDate: string | null;
+};
+export type LineInventory = {
+  supplierProductId: string;
+  variantId: string;
+  available: number;
+  onHand: number;
+  ownAllocated: number;
+  po: LinePurchaseOrder | null;
+};
 export type OrderItem = {
   id: string;
   productId: string | null;
@@ -16,6 +31,10 @@ export type OrderItem = {
   qty: number;
   position?: number;
   packedQuantity?: number;
+  packedDate?: string | null;
+  fulfilledQuantity?: number;
+  /** Hub stock and PO state behind the line (Admin, Staff); null when the product is not in the hub yet. */
+  inventory?: LineInventory | null;
   isEmbroidery?: boolean;
   isPrint?: boolean;
   assignments?: LineItemAssignment[];
@@ -180,7 +199,14 @@ export type OrderRow = {
   packedQuantity: number;
   totalQuantity: number;
   trackings: TrackingSummary[];
+  slipPrinted?: boolean;
+  slipLastPrintedAt?: string | null;
+  packingConfirmations?: PackingConfirmationRow[];
 };
+
+export type PackingLine = { lineItemId: string; quantity: number; full: boolean };
+export type PackingConfirmationRow = { id: string; confirmedAt: string; canceledAt: string | null; lines: PackingLine[] };
+export type PackingRecipient = { id: string; name: string; email: string; role: string };
 
 export type TrackingActionModalState = {
   order: OrderRow;

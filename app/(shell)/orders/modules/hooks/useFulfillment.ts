@@ -168,7 +168,12 @@ export function useFulfillment({ setOrders, blockTestModeAction }: UseFulfillmen
     if (!pendingFulfillment) return;
     if (blockTestModeAction()) return;
 
-    const { order, lines, notifyCustomer, barcodeInput, trackingNumber, trackingUrl, trackingCompany } = pendingFulfillment;
+    const { order, notifyCustomer, barcodeInput, trackingNumber, trackingUrl, trackingCompany } = pendingFulfillment;
+    const lines = pendingFulfillment.lines.filter((line) => line.quantity > 0);
+    if (lines.length === 0) {
+      toast.error('Keep at least one item to fulfil.');
+      return;
+    }
     const barcodes = parseBarcodes(barcodeInput);
     const trimmedTrackingNumber = trackingNumber.trim();
     const trimmedTrackingCompany = trackingCompany.trim();

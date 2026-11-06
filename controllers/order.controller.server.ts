@@ -6,13 +6,23 @@ import { getDecorationCrossVisibility } from '@/lib/decoration-visibility.server
 import { fetchShopifyOrderFinancials } from '@/lib/shopify-order-fetch.server';
 import { buildTaxInvoice, summarizePayments, type PaymentSummary, type TaxInvoice } from '@/lib/tax-invoice.server';
 import { getSettingsTimezone } from '@/lib/task-due-date.server';
+import { normalizeQueue } from '@/lib/order-queue.server';
+import { PickingListModel } from '@/models/picking-list.model.server';
+import { shapeOrderForRole } from '@/lib/order-row-shape.server';
+import { isOrderPickerRole, isStaffLikeRole } from '@/lib/roles';
+import { OrderLineInventoryModel } from '@/models/order-line-inventory.model.server';
 
 const model = new OrderModel();
+const pickingModel = new PickingListModel();
+const lineInventoryModel = new OrderLineInventoryModel();
+
+/** Hub stock and PO state per line is shown to Admin and Staff only. */
+const canSeeLineInventory = (role?: string) => role === 'admin' || isStaffLikeRole(role);
 const productModel = new ProductModel();
 
 type Period = 'all' | 'week' | 'month' | 'year';
 
-const SEARCH_FIELD_VALUES = new Set(['number', 'customer', 'address', 'lineItem']);
+const SEARCH_FIELD_VALUES = new Set(['number', 'customer', 'address', 'lineItem', 'barcode']);
 const SORTABLE_ORDER_FIELDS = new Set(['number', 'customer', 'orderedAt']);
 
 export class OrderController {
@@ -27,6 +37,9 @@ export class OrderController {
     const dateTo = searchParams.get('dateTo')?.trim() ?? '';
     const fulfillmentStatuses = searchParams.getAll('status').map((s) => s.trim()).filter(Boolean);
     const packingStatuses = searchParams.getAll('packingStatus').map((s) => s.trim()).filter(Boolean);
+    const printStatuses = searchParams.getAll('printStatus').map((s) => s.trim()).filter(Boolean);
+    const queue = normalizeQueue(searchParams.get('queue'));
+    const pickerScope = isOrderPickerRole(viewerRole);
     const page = normalizePositiveInt(searchParams.get('page'), 1);
     const pageSize = clamp(normalizePositiveInt(searchParams.get('pageSize'), 20), 5, 100);
     const decorationView = searchParams.get('decorationView') === '1';
@@ -49,6 +62,8 @@ export class OrderController {
               dateTo,
               fulfillmentStatuses,
               packingStatuses,
+              printStatuses,
+              queue,
             },
             stores: [],
             pagination: {
@@ -66,7 +81,7 @@ export class OrderController {
       storeIds = storeIds.length > 0 ? storeIds.filter((id) => allowedStoreIds.includes(id)) : allowedStoreIds;
     }
 
-    const [result, stores] = await Promise.all([
+    const [result, stores, recipients] = await Promise.all([
       model.listForConnectedStores({
         search,
         searchField,
@@ -76,6 +91,9 @@ export class OrderController {
         dateTo: dateTo || undefined,
         fulfillmentStatuses,
         packingStatuses,
+        printStatuses,
+        queue,
+        pickerScope,
         viewerId,
         viewerRole,
         decorationView,
@@ -86,13 +104,14 @@ export class OrderController {
         dir,
       }),
       model.getConnectedStoreOptions(allowedStoreIds),
+      viewerRole === 'admin' || pickerScope ? pickingModel.listRecipientOptions() : null,
     ]);
 
     const totalPages = Math.max(1, Math.ceil(result.total / pageSize));
 
     return {
       data: {
-        orders: result.orders,
+        orders: (canSeeLineInventory(viewerRole) ? await lineInventoryModel.attach(result.orders) : result.orders).map((order) => shapeOrderForRole(order, viewerRole)),
         filters: {
           search,
           searchField,
@@ -102,8 +121,12 @@ export class OrderController {
           dateTo,
           fulfillmentStatuses,
           packingStatuses,
+          printStatuses,
+          queue,
         },
-        stores,
+        stores: pickerScope ? [] : stores,
+        packingRecipients: recipients?.packingRecipients ?? [],
+        packingDefaultRecipientUserIds: recipients?.packingDefaultRecipientUserIds ?? [],
         pagination: {
           page,
           pageSize,
@@ -115,6 +138,32 @@ export class OrderController {
         crossDecorationVisibility,
       },
     };
+  }
+
+  async queueCounts(searchParams: URLSearchParams, allowedStoreIds?: string[] | null, viewerRole?: string) {
+    const searchFieldRaw = searchParams.get('searchField')?.trim() ?? '';
+    let storeIds = searchParams.getAll('storeId').map((s) => s.trim()).filter(Boolean);
+    const dateFrom = searchParams.get('dateFrom')?.trim() ?? '';
+    const dateTo = searchParams.get('dateTo')?.trim() ?? '';
+
+    if (allowedStoreIds !== null && allowedStoreIds !== undefined) {
+      if (allowedStoreIds.length === 0) {
+        return { data: { counts: { all: 0, open: 0, slip_not_printed: 0, slip_printed: 0, not_packed: 0, partial: 0, packed: 0, shipped: 0, issues: 0 } } };
+      }
+      storeIds = storeIds.length > 0 ? storeIds.filter((id) => allowedStoreIds.includes(id)) : allowedStoreIds;
+    }
+
+    const counts = await model.countQueues({
+      search: searchParams.get('search')?.trim() ?? '',
+      searchField: SEARCH_FIELD_VALUES.has(searchFieldRaw) ? searchFieldRaw : '',
+      storeIds,
+      period: normalizePeriod(searchParams.get('period')),
+      dateFrom: dateFrom || undefined,
+      dateTo: dateTo || undefined,
+      fulfillmentStatuses: searchParams.getAll('status').map((s) => s.trim()).filter(Boolean),
+      pickerScope: isOrderPickerRole(viewerRole),
+    });
+    return { data: { counts } };
   }
 
   async listNameAttributes(searchParams: URLSearchParams, viewerId?: string, allowedStoreIds?: string[] | null, viewerRole?: string) {
@@ -327,11 +376,12 @@ export class OrderController {
     };
   }
 
-  async refreshOrder(orderId: string) {
-    const result = await model.refreshFromShopify(orderId);
+  async refreshOrder(orderId: string, viewerRole?: string) {
+    const result = await model.refreshFromShopify(orderId, isOrderPickerRole(viewerRole) ? 'picker' : 'orders');
+    const [withInventory] = canSeeLineInventory(viewerRole) ? await lineInventoryModel.attach([result]) : [result];
 
     return {
-      data: result,
+      data: shapeOrderForRole(withInventory, viewerRole),
       message: 'Order refreshed',
     };
   }
@@ -347,7 +397,7 @@ export class OrderController {
   }
 
   async getOrderMessageCenter(orderId: string, typeInput?: string | null) {
-    const type = parseOrderMessageType(typeInput, true);
+    const type = typeInput?.trim() === 'all' ? 'all' : parseOrderMessageType(typeInput, true);
     const result = await model.getOrderMessageCenter(orderId, type);
 
     return {

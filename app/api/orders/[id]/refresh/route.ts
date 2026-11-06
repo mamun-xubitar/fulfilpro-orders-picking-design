@@ -22,7 +22,7 @@ export async function POST(
       }
     }
 
-    const result = await controller.refreshOrder(id);
+    const result = await controller.refreshOrder(id, session.user.role);
     return apiSuccess({ message: result.message, data: result.data });
   } catch (error) {
     return apiError({

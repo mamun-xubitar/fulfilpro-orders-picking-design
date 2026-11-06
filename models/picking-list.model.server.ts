@@ -1,10 +1,8 @@
 import { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma.server';
 import { sendAppMail } from '@/lib/email.server';
-import { OrderModel } from '@/models/order.model.server';
 import { resolvePickerRecipientOptions } from '@/lib/email-rules.server';
 import { createNotification } from '@/lib/notifications.server';
-import { matchesPackingFilter } from '@/lib/late-label-filter.server';
 
 export type PickingLineInput = {
   lineItemId: string;
@@ -40,172 +38,7 @@ type OrderItem = {
   position: number;
 };
 
-type ShippingLine = {
-  id: string;
-  title: string;
-  code: string | null;
-  source: string | null;
-  price: number;
-  discountedPrice: number | null;
-  currencyCode: string | null;
-  carrierIdentifier: string | null;
-  requestedFulfillmentServiceId: string | null;
-  phone: string | null;
-  deliveryCategory: string | null;
-  discountCodes: string[];
-  discountAllocations: Array<{
-    amount: number;
-    currencyCode: string | null;
-    code: string | null;
-    title: string | null;
-    type: string | null;
-    discountApplicationIndex: number | null;
-  }>;
-};
-
 export class PickingListModel {
-  private readonly orderModel = new OrderModel();
-
-  async list(params: {
-    search?: string;
-    searchField?: string;
-    storeIds?: string[];
-    period?: 'all' | 'week' | 'month' | 'year';
-    dateFrom?: string;
-    dateTo?: string;
-    packedStatuses?: string[];
-    printStatuses?: string[];
-    page: number;
-    pageSize: number;
-    allowedStoreIds?: string[] | null;
-  }) {
-    const where = buildOrderWhere(params);
-    const orderedAtBounds = getOrderedAtBounds(params);
-    const searchTokens = (params.search?.trim() ?? '').split(/\s+/).filter(Boolean);
-    const packedStatuses = new Set(params.packedStatuses ?? []);
-
-    const storeWhere: Prisma.StoreWhereInput = { status: 'connected' };
-    if (params.allowedStoreIds !== null && params.allowedStoreIds !== undefined) {
-      storeWhere.id = { in: params.allowedStoreIds };
-    }
-
-    const [ordersResult, stores] = await Promise.all([
-      this.listOrderRows({
-        where,
-        storeIds: params.storeIds ?? [],
-        searchTokens,
-        searchField: params.searchField,
-        printStatuses: params.printStatuses ?? [],
-        packedStatuses,
-        orderedAtFrom: orderedAtBounds.from,
-        orderedAtTo: orderedAtBounds.to,
-        page: params.page,
-        pageSize: params.pageSize,
-      }),
-      prisma.store.findMany({
-        where: storeWhere,
-        select: { id: true, name: true, storeDomain: true },
-        orderBy: [{ name: 'asc' }, { storeDomain: 'asc' }],
-      }),
-    ]);
-
-    const messageCounts = await getPickingMessageCounts(ordersResult.rows.map((row) => row.id));
-    const pageRows = ordersResult.rows.map((row) => toPickingOrderRow(row, messageCounts.get(row.id) ?? 0));
-    // const rowsWithMetadata = await this.attachMetadata(pageRows);
-
-    return {
-      orders: pageRows,
-      stores: stores.map((store) => ({
-        id: store.id,
-        name: store.name ?? store.storeDomain,
-        storeDomain: store.storeDomain,
-      })),
-      total: ordersResult.total,
-    };
-  }
-
-  private async listOrderRows(params: {
-    where: Prisma.OrderWhereInput;
-    storeIds: string[];
-    searchTokens: string[];
-    searchField?: string;
-    printStatuses: string[];
-    packedStatuses: Set<string>;
-    orderedAtFrom?: Date;
-    orderedAtTo?: Date;
-    page: number;
-    pageSize: number;
-  }) {
-    const include = pickingOrderInclude();
-    const filterByPacking = params.packedStatuses.size > 0;
-    const loadPackingPage = async (ids: string[]) => {
-      const start = (params.page - 1) * params.pageSize;
-      const pageIds = ids.slice(start, start + params.pageSize);
-      const rows = pageIds.length > 0
-        ? await prisma.order.findMany({
-          where: { id: { in: pageIds } },
-          include,
-        })
-        : [];
-      const idOrder = new Map(pageIds.map((id, index) => [id, index]));
-      rows.sort((a, b) => (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0));
-      return { rows, total: ids.length };
-    };
-
-    if (params.searchTokens.length > 0 && !filterByPacking) {
-      const searchPage = await getRankedPickingOrderSearchPage({
-        tokens: params.searchTokens,
-        searchField: params.searchField,
-        storeIds: params.storeIds,
-        printStatuses: params.printStatuses,
-        orderedAtFrom: params.orderedAtFrom,
-        orderedAtTo: params.orderedAtTo,
-        page: params.page,
-        pageSize: params.pageSize,
-      });
-      const rows = searchPage.ids.length > 0
-        ? await prisma.order.findMany({
-          where: { id: { in: searchPage.ids } },
-          include,
-        })
-        : [];
-      const idOrder = new Map(searchPage.ids.map((id, index) => [id, index]));
-      rows.sort((a, b) => (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0));
-      return { rows, total: searchPage.total };
-    }
-
-    if (!filterByPacking) {
-      const [total, rows] = await Promise.all([
-        prisma.order.count({ where: params.where }),
-        prisma.order.findMany({
-          where: params.where,
-          include,
-          orderBy: { orderedAt: 'desc' },
-          skip: (params.page - 1) * params.pageSize,
-          take: params.pageSize,
-        }),
-      ]);
-      return { rows, total };
-    }
-
-    if (params.searchTokens.length > 0) {
-      const searchPage = await getRankedPickingOrderSearchPage({
-        tokens: params.searchTokens,
-        searchField: params.searchField,
-        storeIds: params.storeIds,
-        printStatuses: params.printStatuses,
-        orderedAtFrom: params.orderedAtFrom,
-        orderedAtTo: params.orderedAtTo,
-        page: 1,
-        pageSize: 10000,
-      });
-      const matched = new Set(await getPackingFilteredOrderIds({ id: { in: searchPage.ids } }, undefined, params.packedStatuses));
-      return loadPackingPage(searchPage.ids.filter((id) => matched.has(id)));
-    }
-
-    return loadPackingPage(await getPackingFilteredOrderIds(params.where, { orderedAt: 'desc' }, params.packedStatuses));
-  }
-
   async listRecipientOptions() {
     const [packingOptions, messageOptions] = await Promise.all([
       resolvePickerRecipientOptions('picking_packing'),
@@ -218,12 +51,6 @@ export class PickingListModel {
       messageRecipients: messageOptions.allowedUsers,
       messageDefaultRecipientUserIds: messageOptions.defaultUserIds,
     };
-  }
-
-  async refreshFromShopify(orderId: string) {
-    await this.orderModel.refreshFromShopify(orderId);
-    const result = await this.getPackingSummary(orderId);
-    return result.order;
   }
 
   async confirmPacked(params: {
@@ -278,7 +105,7 @@ export class PickingListModel {
       });
     }
 
-    return this.getPackingSummary(order.id, saved.id);
+    return { confirmationId: saved.id };
   }
 
   async cancelPacked(params: {
@@ -330,7 +157,7 @@ export class PickingListModel {
       });
     }
 
-    return this.getPackingSummary(params.orderId);
+    return { orderId: params.orderId };
   }
 
   async recordPrints(params: {
@@ -360,440 +187,6 @@ export class PickingListModel {
     return { printedOrderIds: orderIds };
   }
 
-  private async getPackingSummary(orderId: string, savedConfirmationId?: string) {
-    const order = await prisma.order.findUnique({
-      where: { id: orderId },
-      include: {
-        store: { select: { id: true, name: true, storeDomain: true } },
-        packingConfirmations: { orderBy: { confirmedAt: 'desc' } },
-        pickingSlipPrints: { orderBy: { printedAt: 'desc' }, take: 1 },
-        _count: { select: { notes: true } },
-      },
-    });
-
-    if (!order) throw new Error('Order not found');
-    // const [row] = await this.attachMetadata([toPickingOrderRow(order)]);
-    const messageCount = await prisma.orderMessage.count({
-      where: { orderId: order.id, type: 'picker' },
-    });
-    return { order: toPickingOrderRow(order, messageCount), savedConfirmationId };
-  }
-
-  private async attachMetadata<T extends { storeId: string; items: Array<OrderItem & { metadata: PickingMetadata }> }>(rows: T[]) {
-    const metadataRows = await loadPickingMetadataRows(rows);
-
-    return rows.map((row) => ({
-      ...row,
-      items: row.items.map((item) => ({
-        ...item,
-        metadata: findBestMetadata(row.storeId, item, metadataRows),
-      })),
-    }));
-  }
-}
-
-type PickingMetadata = { location: string; remark: string; note: string };
-
-const PICKING_LIST_ORDERED_AT_CUTOFF = new Date('2026-05-01T00:00:00.000Z');
-
-function buildOrderWhere(params: {
-  storeIds?: string[];
-  period?: 'all' | 'week' | 'month' | 'year';
-  dateFrom?: string;
-  dateTo?: string;
-  printStatuses?: string[];
-}) {
-  const printStatusConditions = buildPrintStatusWhereConditions(params.printStatuses ?? []);
-  const andConditions: Prisma.OrderWhereInput[] = [
-    {
-      OR: [
-        { orderedAt: null },
-        { orderedAt: { gt: PICKING_LIST_ORDERED_AT_CUTOFF } },
-      ],
-    },
-  ];
-
-  if (printStatusConditions.length > 0) {
-    andConditions.push({ OR: printStatusConditions });
-  }
-
-  const where: Prisma.OrderWhereInput = {
-    store: {
-      is: {
-        status: 'connected',
-        ...(params.storeIds && params.storeIds.length > 0 ? { id: { in: params.storeIds } } : {}),
-      },
-    },
-    fulfillmentStatus: { not: 'fulfilled' },
-    AND: andConditions,
-  };
-
-  if (params.dateFrom || params.dateTo) {
-    where.orderedAt = {
-      ...(params.dateFrom ? { gte: new Date(`${params.dateFrom}T00:00:00.000Z`) } : {}),
-      ...(params.dateTo ? { lte: new Date(`${params.dateTo}T23:59:59.999Z`) } : {}),
-    };
-  } else {
-    const start = getPeriodStartDate(params.period ?? 'all');
-    if (start) where.orderedAt = { gte: start };
-  }
-
-  return where;
-}
-
-function getOrderedAtBounds(params: {
-  period?: 'all' | 'week' | 'month' | 'year';
-  dateFrom?: string;
-  dateTo?: string;
-}) {
-  if (params.dateFrom || params.dateTo) {
-    return {
-      from: params.dateFrom ? new Date(`${params.dateFrom}T00:00:00.000Z`) : undefined,
-      to: params.dateTo ? new Date(`${params.dateTo}T23:59:59.999Z`) : undefined,
-    };
-  }
-
-  return { from: getPeriodStartDate(params.period ?? 'all') ?? undefined, to: undefined };
-}
-
-function pickingOrderInclude() {
-  return {
-    store: { select: { id: true, name: true, storeDomain: true } },
-    packingConfirmations: { orderBy: { confirmedAt: 'desc' as const } },
-    pickingSlipPrints: { orderBy: { printedAt: 'desc' as const }, take: 1 },
-    _count: { select: { notes: true } },
-  } satisfies Prisma.OrderInclude;
-}
-
-function buildPrintStatusWhereConditions(printStatuses: string[]) {
-  const statuses = new Set(printStatuses);
-  const conditions: Prisma.OrderWhereInput[] = [];
-  if (statuses.has('printed')) conditions.push({ pickingSlipPrints: { some: {} } });
-  if (statuses.has('not_printed')) conditions.push({ pickingSlipPrints: { none: {} } });
-  return conditions.length === 2 ? [] : conditions;
-}
-
-async function loadPickingMetadataRows(rows: Array<{ storeId: string; items: OrderItem[] }>) {
-  const storeIds = new Set<string>();
-  const productIds = new Set<string>();
-  const variantIds = new Set<string>();
-  const skus = new Set<string>();
-
-  for (const row of rows) {
-    storeIds.add(row.storeId);
-    for (const item of row.items) {
-      if (item.productId) productIds.add(item.productId);
-      if (item.variantId) variantIds.add(item.variantId);
-      if (item.sku) skus.add(item.sku);
-    }
-  }
-
-  if (
-    storeIds.size === 0 ||
-    (productIds.size === 0 && variantIds.size === 0 && skus.size === 0)
-  ) {
-    return [];
-  }
-
-  const identifierConditions: Prisma.OrderItemPickingMetadataWhereInput[] = [];
-  if (variantIds.size > 0) identifierConditions.push({ variantId: { in: [...variantIds] } });
-  if (productIds.size > 0) identifierConditions.push({ productId: { in: [...productIds] } });
-  if (skus.size > 0) identifierConditions.push({ sku: { in: [...skus] } });
-
-  return prisma.orderItemPickingMetadata.findMany({
-    where: {
-      storeId: { in: [...storeIds] },
-      OR: identifierConditions,
-    },
-  });
-}
-
-async function getRankedPickingOrderSearchPage(params: {
-  tokens: string[];
-  searchField?: string;
-  storeIds: string[];
-  printStatuses: string[];
-  orderedAtFrom?: Date;
-  orderedAtTo?: Date;
-  page: number;
-  pageSize: number;
-}) {
-  const whereSql = buildRankedPickingOrderSearchWhereSql(params);
-  const rankSql = buildPickingOrderSearchRankSql(params.tokens);
-  const skip = (params.page - 1) * params.pageSize;
-  const rows = await prisma.$queryRaw<{ total: number; ids: string[] }[]>(Prisma.sql`
-    WITH filtered AS (
-      SELECT
-        o.id,
-        o."orderedAt",
-        o."createdAt",
-        ${rankSql} AS "searchRank"
-      FROM "Order" o
-      INNER JOIN "Store" s ON s.id = o."storeId"
-      WHERE ${whereSql}
-    ),
-    paged AS (
-      SELECT id, "searchRank", "orderedAt", "createdAt"
-      FROM filtered
-      ORDER BY "searchRank" ASC, "orderedAt" DESC NULLS LAST, "createdAt" DESC, id ASC
-      OFFSET ${skip}
-      LIMIT ${params.pageSize}
-    )
-    SELECT
-      (SELECT COUNT(*)::integer FROM filtered) AS total,
-      COALESCE(
-        array_agg(paged.id ORDER BY paged."searchRank" ASC, paged."orderedAt" DESC NULLS LAST, paged."createdAt" DESC, paged.id ASC)
-          FILTER (WHERE paged.id IS NOT NULL),
-        ARRAY[]::text[]
-      ) AS ids
-    FROM paged
-  `);
-
-  const row = rows[0];
-  return {
-    total: row?.total ?? 0,
-    ids: row?.ids ?? [],
-  };
-}
-
-function buildRankedPickingOrderSearchWhereSql(params: {
-  tokens: string[];
-  searchField?: string;
-  storeIds: string[];
-  printStatuses: string[];
-  orderedAtFrom?: Date;
-  orderedAtTo?: Date;
-}) {
-  const whereParts: Prisma.Sql[] = [
-    Prisma.sql`s.status = 'connected'`,
-    Prisma.sql`(o."fulfillmentStatus" IS NULL OR o."fulfillmentStatus" != 'fulfilled')`,
-    Prisma.sql`(o."orderedAt" IS NULL OR o."orderedAt" > ${PICKING_LIST_ORDERED_AT_CUTOFF})`,
-  ];
-
-  if (params.storeIds.length > 0) {
-    whereParts.push(Prisma.sql`s.id IN (${Prisma.join(params.storeIds)})`);
-  }
-
-  if (params.orderedAtFrom) {
-    whereParts.push(Prisma.sql`o."orderedAt" >= ${params.orderedAtFrom}`);
-  }
-
-  if (params.orderedAtTo) {
-    whereParts.push(Prisma.sql`o."orderedAt" <= ${params.orderedAtTo}`);
-  }
-
-  const printStatusSql = buildPrintStatusFilterSql(params.printStatuses);
-  if (printStatusSql) {
-    whereParts.push(printStatusSql);
-  }
-
-  whereParts.push(buildPickingTokenSearchSql(params.tokens, params.searchField));
-
-  return Prisma.join(whereParts, ' AND ');
-}
-
-function buildPickingTokenSearchSql(tokens: string[], searchField?: string) {
-  const tokenConditions = tokens.map((token) => {
-    const conditions = buildPickingFieldConditionsForToken(token, searchField);
-    return Prisma.sql`(${Prisma.join(conditions, ' OR ')})`;
-  });
-
-  return Prisma.sql`(${Prisma.join(tokenConditions, ' AND ')})`;
-}
-
-function buildPickingFieldConditionsForToken(token: string, searchField?: string): Prisma.Sql[] {
-  switch (searchField) {
-    case 'number':
-      return [ilikeContains(Prisma.sql`o."number"::text`, token)];
-    case 'customer':
-      return [ilikeContains(Prisma.sql`o."cusName"`, token)];
-    case 'address':
-      return [
-        ilikeContains(Prisma.sql`o."address"`, token),
-        ilikeContains(Prisma.sql`o."address2"`, token),
-        ilikeContains(Prisma.sql`o."city"`, token),
-        ilikeContains(Prisma.sql`o."state"`, token),
-        ilikeContains(Prisma.sql`o."country"`, token),
-      ];
-    case 'lineItem':
-      return [ilikeContains(Prisma.sql`o."lineItems"::text`, token)];
-    case 'barcode':
-      return [ilikeContains(Prisma.sql`o."boarcode"`, token)];
-    default:
-      return [
-        ilikeContains(Prisma.sql`o."number"::text`, token),
-        ilikeContains(Prisma.sql`o."cusName"`, token),
-        ilikeContains(Prisma.sql`o."cusEmail"`, token),
-        ilikeContains(Prisma.sql`o."boarcode"`, token),
-        ilikeContains(Prisma.sql`o."address"`, token),
-        ilikeContains(Prisma.sql`o."address2"`, token),
-        ilikeContains(Prisma.sql`o."city"`, token),
-        ilikeContains(Prisma.sql`o."state"`, token),
-        ilikeContains(Prisma.sql`o."zip"`, token),
-        ilikeContains(Prisma.sql`o."country"`, token),
-        ilikeContains(Prisma.sql`s.name`, token),
-        ilikeContains(Prisma.sql`s."storeDomain"`, token),
-        ilikeContains(Prisma.sql`o."lineItems"::text`, token),
-      ];
-  }
-}
-
-function buildPickingOrderSearchRankSql(tokens: string[]) {
-  const terms = uniqueSearchTerms(tokens);
-  return Prisma.sql`CASE
-    WHEN ${anyTerm(terms, (term) => Prisma.sql`o."number"::text = ${term}`)} THEN 0
-    WHEN ${anyTerm(terms, (term) => ilikeStartsWith(Prisma.sql`o."number"::text`, term))} THEN 1
-    WHEN ${anyTerm(terms, (term) => ilikeExact(Prisma.sql`o."boarcode"`, term))} THEN 2
-    WHEN ${anyTerm(terms, (term) => ilikeStartsWith(Prisma.sql`o."boarcode"`, term))} THEN 3
-    WHEN ${anyTerm(terms, (term) => ilikeContains(Prisma.sql`o."number"::text`, term))} THEN 4
-    WHEN ${anyTerm(terms, (term) => ilikeContains(Prisma.sql`o."boarcode"`, term))} THEN 5
-    WHEN ${anyTerm(terms, (term) => Prisma.sql`(${ilikeExact(Prisma.sql`o."cusName"`, term)} OR ${ilikeExact(Prisma.sql`o."cusEmail"`, term)})`)} THEN 6
-    WHEN ${anyTerm(terms, (term) => Prisma.sql`(${ilikeStartsWith(Prisma.sql`o."cusName"`, term)} OR ${ilikeStartsWith(Prisma.sql`o."cusEmail"`, term)})`)} THEN 7
-    WHEN ${anyTerm(terms, (term) => Prisma.sql`(${ilikeContains(Prisma.sql`o."cusName"`, term)} OR ${ilikeContains(Prisma.sql`o."cusEmail"`, term)})`)} THEN 8
-    WHEN ${anyTerm(terms, (term) => Prisma.sql`(${ilikeStartsWith(Prisma.sql`s.name`, term)} OR ${ilikeStartsWith(Prisma.sql`s."storeDomain"`, term)})`)} THEN 9
-    WHEN ${anyTerm(terms, (term) => Prisma.sql`(${ilikeContains(Prisma.sql`s.name`, term)} OR ${ilikeContains(Prisma.sql`s."storeDomain"`, term)})`)} THEN 10
-    WHEN ${anyTerm(terms, (term) => Prisma.sql`(
-      ${ilikeContains(Prisma.sql`o."address"`, term)}
-      OR ${ilikeContains(Prisma.sql`o."address2"`, term)}
-      OR ${ilikeContains(Prisma.sql`o."city"`, term)}
-      OR ${ilikeContains(Prisma.sql`o."state"`, term)}
-      OR ${ilikeContains(Prisma.sql`o."country"`, term)}
-    )`)} THEN 11
-    WHEN ${anyTerm(terms, (term) => ilikeContains(Prisma.sql`o."lineItems"::text`, term))} THEN 12
-    ELSE 20
-  END`;
-}
-
-function buildPrintStatusFilterSql(printStatuses: string[]) {
-  const statuses = new Set(printStatuses);
-  const conditions: Prisma.Sql[] = [];
-  if (statuses.has('printed')) conditions.push(Prisma.sql`EXISTS (SELECT 1 FROM "OrderPickingSlipPrint" p WHERE p."orderId" = o.id)`);
-  if (statuses.has('not_printed')) conditions.push(Prisma.sql`NOT EXISTS (SELECT 1 FROM "OrderPickingSlipPrint" p WHERE p."orderId" = o.id)`);
-  return conditions.length === 0 || conditions.length === 2 ? null : Prisma.sql`(${Prisma.join(conditions, ' OR ')})`;
-}
-
-function anyTerm(terms: string[], build: (term: string) => Prisma.Sql) {
-  return Prisma.sql`(${Prisma.join(terms.map(build), ' OR ')})`;
-}
-
-function ilikeExact(field: Prisma.Sql, value: string) {
-  return Prisma.sql`LOWER(COALESCE(${field}, '')) = LOWER(${value})`;
-}
-
-function ilikeStartsWith(field: Prisma.Sql, value: string) {
-  return Prisma.sql`COALESCE(${field}, '') ILIKE ${buildLikePattern(value, 'startsWith')} ESCAPE '\\'`;
-}
-
-function ilikeContains(field: Prisma.Sql, value: string) {
-  return Prisma.sql`COALESCE(${field}, '') ILIKE ${buildLikePattern(value, 'contains')} ESCAPE '\\'`;
-}
-
-function buildLikePattern(value: string, mode: 'startsWith' | 'contains') {
-  const escaped = value.replace(/[\\%_]/g, (char) => `\\${char}`);
-  return mode === 'startsWith' ? `${escaped}%` : `%${escaped}%`;
-}
-
-function toPickingOrderRow(order: {
-  id: string;
-  number: number;
-  boarcode: string | null;
-  cusName: string;
-  cusEmail: string | null;
-  address: string | null;
-  address2: string | null;
-  city: string | null;
-  state: string | null;
-  zip: string | null;
-  country: string | null;
-  phone: string | null;
-  note: string | null;
-  canceled: boolean;
-  closed: boolean;
-  orderedAt: Date | null;
-  labelPrintedAt: Date | null;
-  lineItems: Prisma.JsonValue;
-  shippingLines: Prisma.JsonValue | null;
-  fulfillmentStatus: string | null;
-  fulfillmentItems: Prisma.JsonValue | null;
-  store: { id: string; name: string | null; storeDomain: string };
-  packingConfirmations: Array<{ id: string; lines: Prisma.JsonValue; confirmedAt: Date; canceledAt: Date | null }>;
-  pickingSlipPrints: Array<{ printedAt: Date }>;
-  _count: { notes: number };
-}, messageCount: number) {
-  const items = toLineItems(order.lineItems)
-    .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
-    .map((item) => ({ ...item, metadata: { location: '', remark: '', note: '' } }));
-  const activeConfirmations = order.packingConfirmations.filter((confirmation) => !confirmation.canceledAt);
-  const packedByLine = getPackedByLine(activeConfirmations);
-  const fulfilledByLine = getFulfilledByLine(order.fulfillmentItems);
-  const totalQuantity = items.reduce((sum, item) => sum + Math.max(0, item.qty), 0);
-  const packedQuantity = [...packedByLine.values()].reduce((sum, qty) => sum + qty, 0);
-  const lastPackedAt = activeConfirmations[0]?.confirmedAt?.toISOString() ?? null;
-  const lastPackingUpdateAt = order.packingConfirmations[0]?.confirmedAt?.toISOString() ?? null;
-  const packingStatus = getPackingStatus(packedQuantity, totalQuantity);
-
-  return {
-    id: order.id,
-    number: order.number,
-    barcode: order.boarcode,
-    customer: order.cusName,
-    customerEmail: order.cusEmail,
-    phone: order.phone,
-    address: order.address,
-    address2: order.address2,
-    city: order.city,
-    state: order.state,
-    zip: order.zip,
-    country: order.country,
-    note: order.note,
-    canceled: order.canceled,
-    closed: order.closed,
-    orderedAt: order.orderedAt?.toISOString() ?? '',
-    labelPrintedAt: order.labelPrintedAt?.toISOString() ?? null,
-    storeId: order.store.id,
-    storeName: order.store.name ?? order.store.storeDomain,
-    storeDomain: order.store.storeDomain,
-    shippingLines: toShippingLines(order.shippingLines),
-    items: items.map((item) => ({
-      ...item,
-      packedQuantity: packedByLine.get(item.id) ?? 0,
-      packedDate: getLinePackedDate(activeConfirmations, item.id),
-      lastPackedUpdate: getLinePackedDate(order.packingConfirmations, item.id),
-      fulfilledQuantity: fulfilledByLine.get(item.id) ?? 0,
-    })),
-    vendors: Array.from(new Set(items.map((item) => item.vendor).filter(Boolean))),
-    printed: order.pickingSlipPrints.length > 0,
-    lastPrintedAt: order.pickingSlipPrints[0]?.printedAt.toISOString() ?? null,
-    packingStatus,
-    packedQuantity,
-    totalQuantity,
-    lastPackedAt,
-    lastPackingUpdateAt,
-    noteCount: order._count.notes,
-    messageCount,
-    fulfillmentStatus: order.fulfillmentStatus ?? null,
-    packingConfirmations: order.packingConfirmations.map((confirmation) => ({
-      id: confirmation.id,
-      confirmedAt: confirmation.confirmedAt.toISOString(),
-      canceledAt: confirmation.canceledAt?.toISOString() ?? null,
-      lines: normalizeStoredLines(confirmation.lines),
-    })),
-  };
-}
-
-async function getPickingMessageCounts(orderIds: string[]) {
-  if (orderIds.length === 0) return new Map<string, number>();
-
-  const rows = await prisma.orderMessage.groupBy({
-    by: ['orderId'],
-    where: {
-      orderId: { in: orderIds },
-      type: 'picker',
-    },
-    _count: { _all: true },
-  });
-
-  return new Map(rows.map((row) => [row.orderId, row._count._all]));
 }
 
 function toLineItems(value: Prisma.JsonValue): OrderItem[] {
@@ -815,77 +208,6 @@ function toLineItems(value: Prisma.JsonValue): OrderItem[] {
       position: typeof obj.position === 'number' ? obj.position : index,
     };
   });
-}
-
-function toShippingLines(value: Prisma.JsonValue | null): ShippingLine[] {
-  if (!Array.isArray(value)) return [];
-  return value.map((item) => {
-    const obj = item && typeof item === 'object' ? item as Record<string, unknown> : {};
-    const priceSet = obj.price_set as { shop_money?: { amount?: unknown; currency_code?: unknown } } | undefined;
-    const discountedPriceSet = obj.discounted_price_set as { shop_money?: { amount?: unknown; currency_code?: unknown } } | undefined;
-    const price = obj.price ?? priceSet?.shop_money?.amount ?? 0;
-    const discountedPrice = obj.discountedPrice ?? obj.discounted_price ?? discountedPriceSet?.shop_money?.amount ?? null;
-    const currencyCode = obj.currencyCode ?? priceSet?.shop_money?.currency_code ?? discountedPriceSet?.shop_money?.currency_code ?? null;
-    const discountAllocations = normalizeShippingDiscountAllocations(obj.discountAllocations ?? obj.discount_allocations);
-    const discountCodes = normalizeStringArray(obj.discountCodes).concat(
-      discountAllocations
-        .map((allocation) => allocation.code)
-        .filter((code): code is string => Boolean(code))
-    );
-
-    return {
-      id: typeof obj.id === 'string' ? obj.id : String(obj.id ?? ''),
-      title: typeof obj.title === 'string' ? obj.title : '',
-      code: typeof obj.code === 'string' ? obj.code : null,
-      source: typeof obj.source === 'string' ? obj.source : null,
-      price: toJsonNumber(price, 0),
-      discountedPrice: discountedPrice === null ? null : toJsonNumber(discountedPrice, 0),
-      currencyCode: typeof currencyCode === 'string' ? currencyCode : null,
-      carrierIdentifier: typeof obj.carrierIdentifier === 'string'
-        ? obj.carrierIdentifier
-        : (typeof obj.carrier_identifier === 'string' ? obj.carrier_identifier : null),
-      requestedFulfillmentServiceId: obj.requestedFulfillmentServiceId
-        ? String(obj.requestedFulfillmentServiceId)
-        : (obj.requested_fulfillment_service_id ? String(obj.requested_fulfillment_service_id) : null),
-      phone: typeof obj.phone === 'string' ? obj.phone : null,
-      deliveryCategory: typeof obj.deliveryCategory === 'string'
-        ? obj.deliveryCategory
-        : (typeof obj.delivery_category === 'string' ? obj.delivery_category : null),
-      discountCodes: Array.from(new Set(discountCodes)),
-      discountAllocations,
-    };
-  });
-}
-
-function normalizeShippingDiscountAllocations(value: unknown): ShippingLine['discountAllocations'] {
-  if (!Array.isArray(value)) return [];
-  return value.map((item) => {
-    const obj = item && typeof item === 'object' ? item as Record<string, unknown> : {};
-    const amountSet = obj.amount_set as { shop_money?: { amount?: unknown; currency_code?: unknown } } | undefined;
-    const amount = obj.amount ?? amountSet?.shop_money?.amount ?? 0;
-    const currencyCode = obj.currencyCode ?? amountSet?.shop_money?.currency_code ?? null;
-    const discountApplicationIndex = obj.discountApplicationIndex ?? obj.discount_application_index ?? null;
-    return {
-      amount: toJsonNumber(amount, 0),
-      currencyCode: typeof currencyCode === 'string' ? currencyCode : null,
-      code: typeof obj.code === 'string' ? obj.code : null,
-      title: typeof obj.title === 'string' ? obj.title : null,
-      type: typeof obj.type === 'string' ? obj.type : null,
-      discountApplicationIndex: discountApplicationIndex === null ? null : toJsonNumber(discountApplicationIndex, 0),
-    };
-  });
-}
-
-function normalizeStringArray(value: unknown) {
-  if (!Array.isArray(value)) return [];
-  return value
-    .map((item) => typeof item === 'string' ? item.trim() : '')
-    .filter(Boolean);
-}
-
-function toJsonNumber(value: unknown, fallback: number) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
 }
 
 function normalizeVariantOptions(value: unknown): Array<{ name: string; value: string }> {
@@ -936,52 +258,6 @@ function normalizePackingLines(
     .filter((line): line is PickingLineInput => Boolean(line));
 }
 
-function getPackingStatus(packedQuantity: number, totalQuantity: number) {
-  return packedQuantity >= totalQuantity && totalQuantity > 0
-    ? 'packed'
-    : packedQuantity > 0
-      ? 'partially_packed'
-      : 'not_packed';
-}
-
-// Packing status is derived in JS, so the packing filter scans every candidate order. Select scalar
-// columns only: including relations here would bind one parameter per order in the follow-up
-// queries and exceed Postgres' 32,767 bind-parameter limit on large stores.
-async function getPackingFilteredOrderIds(where: Prisma.OrderWhereInput, orderBy: Prisma.OrderOrderByWithRelationInput | undefined, packedStatuses: Set<string>) {
-  const [candidates, confirmations] = await Promise.all([
-    prisma.order.findMany({
-      where,
-      orderBy,
-      select: { id: true, lineItems: true, labelPrintedAt: true, canceled: true, closed: true, fulfillmentStatus: true },
-    }),
-    prisma.orderPackingConfirmation.findMany({
-      where: { canceledAt: null, order: { is: where } },
-      select: { orderId: true, lines: true },
-    }),
-  ]);
-
-  const confirmationsByOrder = new Map<string, Array<{ lines: Prisma.JsonValue }>>();
-  for (const confirmation of confirmations) {
-    const list = confirmationsByOrder.get(confirmation.orderId) ?? [];
-    list.push(confirmation);
-    confirmationsByOrder.set(confirmation.orderId, list);
-  }
-
-  return candidates
-    .filter((row) => {
-      const totalQuantity = toLineItems(row.lineItems).reduce((sum, item) => sum + Math.max(0, item.qty), 0);
-      const packedQuantity = [...getPackedByLine(confirmationsByOrder.get(row.id) ?? []).values()].reduce((sum, qty) => sum + qty, 0);
-      return matchesPackingFilter(packedStatuses, {
-        labelPrintedAt: row.labelPrintedAt,
-        canceled: row.canceled,
-        closed: row.closed,
-        fulfillmentStatus: row.fulfillmentStatus,
-        packingStatus: getPackingStatus(packedQuantity, totalQuantity),
-      });
-    })
-    .map((row) => row.id);
-}
-
 function getPackedByLine(confirmations: Array<{ lines: Prisma.JsonValue }>) {
   const packed = new Map<string, number>();
   confirmations.forEach((confirmation) => {
@@ -990,64 +266,6 @@ function getPackedByLine(confirmations: Array<{ lines: Prisma.JsonValue }>) {
     });
   });
   return packed;
-}
-
-function getFulfilledByLine(fulfillmentItems: Prisma.JsonValue | null) {
-  const fulfilled = new Map<string, number>();
-  if (!Array.isArray(fulfillmentItems)) return fulfilled;
-  fulfillmentItems.forEach((item) => {
-    if (!item || typeof item !== 'object') return;
-    const obj = item as Record<string, unknown>;
-    const lineItemId = typeof obj.lineItemId === 'string' ? obj.lineItemId : '';
-    const quantity = typeof obj.quantity === 'number' ? obj.quantity : Number(obj.quantity ?? 0);
-    if (lineItemId && quantity > 0) {
-      fulfilled.set(lineItemId, (fulfilled.get(lineItemId) ?? 0) + quantity);
-    }
-  });
-  return fulfilled;
-}
-
-function getLinePackedDate(confirmations: Array<{ lines: Prisma.JsonValue; confirmedAt: Date }>, lineItemId: string) {
-  const match = confirmations.find((confirmation) => normalizeStoredLines(confirmation.lines).some((line) => line.lineItemId === lineItemId));
-  return match?.confirmedAt.toISOString() ?? null;
-}
-
-function findBestMetadata(storeId: string, item: OrderItem, rows: Array<{
-  storeId: string;
-  productId: string | null;
-  variantId: string | null;
-  sku: string | null;
-  location: string | null;
-  remark: string | null;
-  note: string | null;
-}>): PickingMetadata {
-  const match = rows.find((row) => row.storeId === storeId && item.variantId && row.variantId === item.variantId)
-    ?? rows.find((row) => row.storeId === storeId && item.productId && row.productId === item.productId)
-    ?? rows.find((row) => row.storeId === storeId && item.sku && row.sku === item.sku);
-  return {
-    location: match?.location ?? '',
-    remark: match?.remark ?? '',
-    note: match?.note ?? '',
-  };
-}
-
-function uniqueSearchTerms(tokens: string[]) {
-  const terms = [tokens.join(' '), ...tokens]
-    .map((term) => term.trim().toLowerCase())
-    .filter(Boolean);
-  return Array.from(new Set(terms));
-}
-
-function getPeriodStartDate(period: 'all' | 'week' | 'month' | 'year') {
-  if (period === 'all') return null;
-  const now = new Date();
-  if (period === 'year') return new Date(now.getFullYear(), 0, 1);
-  if (period === 'month') return new Date(now.getFullYear(), now.getMonth(), 1);
-  const day = now.getDay();
-  const weekStart = new Date(now);
-  weekStart.setDate(now.getDate() - day);
-  weekStart.setHours(0, 0, 0, 0);
-  return weekStart;
 }
 
 function toConfiguredRecipients(userIds: string[], allowedUsers: NotifyRecipient[]): NotifyRecipient[] {
@@ -1076,14 +294,19 @@ async function sendPackingEmail(params: {
     return `- ${item?.name ?? line.lineItemId} (${item?.sku || 'no SKU'}): x${line.quantity}`;
   }).join('\n');
   const actor = params.actor?.name || params.actor?.email || 'Order picker';
-  const url = params.originUrl ? `${params.originUrl}/picking-list?search=${encodeURIComponent(params.order.number)}` : '';
+  const url = params.originUrl ? `${params.originUrl}/orders?search=${encodeURIComponent(params.order.number)}` : '';
   const note = params.message ? `\n\nMessage:\n${params.message}` : '';
-  await sendAppMail({
-    to: params.recipients.map((recipient) => recipient.email),
-    subject: `Order ${params.order.number} packing ${params.type}`,
-    text: `${actor} ${verb} items for order ${params.order.number} (${params.order.cusName}).\n\n${lines}${note}${url ? `\n\n${url}` : ''}`,
-    html: `<p><strong>${escapeHtml(actor)}</strong> ${escapeHtml(verb)} items for order <strong>${escapeHtml(params.order.number)}</strong> (${escapeHtml(params.order.cusName)}).</p><pre>${escapeHtml(lines)}</pre>${params.message ? `<p><strong>Message:</strong><br>${escapeHtml(params.message).replace(/\n/g, '<br>')}</p>` : ''}${url ? `<p><a href="${escapeHtml(url)}">Open order</a></p>` : ''}`,
-  });
+  try {
+    await sendAppMail({
+      to: params.recipients.map((recipient) => recipient.email),
+      subject: `Order ${params.order.number} packing ${params.type}`,
+      text: `${actor} ${verb} items for order ${params.order.number} (${params.order.cusName}).\n\n${lines}${note}${url ? `\n\n${url}` : ''}`,
+      html: `<p><strong>${escapeHtml(actor)}</strong> ${escapeHtml(verb)} items for order <strong>${escapeHtml(params.order.number)}</strong> (${escapeHtml(params.order.cusName)}).</p><pre>${escapeHtml(lines)}</pre>${params.message ? `<p><strong>Message:</strong><br>${escapeHtml(params.message).replace(/\n/g, '<br>')}</p>` : ''}${url ? `<p><a href="${escapeHtml(url)}">Open order</a></p>` : ''}`,
+    });
+  } catch (error) {
+    // The packing change is already saved: a broken mail connection must not report it as failed.
+    console.error('Failed to send packing email:', error);
+  }
 
   await Promise.all(params.recipients.map((r) =>
     createNotification({

@@ -141,7 +141,7 @@ const PRODUCT_VARIANTS_QUERY = `
   }
 `;
 
-function buildProductByIdQuery(includeChannels: boolean) {
+function buildProductByIdQuery(includeChannels: boolean, mediaLimit = 20) {
   return `
   query ProductById($id: ID!) {
     product(id: $id) {
@@ -155,7 +155,7 @@ function buildProductByIdQuery(includeChannels: boolean) {
       descriptionHtml
       category { id name }
       featuredImage { url }
-      media(first: 20) { nodes { id ... on MediaImage { image { url altText } } } }
+      media(first: ${mediaLimit}) { nodes { id ... on MediaImage { image { url altText } } } }
       onlineStoreUrl
       onlineStorePreviewUrl
       totalInventory
@@ -194,14 +194,14 @@ async function queryProducts(shop: string, accessToken: string, variables: Recor
   }
 }
 
-async function queryProductById(shop: string, accessToken: string, id: string) {
+async function queryProductById(shop: string, accessToken: string, id: string, mediaLimit?: number) {
   const includeChannels = !shopsWithoutPublicationsScope.has(shop);
   try {
-    return await shopifyGraphQL<ShopifyProductByIdResult>(shop, accessToken, buildProductByIdQuery(includeChannels), { id });
+    return await shopifyGraphQL<ShopifyProductByIdResult>(shop, accessToken, buildProductByIdQuery(includeChannels, mediaLimit), { id });
   } catch (error) {
     if (includeChannels && isPublicationsScopeError(error)) {
       shopsWithoutPublicationsScope.add(shop);
-      return shopifyGraphQL<ShopifyProductByIdResult>(shop, accessToken, buildProductByIdQuery(false), { id });
+      return shopifyGraphQL<ShopifyProductByIdResult>(shop, accessToken, buildProductByIdQuery(false, mediaLimit), { id });
     }
     throw error;
   }
@@ -213,9 +213,11 @@ export async function syncSingleProduct(params: {
   shop: string;
   accessToken: string;
   shopifyProductId: string | number;
+  /** How many images to fetch; defaults to 20 like the bulk sync ("+ PO" asks for Shopify's maximum, 250). */
+  mediaLimit?: number;
 }) {
-  const { storeId, shop, accessToken, shopifyProductId } = params;
-  const data = await queryProductById(shop, accessToken, toProductGid(shopifyProductId));
+  const { storeId, shop, accessToken, shopifyProductId, mediaLimit } = params;
+  const data = await queryProductById(shop, accessToken, toProductGid(shopifyProductId), mediaLimit);
   if (!data.product) return null;
 
   const product = data.product;

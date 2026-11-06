@@ -16,8 +16,8 @@ created by an admin; there is no self-signup. Seven roles, defined in `lib/roles
 - **Staff** — day-to-day order and fulfilment work; blocked from the admin-only sections.
 - **Test User** — a staff-like account whose destructive actions are blocked at the UI layer
   ("test mode") so the app can be demonstrated or trialled against live data.
-- **Order Picker** — sees only the Picking List, Tasks, and Messages. Works from the physical
-  pick sequence, not the order list.
+- **Order Picker** — sees only the Pick & Pack view of the Orders page (packing and picking-slip
+  printing, without customer, fulfilment or stock data), Tasks, and Messages.
 - **Decorator — Print / Emb / Sewer** — sees the Decoration queue for their own discipline.
   Print and Emb are auto-scoped by category keyword; Sewer sees only work explicitly assigned
   to them. Cross-visibility between print and embroidery is an admin-toggled setting.
@@ -65,13 +65,15 @@ The main workflows, one per shell route:
 
 - **Orders** — the cross-store order queue: line items, decoration state, name/number
   attributes, notes, admin messages, stock adjustments, packing confirmation, and fulfilment
-  confirmation back to Shopify. Certain actions (fulfilment edits, cancellation, picking and
+  confirmation back to Shopify. One page serves every role, shaped by role: Admin sees
+  everything, Staff sees fulfilment (no picking slips or packing), and Order Pickers see only
+  packing and picking-slip printing. Each line shows its colour, a link to the product in Shopify
+  admin, available hub stock and purchase-order status, and Admin can raise a purchase order
+  from it (adding the product to the hub under the line's store first if it is missing). Certain actions (fulfilment edits, cancellation, picking and
   packing) run through a request-and-approval flow rather than being taken directly.
 - **Decoration** — the production queue for print, embroidery, and sewing: per-line-item
   decoration records, decorator assignments, work logging, artwork attachments, edit requests,
   and a scheduled end-of-day digest.
-- **Picking List** — the picker's own view, with picking-slip printing and per-item picking
-  metadata.
 - **Back In Stock** — staff raise a request against an order's short items; admins respond in
   a threaded exchange.
 - **Tasks** — assigned and recurring work with due types (standard / urgent / custom),

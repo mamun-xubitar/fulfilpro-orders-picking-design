@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import { isOrderPickerRole, isRestrictedSessionRole } from "@/lib/roles";
+import { isRestrictedSessionRole } from "@/lib/roles";
 
 type StaffAccessInfo = {
   allowed: boolean;
@@ -64,7 +64,7 @@ export default function RestrictedPage() {
       if (!cancelled) {
         setStaffAccess(json.data.staffAccess);
         if (json.data.staffAccess?.allowed) {
-          router.push(isOrderPickerRole(role) ? "/picking-list" : "/orders");
+          router.push("/orders");
         }
       }
     }

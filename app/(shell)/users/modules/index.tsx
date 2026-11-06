@@ -268,7 +268,7 @@ export default function UsersPage() {
   return (
     <main className="flex-1 p-4 md:p-6">
       <div className="flex flex-col gap-6">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6 w-full max-w-3xl">
           <h2 className="text-base font-semibold text-gray-900 mb-5">{formTitle}</h2>
           <div className="space-y-4">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -280,19 +280,18 @@ export default function UsersPage() {
                 <label className="block text-xs font-medium text-gray-600 mb-1">Email *</label>
                 <input type="email" placeholder="jane@example.com" value={form.email} onChange={(e) => updateForm("email", e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
               </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Role</label>
-              <select value={form.role} onChange={(e) => updateForm("role", e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer">
-                <option value="admin">Admin - 24/7 access</option>
-                <option value="staff">Staff - restricted hours</option>
-                <option value="test">Test User - orders view only</option>
-                <option value="order_picker">Order Picker - picking list only</option>
-                <option value="decorator_print">Decorator - Print</option>
-                <option value="decorator_emb">Decorator - Emb</option>
-                <option value="decorator_sewer">Decorator - Sewer</option>
-              </select>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Role</label>
+                <select value={form.role} onChange={(e) => updateForm("role", e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer">
+                  <option value="admin">Admin - 24/7 access</option>
+                  <option value="staff">Staff - restricted hours</option>
+                  <option value="test">Test User - orders view only</option>
+                  <option value="order_picker">Order Picker - picking list only</option>
+                  <option value="decorator_print">Decorator - Print</option>
+                  <option value="decorator_emb">Decorator - Emb</option>
+                  <option value="decorator_sewer">Decorator - Sewer</option>
+                </select>
+              </div>
             </div>
 
             <div>
@@ -327,7 +326,7 @@ export default function UsersPage() {
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-2">
             <h2 className="text-base font-semibold text-gray-900">All Users</h2>
             <span className="text-xs text-gray-400">{loading ? "Loading..." : `${users.length} user${users.length !== 1 ? "s" : ""}`}</span>
           </div>
@@ -374,12 +373,12 @@ export default function UsersPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex gap-1">
-                        <button onClick={() => editUser(user)} className="px-2.5 py-1 text-xs border border-blue-200 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors duration-150 cursor-pointer">Edit</button>
+                      <div className="flex flex-wrap gap-1">
+                        <button onClick={() => editUser(user)} className="px-2.5 py-1 text-xs whitespace-nowrap border border-blue-200 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors duration-150 cursor-pointer">Edit</button>
                         {isNonAdminRole(user.role) && (
                           <button
                             onClick={() => openRestrictions(user.id)}
-                            className="px-2.5 py-1 text-xs border border-purple-200 text-purple-600 rounded-lg hover:bg-purple-50 transition-colors duration-150 cursor-pointer"
+                            className="px-2.5 py-1 text-xs whitespace-nowrap border border-purple-200 text-purple-600 rounded-lg hover:bg-purple-50 transition-colors duration-150 cursor-pointer"
                           >
                             Restrictions
                           </button>
@@ -387,13 +386,13 @@ export default function UsersPage() {
                         <button
                           disabled={updatingId === user.id}
                           onClick={() => toggleActive(user)}
-                          className={`px-2.5 py-1 text-xs border rounded-lg transition-colors duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed ${user.active ? "border-amber-200 text-amber-600 hover:bg-amber-50" : "border-green-200 text-green-600 hover:bg-green-50"}`}
+                          className={`px-2.5 py-1 text-xs whitespace-nowrap border rounded-lg transition-colors duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed ${user.active ? "border-amber-200 text-amber-600 hover:bg-amber-50" : "border-green-200 text-green-600 hover:bg-green-50"}`}
                         >
                           {user.active ? "Deactivate" : "Activate"}
                         </button>
                         <button
                           onClick={() => setConfirmDeleteId(user.id)}
-                          className="px-2.5 py-1 text-xs border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-colors duration-150 cursor-pointer"
+                          className="px-2.5 py-1 text-xs whitespace-nowrap border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-colors duration-150 cursor-pointer"
                         >
                           Delete
                         </button>
@@ -493,7 +492,7 @@ export default function UsersPage() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Access Start Time</label>
                       <input

@@ -4,9 +4,17 @@ import { toast } from "react-toastify";
 import {
   getDecoratorCategory,
   isDecoratorRole,
+  isOrderPickerRole,
   isStaffLikeRole,
   isTestUserRole,
 } from "@/lib/roles";
+import { useOrderMessages as useSharedOrderMessages } from "@/hooks/useOrderMessages";
+import type { OrderRow } from "../types";
+import { getOrderCapabilities } from "../capabilities";
+import { usePacking } from "./usePacking";
+import { useSlipPrinting } from "./useSlipPrinting";
+import { useQueueCounts } from "./useQueueCounts";
+import { useCreatePo } from "./useCreatePo";
 import { useOrdersFilters } from "./useOrdersFilters";
 import { useOrdersData } from "./useOrdersData";
 import { useSync } from "./useSync";
@@ -35,6 +43,8 @@ export function useOrdersPage() {
   const ordersColSpan = (userIsAdmin ? 11 : 10) + (userIsDecorator ? 0 : 1);
   const userIsStaff = isStaffLikeRole(userRole);
   const userIsTest = isTestUserRole(userRole);
+  const userIsPicker = isOrderPickerRole(userRole);
+  const caps = getOrderCapabilities(userRole);
 
   const blockTestModeAction = () => {
     if (!userIsTest) return false;
@@ -44,7 +54,7 @@ export function useOrdersPage() {
 
   const [error, setError] = useState("");
 
-  const filters = useOrdersFilters({ userIsDecorator: userIsDecorator });
+  const filters = useOrdersFilters({ userIsDecorator: userIsDecorator, userIsPicker });
 
   const data = useOrdersData({
     queryString: filters.queryString,
@@ -78,6 +88,7 @@ export function useOrdersPage() {
     setOrders: data.setOrders,
     blockTestModeAction,
     userIsAdmin,
+    bumpCounts: data.bumpCounts,
   });
 
   const decorWork = useDecorationWork({
@@ -106,6 +117,7 @@ export function useOrdersPage() {
   const messages = useOrderMessages({
     setOrders: data.setOrders,
     blockTestModeAction,
+    historyType: caps.admin ? "all" : undefined,
   });
 
   const notes = useOrderNotes({
@@ -136,6 +148,30 @@ export function useOrdersPage() {
 
   const manualInvoice = useManualInvoice({ enabled: userIsAdmin || userIsStaff });
 
+  const queueCounts = useQueueCounts({ queryString: filters.queryString, refreshToken: data.refreshToken + data.countsToken });
+
+  const packing = usePacking({
+    setOrders: data.setOrders,
+    packingDefaultRecipientIds: data.packingDefaultRecipientIds,
+    isLineFullChecked: fulfillment.isLineFullChecked,
+    partialValues: fulfillment.partialValues,
+    blockTestModeAction,
+  });
+
+  const slipPrinting = useSlipPrinting({ setOrders: data.setOrders, blockTestModeAction });
+  const createPo = useCreatePo({ canCreatePo: caps.createPo, setOrders: data.setOrders, blockTestModeAction });
+
+  // Picker-to-admin messages: the Order Picker's message icon, and an Admin shortcut in the packing box.
+  const pickerMessages = useSharedOrderMessages<OrderRow>({
+    messageType: "picker",
+    guard: blockTestModeAction,
+    onCountChange: (orderId, delta) => {
+      if (delta > 0 && userIsPicker) {
+        data.setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, messageCount: o.messageCount + delta } : o)));
+      }
+    },
+  });
+
   const handleRefresh = () => {
     data.setRefreshRotation((prev) => prev + 360);
     sync.setSyncRefreshNeeded(false);
@@ -151,6 +187,8 @@ export function useOrdersPage() {
     ordersColSpan,
     userIsStaff,
     userIsTest,
+    userIsPicker,
+    caps,
     session,
     // data
     orders: data.orders,
@@ -223,12 +261,29 @@ export function useOrdersPage() {
     sort: filters.sort,
     dir: filters.dir,
     handleSortChange: filters.handleSortChange,
+    setSortBy: filters.setSortBy,
     hasActiveFilters: filters.hasActiveFilters,
     handleClearFilters: filters.handleClearFilters,
     pagination: filters.pagination,
     setPagination: filters.setPagination,
     pageNumbers: filters.pageNumbers,
     goToPage: filters.goToPage,
+    // queue tabs, print filter, packing and slip printing
+    queue: filters.queue,
+    setQueue: filters.setQueue,
+    queueCounts,
+    printStatuses: filters.printStatuses,
+    handlePrintStatusToggle: filters.handlePrintStatusToggle,
+    printStatusDropdownOpen: filters.printStatusDropdownOpen,
+    setPrintStatusDropdownOpen: filters.setPrintStatusDropdownOpen,
+    printStatusDropdownRef: filters.printStatusDropdownRef,
+    packingRecipients: data.packingRecipients,
+    ...packing,
+    ...slipPrinting,
+    openCreatePo: createPo.openCreatePo,
+    creatingPoKey: createPo.creatingKey,
+    createPoForm: createPo.form,
+    pickerMessages,
     // name attributes / export
     selectedNameCount: nameAttrs.selectedNameCount,
     isCurrentPageAllChecked: nameAttrs.isCurrentPageAllChecked,

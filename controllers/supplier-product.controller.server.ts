@@ -174,7 +174,7 @@ export class SupplierProductController {
     const name = typeof value.name === 'string' ? upperTrim(value.name) : '';
     const brand = typeof value.brand === 'string' ? upperTrim(value.brand) : '';
     const handleInput = typeof value.handle === 'string' ? value.handle.trim() : '';
-    const handle = handleInput || slugifyHandle(name) || slugifyHandle(itemNo);
+    const handle = handleInput || slugifyHandle(itemNo);
 
     const errors: string[] = [];
     if (supplierIds.length === 0) errors.push('supplierId: At least one supplier is required');

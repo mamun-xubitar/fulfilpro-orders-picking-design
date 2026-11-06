@@ -20,7 +20,7 @@ export default function PoModals({ po, variants, locations }: PoModalsProps) {
   );
 }
 
-function CreatePoModal({ po, variants }: { po: ReturnType<typeof usePurchaseOrder>; variants: VariantRow[] }) {
+export function CreatePoModal({ po, variants }: { po: ReturnType<typeof usePurchaseOrder>; variants: VariantRow[] }) {
   return (
     <ModalShell disableBackdropClose
       title="Create purchase order"
