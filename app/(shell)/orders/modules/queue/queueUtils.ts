@@ -54,25 +54,70 @@ export function getStageNodes(order: OrderRow, caps: OrderCapabilities): StageNo
   return nodes;
 }
 
-/** Row background by status: canceled, closed, back in stock, pending request, then fulfilment / packing / decoration. */
-export function getRowTone(order: OrderRow, caps: OrderCapabilities) {
+export type RowStatus = 'canceled' | 'closed' | 'restock' | 'fulfilled' | 'partial' | 'packed' | 'emb' | 'prt' | 'plain';
+
+/** Row status: canceled, closed, back in stock, then fulfilment / packing / decoration. */
+export function getRowStatus(order: OrderRow, caps: OrderCapabilities): RowStatus {
   const fulfilled = isOrderFullyFulfilled(order);
-  if (order.canceled) return 'bg-orders-tone-canceled hover:brightness-95';
-  if (order.closed) return 'bg-orders-tone-closed hover:brightness-95';
-  if (caps.requestStock && order.backInStockStatus && !fulfilled) return 'bg-orders-tone-restock hover:brightness-95';
-  if (order.status === 'fulfilled' || order.status === 'shipped') return 'bg-orders-tone-fulfilled hover:brightness-95';
-  if (order.status === 'partial' || order.status === 'partially_fulfilled') return 'bg-orders-tone-partial hover:brightness-95';
-  if (order.packingStatus === 'packed') return 'bg-orders-tone-packed hover:brightness-95';
-  if (caps.decoration && order.items.some((i) => i.isEmbroidery)) return 'bg-orders-emb-soft hover:brightness-95';
-  if (caps.decoration && order.items.some((i) => i.isPrint)) return 'bg-orders-prt-soft hover:brightness-95';
-  return 'bg-orders-surface hover:bg-orders-surface-muted';
+  if (order.canceled) return 'canceled';
+  if (order.closed) return 'closed';
+  if (caps.requestStock && order.backInStockStatus && !fulfilled) return 'restock';
+  if (order.status === 'fulfilled' || order.status === 'shipped') return 'fulfilled';
+  if (order.status === 'partial' || order.status === 'partially_fulfilled') return 'partial';
+  if (order.packingStatus === 'packed') return 'packed';
+  if (caps.decoration && order.items.some((i) => i.isEmbroidery)) return 'emb';
+  if (caps.decoration && order.items.some((i) => i.isPrint)) return 'prt';
+  return 'plain';
 }
 
-/** Grid columns of the queue table (prototype `colsA`); the same template is used by the header and every row. */
+const ROW_TINT: Record<RowStatus, string> = {
+  canceled: 'bg-orders-tone-canceled hover:brightness-95',
+  closed: 'bg-orders-tone-closed hover:brightness-95',
+  restock: 'bg-orders-tone-restock hover:brightness-95',
+  fulfilled: 'bg-orders-tone-fulfilled hover:brightness-95',
+  partial: 'bg-orders-tone-partial hover:brightness-95',
+  packed: 'bg-orders-tone-packed hover:brightness-95',
+  emb: 'bg-orders-emb-soft hover:brightness-95',
+  prt: 'bg-orders-prt-soft hover:brightness-95',
+  plain: 'bg-orders-surface hover:bg-orders-surface-muted',
+};
+
+/** Colour of the 3px stripe at the start of an order's group, by status. */
+const ROW_STRIPE: Record<RowStatus, string> = {
+  canceled: '#ef4444',
+  closed: '#9ca3af',
+  restock: '#fbbf24',
+  fulfilled: '#3b82f6',
+  partial: '#f59e0b',
+  packed: '#22c55e',
+  emb: '#8b5cf6',
+  prt: '#0ea5e9',
+  plain: '#d1d5db',
+};
+
+export const getRowStripe = (order: OrderRow, caps: OrderCapabilities) => ROW_STRIPE[getRowStatus(order, caps)];
+
+/** Row background by status. */
+export const getRowTone = (order: OrderRow, caps: OrderCapabilities) => ROW_TINT[getRowStatus(order, caps)];
+
+/** Embroidery / print progress (pieces done / total) and how many different decorators are assigned. */
+export function getDecoProgress(order: OrderRow) {
+  return (['isEmbroidery', 'isPrint'] as const).flatMap((key) => {
+    const lines = order.items.filter((i) => i[key]);
+    if (lines.length === 0) return [];
+    const total = lines.reduce((s, i) => s + i.qty, 0);
+    const done = lines.reduce((s, i) => s + (i.decoration?.doneQty ?? 0), 0);
+    const assignees = new Set(lines.flatMap((i) => (i.assignments ?? []).map((a) => a.assigneeId))).size;
+    return [{ key, label: `${done}/${total} ${key === 'isEmbroidery' ? 'EMB' : 'PRT'}`, tone: key === 'isEmbroidery' ? ('emb' as const) : ('prt' as const), assignees }];
+  });
+}
+
+/** Grid columns of the queue table (prototype `colsA3`); the same template is used by the header and every row.
+ * Customer is the flexible column, Items is fixed, and packing + fulfilment share one column. */
 export function getGridColumns(caps: OrderCapabilities) {
   const nodes = (caps.slipStatus ? 1 : 0) + 1 + (caps.fulfilment ? 2 : 0);
   const icons = 4 + (caps.slip ? 1 : 0) + (caps.labels ? 1 : 0) + (caps.invoice ? 1 : 0) + (caps.admin ? 1 : 0);
-  return ['20px', '96px', '50px', '108px', caps.admin ? '66px' : '', 'minmax(80px,1fr)', `${nodes * 34 + 4}px`, caps.fulfilment ? '104px' : '', '84px', '132px', `${icons * 24 + 4}px`].filter(Boolean).join(' ');
+  return ['20px', '96px', '50px', 'minmax(100px,1fr)', caps.admin ? '56px' : '', '112px', `${nodes * 34 + 4}px`, caps.fulfilment ? '112px' : '64px', caps.packedDate ? '116px' : '200px', `${icons * 24 + 4}px`].filter(Boolean).join(' ');
 }
 
 /** "Today 09:42", "Yesterday 17:21" or "Wed 28 Oct": how the prototype shows when an order was placed. */
@@ -92,8 +137,6 @@ export function getItemShortfall(order: OrderRow, item: OrderItem) {
   const remaining = Math.max(0, item.qty - getFulfilledQty(order, item.id));
   return getLineShortfall(remaining, item.inventory);
 }
-
-export const countShortLines = (order: OrderRow) => order.items.filter((item) => getItemShortfall(order, item) > 0).length;
 
 const STORE_HUES = ['#4f46e5', '#0891b2', '#c026d3', '#475569', '#0d9488', '#b45309'];
 
@@ -125,6 +168,6 @@ export function getTableMinWidth(caps: OrderCapabilities) {
   const mainWidth = main.reduce((sum, t) => sum + trackMin(t), 0) + (main.length - 1) * 8 + 20;
   const lines = getLineColumns(caps, true);
   const lineWidth = lines.reduce((sum, c) => sum + trackMin(c.width), 0) + (lines.length - 1) * lineGap(caps) + 16;
-  const side = (caps.fulfilment || caps.pack ? 254 : 0) + (caps.customer ? 232 : 0);
+  const side = (caps.pack || caps.customer ? 184 : 0) + (caps.customer ? 232 : 0);
   return Math.max(mainWidth, lineWidth + side + 20);
 }

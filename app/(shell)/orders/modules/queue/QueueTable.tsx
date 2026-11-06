@@ -1,8 +1,7 @@
 'use client';
 
-import { Fragment } from 'react';
 import type { OrdersPageBundle } from '../ordersPageContext';
-import { getGridColumns, getTableMinWidth } from './queueUtils';
+import { getGridColumns, getRowStripe, getTableMinWidth } from './queueUtils';
 import QueueRow from './QueueRow';
 import ExpandedOrder from './ExpandedOrder';
 import { StageTrackHead } from './StageTrack';
@@ -24,17 +23,16 @@ function Header({ p }: { p: OrdersPageBundle }) {
   const { caps } = p;
   const some = p.selectedLabelIds.size > 0;
   return (
-    <div role="row" className="sticky top-0 z-10 grid h-[26px] whitespace-nowrap items-center gap-x-2 rounded-t-[10px] border-b border-orders-border bg-orders-surface-muted px-2.5 text-[9.5px] font-bold uppercase tracking-[.4px] text-orders-text-subtle" style={{ gridTemplateColumns: getGridColumns(caps) }}>
+    <div role="row" className="sticky top-0 z-10 grid h-[26px] whitespace-nowrap items-center gap-x-2 rounded-t-[10px] border-b border-l-[3px] border-l-transparent border-orders-border bg-orders-surface-muted px-2.5 text-[9.5px] font-bold uppercase tracking-[.4px] text-orders-text-subtle" style={{ gridTemplateColumns: getGridColumns(caps) }}>
       <input type="checkbox" checked={p.allLabelsOnPageSelected} ref={(el) => { if (el) el.indeterminate = some && !p.allLabelsOnPageSelected; }} onChange={p.toggleSelectAllLabelsOnPage} disabled={p.loading || p.orders.length === 0} aria-label="Select all orders on this page" className="h-[13px] w-[13px] cursor-pointer rounded-[3px] border-orders-border-strong text-orders-primary" />
       <SortHead p={p} label="Order" sortKey="number" />
       <span>Store</span>
       <SortHead p={p} label="Customer" sortKey="customer" />
-      {caps.admin && <span className="text-center" title="Stock adjustment">Stock adj.</span>}
+      {caps.admin && <span className="whitespace-normal text-center leading-[1.1]" title="Stock adjustment">Stock adj.</span>}
       <span>Items</span>
       <StageTrackHead caps={caps} />
-      {caps.fulfilment && <span>Fulfilment</span>}
-      <span>Packed</span>
-      <span>{caps.packedDate ? 'Packed date' : 'Decoration'}</span>
+      <span className={caps.fulfilment ? 'whitespace-normal leading-[1.1]' : ''}>{caps.fulfilment ? 'Packed · Fulfilment' : 'Packed'}</span>
+      <span>{caps.packedDate ? 'Packed date' : 'Status'}</span>
       <span className="text-right">Actions</span>
     </div>
   );
@@ -51,14 +49,14 @@ export default function QueueTable({ p }: { p: OrdersPageBundle }) {
             {loading && <div className="py-12 text-center text-[12px] text-orders-text-subtle">Loading orders…</div>}
             {!loading && error && <div className="py-12 text-center text-[12px] text-orders-danger">{error}</div>}
             {!loading && !error && orders.length === 0 && <div className="py-16 text-center text-[12px] text-orders-text-subtle">No orders found.</div>}
-            {!loading && !error && orders.map((order) => {
+            {!loading && !error && orders.map((order, index) => {
               const isExpanded = expandedIds.has(order.id);
               return (
-                <Fragment key={order.id}>
+                <div key={order.id} className={`border-b border-l-[3px] border-orders-border ${index > 0 ? 'mt-[5px]' : ''}`} style={{ borderLeftColor: getRowStripe(order, caps) }}>
                   <QueueRow p={p} order={order} isExpanded={isExpanded} />
                   {caps.admin && order.items.some((i) => i.isEmbroidery || i.isPrint) && <AttachmentsStrip p={p} order={order} />}
                   {isExpanded && <ExpandedOrder p={p} order={order} />}
-                </Fragment>
+                </div>
               );
             })}
           </div>

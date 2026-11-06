@@ -52,10 +52,10 @@ export function useCreatePo({ canCreatePo, setOrders, blockTestModeAction }: Use
       let { supplierProductId, variantId } = item.inventory ?? { supplierProductId: '', variantId: '' };
       if (!item.inventory) {
         const res = await fetch(`/api/orders/${encodeURIComponent(order.id)}/line-items/${encodeURIComponent(item.id)}/hub-product`, { method: 'POST' });
-        const json = (await res.json()) as ApiResponse<{ supplierProductId: string; variantId: string; created: boolean }>;
+        const json = (await res.json()) as ApiResponse<{ supplierProductId: string; variantId: string; created: boolean; inventory: LineInventory | null }>;
         if (!res.ok || !json.success) throw new Error(getApiErrorMessage(json, 'Failed to create the product in the hub'));
         ({ supplierProductId, variantId } = json.data);
-        const inventory: LineInventory = { supplierProductId, variantId, available: 0, onHand: 0, ownAllocated: 0, po: null };
+        const inventory: LineInventory = json.data.inventory ?? { supplierProductId, variantId, available: 0, onHand: 0, ownAllocated: 0, po: null };
         setOrders((prev) => prev.map((o) => (o.id === order.id ? { ...o, items: o.items.map((i) => (i.id === item.id ? { ...i, inventory } : i)) } : o)));
         if (json.data.created) toast.success(json.message);
       }

@@ -52,7 +52,7 @@ function FileField({ p, order, cfg }: { p: OrdersPageBundle; order: OrderRow; cf
 export default function AttachmentsStrip({ p, order }: { p: OrdersPageBundle; order: OrderRow }) {
   const tone = getRowTone(order, p.caps).split(' ')[0];
   return (
-    <div className={`flex min-h-8 items-center gap-4 overflow-visible whitespace-nowrap border-b border-orders-divider py-[3px] pl-[38px] pr-2.5 text-[10.5px] text-orders-text-body ${tone}`}>
+    <div className={`flex min-h-8 items-center gap-4 overflow-visible whitespace-nowrap border-t border-orders-divider bg-[linear-gradient(rgb(255_255_255/.6),rgb(255_255_255/.6))] py-[3px] pl-[38px] pr-2.5 text-[10.5px] text-orders-text-body ${tone}`}>
       {FIELDS.map((cfg) => <FileField key={cfg.field} p={p} order={order} cfg={cfg} />)}
       <span className="flex min-w-[150px] flex-1 items-center gap-1.5">
         <b className="text-[9.5px] font-normal text-orders-text-subtle">Customer remarks</b>

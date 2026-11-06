@@ -1,5 +1,6 @@
 'use client';
 
+import { useRef, useState } from 'react';
 import { Icon } from './icons';
 import type { OrderItem, OrderRow, OrderStockAdjustmentItem } from '../types';
 import type { OrdersPageBundle } from '../ordersPageContext';
@@ -22,6 +23,22 @@ function Tile({ item }: { item: OrderItem }) {
     : <span className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-md border border-orders-border bg-orders-canvas text-[10px] font-bold text-orders-text-subtle">{item.name.slice(0, 1).toUpperCase()}</span>;
 }
 
+/** SKU as a short mono chip (full SKU in the tooltip); clicking copies it and shows "Copied" for a moment. */
+function SkuChip({ sku }: { sku: string }) {
+  const [copied, setCopied] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const copy = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    void navigator.clipboard?.writeText(sku).catch(() => {});
+    setCopied(true);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setCopied(false), 1200);
+  };
+  return (
+    <button type="button" title={`${sku} · click to copy`} aria-label={`Copy SKU ${sku}`} onClick={copy} className={`h-3.5 max-w-[84px] shrink-0 cursor-copy truncate rounded-[4px] border px-[3px] font-mono text-[9.5px] leading-3 ${copied ? 'border-solid border-orders-success-border bg-orders-success-soft text-orders-success-ink' : 'border-dashed border-orders-border-strong bg-transparent text-orders-text-muted hover:bg-orders-surface-muted hover:text-orders-text'}`}>{copied ? 'Copied' : sku}</button>
+  );
+}
+
 function ItemCell({ p, order, item, restock }: { p: OrdersPageBundle; order: OrderRow; item: OrderItem; restock?: OrderStockAdjustmentItem }) {
   const colour = getItemColour(item);
   const other = getOtherOptions(item);
@@ -29,20 +46,19 @@ function ItemCell({ p, order, item, restock }: { p: OrdersPageBundle; order: Ord
   const nameAttr = getNameAttribute(item);
   const key = nameKey(order.id, item.id);
   const checked = nameAttr ? p.isNameChecked(key) : false;
+  const nameClass = 'block min-w-0 truncate text-[11.5px] font-bold';
   return (
     <span className="flex min-w-0 items-center gap-1.5">
       <Tile item={item} />
-      <span className="flex min-w-0 flex-col gap-px">
-        <span className="flex min-w-0 items-center gap-1">
-          <b className="truncate text-[11.5px] font-bold text-orders-text" title={`${item.name}${item.sku ? ` · ${item.sku}` : ''}`}>{item.name}</b>
-          {url && (
-            <a href={url} target="_blank" rel="noopener noreferrer" title="Open product in Shopify admin" aria-label={`Open ${item.name} in Shopify admin`} onClick={(e) => e.stopPropagation()} className="flex h-4 w-4 shrink-0 items-center justify-center rounded text-orders-primary-ink hover:bg-orders-primary-soft"><Icon name="external" className="h-2.5 w-2.5" /></a>
-          )}
-        </span>
-        {(colour || other) && (
-          <span className="flex min-w-0 items-center gap-1 text-[10px] text-orders-text-subtle">
-            {colour && <span className="inline-flex items-center gap-1 text-orders-text-muted"><i className="inline-block h-[9px] w-[9px] shrink-0 rounded-full border border-[rgba(17,24,39,.35)]" style={{ background: getSwatchColour(colour) }} />{colour}</span>}
+      <span className="flex min-w-0 flex-1 flex-col gap-px">
+        {url
+          ? <a href={url} target="_blank" rel="noopener noreferrer" title={`Open in Shopify admin · ${item.name}`} onClick={(e) => e.stopPropagation()} className={`${nameClass} text-orders-primary-ink hover:underline`}>{item.name}</a>
+          : <b className={`${nameClass} text-orders-text`} title={item.name}>{item.name}</b>}
+        {(colour || other || item.sku) && (
+          <span className="flex min-w-0 items-center gap-1 whitespace-nowrap text-[10px] text-orders-text-subtle">
+            {colour && <span className="inline-flex shrink-0 items-center gap-1 text-orders-text-muted"><i className="inline-block h-[9px] w-[9px] shrink-0 rounded-full border border-[rgba(17,24,39,.35)]" style={{ background: getSwatchColour(colour) }} />{colour}</span>}
             {other && <span className="truncate">{colour ? '· ' : ''}{other}</span>}
+            {item.sku && <SkuChip sku={item.sku} />}
           </span>
         )}
         {(nameAttr || restock) && (
@@ -57,6 +73,7 @@ function ItemCell({ p, order, item, restock }: { p: OrdersPageBundle; order: Ord
           </span>
         )}
       </span>
+      <DecoCell p={p} order={order} item={item} />
     </span>
   );
 }
@@ -104,8 +121,6 @@ export default function ItemLine({ p, order, item, index, restockItems, cols }: 
   const picked = caps.fulfilment && selectable > 0 && (isFull || partial > 0);
   const cell: Record<string, React.ReactNode> = {
     item: <ItemCell p={p} order={order} item={item} restock={restock} />,
-    sku: <span className="block truncate font-mono text-[10px] text-orders-text-muted" title={item.sku || undefined}>{item.sku || '-'}</span>,
-    deco: <DecoCell p={p} order={order} item={item} />,
     qty: <b className="text-center tabular-nums" title={caps.fulfilment ? `${fulfilled} of ${item.qty} fulfilled` : undefined}>{caps.fulfilment ? `${fulfilled}/${item.qty}` : item.qty}</b>,
     packed: <b className={`text-center tabular-nums ${done ? 'text-orders-success-ink' : part ? 'text-orders-warning-ink' : 'text-orders-text-subtle'}`}>{packed}/{item.qty}</b>,
     pdate: <span className="text-[10.5px] text-orders-text-subtle tabular-nums">{item.packedDate ? dayTime(item.packedDate) : '-'}</span>,

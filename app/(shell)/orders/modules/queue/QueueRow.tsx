@@ -3,13 +3,12 @@
 import type { OrderRow } from '../types';
 import type { OrdersPageBundle } from '../ordersPageContext';
 import { formatFulfillmentDate, formatStockStatus, getFulfillmentInfo, isOrderFullyFulfilled } from '../utils';
-import { countShortLines, formatPlaced, getGridColumns, getRowTone, getStoreChip, getThumbnailUrl } from './queueUtils';
-import Badge from './Badge';
+import { STATUS_MAP } from '../constants';
+import { formatPlaced, getDecoProgress, getGridColumns, getRowTone, getStoreChip, getThumbnailUrl } from './queueUtils';
+import Badge, { type BadgeTone } from './Badge';
 import { Icon } from './icons';
 import StageTrack from './StageTrack';
 import RowActions from './RowActions';
-
-const MINI = 'inline-flex h-4 items-center rounded-full border px-[3px]';
 
 function StoreChip({ name }: { name: string }) {
   const { code, hue } = getStoreChip(name);
@@ -50,58 +49,78 @@ function StockAdjCell({ p, order }: { p: OrdersPageBundle; order: OrderRow }) {
   );
 }
 
-function FulfilmentCell({ order }: { order: OrderRow }) {
-  const info = getFulfillmentInfo(order);
-  const first = info[0];
-  if (!first) return <span className="text-orders-text-subtle">-</span>;
-  return (
-    <span className="flex min-w-0 flex-col items-start justify-center gap-px">
-      <span className="max-w-full truncate text-[10.5px] font-bold text-orders-text">{first.date ? formatFulfillmentDate(first.date) : ''}{info.length > 1 && <span className="ml-1 font-normal text-orders-text-subtle">+{info.length - 1}</span>}</span>
-      <span className="max-w-full truncate text-[10px] text-orders-text-subtle">
-        {first.carrier}{first.carrier && first.trackingNumber ? ' · ' : ''}
-        {first.trackingUrl ? <a href={first.trackingUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-orders-primary hover:underline">{first.trackingNumber}</a> : <span className="text-orders-primary">{first.trackingNumber}</span>}
-      </span>
-    </span>
-  );
-}
-
-function PackedCell({ order }: { order: OrderRow }) {
+/** Packed count and bar, then (Admin, Staff) the first parcel's date and carrier · tracking. */
+function PackedFulfilmentCell({ order, withFulfilment }: { order: OrderRow; withFulfilment: boolean }) {
   const pct = order.totalQuantity > 0 ? Math.round((order.packedQuantity / order.totalQuantity) * 100) : 0;
   const bar = order.packedQuantity >= order.totalQuantity && order.totalQuantity > 0 ? 'bg-orders-primary' : order.packedQuantity > 0 ? 'bg-orders-warning' : 'bg-orders-primary';
+  const info = withFulfilment ? getFulfillmentInfo(order) : [];
+  const first = info[0];
   return (
-    <span className="flex items-center gap-1.5">
-      <b className="tabular-nums">{order.packedQuantity}/{order.totalQuantity}</b>
-      <span className="h-1 w-[38px] overflow-hidden rounded-sm bg-orders-border"><i className={`block h-full ${bar}`} style={{ width: `${pct}%` }} /></span>
+    <span className="flex min-w-0 flex-col justify-center gap-px">
+      <span className="flex items-center gap-1.5">
+        <b className="tabular-nums">{order.packedQuantity}/{order.totalQuantity}</b>
+        <span className="h-1 w-6 overflow-hidden rounded-sm bg-orders-border"><i className={`block h-full ${bar}`} style={{ width: `${pct}%` }} /></span>
+      </span>
+      {first && (
+        <>
+          <span className="max-w-full truncate text-[10.5px] font-bold text-orders-text">{first.date ? formatFulfillmentDate(first.date) : ''}{info.length > 1 && <span className="ml-1 font-normal text-orders-text-subtle">+{info.length - 1}</span>}</span>
+          <span className="max-w-full truncate text-[10px] text-orders-text-subtle">
+            {first.carrier}{first.carrier && first.trackingNumber ? ' · ' : ''}
+            {first.trackingUrl ? <a href={first.trackingUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-orders-primary hover:underline">{first.trackingNumber}</a> : <span className="text-orders-primary">{first.trackingNumber}</span>}
+          </span>
+        </>
+      )}
     </span>
   );
 }
 
-function DecoCell({ order, p }: { order: OrderRow; p: OrdersPageBundle }) {
+type StatusChip = { key: string; tone: BadgeTone; title: string; node: React.ReactNode };
+
+function getStatusChips(order: OrderRow, p: OrdersPageBundle): StatusChip[] {
+  const { caps } = p;
+  const fulfilled = isOrderFullyFulfilled(order);
+  const chips: StatusChip[] = [];
+  const map = STATUS_MAP[order.status.toLowerCase()] ?? STATUS_MAP.pending;
+  if (order.canceled) chips.push({ key: 'canceled', tone: 'bad', title: 'Order canceled', node: 'Canceled' });
+  else if (order.closed) chips.push({ key: 'closed', tone: 'neutral', title: 'Order closed in Shopify', node: 'Closed' });
+  else {
+    const key = order.status.toLowerCase();
+    const tone: BadgeTone = key === 'fulfilled' || key === 'shipped' ? 'solid' : key === 'partial' || key === 'partially_fulfilled' ? 'warn' : 'outline';
+    chips.push({ key: 'status', tone, title: map.label, node: map.label });
+  }
+  if (order.packingStatus === 'packed') chips.push({ key: 'packed', tone: 'ok', title: 'Every line packed', node: 'Packed' });
+  else if (order.packingStatus === 'partially_packed') chips.push({ key: 'partial-packed', tone: 'warn', title: 'Some lines packed', node: 'Partial Packed' });
+  if (caps.slipStatus && order.slipPrinted) chips.push({ key: 'slip', tone: 'ok', title: 'Picking slip printed', node: <><Icon name="printer" className="h-2.5 w-2.5" />Slip printed</> });
+  if (caps.labels && order.labelPrintedAt) chips.push({ key: 'label', tone: 'ok', title: 'Shipping label printed', node: <><Icon name="tag" className="h-2.5 w-2.5" />Label</> });
+  const track = caps.fulfilment ? order.trackings?.[0]?.status : null;
+  if (track) chips.push({ key: 'track', tone: track === 'Delivered' ? 'ok' : 'info', title: `17track: ${track}`, node: track });
+  if (caps.requestStock && order.backInStockStatus && !fulfilled) chips.push({ key: 'restock', tone: order.backInStockStatus === 'back_in_stock' ? 'ok' : 'warn', title: 'Back-in-stock request', node: formatStockStatus(order.backInStockStatus) });
+  if (caps.decoration) {
+    for (const d of getDecoProgress(order)) {
+      chips.push({ key: d.key, tone: d.tone, title: `${d.label} decorated${d.assignees ? ` · ${d.assignees} decorator${d.assignees > 1 ? 's' : ''}` : ''}`, node: <>{d.label}{d.assignees > 0 && <i className="ml-0.5 inline-flex h-3 min-w-3 items-center justify-center rounded-full bg-white/75 px-[3px] text-[8.5px] not-italic" title="Decorators assigned">{d.assignees}</i>}</> });
+    }
+  }
+  return chips;
+}
+
+/** Status column (was Decoration): the old Orders page's badges plus slip, tracking and decoration state, two per line.
+ * Order Picker sees the date of the last packing instead. */
+function StatusCell({ order, p }: { order: OrderRow; p: OrdersPageBundle }) {
   if (p.caps.packedDate) {
     const last = (order.packingConfirmations ?? []).find((c) => !c.canceledAt);
     return <span className="text-[10.5px] tabular-nums text-orders-text-subtle">{last ? new Date(last.confirmedAt).toLocaleString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false }) : '-'}</span>;
   }
-  const short = p.caps.stock && !isOrderFullyFulfilled(order) ? countShortLines(order) : 0;
-  const prog = p.caps.decoration
-    ? (['isEmbroidery', 'isPrint'] as const).flatMap((key) => {
-        const lines = order.items.filter((i) => i[key]);
-        if (lines.length === 0) return [];
-        const total = lines.reduce((s, i) => s + i.qty, 0);
-        const done = lines.reduce((s, i) => s + (i.decoration?.doneQty ?? 0), 0);
-        return [{ key, label: `${done}/${total} ${key === 'isEmbroidery' ? 'EMB' : 'PRT'}`, tone: key === 'isEmbroidery' ? ('emb' as const) : ('prt' as const) }];
-      })
-    : [];
+  const chips = getStatusChips(order, p);
+  const lines = Array.from({ length: Math.ceil(chips.length / 2) }, (_, i) => chips.slice(i * 2, i * 2 + 2));
   return (
-    <span className="flex min-w-0 flex-col justify-center gap-0.5 whitespace-nowrap">
-      {short > 0 && <span className="flex"><Badge tone="warn" title={`${short} line${short > 1 ? 's' : ''} not covered by available stock`}>Short {short}</Badge></span>}
-      {prog.length > 0 && <span className="flex items-center gap-[5px]">{prog.map((d) => <Badge key={d.key} tone={d.tone}>{d.label}</Badge>)}</span>}
+    <span className="flex min-w-0 flex-col items-start gap-0.5">
+      {lines.map((line, i) => <span key={i} className="flex min-w-0 max-w-full gap-[3px]">{line.map((c) => <Badge key={c.key} tone={c.tone} title={c.title}>{c.node}</Badge>)}</span>)}
     </span>
   );
 }
 
 export default function QueueRow({ p, order, isExpanded }: { p: OrdersPageBundle; order: OrderRow; isExpanded: boolean }) {
   const { caps } = p;
-  const fulfilled = isOrderFullyFulfilled(order);
   const canceled = order.canceled;
   const selected = p.selectedLabelIds.has(order.id);
   const tone = getRowTone(order, caps);
@@ -111,7 +130,7 @@ export default function QueueRow({ p, order, isExpanded }: { p: OrdersPageBundle
     <div
       role="row"
       onClick={() => p.toggleExpanded(order.id)}
-      className={`grid h-9 cursor-pointer items-center gap-x-2 border-b border-orders-divider px-2.5 text-[11.5px] ${canceled ? 'text-orders-text-subtle' : 'text-orders-text-body'} ${isExpanded ? 'relative shadow-[inset_0_0_0_1.5px_var(--orders-primary)]' : ''} ${bg}`}
+      className={`grid min-h-10 cursor-pointer items-center gap-x-2 px-2.5 py-1 text-[11.5px] ${canceled ? 'text-orders-text-subtle' : 'text-orders-text-body'} ${isExpanded ? 'relative shadow-[inset_0_0_0_1.5px_var(--orders-primary)]' : ''} ${bg}`}
       style={{ gridTemplateColumns: getGridColumns(caps) }}
     >
       <span onClick={(e) => e.stopPropagation()} className="flex">
@@ -120,10 +139,8 @@ export default function QueueRow({ p, order, isExpanded }: { p: OrdersPageBundle
       <span className="flex min-w-0 flex-col items-start justify-center gap-px">
         <span className="flex min-w-0 items-center gap-[5px] whitespace-nowrap">
           <b className={`tabular-nums ${canceled ? 'text-orders-text-subtle line-through' : caps.labels && order.labelPrintedAt ? 'text-orders-success-ink' : 'text-orders-text'}`}>#{order.number}</b>
-          {caps.labels && order.labelPrintedAt && <span title="Shipping label printed" className={`${MINI} border-orders-success-border bg-orders-success-soft text-orders-success-ink`}><Icon name="tag" className="h-2.5 w-2.5" /></span>}
-          {caps.requestStock && order.backInStockStatus && !fulfilled && <span title={`${formatStockStatus(order.backInStockStatus)}: back-in-stock request`} className={`${MINI} ${order.backInStockStatus === 'back_in_stock' ? 'border-orders-success-border bg-orders-success-soft text-orders-success-ink' : 'border-orders-warning-border bg-orders-warning-soft text-orders-warning-ink'}`}><Icon name="cube" className="h-2.5 w-2.5" /></span>}
-          {order.closed && !canceled && <Badge title="Order closed in Shopify">Closed</Badge>}
-          {canceled && <Badge>Canceled</Badge>}
+          {caps.packedDate && order.closed && !canceled && <Badge title="Order closed in Shopify">Closed</Badge>}
+          {caps.packedDate && canceled && <Badge>Canceled</Badge>}
         </span>
         <span className="max-w-full truncate text-[10px] text-orders-text-subtle">{formatPlaced(order.orderedAt)}</span>
       </span>
@@ -132,9 +149,8 @@ export default function QueueRow({ p, order, isExpanded }: { p: OrdersPageBundle
       {caps.admin && <StockAdjCell p={p} order={order} />}
       <Thumbs order={order} />
       <StageTrack order={order} caps={caps} />
-      {caps.fulfilment && <FulfilmentCell order={order} />}
-      <PackedCell order={order} />
-      <DecoCell order={order} p={p} />
+      <PackedFulfilmentCell order={order} withFulfilment={caps.fulfilment} />
+      <StatusCell order={order} p={p} />
       <span onClick={(e) => e.stopPropagation()}><RowActions p={p} order={order} isExpanded={isExpanded} /></span>
     </div>
   );

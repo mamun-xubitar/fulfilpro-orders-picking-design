@@ -3,15 +3,17 @@
 import type { OrderRow } from '../types';
 import type { OrdersPageBundle } from '../ordersPageContext';
 import ItemsCard from './ItemsCard';
-import FulfilmentCard from './FulfilmentCard';
 import PackingCard from './PackingCard';
+import ShippingCard from './ShippingCard';
 import CustomerCard from './CustomerCard';
 
-/** The opened order (prototype `expandedA2`): items + note | fulfilment + packing (246px) | customer (224px). */
+/** The opened order (prototype `expandedA3`): items + note | packing & slip, then shipping (176px) | customer (224px). Fulfilment
+ * has no card: its buttons sit in the Order items bar. */
 export default function ExpandedOrder({ p, order }: { p: OrdersPageBundle; order: OrderRow }) {
   const { caps } = p;
   const showNote = caps.customer && Boolean(order.note);
-  const showMiddle = caps.fulfilment || caps.pack;
+  const showShipping = caps.customer && order.shippingLines?.length > 0;
+  const showMiddle = caps.pack || showShipping;
   return (
     <div className="flex items-start gap-2 border-b border-orders-primary-ring bg-orders-surface-muted px-2.5 pb-2.5 pt-2">
       <div className="flex min-w-0 flex-1 flex-col gap-2">
@@ -28,9 +30,9 @@ export default function ExpandedOrder({ p, order }: { p: OrdersPageBundle; order
         )}
       </div>
       {showMiddle && (
-        <div className="flex w-[246px] min-w-0 flex-none flex-col gap-2">
-          {caps.fulfilment && <FulfilmentCard p={p} order={order} />}
+        <div className="flex w-[176px] min-w-0 flex-none flex-col gap-2">
           {caps.pack && <PackingCard p={p} order={order} />}
+          {showShipping && <ShippingCard order={order} />}
         </div>
       )}
       {caps.customer && (

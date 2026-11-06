@@ -22,7 +22,8 @@ export class HubProductError extends Error {
 /** Makes sure the product behind an order line exists in the hub catalogue under the line's store, so a
  * purchase order can be raised for it. Reuses a hub product with the same handle (adopting it for the store);
  * otherwise creates an active, verified copy of the store product: same handle, details, images and one
- * variant per store variant. Stock starts at 0: stock belongs to the hub, not the store. */
+ * variant per store variant. Each new variant opens with the store's on-hand quantity from Shopify (the hub has no
+ * stock of its own for a product it has never held); variants that already exist in the hub keep their stock. */
 export class OrderHubProductModel {
   /** The order line, its store's Shopify credentials, and the hub variant the line already maps to (if any). */
   async findLine(orderId: string, lineItemId: string) {
@@ -110,7 +111,7 @@ export class OrderHubProductModel {
           select: { id: true, url: true, sourceUrl: true },
         });
         for (const image of images) imageIdByKey.set(imageKey(image.sourceUrl ?? image.url), image.id);
-        await tx.inventoryActivity.create({ data: { supplierProductId: hub.id, type: 'created', message: `Product "${name}" created from order #${order.number}`, actorId: params.actor.id, actorName: params.actor.name } });
+        await tx.inventoryActivity.create({ data: { supplierProductId: hub.id, type: 'created', message: `Product "${name}" created from order #${order.number}; opening stock copied from the store (${sources.reduce((sum, s) => sum + s.stock, 0)} in total)`, actorId: params.actor.id, actorName: params.actor.name } });
       }
 
       const hubVariants = await tx.supplierProductVariant.findMany({ where: { supplierProductId: hub.id }, select: { id: true, sku: true, colour: true, size: true, position: true } });
@@ -128,7 +129,7 @@ export class OrderHubProductModel {
           position += 1;
           const imageId = source.imageUrl ? imageIdByKey.get(imageKey(source.imageUrl)) ?? null : null;
           hubVariant = await tx.supplierProductVariant.create({
-            data: { supplierProductId: hub.id, colour: source.colour, size: source.size, sku: source.sku, barcode: source.barcode, stockOnHand: 0, sellPrice: source.price, buyPrice: source.cost ?? 0, position, imageId },
+            data: { supplierProductId: hub.id, colour: source.colour, size: source.size, sku: source.sku, barcode: source.barcode, stockOnHand: source.stock, sellPrice: source.price, buyPrice: source.cost ?? 0, position, imageId },
             select: { id: true, sku: true, colour: true, size: true, position: true },
           });
           hubVariants.push(hubVariant);

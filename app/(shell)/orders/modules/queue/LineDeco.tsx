@@ -8,8 +8,8 @@ import { Icon } from './icons';
 const firstName = (name: string) => name.split(' ')[0];
 const kindOn = { emb: 'border-orders-emb-border bg-orders-emb-soft text-orders-emb', prt: 'border-orders-prt-border bg-orders-prt-soft text-orders-prt' };
 
-/** Decoration column (prototype `lineDeco` with both toggles): an EMB and a PRT badge on every line, side by side
- * and never wrapped (Admin toggles them, Staff reads them). Who does the work lives in the Decorator column. */
+/** Decoration badges at the right of the Item cell (prototype `lineDeco` with both toggles): EMB over PRT on every line
+ * (Admin toggles them, Staff reads them). Who does the work lives in the Decorator column. */
 export function DecoCell({ p, order, item }: { p: OrdersPageBundle; order: OrderRow; item: OrderItem }) {
   const done = item.decoration?.doneQty ?? 0;
   const admin = p.caps.admin;
@@ -23,7 +23,8 @@ export function DecoCell({ p, order, item }: { p: OrdersPageBundle; order: Order
     return on ? <Badge key={key} tone={tone} title={`${name}: ${done} of ${item.qty} decorated`}>{text}</Badge> : null;
   };
   const badges = [badge('isEmbroidery', 'EMB', item.isEmbroidery, 'embroidery', 'emb'), badge('isPrint', 'PRT', item.isPrint, 'print', 'prt')].filter(Boolean);
-  return <span className="flex flex-nowrap items-center gap-[3px] whitespace-nowrap">{badges.length > 0 ? badges : <span className="text-orders-text-subtle">-</span>}</span>;
+  if (badges.length === 0) return null;
+  return <span className="flex flex-none flex-col items-end gap-0.5 whitespace-nowrap">{badges}</span>;
 }
 
 const TEXT_BTN = 'inline-flex h-4 items-center whitespace-nowrap rounded-full border border-orders-border px-1.5 text-[9.5px] font-bold text-orders-text-muted hover:bg-orders-divider hover:text-orders-text focus-visible:outline focus-visible:outline-2 focus-visible:outline-orders-primary disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer';

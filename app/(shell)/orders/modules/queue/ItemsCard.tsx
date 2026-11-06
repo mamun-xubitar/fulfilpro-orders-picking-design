@@ -26,8 +26,7 @@ export const CardBody = ({ children }: { children: ReactNode }) => <div classNam
 
 export default function ItemsCard({ p, order }: { p: OrdersPageBundle; order: OrderRow }) {
   const { caps } = p;
-  const showDecorator = order.items.some((i) => i.isEmbroidery || i.isPrint || (i.assignments?.length ?? 0) > 0 || (i.decoration?.works?.length ?? 0) > 0);
-  const cols = getLineColumns(caps, showDecorator);
+  const cols = getLineColumns(caps, true);
   const restockItems = (order.stockAdjustment?.items ?? []).filter((i) => i.action === 'restore');
   const allFull = order.items.length > 0 && order.items.every((item, i) => p.isLineFullChecked(order, item, i));
   return (
