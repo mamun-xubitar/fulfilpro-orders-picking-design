@@ -135,19 +135,7 @@ export default function QueueRow({ p, order, isExpanded }: { p: OrdersPageBundle
       {caps.fulfilment && <FulfilmentCell order={order} />}
       <PackedCell order={order} />
       <DecoCell order={order} p={p} />
-      <span className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
-        <NoteButton p={p} order={order} />
-      </span>
       <span onClick={(e) => e.stopPropagation()}><RowActions p={p} order={order} isExpanded={isExpanded} /></span>
     </div>
-  );
-}
-
-function NoteButton({ p, order }: { p: OrdersPageBundle; order: OrderRow }) {
-  return (
-    <button type="button" title="Order notes" aria-label="Order notes" onClick={() => void p.openNoteModal(order)} className="relative flex h-5 w-5 items-center justify-center rounded text-orders-text-subtle hover:bg-orders-divider hover:text-orders-text cursor-pointer">
-      <Icon name="note" className="h-3.5 w-3.5" />
-      {order.noteCount > 0 && <i className="absolute -right-[3px] -top-0.5 rounded-full bg-orders-primary px-[3.5px] text-[8px] font-bold not-italic leading-3 text-white">{order.noteCount > 99 ? '99+' : order.noteCount}</i>}
-    </button>
   );
 }

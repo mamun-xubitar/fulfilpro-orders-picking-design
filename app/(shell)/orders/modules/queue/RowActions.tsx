@@ -62,6 +62,7 @@ export default function RowActions({ p, order, isExpanded }: { p: OrdersPageBund
       {caps.slip && <IconButton icon="printer" label={slipLabel} printed={slipPrinted} disabled={allPacked} onClick={() => p.openPrintModal([order])} />}
       {caps.labels && <IconButton icon="tag" label={fulfilled ? 'Fulfilled: label locked' : order.labelPrintedAt ? 'Shipping label printed, print again' : 'Print label'} printed={Boolean(order.labelPrintedAt)} disabled={fulfilled || p.printingOrderId === order.id} spinning={p.printingOrderId === order.id} onClick={() => void p.printPackingSlipLabel(order)} />}
       {caps.invoice && <IconButton icon="receipt" label="Print tax invoice" disabled={p.printingInvoiceOrderId === order.id} spinning={p.printingInvoiceOrderId === order.id} onClick={() => void p.printTaxInvoice(order)} />}
+      <IconButton icon="note" label="Order notes" count={order.noteCount} onClick={() => void p.openNoteModal(order)} />
       <MessagesButton p={p} order={order} disabled={messageDisabled} />
       {caps.admin && <IconButton icon="tracking" label={trk.label} disabled={trk.disabled} tone={trk.tone} onClick={() => p.openTrackingModal(order)} />}
       <IconButton icon="refresh" label="Refresh order from Shopify" disabled={refreshing || (caps.role === 'picker' && allPacked)} spinning={refreshing} onClick={() => void p.refreshSingleOrder(order)} />

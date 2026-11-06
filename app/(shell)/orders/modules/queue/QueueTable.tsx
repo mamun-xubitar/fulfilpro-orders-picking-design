@@ -35,7 +35,6 @@ function Header({ p }: { p: OrdersPageBundle }) {
       {caps.fulfilment && <span>Fulfilment</span>}
       <span>Packed</span>
       <span>{caps.packedDate ? 'Packed date' : 'Decoration'}</span>
-      <span>Notes</span>
       <span className="text-right">Actions</span>
     </div>
   );

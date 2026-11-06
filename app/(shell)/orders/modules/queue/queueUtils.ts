@@ -71,8 +71,8 @@ export function getRowTone(order: OrderRow, caps: OrderCapabilities) {
 /** Grid columns of the queue table (prototype `colsA`); the same template is used by the header and every row. */
 export function getGridColumns(caps: OrderCapabilities) {
   const nodes = (caps.slipStatus ? 1 : 0) + 1 + (caps.fulfilment ? 2 : 0);
-  const icons = 3 + (caps.slip ? 1 : 0) + (caps.labels ? 1 : 0) + (caps.invoice ? 1 : 0) + (caps.admin ? 1 : 0);
-  return ['20px', '96px', '50px', '108px', caps.admin ? '66px' : '', 'minmax(80px,1fr)', `${nodes * 34 + 4}px`, caps.fulfilment ? '104px' : '', '84px', '132px', '52px', `${icons * 24 + 4}px`].filter(Boolean).join(' ');
+  const icons = 4 + (caps.slip ? 1 : 0) + (caps.labels ? 1 : 0) + (caps.invoice ? 1 : 0) + (caps.admin ? 1 : 0);
+  return ['20px', '96px', '50px', '108px', caps.admin ? '66px' : '', 'minmax(80px,1fr)', `${nodes * 34 + 4}px`, caps.fulfilment ? '104px' : '', '84px', '132px', `${icons * 24 + 4}px`].filter(Boolean).join(' ');
 }
 
 /** "Today 09:42", "Yesterday 17:21" or "Wed 28 Oct": how the prototype shows when an order was placed. */

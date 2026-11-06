@@ -33,7 +33,7 @@ export class OrderHubProductController {
 
       const data = await model.ensureForLine({ order, line, images, actor: { id: actor.id ?? null, name: actor.name ?? actor.email ?? 'Unknown' } });
       if (data.created && images.length > 0) after(() => this.localizeImages(data.supplierProductId));
-      return { data, message: data.created ? 'Product created in the hub' : 'Product is already in the hub' };
+      return { data, message: data.created ? 'Product created in the Inventory' : 'Product is already in the hub' };
     } catch (error) {
       if (error instanceof HubProductError) return { error: { message: error.message, status: error.status } };
       throw error;
