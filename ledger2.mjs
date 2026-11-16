@@ -64,14 +64,14 @@ function headLine(r, role, open) {
       : cap.poCreate && !shipped && !r.canceled && !r.closed ? `<button class="poc" title="Create a purchase order for every line">PO all items</button>` : '';
     if (po) H.push(o(891, 63, po));
     const tk = l.trk && shipped;
-    H.push(o(958, 97, `${fld(tk ? `<a class="trn" href="#">${l.trk.no}</a>` : '', 'grow')}${cap.track ? X.trackingIcon(r, cap, true) : ''}`));
+    H.push(o(958, 97, `${fld(tk ? `<a class="trn" href="#">${l.trk.no}</a>` : '', 'grow')}${cap.track && tk ? X.trackingIcon(r, cap, true) : ''}`));
     H.push(o(1058, 92, fld(tk ? l.trk.carrier : '')));
     H.push(o(1153, 90, `${fld(tk ? l.trk.at : '', 'mn grow')}${cap.ful && tk ? `<button class="ib pen" title="${cap.req === 'direct' ? 'Edit fulfilment' : 'Request a fulfilment edit'}">${ic('pencil', 'i10')}</button>` : ''}`));
     if (cap.labels) H.push(o(1249, 63, seg('lbl', '', 'Label', r.label, 'Print the shipping label')));
     if (cap.invoice) H.push(o(1316, 81, seg('inv', '', 'Tax invoice', Boolean(r.label || l.ful === 'full'), 'Print the tax invoice')));
   }
   const off = P.msgOff(r);
-  H.push(o(1402, 63, `<button class="msgb"${off ? ' disabled title="Messages are closed for this order"' : ' title="Messages about this order (in place of Task / Problem)"'}>Messages${r.msgs ? `<i>${r.msgs}</i>` : ''}</button>`));
+  H.push(o(1402, 63, `<button class="msgb"${off ? ' disabled title="Messages are closed for this order"' : ' title="Messages about this order (in place of Task / Problem)"'}>Messages</button>${r.msgs ? `<i class="msgc">${r.msgs}</i>` : ''}`));
   if (cap.req === 'direct') H.push(o(1468, 22, `<button class="ib del" data-l1-del="${r.no}" title="Delete this order from FulfilPro (Shopify is not changed)">${ic('trash', 'i12')}</button>`, { cls: 'c' }));
   return `<div class="lg-h l2h h-${l.head}">${H.join('')}</div>`;
 }
@@ -80,11 +80,11 @@ function headLine(r, role, open) {
 function lineHead(r, role) {
   const cap = CAP[role], pk = role === 'picker', l = ledgerOf(r);
   const lab = (x, w, t, cls = '') => o(x, w, `<span>${t}</span>`, { cls });
-  const L = [o(4, 57, '<span class="src" title="Order source: Shopify store">Online Order</span>'), lab(65, 200, 'Description'), lab(267, 62, 'SKU'), lab(330, 66, 'Size &amp;<br>picture'), lab(397, 25, 'Qty', 'c')];
+  const L = [o(4, 57, '<span class="src" title="Order source: Shopify store">Online<br>Order</span>'), lab(65, 200, 'Description'), lab(267, 62, 'SKU'), lab(330, 66, 'Size &amp;<br>picture'), lab(397, 25, 'Qty', 'c')];
   if (!pk) L.push(lab(424, 42, 'Price', 'r'), lab(468, 26, 'Disc<br>%', 'c'));
   L.push(lab(496, 45, 'Qty<br>status', 'c'));
   if (!pk) L.push(lab(543, 51, 'Total', 'r'));
-  if (cap.stock) L.push(lab(596, 46, 'Stock', 'c'), lab(775, 99, 'Supplier'), lab(876, 34, 'Due<br>date'), lab(912, 46, 'Purchase<br>status'));
+  if (cap.stock) L.push(lab(596, 46, 'Stock', 'c'), lab(775, 99, 'Supplier'), lab(876, 34, 'Due<br>date'), lab(912, 46, 'Purchase<br>status', 'tight'));
   L.push(lab(961, 55, 'Packed'));
   if (cap.stockAdj) L.push(lab(1018, 50, 'Stock<br>out'));
   if (cap.ful) L.push(lab(1072, 172, 'Tracking number /<br>company / date &amp; time'));
@@ -162,7 +162,7 @@ function footer(r, role) {
   const n = r.items.length, nNames = r.items.filter((x) => x.nameAttr).length;
   Fo.push(fr(1, 84, 47, `<button class="tg lines" data-l1-lines-show data-cnt=".itc" title="Show all lines, or hide shipped lines">Show all</button>`));
   Fo.push(fr(1, 134, 66, `<span class="itc">${ic('eye', 'i12')}<b>${n}/${n}</b> item(s)</span>`));
-  if (cap.names && nNames) Fo.push(fr(1, 202, 80, `<button class="tg add" title="Export name attributes as CSV or print">${ic('download', 'i10')}Names (${nNames})${ic('chevronDown', 'i10')}</button>`));
+  if (cap.names && nNames) Fo.push(fr(1, 208, 74, `<button class="tg add" title="Export name attributes as CSV or print">Names (${nNames})${ic('chevronDown', 'i10')}</button>`));
   if (!pk) {
     Fo.push(fr(2, 81, 112, `<span class="f2 fu2">${two('(Paid) Payment', 'follow-up date')}</span>`));
     Fo.push(fr(2, 194, 56, `<span class="f2 mn${l.followUp && l.owing ? ' due' : ''}">${l.followUp && l.owing ? l.followUp.slice(0, 5) : ''}</span>`));
@@ -173,10 +173,10 @@ function footer(r, role) {
   if (cap.lineEdit) Fo.push(fr(1, 287, 53, `<button class="tg add" title="Add a line item">+ Item</button>`));
   const urg = l.urgent ? two('Urgent', `<span class="tg-d">${l.urgent.slice(0, 5)}</span>`) : 'Urgent';
   Fo.push(fr(1, 343, 53, pk ? `<span class="tg urg ro${l.urgent ? ' on' : ''}">${urg}</span>` : `<button class="tg urg${l.urgent ? ' on' : ''}" data-l1-pop="urg-${role}" title="Priority order: top of every list. Set the date the customer needs it.">${urg}</button>`));
-  Fo.push(fr(1, 400, 62, pk ? `<span class="tg rep ro${l.repeat ? ' on' : ''}">Repeat order</span>` : `<button class="tg rep${l.repeat ? ' on' : ''}" data-l1-tog title="Repeat order: check the previous order's remarks first">Repeat order</button>`));
+  Fo.push(fr(1, 400, 64, pk ? `<span class="tg rep ro${l.repeat ? ' on' : ''}">Repeat order</span>` : `<button class="tg rep${l.repeat ? ' on' : ''}" data-l1-tog title="Repeat order: check the previous order's remarks first">Repeat order</button>`));
   const nRs = r.items.filter((x) => x.restock).length;
   if (cap.reqStock && !r.canceled) Fo.push(fr(2, 287, 53, `<button class="tg add" title="Ask a supplier to restock (back in stock), in place of Supplier">${two('Request', `stock${nRs ? ` (${nRs})` : ''}`)}</button>`));
-  Fo.push(fr(2, 343, 84, cap.slip ? `<span class="seg brand"><button title="Print the picking list (per-line qty, Location, Remark)">Picking list</button><button class="p${l.pickAt ? ' on' : ''}" title="${l.pickAt ? 'Printed ' + l.pickAt + ' · print again' : 'Not printed yet'}">P</button></span>` : `<span class="stp-d">${l.pickAt ? two(`${ic('check', 'i10')}Picking list printed`, l.pickAt) : two('Picking list', 'not printed')}</span>`));
+  Fo.push(fr(2, 343, 84, cap.slip ? `<span class="seg brand"><button title="Print the picking list (per-line qty, Location, Remark)">Picking list</button><button class="p${l.pickAt ? ' on' : ''}" title="${l.pickAt ? 'Printed ' + l.pickAt + ' · print again' : 'Not printed yet'}">P</button></span>` : `<span class="stp-d">${l.pickAt ? two(`${ic('check', 'i10')}Picking list`, l.pickAt) : two('Picking list', 'not printed')}</span>`));
   if (cap.slip && l.pickAt) Fo.push(fr(2, 430, 44, `<span class="stp-d">${two(l.pickAt.split(' ')[0], l.pickAt.split(' ')[1])}</span>`));
   if (pk) {
     // Picker: packing history in the payment-box slot (payment, totals, design and marketing are hidden for pickers)
@@ -327,6 +327,13 @@ export const CSS_L2 = `
 .l2 .phist>b{font-size:9px;text-transform:uppercase;letter-spacing:.4px;color:#4a4663}
 .l2 .phist>span{display:flex;align-items:center;justify-content:space-between;border:1px solid #e1def0;border-radius:6px;background:#fff;padding:1px 2px 1px 7px}
 .l2 .lg>.under{border-top:1px solid #e3e0f0}
+.l2 .l2lh .src{display:inline-flex;align-items:center;justify-content:center;text-align:center;height:18px;border-radius:6px;line-height:8.5px;padding:0 6px;white-space:normal}
+.l2 .l2lh .o.tight>span{letter-spacing:-.45px}
+.l2 .o>.msgc{position:absolute;top:1px;right:-3px;font-style:normal;background:#fff;color:var(--fm-ink);box-shadow:0 0 0 1px var(--fm-lav);border-radius:999px;font-size:8.5px;font-weight:700;padding:0 4px;line-height:12px}
+.l2 .tg.lines,.l2 .tg.rep{letter-spacing:-.25px;padding:0 1px}
+.l2 .itc{letter-spacing:-.1px}
+.l2 .mkb{padding:2px 7px;gap:0}.l2 .mkb .mk{height:16px}.l2 .mkb>.lnk{line-height:14px}
+.l2 .ins2,.l2 .nopo2{letter-spacing:-.2px}
 .l2 .f2{padding:0 4px}
 .l2 .fl{gap:1px}.l2 .fl i{width:14px;height:14px}
 .l2 .o .store{gap:3px;padding:0 3px}

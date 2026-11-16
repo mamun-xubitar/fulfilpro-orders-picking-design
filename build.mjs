@@ -79,10 +79,10 @@ body{background:#e9edf3}
 .case-t{font-size:17px;font-weight:700;letter-spacing:-.2px;display:flex;align-items:center;gap:8px}
 .rec{font-size:10px;font-weight:700;color:#1d4ed8;background:#eff6ff;border:1px solid #bfdbfe;border-radius:999px;padding:2px 8px}
 .case-d{font-size:12.5px;color:#4b5563;margin-top:4px;line-height:1.55;max-width:1000px}
-.tags{display:flex;gap:6px;margin-top:8px}.tg{font-size:10px;font-weight:700;padding:2.5px 8px;border-radius:999px;border:1px solid #e5e7eb;background:#fff;color:#4b5563}
-.tg.good{background:#ecfdf5;border-color:#a7f3d0;color:#047857}.tg.warn{background:#fffbeb;border-color:#fde68a;color:#92400e}
+.tags{display:flex;gap:6px;margin-top:8px}.itag{font-size:10px;font-weight:700;padding:2.5px 8px;border-radius:999px;border:1px solid #e5e7eb;background:#fff;color:#4b5563}
+.itag.good{background:#ecfdf5;border-color:#a7f3d0;color:#047857}.itag.warn{background:#fffbeb;border-color:#fde68a;color:#92400e}
 .rs{display:flex;align-items:center;gap:10px;margin-bottom:10px}
-.rs button{font:700 12px Arial;padding:6px 12px;border-radius:8px;border:1px solid #d1d5db;background:#fff;color:#374151;cursor:pointer}
+.rs button{flex:none;white-space:nowrap;font:700 12px Arial;padding:6px 12px;border-radius:8px;border:1px solid #d1d5db;background:#fff;color:#374151;cursor:pointer}
 .rs button.on{background:#111827;border-color:#111827;color:#fff}
 .rs .note{font-size:12px;color:#4b5563;margin-left:6px}.rs .note b{color:#111827}
 .pane{display:none}.pane.on{display:block}
@@ -102,7 +102,7 @@ if (withPo) {
 }
 const rolesOf = (c) => (c.id === 'd' && withPo ? [...ROLES, 'po'] : ROLES);
 const noteOf = (c, r) => (c.notes && c.notes[r]) || ROLE_NOTE[r];
-const caseHtml = (c) => `<section class="case" data-case="${c.id}"><div class="case-hd"><div class="case-no">${c.id.toUpperCase()}</div><div><div class="case-t">${c.t}<span class="rec">${c.rec}</span></div><div class="case-d">${c.d}</div><div class="tags">${c.tags.map(([l, k]) => `<span class="tg ${k}">${l}</span>`).join('')}</div></div></div>
+const caseHtml = (c) => `<section class="case" data-case="${c.id}"><div class="case-hd"><div class="case-no">${c.id.toUpperCase()}</div><div><div class="case-t">${c.t}<span class="rec">${c.rec}</span></div><div class="case-d">${c.d}</div><div class="tags">${c.tags.map(([l, k]) => `<span class="itag ${k}">${l}</span>`).join('')}</div></div></div>
 <div class="rs">${rolesOf(c).map((r, i) => `<button data-r="${r}" class="${i ? '' : 'on'}">${ROLE_LABEL[r]}</button>`).join('')}<span class="note" data-note></span></div>
 ${rolesOf(c).map((r, i) => `<div class="pane${i ? '' : ' on'}" data-r="${r}" data-n="${noteOf(c, r)[0]}||${noteOf(c, r)[1]}">${r === 'po' ? arts.dpo : arts[c.id + r]}</div>`).join('')}${c.extra ?? ''}</section>`;
 const index =`<!doctype html><html lang="en"><head><meta charset="utf-8"><title>FulfilPro · Orders · L2 Order Ledger, exact positions (proposed) + L1 + A1 (current)</title><style>${FILE_CSS}${D3.CSS_A3}${INDEX_CSS}</style></head><body><div class="sheet">
