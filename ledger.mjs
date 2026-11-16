@@ -137,10 +137,13 @@ function group(r, role, open) {
   const cap = CAP[role];
   return `<div class="lg b-${ledgerOf(r).head}${open ? ' open' : ''}" data-no="${r.no}">${headLine(r, role, open)}${X.underRow(r, cap, '')}<div class="lg-x">${lines(r, role)}${F.footer(r, role)}${F.infoStrip(r, role)}</div></div>`;
 }
+/* Sample board only: embroidery / print stay on three orders so the list is not all decorated. Copies, so concept A1 keeps the shared data. */
+const KEEP_DECO = new Set(['4752', '0733', '2181']);
+const lessDeco = (r) => (KEEP_DECO.has(r.no) ? r : { ...r, items: r.items.map((x) => ({ ...x, deco: null, work: undefined })) });
 const OPEN = { admin: ['2204', '4752'], staff: ['2204', '4752'], picker: ['4752', '4821'] };
 export function conceptL1(role) {
   P.setRole(role);
-  const cap = CAP[role], rows = ledgerSort(D.rowsFor(role));
+  const cap = CAP[role], rows = ledgerSort(D.rowsFor(role)).map(lessDeco);
   const body = rows.map((r) => group(r, role, OPEN[role].includes(r.no))).join('');
   const qty = rows.reduce((a, r) => a + totalQty(r), 0);
   const title = `<div class="l1-th" style="--hc:${HC[role]}"><span style="padding-left:21px"><span class="ck" data-l1-selall title="Select the whole found set (${rows.length} orders), not just this page"></span></span>${HEAD[role].map((t) => `<span>${t}</span>`).join('')}</div>`;
