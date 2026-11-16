@@ -85,7 +85,7 @@ export const CSS_A2 = `
 .btn.sky{background:#0284c7;color:#fff}.btn.sky:hover{background:#0369a1}
 .tscroll{position:absolute;inset:0;overflow:auto;padding-bottom:70px}
 `;
-/** Concept A2: same table, but the expanded panel is packed into columns that size to their content (items + notes, packing + fulfilment, customer + shipping). */
+/** The original Concept A1 (archived, build id a1-old; renderer kept the historical name conceptA2): same table, but the expanded panel is packed into columns that size to their content (items + notes, packing + fulfilment, customer + shipping). */
 function expandedA2(r, role) {
   const cap = CAP[role], lnH = 34, note = X.customerNote(r, cap);
   const items = `<div class="bx">${P.secHead('package', 'Order items', `<span class="muted tn">${totalQty(r)} pcs · ${packedQty(r)} packed</span>`)}${X.extrasBar(r, cap)}${P.lines(r, cap, { rowH: lnH, skuSub: false, workCol: true, decoBoth: true })}${X.fulHistory(r, cap)}</div>`;

@@ -1,13 +1,13 @@
 # Orders + Picking List: merged page, six layout concepts (round 3)
 
-> **Decision: Concept A2 (queue table, expanded panel uses the space) is the chosen layout.** The original Concept A was removed; B–F are archived in `archive/` (artboards only; their renderers stay in `designs*.mjs`). `node build.mjs` builds A2 only; `CONCEPTS=a2,b,c,d,e,f node build.mjs` rebuilds it with B–F into the top-level folder. Sections below that mention A or six concepts are kept as history.
+> **Decision: Concept A1 (queue table re-laid to fit 1280 px without sideways scroll) is the chosen layout.** The original Concept A, the original Concept A1 and B–F are archived in `archive/` (artboards only; their renderers stay in `designs*.mjs`). `node build.mjs` builds A1 only; `CONCEPTS=a1-old,b,c,d,e,f node build.mjs` rebuilds the archived concepts into the top-level folder. Sections below that mention A, the original A1 or A2 are kept as history (A2 = today's A1, renamed in Round 18).
 
 Design prototype for merging `app/(shell)/orders` and `app/(shell)/picking-list` into one page.
 Round 3 changes: the filter now follows the picking slip with a green printed icon (the old 24 h “late” rule is an optional extra), and every gap found against today's pages was closed. See **`PARITY.md`** for the old-vs-new checklist and **`dialogs.html`** for all dialogs, menus and popovers.
 
 Round 4 (Concept A): the **decoration attachments strip** (Files / Customer design / Photo / Customer remarks, Admin) now sits under each row without expanding, the **Customer note** shows in the expanded order as today, and rows are **tinted by status** again (see PARITY.md).
 
-Round 5: the **Shipping block** from today's Orders page (title, Free / Paid, discount codes, Price, Discounted) is back in the expanded order, and **Concept A2** (now the only table concept) re-lays the expanded panel so no column stretches over blank space.
+Round 5: the **Shipping block** from today's Orders page (title, Free / Paid, discount codes, Price, Discounted) is back in the expanded order, and **Concept A1** (now the only table concept) re-lays the expanded panel so no column stretches over blank space.
 
 Open **`index.html`**: it shows every concept, a role switcher (Admin / Staff / Picker) per concept, the role
 matrix and the questions for the client. The zoom control works on every artboard (50–150%, Ctrl +/−/0 while the
@@ -109,9 +109,9 @@ Inventory access today, so they get none of the stock, PO or Shopify items.
 | `dialogs.html` | round 3: every dialog, menu and popover of today's pages, shared by all concepts |
 | `PARITY.md` | round 3: old-system capability checklist (covered / added / changed) |
 | `extras.mjs`, `dialogs.mjs` | round 3 renderers: decoration, restock, name attributes, attachments, label state; the dialogs sheet |
-| `concept-a2-{admin,staff,picker}.html` | A2 artboards (built by default) |
-| `concept-{a..f}-{admin,staff,picker}.html / .png` | 18 artboards, 1280 × 800, PNGs at 2× |
-| `concept-d-admin-po.html / .png` | Create PO popover |
+| `concept-a1-{admin,staff,picker}.html` | A1 artboards (built by default) |
+| `archive/concept-{a1-old,b..f}-*.html / .png` | archived artboards: the original A1 (as `a1-old`) and B–F, 1280 × 800, PNGs at 2×; rebuild with `CONCEPTS=a1-old,b,c,d,e,f node build.mjs` |
+| `archive/concept-d-admin-po.html / .png` | Create PO popover |
 | `data.mjs` | sample orders, stock, POs, restock, decoration and derived state |
 | `parts.mjs` | role capabilities (`CAP`) and shared widgets |
 | `designs.mjs`, `designs2.mjs` | concepts A–C and D–F |
@@ -134,11 +134,11 @@ Round 9 (Staff only): the expanded order always shows today's **Actions** block 
 
 Round 10: the pager (select on the left, next to "Showing") now has a **Rows per page** select (10 / 20 / 50 / 100, default 20) on every role, as in today's shared Pagination component; changing it updates the "Showing 1–N" range.
 
-Round 11: every role (Admin, Staff, Picker) now opens **two orders** on its A2 artboard so two states can be compared (Admin #2188 fulfilled + #1184 unfulfilled, Staff #0702 + #0718, Picker #2204 slip printed + #4821 slip not printed). The order list scrolls inside its card (`.tscroll`); header, tabs, pager and the floating bulk bar stay fixed.
+Round 11: every role (Admin, Staff, Picker) now opens **two orders** on its A1 artboard so two states can be compared (Admin #2188 fulfilled + #1184 unfulfilled, Staff #0702 + #0718, Picker #2204 slip printed + #4821 slip not printed). The order list scrolls inside its card (`.tscroll`); header, tabs, pager and the floating bulk bar stay fixed.
 
 Round 12 (filters, all three roles): the toolbar of **Admin, Staff** and **Order Picker** now carries the filters of today's pages; the Slip chip is gone. Admin (sees both pages): Store, Period, Status, Packed, Print, Sync, barcode search. Staff: Store, Period, Status (fulfilment), **Packed** (Not Packed, Partial Packed, Packed, Late Unpacked, Shipped Delayed); search has no Barcode field. Picker: **Packed** (opens on Not Packed + Partial Packed, as today) and **Print** (Slip Not Printed / Slip Printed), Clear filters, barcode search; no Store, Period or Sync. Queue tabs are kept next to the filters. Late Unpacked / Shipped Delayed are back in the Packed menu for every role. Menus: `dialogs.html` card 11.
 
-Round 13 (synced to the implemented app, concept A2, all roles): the prototype was brought back in line with the Orders page as it ships on branch `merge-orders-and-picking-page-and-redesign-this-UI` after the 4–5 Nov commits.
+Round 13 (synced to the implemented app, concept A1, all roles): the prototype was brought back in line with the Orders page as it ships on branch `merge-orders-and-picking-page-and-redesign-this-UI` after the 4–5 Nov commits.
 - **Item table**: *Deco* is now **Decoration** (EMB / PRT badges only, never wrapped); the *Work* column is replaced by a **Decorator** column (assignee chip or "Unassigned", `+` to assign, **Mark done** and **View** buttons under it, Admin). **Qty** reads `fulfilled/ordered` for Admin and Staff. Lines picked for fulfilment get a blue tint; Staff now see Full / Partial. At 1280 px the table scrolls sideways when Decorator and Full / Partial both show (as in the app; zoom out to see it whole).
 - **Queue**: header *Decoration*; Short N sits above the EMB / PRT progress; the Sort chip is a field (Date placed / Order no. / Customer) plus Ascending / Descending; the stage track shows the **Slip dot to Staff too** (read-only).
 - **Approvals** (Admin): one collapsible amber section with a count; open it to Approve / Reject (dialogs.html card 15).
@@ -147,3 +147,38 @@ Round 13 (synced to the implemented app, concept A2, all roles): the prototype w
 - **Notes and messages**: two panes (compose left, History right), tab renamed **Message**, Send disabled once messaging is closed (Picker: fully packed; Staff: fully fulfilled); the row Message icon is one button and shows disabled in those states.
 - **Create PO** from + PO opens Inventory's Create purchase order modal (dialogs.html card 16), prefilled with the shortfall.
 - **Filter menus**: size to their content; the custom range shows two larger months.
+
+Round 14 (**Concept A2**, new; A1 and its artboards are untouched): A1 re-laid so the queue and an opened order fit about 1200px (1280px screen, sidebar collapsed) with **no sideways scroll** (`node overflow.mjs concept-a3-*.html` reports no horizontal overflow). Built by `designs3.mjs`, which only imports A1's helpers; `node build.mjs` now builds `a1,a2` (`CONCEPTS=a1` for A1 only).
+- **Queue**: Items is a fixed 112px (was the flexible column), Packed 64px, the Notes column is gone (the note icon joins Actions). **Decoration is now Status** and shows the old Orders page's badges, stacked: fulfilment chip (Unfulfilled / Partially Fulfilled / Fulfilled / Closed / Canceled), edit-request flag, Packed / Partial Packed + Label, back-in-stock state, `x/y EMB` `x/y PRT`. The "Short N" badge is removed. Picker keeps Packed date.
+- **Row separation**: every order (row, attachments strip, expanded panel) is a group with a 3px left stripe coloured by status (canceled red, closed gray, partial / restock amber, fulfilled blue, packed green, EMB purple, PRT sky) and a 5px gap before the next group.
+- **Opened order**: the product name links to Shopify admin (the icon is gone); the SKU is a short mono chip with `…`, full SKU in the tooltip, click copies it ("Copied"). The Decoration column is gone: `1/1 EMB` over `1/1 PRT` sit at the right of the Item cell. Qty and Packed stay as narrow columns. Fulfilment has no section of its own (see Round 15); Packing & slip is **Confirm packed / All N items packed** plus the history. Side columns are 176px (packing, shipping) and 224px (customer).
+- PO status / Avail are unchanged (the "stock missing on a hub product created from + PO" point is a functional fix, not part of this design round).
+
+Round 15 (Concept A2 only; A1 untouched):
+- **Row icons**: the tax-invoice button uses the app's receipt icon and Order notes the app's note icon (`icons.tsx`), so the two no longer look alike.
+- **Packing & slip**: the Print Slip / Reprint Slip button is gone (the row already has the slip icon).
+- **No Fulfilment section**: **Confirm fulfilment** and **[printer] & Confirm** sit at the right end of the Order items action bar (after Request stock, Fulfilments, Stock, Add line, tracking). They are disabled once fulfilled, and read "Fulfilment locked" on closed / canceled orders. The bar wraps to a second line if it is too full.
+- **Decorator column** is always shown for Admin and Staff, as in the app (Admin: Unassigned + `+`, Mark done, View).
+- **Shipping** moved under Packing & slip (middle column); the right column is Customer only.
+- **PO status column** is 108px (was 86px): "#1038 Part received" plus its "6/10 in · ETA 2 Nov" line overlapped the Decorator column. Badges in the item rows now also ellipsize instead of spilling into the next column. (`concept-a2` and the shipped app still use 86px.)
+- **Qty column** is renamed **Fulfilled** (Admin and Staff, where it reads fulfilled / ordered); Order Picker keeps "Qty". The column is 54px to fit the heading.
+
+Round 16 (Concept A2 only; A1 untouched):
+- **Packed and Fulfilment share one column** (Admin, Staff; header "Packed · Fulfilment"): packed count and bar on top, then the first parcel's date and carrier · tracking. Order Picker keeps its single Packed column.
+- **Status badges: at most two per line** (a 200px column; each line holds two badges side by side, no empty gap between them), so rows with many badges are about half as tall.
+
+Round 17 (Concept A2 only): the Orders table's column headings sit inside the scroll area (sticky), so they share one width with the rows. Before, the header was outside the scrollbar, which pushed every column right of Customer about 10px left of its heading in the rows. A1 still has that offset. The expanded order is unchanged.
+
+Round 18: **Concept A2 is renamed A1 and is the chosen layout.** The original A1's artboards are archived as `archive/concept-a1-old-*` and stay rebuildable as build id `a1-old` (renderer `D.conceptA2` in `designs.mjs`); `node build.mjs` now builds `a1` only (`CONCEPTS=a1-old,b,c,d,e,f` rebuilds the archive). Rounds 14–17's "Concept A2" is this concept's old name.
+
+Round 19: **Concept L1 · Order Ledger (proposed, for client approval)**, built from the 13 Nov client walkthrough in `client-qa/` (FileMaker "Online Orders Ledger": screenshots, marked controls #0–#18, transcript, video from 26:00). Each order keeps the client's three bands, in the client's own colours (hex values measured from their screenshots, `--fm-*` tokens in `ledger.mjs`):
+- **Header line**: what a collapsed order shows. Coloured with the client's legend: Late red, Paid lime, Shipped light blue, Shipped a part dark blue, New white.
+- **Lines**: Purchased purple / shipped / part shipped per line.
+- **Footer panel**: Production and Pick & Pack lights, Urgent and Repeat, Picking list | P, totals, payment box with the star, Design sent › approved › colours, FulfilPro's fulfilment actions, Marketing + VIP. Peach when the picking list is printed and the order is not packed yet.
+
+Every FulfilPro feature is kept in those bands. Artboards are 1440 × 900 (`concept-l1-{admin,staff,picker}.html / .png`) and interactive. `node build.mjs` now builds `l1,a1`; A1 stays in index.html as the current app, for comparison. index.html lists the colour legend, the client-marker map (kept / merged / removed / new), the role split, the data the build round needs and the questions for the client. Files:
+- `ledger.mjs`: page, header line, lines, CSS, interactions.
+- `ledger-parts.mjs`: footer, toolbar, popovers, index notes.
+- `ledger-data.mjs`: synthetic payment, urgent, design, marketing and per-line fields. `data.mjs` is unchanged.
+
+`W=1440 H=900 node overflow.mjs concept-l1-*.html` checks the new boards.

@@ -1,6 +1,6 @@
 # Parity check: current Orders + Picking List vs the merged prototype
 
-> **Decision:** Concept A2 is chosen (the original A was removed); B–F are archived in `archive/`. Rows below that name other concepts (B–F) are history.
+> **Decision:** Concept A1 is chosen (the original A and the original A1 are archived in `archive/`; today's A1 is the former A2, renamed in Round 18). Rows below that name other concepts are history.
 
 Source of truth: the stable code on branch `merge-orders-and-picking-page-and-redesign-this-UI`
 (`app/(shell)/orders/modules`, `app/(shell)/picking-list/modules`, `proxy.ts`, `lib/roles.ts`,
@@ -125,3 +125,33 @@ Source of truth: `app/(shell)/orders/modules` as of commit `15cd13d`. Statuses: 
 | Create PO uses Inventory's modal | Changed | dialogs.html [16] |
 | Filter menus fit content; larger two-month calendar | Changed | dialogs.html [11] |
 | Item table and queue scroll sideways below their computed minimum width | Note | not drawable at 1280 px |
+
+## Round 19: client FileMaker ledger → Concept L1
+
+Source: `client-qa/` (client-old-system-marking.png, converstaion.md, conversation-summary.md, client-system-*.png, video). The full table (with the colour legend, role split and open questions) is rendered under the L1 artboards in index.html (`ledgerDocs()` in `ledger-parts.mjs`).
+
+| # | Old control | Decision | In L1 |
+|---|---|---|---|
+| 0 | (−) omit | New | Hides the order from the found set only, Undo toast |
+| 1 | Tick above Online Order | Merged | Title-row checkbox selects the whole found set |
+| 2 | Order tick | New | Ticks every line of the order |
+| 3 | Eye / magnifier | Kept / removed | Eye opens the Customer record; magnifier removed |
+| 4 | Task / Problem | Removed | FulfilPro Tasks |
+| 4·5 | Label \| P, Tax invoice \| P | Merged | P fills once printed |
+| 6 | Delete | New | Admin, FulfilPro only (never Shopify), confirm dialog |
+| 7 | Take from | Removed | |
+| 8 | Production | New | Auto-lit on decoration keywords; room date + time |
+| 9 | Pick to do date / payment follow-up | Removed / moved | Follow-up date in the payment box |
+| 10 | Pick & Pack | Merged | Our Confirm packed: orange → green with date |
+| 11 | Urgent (+ Repeat, new) | New | Need-by date; urgent orders sort first |
+| 12 | Supplier | Removed | Supplier · PO per line |
+| 13 | Star | New | Clear paid, yellow unpaid, orange part paid, red shipped and owing |
+| 14·16 | Design sent › approved › colours + field | New | Steps go green; field shows the step's value |
+| 15 | A4 / Label, Booking Ship | Removed | Old courier service; room date moved to #8 |
+| 17 | Marketing (+ VIP, new) | New | All ticked by default; VIP manual |
+| 18 | ≡ master select | Merged | Line-header tick (Full on every line) |
+| — | Order's remark | Merged | Order notes (header icon) |
+| — | Stock return, Back order, Remark per line | New | Per-line buttons and remark field |
+| — | Sync •••, quick buttons, payment-method totals | New | Sync popover, quick-filter row, purple bottom bar |
+
+Not stored in FulfilPro today (needed for the build round): Order financial status / outstanding, urgent + need-by, repeat, soft delete, tax-invoice printed time, decoration-room date, design track, payment follow-up; Customer marketing + VIP and an Order → Customer link; per-line remark / stock return / back order / supplier PO link; sync date range, new-only, period.
