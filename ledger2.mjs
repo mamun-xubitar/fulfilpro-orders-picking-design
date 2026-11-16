@@ -343,7 +343,7 @@ export const CSS_L2 = `
 .l2 .pur{padding:0 4px;gap:2px}
 .l2 .lb.two-b .two{font-size:8.5px}
 .l2 .lb{padding:0 2px}
-.l2 .o>.ib.del{width:18px;height:18px}
+.l2 .o>.ib.del{width:20px;height:20px;border-radius:5px;color:#d93a2b;background:#fdeceb;box-shadow:inset 0 0 0 1px #ef8a82}.l2 .o>.ib.del:hover{background:#fbd5d2;color:#b82a1c}.l2 .ll .o>.ib.del{width:18px;height:18px}
 .l2 .pob{font-size:8.5px;padding:0 2px}
 .l2 .lt.l2lt{padding:0 4px}
 .l2 .itc{gap:3px}
