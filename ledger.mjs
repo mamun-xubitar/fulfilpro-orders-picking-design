@@ -134,7 +134,7 @@ function lines(r, role) {
 
 /* ---------------- order group + page ---------------- */
 /** Embroidery / print orders: exactly Files, Customer design, Photo (each with Add files) and Customer remarks. */
-function decoStrip(r, cap) {
+export function decoStrip(r, cap) {
   if (!(cap.attach && r.items.some((x) => x.deco))) return '';
   const f = (t) => `<span class="uf"><b>${t}</b><button class="lnk">${ic('paperclip', 'i10')}Add files</button></span>`;
   return `<div class="under">${f('Files')}${f('Customer design')}${f('Photo')}<span class="rem"><b>Customer remarks</b><span class="inp ph">Add a remark for the decorator…</span></span></div>`;
@@ -144,8 +144,8 @@ function group(r, role, open) {
   return `<div class="lg b-${ledgerOf(r).head}${open ? ' open' : ''}" data-no="${r.no}">${headLine(r, role, open)}${decoStrip(r, cap)}<div class="lg-x">${lines(r, role)}${F.footer(r, role)}${F.infoStrip(r, role)}</div></div>`;
 }
 /* Sample board only: embroidery / print stay on three orders so the list is not all decorated. Copies, so concept A1 keeps the shared data. */
-const KEEP_DECO = new Set(['4752', '0733', '2181']);
-const lessDeco = (r) => (KEEP_DECO.has(r.no) ? r : { ...r, items: r.items.map((x) => ({ ...x, deco: null, work: undefined })) });
+export const KEEP_DECO = new Set(['4752', '0733', '2181']);
+export const lessDeco = (r) => (KEEP_DECO.has(r.no) ? r : { ...r, items: r.items.map((x) => ({ ...x, deco: null, work: undefined })) });
 const OPEN = { admin: ['2204', '4752'], staff: ['2204', '4752'], picker: ['4752', '4821'] };
 export function conceptL1(role) {
   P.setRole(role);
@@ -389,7 +389,7 @@ var undo=null,timer=null;
 function toast(a,msg,fn){var t=Q(a,'.l1-toast');Q(t,'[data-l1-tmsg]').textContent=msg;t.classList.add('on');undo=fn;clearTimeout(timer);timer=setTimeout(function(){t.classList.remove('on');undo=null},6000)}
 function found(a,d){QA(a,'[data-l1-found],[data-l1-found2]').forEach(function(e){e.textContent=+e.textContent+d})}
 function bulk(a){var n=QA(a,'.lg:not(.gone) .lg-h .ck.on').length,c=Q(a,'.l1-card'),all=Q(a,'[data-l1-selall]');c.classList.toggle('has-sel',n>0);var b=Q(c,'.bulk b');if(b)b.textContent=(all&&all.classList.contains('on')?Q(a,'[data-l1-found2]').textContent+' selected · whole found set':n+' selected')}
-function setOpen(g,o){g.classList.toggle('open',o);var b=Q(g,'.lg-h [data-l1-exp]');if(b){b.title=o?'Collapse':'Expand';b.innerHTML=o?'<svg class="i12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 15l7-7 7 7"/></svg>':'<svg class="i12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 9l-7 7-7-7"/></svg>'}}
+function setOpen(g,o){g.classList.toggle('open',o);var b=Q(g,'.lg-h [data-l1-exp]');if(b&&b.hasAttribute('data-keep')){b.title=o?'Hide the lines':'Show the lines'}else if(b){b.title=o?'Collapse':'Expand';b.innerHTML=o?'<svg class="i12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 15l7-7 7 7"/></svg>':'<svg class="i12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 9l-7 7-7-7"/></svg>'}}
 var opener=null;
 document.addEventListener('click',function(e){var t=e.target,a=art(t),b,g;if(!a||!a.classList.contains('l1'))return;
   if((b=t.closest('[data-l1-pop]'))){e.preventDefault();var p=Q(a,'#'+b.dataset.l1Pop);if(!p)return;var was=p.classList.contains('on');close(a);if(was)return;opener=b;p.classList.add('on');
@@ -407,11 +407,12 @@ document.addEventListener('click',function(e){var t=e.target,a=art(t),b,g;if(!a|
   if((b=t.closest('[data-l1-selall]'))){var on2=!b.classList.contains('on');b.classList.toggle('on',on2);QA(a,'.lg:not(.gone) .lg-h .ck').forEach(function(c){c.classList.toggle('on',on2)});bulk(a);return}
   if((b=t.closest('[data-l1-sel]'))){b.classList.toggle('on');var sa=Q(a,'[data-l1-selall]');if(sa)sa.classList.remove('on');bulk(a);return}
   if((b=t.closest('[data-l1-lines]'))){g=b.closest('.lg');var cks=QA(g,'.ll .ck'),allOn=cks.every(function(c){return c.classList.contains('on')});cks.forEach(function(c){c.classList.toggle('on',!allOn)});var hk=Q(g,'.llh .ck');if(hk)hk.classList.toggle('on',!allOn);if(!g.classList.contains('open'))setOpen(g,true);return}
+  if((b=t.closest('[data-l1-ckall]'))){g=b.closest('.lg');var c2=QA(g,b.dataset.l1Ckall),on5=!c2.every(function(c){return c.classList.contains('on')});c2.forEach(function(c){c.classList.toggle('on',on5)});return}
   if((b=t.closest('.lg-h .ck,.ll .ck'))){b.classList.toggle('on');return}
   if((b=t.closest('[data-l1-all]'))){var gs=QA(a,'.lg:not(.gone)'),any=gs.some(function(x){return x.classList.contains('open')});gs.forEach(function(x){setOpen(x,!any)});Q(b,'span').textContent=any?'Expand all':'Collapse all';b.title=any?'Open every order':'Collapse every order to its header line';return}
   if((b=t.closest('[data-l1-exp]'))||(t.closest('.lg-h')&&!t.closest('button,a,.ck,input,select'))){g=t.closest('.lg');setOpen(g,!g.classList.contains('open'));return}
   if((b=t.closest('[data-l1-pp]'))){var on3=!b.classList.contains('on');b.classList.toggle('on',on3);Q(b,'.lt-d').textContent=on3?'Packed 30/10 14:20':'Not actioned';return}
-  if((b=t.closest('[data-l1-lines-show]'))){g=b.closest('.lg');var sh=QA(g,'.ll.t-ship'),hid=sh.length&&sh[0].style.display!=='none';sh.forEach(function(x){x.style.display=hid?'none':''});var n=QA(g,'.ll').length;b.lastChild.textContent='Lines '+(hid?n-sh.length:n)+'/'+n;b.classList.toggle('on',!hid);return}
+  if((b=t.closest('[data-l1-lines-show]'))){g=b.closest('.lg');var sh=QA(g,'.ll.t-ship'),hid=sh.length&&sh[0].style.display!=='none';sh.forEach(function(x){x.style.display=hid?'none':''});var n=QA(g,'.ll').length;if(b.dataset.cnt){Q(g,b.dataset.cnt+' b').textContent=(hid?n-sh.length:n)+'/'+n}else{b.lastChild.textContent='Lines '+(hid?n-sh.length:n)+'/'+n}b.classList.toggle('on',!hid);return}
   if((b=t.closest('[data-l1-step]'))){var wrap=b.closest('.dsg');b.classList.toggle('done');QA(wrap,'.stp').forEach(function(x){x.classList.toggle('act',x===b)});var v=Q(wrap,'[data-l1-dvv]');Q(wrap,'[data-l1-dvl]').textContent=b.dataset.lab;v.textContent=b.dataset.val||b.dataset.ph;v.classList.toggle('ph',!b.dataset.val);return}
   if((b=t.closest('[data-l1-mk]'))){var k=b.dataset.l1Mk,box=b.closest('.mk-g');var on4=!b.classList.contains('on');if(k==='all'&&box){QA(box,'[data-l1-mk]:not([data-l1-mk=vip])').forEach(function(x){x.classList.toggle('on',on4);Q(x,'.ck').classList.toggle('on',on4)})}else{b.classList.toggle('on',on4);Q(b,'.ck').classList.toggle('on',on4);if(box){var al=Q(box,'[data-l1-mk=all]'),every=QA(box,'[data-l1-mk]:not([data-l1-mk=all]):not([data-l1-mk=vip])').every(function(x){return x.classList.contains('on')});al.classList.toggle('on',every);Q(al,'.ck').classList.toggle('on',every)}}return}
   if((b=t.closest('[data-l1-tog]'))){b.classList.toggle('on');return}

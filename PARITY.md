@@ -1,6 +1,6 @@
 # Parity check: current Orders + Picking List vs the merged prototype
 
-> **Decision:** Concept A1 is chosen (the original A and the original A1 are archived in `archive/`; today's A1 is the former A2, renamed in Round 18). Rows below that name other concepts are history.
+> **Decision:** Concept A1 is chosen (the original A and the original A1 are retired; today's A1 is the former A2, renamed in Round 18). Round 20 adds L2 (exact FileMaker positions) as the proposal. Rows below that name other concepts are history.
 
 Source of truth: the stable code on branch `merge-orders-and-picking-page-and-redesign-this-UI`
 (`app/(shell)/orders/modules`, `app/(shell)/picking-list/modules`, `proxy.ts`, `lib/roles.ts`,
@@ -155,3 +155,35 @@ Source: `client-qa/` (client-old-system-marking.png, converstaion.md, conversati
 | — | Sync •••, quick buttons, payment-method totals | New | Sync popover, quick-filter row, purple bottom bar |
 
 Not stored in FulfilPro today (needed for the build round): Order financial status / outstanding, urgent + need-by, repeat, soft delete, tax-invoice printed time, decoration-room date, design track, payment follow-up; Customer marketing + VIP and an Order → Customer link; per-line remark / stock return / back order / supplier PO link; sync date range, new-only, period.
+
+## Round 20: exact FileMaker positions → Concept L2
+
+Client feedback on L1: everything must stay in the position it has in their FileMaker ledger; extras are added accordingly. L2 draws each object at its measured FileMaker x / width (points, block 1494 pt), with L1's text size and spacing. The full object table is under the L2 artboards in index.html (`l2Docs()` in `ledger2.mjs`).
+
+| Slot freed by the client | Now holds |
+|---|---|
+| Task / Problem (header) | Messages |
+| Magnifier next to the name | nothing (gap kept) |
+| Take from · In Stock (line) | Stock check: In Stock / Short |
+| Pick to do date (footer) | Stock out (stock adjustment light) |
+| Supplier (footer) | Request stock |
+| A4 · LABEL \| P (footer) | Fulfilments · Confirm & print label |
+| Booking Ship (footer) | Confirm fulfilment |
+
+| Added in free space | Where |
+|---|---|
+| Urgent / Repeat / VIP flags | header, between ≡ and the order date |
+| Repeat order | footer, right of URGENT (client request) |
+| Names (n) ▾ export | footer, right of "3/3 item(s)" |
+| VIP | Marketing box, free cell under All |
+| Decoration files | bottom of the order (collapsed and expanded) |
+
+Kept at their FileMaker spots with FulfilPro behaviour:
+- ≡ = show / hide lines
+- ✓ = select the order and its lines
+- Order's remark = Order notes
+- green ⟳ = refresh from Shopify
+- ✎ next to the shipment date = edit fulfilment
+- Packed Qty = partial pack quantity
+- Stock out + Qty = line stock adjustment
+- ✉ by the tracking date = send tracking to the customer

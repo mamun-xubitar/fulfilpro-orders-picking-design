@@ -1,5 +1,5 @@
 /* Concept A1 (the former A2): the queue-table layout re-laid to fit 1280px (sidebar collapsed, ~1200px of table) without sideways scroll.
-   The original A1 is archived in ./archive; this file only imports its helpers. Kept internal names: renderer `conceptA3`, classes prefixed `a3-`. */
+   The original A1 is retired (build id a1-old); this file only imports its helpers. Kept internal names: renderer `conceptA3`, classes prefixed `a3-`. */
 import * as P from './parts.mjs';
 import * as X from './extras.mjs';
 import * as D from './designs.mjs';

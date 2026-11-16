@@ -1,6 +1,6 @@
 # Orders + Picking List: merged page, six layout concepts (round 3)
 
-> **Decision: Concept A1 (queue table re-laid to fit 1280 px without sideways scroll) is the chosen layout.** The original Concept A, the original Concept A1 and B–F are archived in `archive/` (artboards only; their renderers stay in `designs*.mjs`). `node build.mjs` builds A1 only; `CONCEPTS=a1-old,b,c,d,e,f node build.mjs` rebuilds the archived concepts into the top-level folder. Sections below that mention A, the original A1 or A2 are kept as history (A2 = today's A1, renamed in Round 18).
+> **Now (round 20): L2 Order Ledger (exact FileMaker positions) is the proposal; L1 and A1 (the current app) stay for comparison.** The original Concept A, the original Concept A1 and B–F are no longer published (the `archive/` folder was deleted in round 20); their renderers stay in `designs*.mjs`, and `CONCEPTS=a1-old,b,c,d,e,f node build.mjs` rebuilds them into the top-level folder. `node build.mjs` builds `l2,l1,a1`. Sections below that mention A, the original A1 or A2 are kept as history (A2 = today's A1, renamed in Round 18).
 
 Design prototype for merging `app/(shell)/orders` and `app/(shell)/picking-list` into one page.
 Round 3 changes: the filter now follows the picking slip with a green printed icon (the old 24 h “late” rule is an optional extra), and every gap found against today's pages was closed. See **`PARITY.md`** for the old-vs-new checklist and **`dialogs.html`** for all dialogs, menus and popovers.
@@ -110,8 +110,8 @@ Inventory access today, so they get none of the stock, PO or Shopify items.
 | `PARITY.md` | round 3: old-system capability checklist (covered / added / changed) |
 | `extras.mjs`, `dialogs.mjs` | round 3 renderers: decoration, restock, name attributes, attachments, label state; the dialogs sheet |
 | `concept-a1-{admin,staff,picker}.html` | A1 artboards (built by default) |
-| `archive/concept-{a1-old,b..f}-*.html / .png` | archived artboards: the original A1 (as `a1-old`) and B–F, 1280 × 800, PNGs at 2×; rebuild with `CONCEPTS=a1-old,b,c,d,e,f node build.mjs` |
-| `archive/concept-d-admin-po.html / .png` | Create PO popover |
+| `concept-l2-{admin,staff,picker}.html / .png`, `concept-l2-*-full.png` | round 20 L2 artboards, 1512 × 982 (PNGs at 2×); `-full` = first two orders expanded, five collapsed |
+| `ledger2.mjs` | L2 renderer: FileMaker position spec, CSS, index notes |
 | `data.mjs` | sample orders, stock, POs, restock, decoration and derived state |
 | `parts.mjs` | role capabilities (`CAP`) and shared widgets |
 | `designs.mjs`, `designs2.mjs` | concepts A–C and D–F |
@@ -169,7 +169,7 @@ Round 16 (Concept A2 only; A1 untouched):
 
 Round 17 (Concept A2 only): the Orders table's column headings sit inside the scroll area (sticky), so they share one width with the rows. Before, the header was outside the scrollbar, which pushed every column right of Customer about 10px left of its heading in the rows. A1 still has that offset. The expanded order is unchanged.
 
-Round 18: **Concept A2 is renamed A1 and is the chosen layout.** The original A1's artboards are archived as `archive/concept-a1-old-*` and stay rebuildable as build id `a1-old` (renderer `D.conceptA2` in `designs.mjs`); `node build.mjs` now builds `a1` only (`CONCEPTS=a1-old,b,c,d,e,f` rebuilds the archive). Rounds 14–17's "Concept A2" is this concept's old name.
+Round 18: **Concept A2 is renamed A1 and is the chosen layout.** The original A1 stays rebuildable as build id `a1-old` (renderer `D.conceptA2` in `designs.mjs`; its archived artboards were deleted in round 20). Rounds 14–17's "Concept A2" is this concept's old name.
 
 Round 19: **Concept L1 · Order Ledger (proposed, for client approval)**, built from the 13 Nov client walkthrough in `client-qa/` (FileMaker "Online Orders Ledger": screenshots, marked controls #0–#18, transcript, video from 26:00). Each order keeps the client's three bands, in the client's own colours (hex values measured from their screenshots, `--fm-*` tokens in `ledger.mjs`):
 - **Header line**: what a collapsed order shows. Coloured with the client's legend: Late red, Paid lime, Shipped light blue, Shipped a part dark blue, New white.
@@ -182,3 +182,21 @@ Every FulfilPro feature is kept in those bands. Artboards are 1440 × 900 (`conc
 - `ledger-data.mjs`: synthetic payment, urgent, design, marketing and per-line fields. `data.mjs` is unchanged.
 
 `W=1440 H=900 node overflow.mjs concept-l1-*.html` checks the new boards.
+
+Round 20: **Concept L2 · Order Ledger, exact FileMaker positions (proposed)**. The client's feedback on L1: "Whatever is in a particular position must remain in that exact position. Everything needs to be similar, and if anything extra is added, it should be added accordingly."
+- **Positions:** L2 places every object of the client's order block (header line, line header, line rows, footer) at the x position and width measured from `client-qa/client-old-system.png`, in FileMaker points (block = 1494 pt). Each object is drawn as `left: x/1494`, `width: w/1494` of the order width, so it lines up at any screen width. The spec tables are in `ledger2.mjs`; a headless check confirms every object is within 0.3% of its spec.
+- **Look:** text size, spacing, colours and interactions are L1's (shared classes, tokens and `L1_JS`).
+- **Freed slots:** controls the client dropped hand their slot to the closest FulfilPro feature:
+  - Task/Problem → Messages
+  - Take from / In Stock → stock check
+  - Pick to do date → Stock out
+  - Supplier → Request stock
+  - A4 / LABEL | P → Fulfilments and Confirm & print
+  - Booking Ship → Confirm fulfilment
+- **Added in free space:** Urgent / Repeat / VIP flags, Repeat order (next to Urgent), Names export, VIP (in the Marketing box).
+- **Restored:** the ≡ button is back at its FileMaker spot as the show / hide lines toggle.
+- **Roles:** objects a role can't use are hidden and leave their gap.
+
+Artboards are 1512 × 982. `concept-l2-*-full.png` shows two orders expanded and five collapsed. `node build.mjs` builds `l2,l1,a1`. The `archive/` folder was deleted.
+
+`W=1512 H=982 node overflow.mjs concept-l2-*.html` checks the boards.
