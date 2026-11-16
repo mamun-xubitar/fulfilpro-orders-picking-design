@@ -194,7 +194,7 @@ Round 20: **Concept L2 · Order Ledger, exact FileMaker positions (proposed)**. 
   - A4 / LABEL | P → Fulfilments and Confirm & print
   - Booking Ship → Confirm fulfilment
 - **Added in free space:** Urgent / Repeat / VIP flags, Repeat order (next to Urgent), Names export, VIP (in the Marketing box).
-- **Restored:** the ≡ button is back at its FileMaker spot as the show / hide lines toggle.
+- **Removed:** the ≡ button after the order tick (on request); click the order's top line to open or close it.
 - **Roles:** objects a role can't use are hidden and leave their gap.
 
 Artboards are 1512 × 982. `concept-l2-*-full.png` shows two orders expanded and five collapsed. `node build.mjs` builds `l2,l1,a1`. The `archive/` folder was deleted.

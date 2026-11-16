@@ -44,7 +44,6 @@ function headLine(r, role, open) {
   const shipped = l.lines.some((x) => x.shipped > 0), H = [];
   H.push(o(7, 12, `<button class="om" data-l1-omit title="Omit: hide this order from the found set (nothing is deleted)">${ic('minusCircle', 'i14')}</button>`, { cls: 'c' }));
   H.push(o(25, 20, `<span class="ck" data-l1-sel title="Select this order and all its lines"></span>`, { cls: 'c' }));
-  H.push(o(49, 20, `<button class="mnu" data-l1-exp data-keep title="${open ? 'Hide' : 'Show'} the lines">${ic('bars', 'i12')}</button>`, { cls: 'c' }));
   const fl = [l.urgent && `<i class="f-urg" title="Urgent · customer needs it by ${l.urgent}">${ic('zap', 'i10')}</i>`, l.repeat && `<i class="f-rep" title="Repeat order">${ic('repeat', 'i10')}</i>`, l.vip && !pk && `<i class="f-vip" title="VIP customer">${ic('crown', 'i10')}</i>`].filter(Boolean).slice(0, 2).join('');
   if (fl) H.push(o(71, 32, `<span class="fl">${fl}</span>`));
   H.push(o(105, 52, fld(l.date.slice(0, 6) + l.date.slice(8), 'mn'), { title: l.date }));
@@ -360,7 +359,8 @@ export function l2Docs() {
   const K = { Kept: 'merged', Reused: 'new', Added: 'mix', Removed: 'removed' };
   const row = (zone, old, x, d, now) => `<tr><td>${zone}</td><td>${old}</td><td class="mn">${x}</td><td><span class="dc ${K[d]}">${d === 'Reused' ? 'Reused slot' : d === 'Added' ? 'Added in free space' : d}</span></td><td>${now}</td></tr>`;
   const T = [
-    ['Header', '⊖ · ✓ · ≡', '7 · 25 · 49', 'Kept', 'Omit from the found set · select the order and its lines · show / hide the lines'],
+    ['Header', '⊖ · ✓', '7 · 25', 'Kept', 'Omit from the found set · select the order and its lines'],
+    ['Header', '≡ after the order tick', '49', 'Removed', 'Removed on request; click the order’s top line to open or close it'],
     ['Header', 'gap between ≡ and the date', '71', 'Added', 'Urgent / Repeat / VIP flags (up to two)'],
     ['Header', 'Order date, Order #, Name + eye, Email + ✉, Branch, Address', '105 – 888', 'Kept', 'Same fields; the eye opens the FulfilPro customer record'],
     ['Header', 'Magnifier next to the name', '351', 'Removed', 'Gap kept'],

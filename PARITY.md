@@ -179,7 +179,6 @@ Client feedback on L1: everything must stay in the position it has in their File
 | Decoration files | bottom of the order (collapsed and expanded) |
 
 Kept at their FileMaker spots with FulfilPro behaviour:
-- ≡ = show / hide lines
 - ✓ = select the order and its lines
 - Order's remark = Order notes
 - green ⟳ = refresh from Shopify
