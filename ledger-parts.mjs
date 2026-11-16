@@ -89,10 +89,9 @@ function design(r, l, cap) {
   const act = d.colours ? 2 : d.approved ? 1 : 0;
   const steps = S.map(([k, t, lab, ph], i) => `<${admin ? 'button' : 'span'} class="stp${d[k] ? ' done' : ''}${i === act ? ' act' : ''}" data-l1-step data-lab="${lab}" data-val="${d[k] || ''}" data-ph="${ph}">${t}</${admin ? 'button' : 'span'}>`).join('');
   const [, , lab, ph] = S[act];
-  const a = r.att || { design: 0 };
   return `<div class="fc dsg"><div class="steps">${steps}</div>
     <div class="dv"><span class="dv-l" data-l1-dvl>${lab}</span><span class="dv-v${d[S[act][0]] ? '' : ' ph'}" data-l1-dvv>${d[S[act][0]] || ph}</span></div>
-    <div class="fr2"><span class="muted" style="font-size:9.5px">${ic('paperclip', 'i10')} Customer design${a.design ? ` <b class="strong">${a.design} file</b>` : ': none'}</span>${admin ? `<button class="lnk">${ic('upload', 'i10')}Upload design</button>` : ''}</div></div>`;
+    </div>`;
 }
 /** Col 6: FulfilPro actions the old system does not have (kept): fulfilment, history, stock, names. */
 function fulfil(r, l, cap) {

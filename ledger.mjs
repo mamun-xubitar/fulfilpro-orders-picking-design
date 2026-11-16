@@ -133,9 +133,15 @@ function lines(r, role) {
 }
 
 /* ---------------- order group + page ---------------- */
+/** Embroidery / print orders: exactly Files, Customer design, Photo (each with Add files) and Customer remarks. */
+function decoStrip(r, cap) {
+  if (!(cap.attach && r.items.some((x) => x.deco))) return '';
+  const f = (t) => `<span class="uf"><b>${t}</b><button class="lnk">${ic('paperclip', 'i10')}Add files</button></span>`;
+  return `<div class="under">${f('Files')}${f('Customer design')}${f('Photo')}<span class="rem"><b>Customer remarks</b><span class="inp ph">Add a remark for the decorator…</span></span></div>`;
+}
 function group(r, role, open) {
   const cap = CAP[role];
-  return `<div class="lg b-${ledgerOf(r).head}${open ? ' open' : ''}" data-no="${r.no}">${headLine(r, role, open)}${X.underRow(r, cap, '')}<div class="lg-x">${lines(r, role)}${F.footer(r, role)}${F.infoStrip(r, role)}</div></div>`;
+  return `<div class="lg b-${ledgerOf(r).head}${open ? ' open' : ''}" data-no="${r.no}">${headLine(r, role, open)}${decoStrip(r, cap)}<div class="lg-x">${lines(r, role)}${F.footer(r, role)}${F.infoStrip(r, role)}</div></div>`;
 }
 /* Sample board only: embroidery / print stay on three orders so the list is not all decorated. Copies, so concept A1 keeps the shared data. */
 const KEEP_DECO = new Set(['4752', '0733', '2181']);
