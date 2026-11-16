@@ -176,7 +176,7 @@ Round 19: **Concept L1 · Order Ledger (proposed, for client approval)**, built 
 - **Lines**: Purchased purple / shipped / part shipped per line.
 - **Footer panel**: Production and Pick & Pack lights, Urgent and Repeat, Picking list | P, totals, payment box with the star, Design sent › approved › colours, FulfilPro's fulfilment actions, Marketing + VIP. Peach when the picking list is printed and the order is not packed yet.
 
-Every FulfilPro feature is kept in those bands. Artboards are 1440 × 900 (`concept-l1-{admin,staff,picker}.html / .png`) and interactive. `node build.mjs` now builds `l1,a1`; A1 stays in index.html as the current app, for comparison. index.html lists the colour legend, the client-marker map (kept / merged / removed / new), the role split, the data the build round needs and the questions for the client. Files:
+Every FulfilPro feature is kept in those bands. Artboards are 1440 × 900 (`concept-l1-{admin,staff,picker}.html`; its PNGs were removed in round 20, regenerate with `./shot.sh`) and interactive. `node build.mjs` now builds `l1,a1`; A1 stays in index.html as the current app, for comparison. index.html lists the colour legend, the client-marker map (kept / merged / removed / new), the role split, the data the build round needs and the questions for the client. Files:
 - `ledger.mjs`: page, header line, lines, CSS, interactions.
 - `ledger-parts.mjs`: footer, toolbar, popovers, index notes.
 - `ledger-data.mjs`: synthetic payment, urgent, design, marketing and per-line fields. `data.mjs` is unchanged.
